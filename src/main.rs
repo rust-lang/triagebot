@@ -4,6 +4,7 @@
 extern crate rocket;
 
 use failure::Error;
+use failure::ResultExt;
 use lazy_static::lazy_static;
 use openssl::hash::MessageDigest;
 use openssl::memcmp;
@@ -201,7 +202,7 @@ impl IssueCommentEvent {
         if self.action == IssueCommentAction::Deleted {
             return Ok(());
         }
-        self.handle_labels(g)?;
+        self.handle_labels(g).context("handle_labels")?;
         Ok(())
     }
 }
@@ -295,7 +296,7 @@ fn webhook(
             .deserialize::<IssueCommentEvent>()
             .map_err(|e| format!("IssueCommentEvent failed to deserialize: {:?}", e))?
             .run(&client, &permissions)
-            .map_err(|e| e.to_string())?,
+            .map_err(|e| format!("{:?}", e))?,
         // Other events need not be handled
         Event::Other => {}
     }
