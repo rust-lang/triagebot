@@ -270,7 +270,7 @@ impl SignedPayload {
     }
 }
 
-#[post("/github-hoook", data = "<payload>")]
+#[post("/github-hook", data = "<payload>")]
 fn webhook(
     event: Event,
     payload: SignedPayload,
