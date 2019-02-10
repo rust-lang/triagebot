@@ -5,3 +5,17 @@ authors = ["Mark Rousskov <mark.simulacrum@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+rocket = "0.4"
+rocket_contrib = "0.4"
+serde_json = "1"
+openssl = "0.10"
+dotenv = "0.13"
+reqwest = "0.9"
+regex = "1"
+lazy_static = "1"
+log = "0.4"
+failure = "0.1"
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
