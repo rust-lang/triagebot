@@ -13,6 +13,19 @@ pub struct Label {
     pub name: String,
 }
 
+impl Label {
+    fn exists(&self, repo_api_prefix: &str, client: &GithubClient) -> bool {
+        match client
+            .get(&format!("{}/labels/{}", repo_api_prefix, self.name))
+            .send_req()
+        {
+            Ok(_) => true,
+            // XXX: Error handling if the request failed for reasons beyond 'label didn't exist'
+            Err(_) => false,
+        }
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct Issue {
     number: u64,
@@ -31,7 +44,11 @@ pub struct Comment {
 }
 
 impl Issue {
-    pub fn set_labels(&mut self, client: &GithubClient, labels: Vec<Label>) -> Result<(), Error> {
+    pub fn set_labels(
+        &mut self,
+        client: &GithubClient,
+        mut labels: Vec<Label>,
+    ) -> Result<(), Error> {
         // PUT /repos/:owner/:repo/issues/:number/labels
         // repo_url = https://api.github.com/repos/Codertocat/Hello-World
         // Might need `Accept: application/vnd.github.symmetra-preview+json` for emoji and descriptions
@@ -40,6 +57,8 @@ impl Issue {
             repo_url = self.repository_url,
             number = self.number
         );
+
+        labels.retain(|label| label.exists(&self.repository_url, &client));
 
         #[derive(serde::Serialize)]
         struct LabelsReq {
@@ -94,6 +113,10 @@ pub struct GithubClient {
 impl GithubClient {
     pub fn new(c: Client, token: String) -> Self {
         GithubClient { client: c, token }
+    }
+
+    fn get(&self, url: &str) -> RequestBuilder {
+        self.client.get(url).configure(self)
     }
 
     fn put(&self, url: &str) -> RequestBuilder {
