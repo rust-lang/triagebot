@@ -242,6 +242,18 @@ impl FromDataSimple for SignedPayload {
             }
         };
         let signature = &signature["sha1=".len()..];
+        let signature = match hex::decode(&signature) {
+            Ok(e) => e,
+            Err(e) => {
+                return Outcome::Failure((
+                    Status::BadRequest,
+                    format!(
+                        "failed to convert signature {:?} from hex: {:?}",
+                        signature, e
+                    ),
+                ));
+            }
+        };
 
         let mut stream = data.open().take(1024 * 1024 * 5); // 5 Megabytes
         let mut buf = Vec::new();
@@ -257,7 +269,7 @@ impl FromDataSimple for SignedPayload {
         signer.update(&buf).unwrap();
         let hmac = signer.sign_to_vec().unwrap();
 
-        if !memcmp::eq(&hmac, signature.as_bytes()) {
+        if !memcmp::eq(&hmac, &signature) {
             return Outcome::Failure((Status::Unauthorized, format!("HMAC not correct")));
         }
 
