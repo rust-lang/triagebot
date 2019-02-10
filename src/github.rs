@@ -20,13 +20,8 @@ pub struct Issue {
     user: User,
     labels: Vec<Label>,
     assignees: Vec<User>,
-    repository: Repository,
-}
-
-#[derive(Debug, serde::Deserialize)]
-pub struct Repository {
     // API URL
-    pub url: String,
+    repository_url: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -42,7 +37,7 @@ impl Issue {
         // Might need `Accept: application/vnd.github.symmetra-preview+json` for emoji and descriptions
         let url = format!(
             "{repo_url}/issues/{number}/labels",
-            repo_url = self.repository.url,
+            repo_url = self.repository_url,
             number = self.number
         );
 
