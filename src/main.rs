@@ -241,6 +241,7 @@ impl FromDataSimple for SignedPayload {
                 ));
             }
         };
+        let signature = &signature["sha1=".len()..];
 
         let mut stream = data.open().take(1024 * 1024 * 5); // 5 Megabytes
         let mut buf = Vec::new();
