@@ -44,11 +44,7 @@ pub struct Comment {
 }
 
 impl Issue {
-    pub fn set_labels(
-        &mut self,
-        client: &GithubClient,
-        mut labels: Vec<Label>,
-    ) -> Result<(), Error> {
+    pub fn set_labels(&self, client: &GithubClient, mut labels: Vec<Label>) -> Result<(), Error> {
         // PUT /repos/:owner/:repo/issues/:number/labels
         // repo_url = https://api.github.com/repos/Codertocat/Hello-World
         // Might need `Accept: application/vnd.github.symmetra-preview+json` for emoji and descriptions
@@ -72,7 +68,6 @@ impl Issue {
             .send_req()
             .context("failed to set labels")?;
 
-        self.labels = labels;
         Ok(())
     }
 
@@ -81,7 +76,7 @@ impl Issue {
     }
 
     #[allow(unused)]
-    pub fn add_assignee(&mut self, client: &GithubClient, user: &str) -> Result<(), Error> {
+    pub fn add_assignee(&self, client: &GithubClient, user: &str) -> Result<(), Error> {
         unimplemented!()
     }
 }
@@ -106,6 +101,7 @@ impl RequestSend for RequestBuilder {
     }
 }
 
+#[derive(Clone)]
 pub struct GithubClient {
     token: String,
     client: Client,
