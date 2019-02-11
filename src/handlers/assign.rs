@@ -38,8 +38,8 @@ impl Handler for AssignmentHandler {
         };
 
         lazy_static! {
-            static ref RE_ASSIGN: Regex = Regex::new(r"\b/assign @(\S+)").unwrap();
-            static ref RE_CLAIM: Regex = Regex::new(r"\b/claim\b").unwrap();
+            static ref RE_ASSIGN: Regex = Regex::new(r"/assign @(\S+)").unwrap();
+            static ref RE_CLAIM: Regex = Regex::new(r"/claim").unwrap();
         }
 
         if RE_CLAIM.is_match(&event.comment.body) {

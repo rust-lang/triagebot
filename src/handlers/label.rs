@@ -31,7 +31,7 @@ impl Handler for LabelHandler {
         };
 
         lazy_static! {
-            static ref LABEL_RE: Regex = Regex::new(r#"\b/label (\S+\s*)+"#).unwrap();
+            static ref LABEL_RE: Regex = Regex::new(r#"/label (\S+\s*)+"#).unwrap();
         }
 
         let mut issue_labels = event.issue.labels().to_owned();
