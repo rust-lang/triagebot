@@ -1,10 +1,5 @@
 use failure::Error;
-use reqwest::Client;
 use std::str::FromStr;
-
-pub struct Permissions {
-    client: Client,
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Team {
@@ -38,11 +33,5 @@ impl FromStr for Team {
             "lang" => Team::Lang,
             _ => failure::bail!("unknown team: {:?}", s),
         })
-    }
-}
-
-impl Permissions {
-    pub fn new(client: Client) -> Permissions {
-        Permissions { client }
     }
 }

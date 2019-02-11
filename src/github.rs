@@ -80,6 +80,7 @@ impl Issue {
         &self.labels
     }
 
+    #[allow(unused)]
     pub fn add_assignee(&mut self, client: &GithubClient, user: &str) -> Result<(), Error> {
         unimplemented!()
     }

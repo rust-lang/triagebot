@@ -6,26 +6,23 @@ extern crate rocket;
 use failure::Error;
 use failure::ResultExt;
 use lazy_static::lazy_static;
-use openssl::hash::MessageDigest;
-use openssl::memcmp;
-use openssl::pkey::PKey;
-use openssl::sign::Signer;
 use regex::Regex;
 use reqwest::Client;
-use rocket::data::{self, FromDataSimple};
 use rocket::request;
 use rocket::State;
-use rocket::{http::Status, Data, Outcome, Request};
+use rocket::{http::Status, Outcome, Request};
 use std::env;
-use std::io::Read;
 
 mod github;
-mod permissions;
+mod payload;
+mod team;
+
+use payload::SignedPayload;
 
 static BOT_USER_NAME: &str = "rust-highfive";
 
 use github::{Comment, GithubClient, Issue, Label};
-use permissions::{Permissions, Team};
+use team::Team;
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -102,6 +99,7 @@ impl IssueCommentEvent {
     /// the issue if necessary.
     ///
     /// Assign users with `assign: @gh-user` or `@bot claim` (self-claim).
+    #[allow(unused)]
     fn handle_assign(&mut self, g: &GithubClient) -> Result<(), Error> {
         lazy_static! {
             static ref RE_ASSIGN: Regex = Regex::new(r"\bassign: @(\S+)").unwrap();
@@ -145,11 +143,8 @@ impl IssueCommentEvent {
     /// Long-term, this will also create a thread on internals and lock the tracking issue,
     /// directing commentary to the thread, but for the time being we limit the scope of work as
     /// well as project impact.
-    fn handle_create_tracking_issue(
-        &mut self,
-        g: &GithubClient,
-        auth: &Permissions,
-    ) -> Result<(), Error> {
+    #[allow(unused)]
+    fn handle_create_tracking_issue(&mut self, g: &GithubClient) -> Result<(), Error> {
         lazy_static! {
             static ref RE_TRACKING: Regex = Regex::new(&format!(
                 r#"\b@{} tracking-issue create feature=("[^"]+|\S+) team=(libs|lang)"#,
@@ -191,11 +186,12 @@ impl IssueCommentEvent {
     /// TODO: Check the checkbox in the tracking issue when `tracked-bug` is closed.
     ///
     /// Syntax: `link: #xxx`
+    #[allow(unused)]
     fn handle_link_tracking_issue(&mut self, g: &GithubClient) -> Result<(), Error> {
         unimplemented!()
     }
 
-    fn run(mut self, g: &GithubClient, permissions: &Permissions) -> Result<(), Error> {
+    fn run(mut self, g: &GithubClient) -> Result<(), Error> {
         // Don't do anything on deleted comments.
         //
         // XXX: Should we attempt to roll back the action instead?
@@ -228,74 +224,17 @@ impl<'a, 'r> request::FromRequest<'a, 'r> for Event {
     }
 }
 
-struct SignedPayload(Vec<u8>);
-
-impl FromDataSimple for SignedPayload {
-    type Error = String;
-    fn from_data(req: &Request, data: Data) -> data::Outcome<Self, Self::Error> {
-        let signature = match req.headers().get_one("X-Hub-Signature") {
-            Some(s) => s,
-            None => {
-                return Outcome::Failure((
-                    Status::Unauthorized,
-                    format!("Unauthorized, no signature"),
-                ));
-            }
-        };
-        let signature = &signature["sha1=".len()..];
-        let signature = match hex::decode(&signature) {
-            Ok(e) => e,
-            Err(e) => {
-                return Outcome::Failure((
-                    Status::BadRequest,
-                    format!(
-                        "failed to convert signature {:?} from hex: {:?}",
-                        signature, e
-                    ),
-                ));
-            }
-        };
-
-        let mut stream = data.open().take(1024 * 1024 * 5); // 5 Megabytes
-        let mut buf = Vec::new();
-        if let Err(err) = stream.read_to_end(&mut buf) {
-            return Outcome::Failure((
-                Status::InternalServerError,
-                format!("failed to read request body to string: {:?}", err),
-            ));
-        }
-
-        let key = PKey::hmac(env::var("GITHUB_WEBHOOK_SECRET").unwrap().as_bytes()).unwrap();
-        let mut signer = Signer::new(MessageDigest::sha1(), &key).unwrap();
-        signer.update(&buf).unwrap();
-        let hmac = signer.sign_to_vec().unwrap();
-
-        if !memcmp::eq(&hmac, &signature) {
-            return Outcome::Failure((Status::Unauthorized, format!("HMAC not correct")));
-        }
-
-        Outcome::Success(SignedPayload(buf))
-    }
-}
-
-impl SignedPayload {
-    fn deserialize<T: serde::de::DeserializeOwned>(self) -> Result<T, serde_json::Error> {
-        serde_json::from_slice(&self.0)
-    }
-}
-
 #[post("/github-hook", data = "<payload>")]
 fn webhook(
     event: Event,
     payload: SignedPayload,
     client: State<GithubClient>,
-    permissions: State<Permissions>,
 ) -> Result<(), String> {
     match event {
         Event::IssueComment => payload
             .deserialize::<IssueCommentEvent>()
             .map_err(|e| format!("IssueCommentEvent failed to deserialize: {:?}", e))?
-            .run(&client, &permissions)
+            .run(&client)
             .map_err(|e| format!("{:?}", e))?,
         // Other events need not be handled
         Event::Other => {}
@@ -316,7 +255,6 @@ fn main() {
             client.clone(),
             env::var("GITHUB_API_TOKEN").unwrap(),
         ))
-        .manage(Permissions::new(client))
         .mount("/", routes![webhook])
         .register(catchers![not_found])
         .launch();
