@@ -81,6 +81,24 @@ impl Issue {
             number = self.number
         );
 
+        let check_url = format!(
+            "{repo_url}/assignees/{number}/{name}",
+            repo_url = self.repository_url,
+            number = self.number,
+            name = user,
+        );
+
+        match client.get(&check_url).send() {
+            Ok(resp) => {
+                if resp.status() == reqwest::StatusCode::NO_CONTENT {
+                    // all okay
+                } else if resp.status() == reqwest::StatusCode::NOT_FOUND {
+                    failure::bail!("invalid assignee");
+                }
+            }
+            Err(e) => failure::bail!("unable to check assignee validity: {:?}", e),
+        }
+
         #[derive(serde::Serialize)]
         struct AssigneeReq<'a> {
             assignees: &'a [&'a str],
@@ -98,7 +116,6 @@ impl Issue {
 trait RequestSend: Sized {
     fn configure(self, g: &GithubClient) -> Self;
     fn send_req(self) -> Result<Response, HttpError>;
-    fn send(self) {} // cause conflicts to force users to `send_req`
 }
 
 impl RequestSend for RequestBuilder {
