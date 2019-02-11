@@ -82,9 +82,8 @@ impl Issue {
         );
 
         let check_url = format!(
-            "{repo_url}/assignees/{number}/{name}",
+            "{repo_url}/assignees/{name}",
             repo_url = self.repository_url,
-            number = self.number,
             name = user,
         );
 
@@ -93,7 +92,7 @@ impl Issue {
                 if resp.status() == reqwest::StatusCode::NO_CONTENT {
                     // all okay
                 } else if resp.status() == reqwest::StatusCode::NOT_FOUND {
-                    failure::bail!("invalid assignee");
+                    failure::bail!("invalid assignee {:?}", user);
                 }
             }
             Err(e) => failure::bail!("unable to check assignee validity: {:?}", e),
