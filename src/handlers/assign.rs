@@ -43,11 +43,21 @@ impl Handler for AssignmentHandler {
         }
 
         if RE_CLAIM.is_match(&event.comment.body) {
+            log::trace!(
+                "comment {:?} matched claim regex, assigning {:?}",
+                event.comment.body,
+                event.comment.user.login
+            );
             event
                 .issue
                 .add_assignee(&self.client, &event.comment.user.login)?;
         } else {
             if let Some(capture) = RE_ASSIGN.captures(&event.comment.body) {
+                log::trace!(
+                    "comment {:?} matched assignment regex, assigning {:?}",
+                    event.comment.body,
+                    &capture[1]
+                );
                 event.issue.add_assignee(&self.client, &capture[1])?;
             }
         }

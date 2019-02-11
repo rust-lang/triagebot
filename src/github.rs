@@ -127,14 +127,17 @@ impl GithubClient {
     }
 
     fn get(&self, url: &str) -> RequestBuilder {
+        log::trace!("get {:?}", url);
         self.client.get(url).configure(self)
     }
 
     fn post(&self, url: &str) -> RequestBuilder {
+        log::trace!("post {:?}", url);
         self.client.post(url).configure(self)
     }
 
     fn put(&self, url: &str) -> RequestBuilder {
+        log::trace!("put {:?}", url);
         self.client.put(url).configure(self)
     }
 }

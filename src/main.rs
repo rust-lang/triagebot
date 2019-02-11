@@ -81,6 +81,7 @@ fn not_found(_: &Request) -> &'static str {
 }
 
 fn main() {
+    env_logger::init();
     dotenv::dotenv().ok();
     let client = Client::new();
     let gh = GithubClient::new(client.clone(), env::var("GITHUB_API_TOKEN").unwrap());
