@@ -59,16 +59,40 @@ impl<'a, 'r> request::FromRequest<'a, 'r> for Event {
     }
 }
 
+#[derive(Debug)]
+struct WebhookError(Error);
+
+impl<'r> rocket::response::Responder<'r> for WebhookError {
+    fn respond_to(self, _: &Request) -> rocket::response::Result<'r> {
+        let body = format!("{:?}", self.0);
+        rocket::Response::build()
+            .header(rocket::http::ContentType::Plain)
+            .sized_body(std::io::Cursor::new(body))
+            .ok()
+    }
+}
+
+impl From<Error> for WebhookError {
+    fn from(e: Error) -> WebhookError {
+        WebhookError(e)
+    }
+}
+
 #[post("/github-hook", data = "<payload>")]
-fn webhook(event: Event, payload: SignedPayload, reg: State<HandleRegistry>) -> Result<(), Error> {
+fn webhook(
+    event: Event,
+    payload: SignedPayload,
+    reg: State<HandleRegistry>,
+) -> Result<(), WebhookError> {
     match event {
         Event::IssueComment => {
             let payload = payload
                 .deserialize::<IssueCommentEvent>()
-                .context("IssueCommentEvent failed to deserialize")?;
+                .context("IssueCommentEvent failed to deserialize")
+                .map_err(Error::from)?;
 
             let event = registry::Event::IssueComment(payload);
-            reg.handle(&event)?;
+            reg.handle(&event).map_err(Error::from)?;
         }
         // Other events need not be handled
         Event::Other => {}

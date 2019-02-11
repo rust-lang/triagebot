@@ -18,7 +18,12 @@ impl HandleRegistry {
 
     pub fn handle(&self, event: &Event) -> Result<(), Error> {
         for h in &self.handlers {
-            h.handle_event(event)?;
+            match h.handle_event(event) {
+                Ok(()) => {}
+                Err(e) => {
+                    eprintln!("event handling failed: {:?}", e);
+                }
+            }
         }
         Ok(())
     }
