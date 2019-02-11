@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate rocket;
 
+use failure::{Error, ResultExt};
 use reqwest::Client;
 use rocket::request;
 use rocket::State;
@@ -59,15 +60,15 @@ impl<'a, 'r> request::FromRequest<'a, 'r> for Event {
 }
 
 #[post("/github-hook", data = "<payload>")]
-fn webhook(event: Event, payload: SignedPayload, reg: State<HandleRegistry>) -> Result<(), String> {
+fn webhook(event: Event, payload: SignedPayload, reg: State<HandleRegistry>) -> Result<(), Error> {
     match event {
         Event::IssueComment => {
             let payload = payload
                 .deserialize::<IssueCommentEvent>()
-                .map_err(|e| format!("IssueCommentEvent failed to deserialize: {:?}", e))?;
+                .context("IssueCommentEvent failed to deserialize")?;
 
             let event = registry::Event::IssueComment(payload);
-            reg.handle(&event).map_err(|e| format!("{:?}", e))?;
+            reg.handle(&event)?;
         }
         // Other events need not be handled
         Event::Other => {}
