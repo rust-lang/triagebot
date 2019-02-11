@@ -36,11 +36,13 @@ impl Handler for LabelHandler {
 
         let mut issue_labels = event.issue.labels().to_owned();
 
+        let mut changed = false;
         for label_block in LABEL_RE.find_iter(&event.comment.body) {
             let label_block = &label_block.as_str()["label: ".len()..]; // guaranteed to start with this
             for label in label_block.split_whitespace() {
                 if label.starts_with('-') {
                     if let Some(label) = issue_labels.iter().position(|el| el.name == &label[1..]) {
+                        changed = true;
                         issue_labels.remove(label);
                     } else {
                         // do nothing, if the user attempts to remove a label that's not currently
@@ -48,11 +50,13 @@ impl Handler for LabelHandler {
                     }
                 } else if label.starts_with('+') {
                     // add this label, but without the +
+                    changed = true;
                     issue_labels.push(Label {
                         name: label[1..].to_string(),
                     });
                 } else {
                     // add this label (literally)
+                    changed = true;
                     issue_labels.push(Label {
                         name: label.to_string(),
                     });
@@ -60,7 +64,9 @@ impl Handler for LabelHandler {
             }
         }
 
-        event.issue.set_labels(&self.client, issue_labels)?;
+        if changed {
+            event.issue.set_labels(&self.client, issue_labels)?;
+        }
 
         Ok(())
     }
