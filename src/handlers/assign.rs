@@ -13,7 +13,7 @@
 //! been given for the past 2 weeks, the bot will de-assign the user. They can once more claim
 //! the issue if necessary.
 //!
-//! Assign users with `assign: @gh-user` or `@bot claim` (self-claim).
+//! Assign users with `/assign @gh-user` or `/claim` (self-claim).
 
 use crate::{
     github::GithubClient,
@@ -38,13 +38,9 @@ impl Handler for AssignmentHandler {
         };
 
         lazy_static! {
-            static ref RE_ASSIGN: Regex = Regex::new(r"\bassign: @(\S+)").unwrap();
-            static ref RE_CLAIM: Regex =
-                Regex::new(&format!(r"\b@{} claim\b", crate::BOT_USER_NAME)).unwrap();
+            static ref RE_ASSIGN: Regex = Regex::new(r"\b/assign @(\S+)").unwrap();
+            static ref RE_CLAIM: Regex = Regex::new(r"\b/claim\b").unwrap();
         }
-
-        // XXX: Handle updates to the comment specially to avoid double-queueing or double-assigning
-        // and other edge cases.
 
         if RE_CLAIM.is_match(&event.comment.body) {
             event
@@ -59,7 +55,6 @@ impl Handler for AssignmentHandler {
         // TODO: Enqueue a check-in in two weeks.
         // TODO: Post a comment documenting the biweekly check-in? Maybe just give them two weeks
         //       without any commentary from us.
-        // TODO: How do we handle `claim`/`assign:` if someone's already assigned? Error out?
 
         Ok(())
     }

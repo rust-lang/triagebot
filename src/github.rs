@@ -47,7 +47,6 @@ impl Issue {
     pub fn set_labels(&self, client: &GithubClient, mut labels: Vec<Label>) -> Result<(), Error> {
         // PUT /repos/:owner/:repo/issues/:number/labels
         // repo_url = https://api.github.com/repos/Codertocat/Hello-World
-        // Might need `Accept: application/vnd.github.symmetra-preview+json` for emoji and descriptions
         let url = format!(
             "{repo_url}/issues/{number}/labels",
             repo_url = self.repository_url,
@@ -75,9 +74,24 @@ impl Issue {
         &self.labels
     }
 
-    #[allow(unused)]
     pub fn add_assignee(&self, client: &GithubClient, user: &str) -> Result<(), Error> {
-        unimplemented!()
+        let url = format!(
+            "{repo_url}/issues/{number}/assignees",
+            repo_url = self.repository_url,
+            number = self.number
+        );
+
+        #[derive(serde::Serialize)]
+        struct AssigneeReq<'a> {
+            assignees: &'a [&'a str],
+        }
+        client
+            .post(&url)
+            .json(&AssigneeReq { assignees: &[user] })
+            .send_req()
+            .context("failed to add assignee")?;
+
+        Ok(())
     }
 }
 
@@ -114,6 +128,10 @@ impl GithubClient {
 
     fn get(&self, url: &str) -> RequestBuilder {
         self.client.get(url).configure(self)
+    }
+
+    fn post(&self, url: &str) -> RequestBuilder {
+        self.client.post(url).configure(self)
     }
 
     fn put(&self, url: &str) -> RequestBuilder {

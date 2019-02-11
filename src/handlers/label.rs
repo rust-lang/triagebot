@@ -1,10 +1,10 @@
 //! Purpose: Allow any user to modify issue labels on GitHub via comments.
 //!
 //! The current syntax allows adding labels (+labelname or just labelname) following the
-//! `label:` prefix. Users can also remove labels with -labelname.
+//! `/label` prefix. Users can also remove labels with -labelname.
 //!
-//! No verification is currently attempted of the added labels (only currently present labels
-//! can be removed). XXX: How does this affect users workflow?
+//! Labels are checked against the labels in the project; the bot does not support creating new
+//! labels.
 //!
 //! There will be no feedback beyond the label change to reduce notification noise.
 
@@ -31,7 +31,7 @@ impl Handler for LabelHandler {
         };
 
         lazy_static! {
-            static ref LABEL_RE: Regex = Regex::new(r#"\blabel: (\S+\s*)+"#).unwrap();
+            static ref LABEL_RE: Regex = Regex::new(r#"\b/label (\S+\s*)+"#).unwrap();
         }
 
         let mut issue_labels = event.issue.labels().to_owned();
