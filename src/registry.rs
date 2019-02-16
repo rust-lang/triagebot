@@ -17,15 +17,21 @@ impl HandleRegistry {
     }
 
     pub fn handle(&self, event: &Event) -> Result<(), Error> {
+        let mut last_error = None;
         for h in &self.handlers {
             match h.handle_event(event) {
                 Ok(()) => {}
                 Err(e) => {
                     eprintln!("event handling failed: {:?}", e);
+                    last_error = Some(e);
                 }
             }
         }
-        Ok(())
+        if let Some(err) = last_error {
+            Err(err)
+        } else {
+            Ok(())
+        }
     }
 }
 

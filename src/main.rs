@@ -67,6 +67,7 @@ impl<'r> rocket::response::Responder<'r> for WebhookError {
         let body = format!("{:?}", self.0);
         rocket::Response::build()
             .header(rocket::http::ContentType::Plain)
+            .status(rocket::http::Status::InternalServerError)
             .sized_body(std::io::Cursor::new(body))
             .ok()
     }
