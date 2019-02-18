@@ -30,6 +30,8 @@ pub struct Error<'a> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ErrorKind {
     UnterminatedString,
+    QuoteInWord,
+    RawString,
 }
 
 impl fmt::Display for ErrorKind {
@@ -39,6 +41,8 @@ impl fmt::Display for ErrorKind {
             "{}",
             match self {
                 ErrorKind::UnterminatedString => "unterminated string",
+                ErrorKind::QuoteInWord => "quote in word",
+                ErrorKind::RawString => "raw strings are not yet supported",
             }
         )
     }
@@ -47,6 +51,11 @@ impl fmt::Display for ErrorKind {
 impl<'a> Error<'a> {
     pub fn kind(&self) -> ErrorKind {
         self.kind
+    }
+
+    #[cfg(test)]
+    fn position_and_kind(&self) -> (usize, ErrorKind) {
+        (self.position, self.kind)
     }
 }
 
@@ -166,7 +175,12 @@ impl<'a> Tokenizer<'a> {
             !(self.cur_punct().is_some() || ch.is_whitespace())
         }) {
             if self.cur().unwrap().1 == '"' {
-                // TODO: error out -- quotes should *not* be allowed inside words
+                let so_far = self.str_from(start);
+                if so_far.starts_with('r') && so_far.chars().skip(1).all(|v| v == '#' || v == '"') {
+                    return Err(self.error(ErrorKind::RawString));
+                } else {
+                    return Err(self.error(ErrorKind::QuoteInWord));
+                }
             }
             self.advance();
         }
@@ -250,7 +264,35 @@ fn tokenize_5() {
 #[test]
 fn tokenize_6() {
     assert_eq!(
-        tokenize(r#""testing"#).unwrap_err().kind(),
-        ErrorKind::UnterminatedString
+        tokenize(r#""testing"#).unwrap_err().position_and_kind(),
+        (8, ErrorKind::UnterminatedString)
+    );
+}
+
+#[test]
+fn tokenize_7() {
+    assert_eq!(
+        tokenize(r#"wordy wordy word"quoteno"#)
+            .unwrap_err()
+            .position_and_kind(),
+        (16, ErrorKind::QuoteInWord)
+    );
+}
+
+#[test]
+fn tokenize_raw_string_prohibit() {
+    assert_eq!(
+        tokenize(r##"r#""#"##).unwrap_err().position_and_kind(),
+        (2, ErrorKind::RawString)
+    );
+}
+
+#[test]
+fn tokenize_raw_string_prohibit_1() {
+    assert_eq!(
+        tokenize(r##"map_of_arkansas_r#""#"##)
+            .unwrap_err()
+            .position_and_kind(),
+        (18, ErrorKind::QuoteInWord)
     );
 }
