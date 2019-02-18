@@ -1,3 +1,4 @@
+use crate::error::Error;
 use std::fmt;
 use std::iter::Peekable;
 use std::str::CharIndices;
@@ -14,17 +15,25 @@ pub enum Token<'a> {
     Word(&'a str),
 }
 
+impl fmt::Display for Token<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Token::Dot => write!(f, "."),
+            Token::Comma => write!(f, ","),
+            Token::Semi => write!(f, ";"),
+            Token::Exclamation => write!(f, "!"),
+            Token::Question => write!(f, "?"),
+            Token::Colon => write!(f, ":"),
+            Token::Quote(body) => write!(f, r#""{}""#, body),
+            Token::Word(word) => write!(f, "{}", word),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Tokenizer<'a> {
     input: &'a str,
     chars: Peekable<CharIndices<'a>>,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct Error<'a> {
-    input: &'a str,
-    position: usize,
-    kind: ErrorKind,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -33,6 +42,8 @@ pub enum ErrorKind {
     QuoteInWord,
     RawString,
 }
+
+impl std::error::Error for ErrorKind {}
 
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -48,27 +59,12 @@ impl fmt::Display for ErrorKind {
     }
 }
 
+#[cfg(test)]
 impl<'a> Error<'a> {
-    pub fn kind(&self) -> ErrorKind {
-        self.kind
-    }
-
-    #[cfg(test)]
     fn position_and_kind(&self) -> (usize, ErrorKind) {
-        (self.position, self.kind)
-    }
-}
-
-impl<'a> fmt::Display for Error<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let space = 10;
-        let end = std::cmp::min(self.input.len(), self.position + space);
-        write!(
-            f,
-            "...{}|error: {} at >|{}...",
-            &self.input[self.position.saturating_sub(space)..self.position],
-            self.kind,
-            &self.input[self.position..end],
+        (
+            self.position,
+            *self.source.downcast_ref::<ErrorKind>().unwrap(),
         )
     }
 }
@@ -81,11 +77,11 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    fn error(&mut self, kind: ErrorKind) -> Error<'a> {
+    pub fn error<T: 'static + std::error::Error>(&mut self, source: T) -> Error<'a> {
         Error {
             input: self.input,
             position: self.cur_pos(),
-            kind,
+            source: Box::new(source),
         }
     }
 
