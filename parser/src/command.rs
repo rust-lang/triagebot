@@ -80,6 +80,14 @@ impl<'a> Input<'a> {
 }
 
 #[test]
+fn errors_outside_command_are_fine() {
+    let input =
+        "haha\" unterminated quotes @bot modify labels: +bug. Terminating after the command";
+    let mut input = Input::new(input, "bot");
+    assert!(input.parse_command().is_ok());
+}
+
+#[test]
 fn code_1() {
     let input = "`@bot modify labels: +bug.`";
     let mut input = Input::new(input, "bot");
