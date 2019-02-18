@@ -1,49 +1,27 @@
 use crate::token::{Error, Token, Tokenizer};
 
-/// Returns the start of the invocation, or None if at the end of the stream
-pub fn eat_until_invocation<'a>(
-    tok: &mut Tokenizer<'a>,
-    bot: &str,
-) -> Result<Option<usize>, Error<'a>> {
-    let command = format!("@{}", bot);
-    while let Some(token) = tok.peek_token()? {
-        match token {
-            Token::Word(word) if word == command => {
-                // eat invocation of bot
-                let pos = tok.position();
-                tok.next_token().unwrap();
-                return Ok(Some(pos));
-            }
-            // unwrap is safe because we've successfully peeked above
-            _ => {
-                tok.next_token().unwrap();
-            }
-        }
-    }
-    Ok(None)
+pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
+    input.find(&format!("@{}", bot))
 }
 
-#[test]
-fn cs_1() {
-    let input = "testing @bot command";
-    let mut toks = Tokenizer::new(input);
-    assert_eq!(toks.peek_token().unwrap(), Some(Token::Word("testing")));
-    assert_eq!(eat_until_invocation(&mut toks, "bot").unwrap(), Some(7));
-    assert_eq!(toks.peek_token().unwrap(), Some(Token::Word("command")));
+#[derive(Debug)]
+pub enum Command {
+    Label(label::LabelCommand),
 }
 
-#[test]
-fn cs_2() {
-    let input = "@bot command";
-    let mut toks = Tokenizer::new(input);
-    assert_eq!(toks.peek_token().unwrap(), Some(Token::Word("@bot")));
-    assert_eq!(eat_until_invocation(&mut toks, "bot").unwrap(), Some(0));
-    assert_eq!(toks.peek_token().unwrap(), Some(Token::Word("command")));
-}
+pub fn parse_command<'a>(input: &'a str, bot: &str) -> Result<Option<Command>, Error<'a>> {
+    let start = match find_commmand_start(input, bot) {
+        Some(pos) => pos,
+        None => return Ok(None),
+    };
+    let input = &input[start..];
+    let mut tok = Tokenizer::new(input);
+    assert_eq!(
+        tok.next_token().unwrap(),
+        Some(Token::Word(&format!("@{}", bot)))
+    );
 
-#[test]
-fn cs_3() {
-    let input = "no command";
-    let mut toks = Tokenizer::new(input);
-    assert_eq!(eat_until_invocation(&mut toks, "bot").unwrap(), None);
+    let cmd = Command::Label;
+
+    Ok(Some(cmd))
 }
