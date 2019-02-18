@@ -52,3 +52,19 @@ pub fn parse_command<'a>(input: &mut &'a str, bot: &str) -> Result<Option<Comman
 
     Ok(success.pop())
 }
+
+#[test]
+fn move_input_along() {
+    let mut input = "@bot modify labels: +bug. Afterwards, delete the world.";
+    assert!(parse_command(&mut input, "bot").unwrap().is_some());
+    assert_eq!(input, " Afterwards, delete the world.");
+}
+
+#[test]
+fn move_input_along_1() {
+    let mut input = "@bot modify labels\": +bug. Afterwards, delete the world.";
+    let input_cp = input;
+    assert!(parse_command(&mut input, "bot").is_err());
+    // don't move input along if parsing the command fails
+    assert_eq!(input, input_cp);
+}
