@@ -1,3 +1,4 @@
+use std::fmt;
 use std::iter::Peekable;
 use std::str::CharIndices;
 
@@ -19,11 +20,63 @@ pub struct Tokenizer<'a> {
     chars: Peekable<CharIndices<'a>>,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct Error<'a> {
+    input: &'a str,
+    position: usize,
+    kind: ErrorKind,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ErrorKind {
+    UnterminatedString,
+}
+
+impl fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ErrorKind::UnterminatedString => "unterminated string",
+            }
+        )
+    }
+}
+
+impl<'a> Error<'a> {
+    pub fn kind(&self) -> ErrorKind {
+        self.kind
+    }
+}
+
+impl<'a> fmt::Display for Error<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let space = 10;
+        let end = std::cmp::min(self.input.len(), self.position + space);
+        write!(
+            f,
+            "...{}|error: {} at >|{}...",
+            &self.input[self.position.saturating_sub(space)..self.position],
+            self.kind,
+            &self.input[self.position..end],
+        )
+    }
+}
+
 impl<'a> Tokenizer<'a> {
     pub fn new(input: &'a str) -> Tokenizer<'a> {
         Tokenizer {
             input: input,
             chars: input.char_indices().peekable(),
+        }
+    }
+
+    fn error(&mut self, kind: ErrorKind) -> Error<'a> {
+        Error {
+            input: self.input,
+            position: self.cur_pos(),
+            kind,
         }
     }
 
@@ -73,33 +126,37 @@ impl<'a> Tokenizer<'a> {
         &self.input[pos..self.cur_pos()]
     }
 
-    fn consume_string(&mut self) -> Option<Token<'a>> {
-        if self.cur()?.1 == '"' {
-            self.advance(); // eat "
-            let start = self.cur_pos();
-            while self.cur().map_or(false, |c| c.1 != '"') {
-                if self.advance().is_none() {
-                    // XXX: Error: unterminated string
-                }
-            }
-            let body = self.str_from(start);
-            self.advance(); // eat final '"'
-            return Some(Token::Quote(body));
+    fn consume_string(&mut self) -> Result<Option<Token<'a>>, Error<'a>> {
+        if let Some((_, '"')) = self.cur() {
+            // okay
+        } else {
+            return Ok(None);
         }
-        None
+        self.advance(); // eat "
+        let start = self.cur_pos();
+        loop {
+            match self.cur() {
+                Some((_, '"')) => break,
+                Some(_) => self.advance(),
+                None => return Err(self.error(ErrorKind::UnterminatedString)),
+            };
+        }
+        let body = self.str_from(start);
+        self.advance(); // eat final '"'
+        Ok(Some(Token::Quote(body)))
     }
 
-    pub fn next_token(&mut self) -> Option<Token<'a>> {
+    pub fn next_token(&mut self) -> Result<Option<Token<'a>>, Error<'a>> {
         self.consume_whitespace();
         if self.at_end() {
-            return None;
+            return Ok(None);
         }
         if let Some(punct) = self.consume_punct() {
-            return Some(punct);
+            return Ok(Some(punct));
         }
 
-        if let Some(s) = self.consume_string() {
-            return Some(s);
+        if let Some(s) = self.consume_string()? {
+            return Ok(Some(s));
         }
 
         // Attempt to consume a word from the input.
@@ -113,42 +170,24 @@ impl<'a> Tokenizer<'a> {
             }
             self.advance();
         }
-        Some(Token::Word(&self.str_from(start)))
+        Ok(Some(Token::Word(&self.str_from(start))))
     }
 }
 
 #[cfg(test)]
-#[derive(Debug)]
-struct TokenStream<'a> {
-    tokens: Vec<Token<'a>>,
-}
-
-#[cfg(test)]
-impl<'a> TokenStream<'a> {
-    fn new(input: &'a str) -> TokenStream<'a> {
-        let mut tokens = Vec::new();
-        let mut gen = Tokenizer::new(input);
-        while let Some(tok) = gen.next_token() {
-            tokens.push(tok);
-        }
-        TokenStream { tokens }
+fn tokenize<'a>(input: &'a str) -> Result<Vec<Token<'a>>, Error<'a>> {
+    let mut tokens = Vec::new();
+    let mut gen = Tokenizer::new(input);
+    while let Some(tok) = gen.next_token()? {
+        tokens.push(tok);
     }
-}
-
-#[cfg(test)]
-impl<'a, T> PartialEq<T> for TokenStream<'a>
-where
-    T: ?Sized + PartialEq<[Token<'a>]>,
-{
-    fn eq(&self, other: &T) -> bool {
-        other == &self.tokens[..]
-    }
+    Ok(tokens)
 }
 
 #[test]
 fn tokenize_1() {
     assert_eq!(
-        TokenStream::new("foo\t\r\n bar\nbaz"),
+        tokenize("foo\t\r\n bar\nbaz").unwrap(),
         [Token::Word("foo"), Token::Word("bar"), Token::Word("baz"),]
     );
 }
@@ -156,7 +195,7 @@ fn tokenize_1() {
 #[test]
 fn tokenize_2() {
     assert_eq!(
-        TokenStream::new(",,,.,.,"),
+        tokenize(",,,.,.,").unwrap(),
         [
             Token::Comma,
             Token::Comma,
@@ -172,7 +211,7 @@ fn tokenize_2() {
 #[test]
 fn tokenize_whitespace_dots() {
     assert_eq!(
-        TokenStream::new("baz . ,bar "),
+        tokenize("baz . ,bar ").unwrap(),
         [
             Token::Word("baz"),
             Token::Dot,
@@ -185,7 +224,7 @@ fn tokenize_whitespace_dots() {
 #[test]
 fn tokenize_3() {
     assert_eq!(
-        TokenStream::new("bar, and -baz"),
+        tokenize("bar, and -baz").unwrap(),
         [
             Token::Word("bar"),
             Token::Comma,
@@ -198,12 +237,20 @@ fn tokenize_3() {
 #[test]
 fn tokenize_4() {
     assert_eq!(
-        TokenStream::new(", , b"),
+        tokenize(", , b").unwrap(),
         [Token::Comma, Token::Comma, Token::Word("b")]
     );
 }
 
 #[test]
 fn tokenize_5() {
-    assert_eq!(TokenStream::new(r#""testing""#), [Token::Quote("testing")],);
+    assert_eq!(tokenize(r#""testing""#).unwrap(), [Token::Quote("testing")]);
+}
+
+#[test]
+fn tokenize_6() {
+    assert_eq!(
+        tokenize(r#""testing"#).unwrap_err().kind(),
+        ErrorKind::UnterminatedString
+    );
 }
