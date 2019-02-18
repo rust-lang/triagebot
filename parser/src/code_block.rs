@@ -1,6 +1,7 @@
 use pulldown_cmark::{Event, Parser, Tag};
 use std::ops::Range;
 
+#[derive(Debug)]
 pub struct ColorCodeBlocks {
     code: Vec<Range<usize>>,
 }
@@ -31,14 +32,14 @@ impl ColorCodeBlocks {
         ColorCodeBlocks { code }
     }
 
-    pub fn is_in_code(&self, pos: usize) -> bool {
-        for range in &self.code {
-            if range.start <= pos && pos <= range.end {
-                return true;
+    pub fn overlaps_code(&self, region: Range<usize>) -> Option<Range<usize>> {
+        for code in &self.code {
+            // See https://stackoverflow.com/questions/3269434.
+            if code.start <= region.end && region.start <= code.end {
+                return Some(code.clone());
             }
         }
-
-        false
+        None
     }
 }
 
