@@ -14,7 +14,7 @@ pub enum Token<'a> {
     Word(&'a str),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Tokenizer<'a> {
     input: &'a str,
     chars: Peekable<CharIndices<'a>>,
@@ -153,6 +153,14 @@ impl<'a> Tokenizer<'a> {
         let body = self.str_from(start);
         self.advance(); // eat final '"'
         Ok(Some(Token::Quote(body)))
+    }
+
+    pub fn position(&mut self) -> usize {
+        self.cur_pos()
+    }
+
+    pub fn peek_token(&mut self) -> Result<Option<Token<'a>>, Error<'a>> {
+        self.clone().next_token()
     }
 
     pub fn next_token(&mut self) -> Result<Option<Token<'a>>, Error<'a>> {
