@@ -14,19 +14,13 @@ pub enum Token<'a> {
 }
 
 #[derive(Debug)]
-pub struct TokenStream<'a> {
-    tokens: Vec<Token<'a>>,
-    position: usize,
-}
-
-#[derive(Debug)]
 pub struct Tokenizer<'a> {
     input: &'a str,
     chars: Peekable<CharIndices<'a>>,
 }
 
 impl<'a> Tokenizer<'a> {
-    fn new(input: &'a str) -> Tokenizer<'a> {
+    pub fn new(input: &'a str) -> Tokenizer<'a> {
         Tokenizer {
             input: input,
             chars: input.char_indices().peekable(),
@@ -95,7 +89,7 @@ impl<'a> Tokenizer<'a> {
         None
     }
 
-    fn next_token(&mut self) -> Option<Token<'a>> {
+    pub fn next_token(&mut self) -> Option<Token<'a>> {
         self.consume_whitespace();
         if self.at_end() {
             return None;
@@ -123,34 +117,31 @@ impl<'a> Tokenizer<'a> {
     }
 }
 
+#[cfg(test)]
+#[derive(Debug)]
+struct TokenStream<'a> {
+    tokens: Vec<Token<'a>>,
+}
+
+#[cfg(test)]
 impl<'a> TokenStream<'a> {
-    pub fn new(input: &'a str) -> TokenStream<'a> {
+    fn new(input: &'a str) -> TokenStream<'a> {
         let mut tokens = Vec::new();
         let mut gen = Tokenizer::new(input);
         while let Some(tok) = gen.next_token() {
             tokens.push(tok);
         }
-        TokenStream {
-            tokens,
-            position: 0,
-        }
-    }
-
-    pub fn current(&self) -> Option<Token<'a>> {
-        self.tokens.get(self.position).cloned()
-    }
-
-    pub fn at_end(&self) -> bool {
-        self.position == self.tokens.len()
+        TokenStream { tokens }
     }
 }
 
+#[cfg(test)]
 impl<'a, T> PartialEq<T> for TokenStream<'a>
 where
     T: ?Sized + PartialEq<[Token<'a>]>,
 {
     fn eq(&self, other: &T) -> bool {
-        other == &self.tokens[self.position..]
+        other == &self.tokens[..]
     }
 }
 
