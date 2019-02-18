@@ -79,6 +79,22 @@ impl<'a> Tokenizer<'a> {
         &self.input[pos..self.cur_pos()]
     }
 
+    fn consume_string(&mut self) -> Option<Token<'a>> {
+        if self.cur()?.1 == '"' {
+            self.advance(); // eat "
+            let start = self.cur_pos();
+            while self.cur().map_or(false, |c| c.1 != '"') {
+                if self.advance().is_none() {
+                    // XXX: Error: unterminated string
+                }
+            }
+            let body = self.str_from(start);
+            self.advance(); // eat final '"'
+            return Some(Token::Quote(body));
+        }
+        None
+    }
+
     fn next_token(&mut self) -> Option<Token<'a>> {
         self.consume_whitespace();
         if self.at_end() {
@@ -88,12 +104,19 @@ impl<'a> Tokenizer<'a> {
             return Some(punct);
         }
 
+        if let Some(s) = self.consume_string() {
+            return Some(s);
+        }
+
         // Attempt to consume a word from the input.
         // Stop if we encounter whitespace or punctuation.
         let start = self.cur_pos();
         while self.cur().map_or(false, |(_, ch)| {
             !(self.cur_punct().is_some() || ch.is_whitespace())
         }) {
+            if self.cur().unwrap().1 == '"' {
+                // TODO: error out -- quotes should *not* be allowed inside words
+            }
             self.advance();
         }
         Some(Token::Word(&self.str_from(start)))
@@ -187,4 +210,9 @@ fn tokenize_4() {
         TokenStream::new(", , b"),
         [Token::Comma, Token::Comma, Token::Word("b")]
     );
+}
+
+#[test]
+fn tokenize_5() {
+    assert_eq!(TokenStream::new(r#""testing""#), [Token::Quote("testing")],);
 }
