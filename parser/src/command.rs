@@ -9,8 +9,8 @@ pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
 }
 
 #[derive(Debug)]
-pub enum Command<'a> {
-    Label(label::LabelCommand<'a>),
+pub enum Command {
+    Label(label::LabelCommand),
 }
 
 #[derive(Debug)]
@@ -31,7 +31,7 @@ impl<'a> Input<'a> {
         }
     }
 
-    pub fn parse_command(&mut self) -> Result<Option<Command<'a>>, Error<'a>> {
+    pub fn parse_command(&mut self) -> Result<Option<Command>, Error<'a>> {
         let start = match find_commmand_start(&self.all[self.parsed..], self.bot) {
             Some(pos) => pos,
             None => return Ok(None),

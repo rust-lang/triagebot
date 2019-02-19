@@ -30,16 +30,16 @@ use std::error::Error as _;
 use std::fmt;
 
 #[derive(Debug)]
-pub struct LabelCommand<'a>(Vec<LabelDelta<'a>>);
+pub struct LabelCommand(Vec<LabelDelta>);
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum LabelDelta<'a> {
-    Add(Label<'a>),
-    Remove(Label<'a>),
+pub enum LabelDelta {
+    Add(Label),
+    Remove(Label),
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub struct Label<'a>(&'a str);
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Label(String);
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum ParseError {
@@ -62,29 +62,25 @@ impl fmt::Display for ParseError {
     }
 }
 
-impl<'a> Label<'a> {
-    fn parse(input: &'a str) -> Result<Label<'a>, ParseError> {
+impl Label {
+    fn parse(input: &str) -> Result<Label, ParseError> {
         if input.is_empty() {
             Err(ParseError::EmptyLabel)
         } else {
-            Ok(Label(input))
+            Ok(Label(input.into()))
         }
     }
+}
 
-    pub fn as_str(&self) -> &'a str {
-        self.0
+impl std::ops::Deref for Label {
+    type Target = String;
+    fn deref(&self) -> &String {
+        &self.0
     }
 }
 
-impl<'a> std::ops::Deref for Label<'a> {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.0
-    }
-}
-
-impl<'a> LabelDelta<'a> {
-    fn parse(input: &mut Tokenizer<'a>) -> Result<LabelDelta<'a>, Error<'a>> {
+impl LabelDelta {
+    fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<LabelDelta, Error<'a>> {
         let delta = match input.peek_token()? {
             Some(Token::Word(delta)) => {
                 input.next_token()?;
@@ -121,8 +117,8 @@ fn delta_empty() {
     assert_eq!(err.position(), 1);
 }
 
-impl<'a> LabelCommand<'a> {
-    pub fn parse(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
+impl LabelCommand {
+    pub fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
         let mut toks = input.clone();
         if let Some(Token::Word("modify")) = toks.next_token()? {
             // continue
@@ -167,7 +163,7 @@ impl<'a> LabelCommand<'a> {
 }
 
 #[cfg(test)]
-fn parse<'a>(input: &'a str) -> Result<Option<Vec<LabelDelta<'a>>>, Error<'a>> {
+fn parse<'a>(input: &'a str) -> Result<Option<Vec<LabelDelta>>, Error<'a>> {
     let mut toks = Tokenizer::new(input);
     Ok(LabelCommand::parse(&mut toks)?.map(|c| c.0))
 }
@@ -177,9 +173,9 @@ fn parse_simple() {
     assert_eq!(
         parse("modify labels: +T-compiler -T-lang bug."),
         Ok(Some(vec![
-            LabelDelta::Add(Label("T-compiler")),
-            LabelDelta::Remove(Label("T-lang")),
-            LabelDelta::Add(Label("bug")),
+            LabelDelta::Add(Label("T-compiler".into())),
+            LabelDelta::Remove(Label("T-lang".into())),
+            LabelDelta::Add(Label("bug".into())),
         ]))
     );
 }
