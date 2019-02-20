@@ -10,6 +10,7 @@
 
 use crate::{
     github::{self, GithubClient},
+    interactions::ErrorComment,
     registry::{Event, Handler},
 };
 use failure::Error;
@@ -35,9 +36,20 @@ impl Handler for LabelHandler {
         let mut input = Input::new(&event.comment.body, self.client.username());
         let deltas = match input.parse_command() {
             Command::Label(Ok(LabelCommand(deltas))) => deltas,
-            Command::Label(Err(_)) => {
-                // XXX: inform user of error
-                return Ok(());
+            Command::Label(Err(err)) => {
+                ErrorComment::new(
+                    &event.issue,
+                    format!(
+                        "Parsing label command in [comment]({}) failed: {}",
+                        event.comment.html_url, err
+                    ),
+                )
+                .post(&self.client)?;
+                failure::bail!(
+                    "label parsing failed for issue #{}, error: {:?}",
+                    event.issue.number,
+                    err
+                );
             }
             _ => return Ok(()),
         };

@@ -28,22 +28,37 @@ impl Label {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Issue {
-    number: u64,
+    pub number: u64,
     title: String,
     user: User,
     labels: Vec<Label>,
     assignees: Vec<User>,
     // API URL
     repository_url: String,
+    comments_url: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Comment {
     pub body: String,
+    pub html_url: String,
     pub user: User,
 }
 
 impl Issue {
+    pub fn post_comment(&self, client: &GithubClient, body: &str) -> Result<(), Error> {
+        #[derive(serde::Serialize)]
+        struct PostComment<'a> {
+            body: &'a str,
+        }
+        client
+            .post(&self.comments_url)
+            .json(&PostComment { body: body })
+            .send_req()
+            .context("failed to post comment")?;
+        Ok(())
+    }
+
     pub fn set_labels(&self, client: &GithubClient, mut labels: Vec<Label>) -> Result<(), Error> {
         // PUT /repos/:owner/:repo/issues/:number/labels
         // repo_url = https://api.github.com/repos/Codertocat/Hello-World

@@ -14,6 +14,7 @@ mod handlers;
 mod registry;
 
 mod github;
+mod interactions;
 mod payload;
 mod team;
 
