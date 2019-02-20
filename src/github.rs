@@ -133,13 +133,23 @@ impl RequestSend for RequestBuilder {
 
 #[derive(Clone)]
 pub struct GithubClient {
+    username: String,
     token: String,
     client: Client,
 }
 
 impl GithubClient {
     pub fn new(c: Client, token: String) -> Self {
-        GithubClient { client: c, token }
+        // XXX: configuration for username
+        GithubClient {
+            client: c,
+            token,
+            username: String::from("rust-highfive"),
+        }
+    }
+
+    pub fn username(&self) -> &str {
+        self.username.as_str()
     }
 
     fn get(&self, url: &str) -> RequestBuilder {

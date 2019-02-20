@@ -5,7 +5,6 @@ authors = ["Mark Rousskov <mark.simulacrum@gmail.com>"]
 edition = "2018"
 
 [workspace]
-members = ["parser"]
 
 [dependencies]
 rocket = "0.4"
@@ -20,6 +19,7 @@ log = "0.4"
 failure = "0.1"
 hex = "0.3.2"
 env_logger = "0.6"
+parser = { path = "parser" }
 
 [dependencies.serde]
 version = "1"

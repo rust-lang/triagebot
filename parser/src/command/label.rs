@@ -30,7 +30,7 @@ use std::error::Error as _;
 use std::fmt;
 
 #[derive(Debug)]
-pub struct LabelCommand(Vec<LabelDelta>);
+pub struct LabelCommand(pub Vec<LabelDelta>);
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum LabelDelta {

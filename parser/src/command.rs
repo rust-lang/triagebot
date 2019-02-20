@@ -9,8 +9,9 @@ pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
 }
 
 #[derive(Debug)]
-pub enum Command {
-    Label(label::LabelCommand),
+pub enum Command<'a> {
+    Label(Result<label::LabelCommand, Error<'a>>),
+    None,
 }
 
 #[derive(Debug)]
@@ -31,10 +32,10 @@ impl<'a> Input<'a> {
         }
     }
 
-    pub fn parse_command(&mut self) -> Result<Option<Command>, Error<'a>> {
+    pub fn parse_command(&mut self) -> Command<'a> {
         let start = match find_commmand_start(&self.all[self.parsed..], self.bot) {
             Some(pos) => pos,
-            None => return Ok(None),
+            None => return Command::None,
         };
         self.parsed += start;
         let mut tok = Tokenizer::new(&self.all[self.parsed..]);
@@ -45,15 +46,18 @@ impl<'a> Input<'a> {
 
         let mut success = vec![];
 
+        let original_tokenizer = tok.clone();
+
         {
-            let mut lc = tok.clone();
-            let res = label::LabelCommand::parse(&mut lc)?;
+            let mut tok = original_tokenizer.clone();
+            let res = label::LabelCommand::parse(&mut tok);
             match res {
-                None => {}
-                Some(cmd) => {
-                    // save tokenizer off
-                    tok = lc;
-                    success.push(Command::Label(cmd));
+                Ok(None) => {}
+                Ok(Some(cmd)) => {
+                    success.push((tok, Command::Label(Ok(cmd))));
+                }
+                Err(err) => {
+                    success.push((tok, Command::Label(Err(err))));
                 }
             }
         }
@@ -70,12 +74,39 @@ impl<'a> Input<'a> {
             .code
             .overlaps_code((self.parsed)..(self.parsed + tok.position()))
         {
-            return Ok(None);
+            return Command::None;
         }
 
-        self.parsed += tok.position();
+        match success.pop() {
+            Some((mut tok, c)) => {
+                // if we errored out while parsing the command do not move the input forwards
+                if c.is_ok() {
+                    self.parsed += tok.position();
+                }
+                c
+            }
+            None => Command::None,
+        }
+    }
+}
 
-        Ok(success.pop())
+impl<'a> Command<'a> {
+    pub fn is_ok(&self) -> bool {
+        match self {
+            Command::Label(r) => r.is_ok(),
+            Command::None => true,
+        }
+    }
+
+    pub fn is_err(&self) -> bool {
+        !self.is_ok()
+    }
+
+    pub fn is_none(&self) -> bool {
+        match self {
+            Command::None => true,
+            _ => false,
+        }
     }
 }
 
@@ -91,7 +122,7 @@ fn errors_outside_command_are_fine() {
 fn code_1() {
     let input = "`@bot modify labels: +bug.`";
     let mut input = Input::new(input, "bot");
-    assert!(input.parse_command().unwrap().is_none());
+    assert!(input.parse_command().is_none());
 }
 
 #[test]
@@ -100,14 +131,15 @@ fn code_2() {
     @bot modify labels: +bug.
     ```";
     let mut input = Input::new(input, "bot");
-    assert!(input.parse_command().unwrap().is_none());
+    assert!(input.parse_command().is_none());
 }
 
 #[test]
 fn move_input_along() {
     let input = "@bot modify labels: +bug. Afterwards, delete the world.";
     let mut input = Input::new(input, "bot");
-    assert!(input.parse_command().unwrap().is_some());
+    let parsed = input.parse_command();
+    assert!(parsed.is_ok());
     assert_eq!(&input.all[input.parsed..], " Afterwards, delete the world.");
 }
 

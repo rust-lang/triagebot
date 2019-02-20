@@ -1,20 +1,20 @@
 //! Purpose: Allow any user to modify issue labels on GitHub via comments.
 //!
-//! The current syntax allows adding labels (+labelname or just labelname) following the
-//! `/label` prefix. Users can also remove labels with -labelname.
-//!
 //! Labels are checked against the labels in the project; the bot does not support creating new
 //! labels.
 //!
-//! There will be no feedback beyond the label change to reduce notification noise.
+//! Parsing is done in the `parser::command::label` module.
+//!
+//! If the command was successful, there will be no feedback beyond the label change to reduce
+//! notification noise.
 
 use crate::{
-    github::{GithubClient, Label},
+    github::{self, GithubClient},
     registry::{Event, Handler},
 };
 use failure::Error;
-use lazy_static::lazy_static;
-use regex::Regex;
+use parser::command::label::{LabelCommand, LabelDelta};
+use parser::command::{Command, Input};
 
 pub struct LabelHandler {
     pub client: GithubClient,
@@ -30,36 +30,34 @@ impl Handler for LabelHandler {
             return Ok(());
         };
 
-        lazy_static! {
-            static ref LABEL_RE: Regex = Regex::new(r#"/label (\S+\s*)+"#).unwrap();
-        }
-
         let mut issue_labels = event.issue.labels().to_owned();
 
+        let mut input = Input::new(&event.comment.body, self.client.username());
+        let deltas = match input.parse_command() {
+            Command::Label(Ok(LabelCommand(deltas))) => deltas,
+            Command::Label(Err(_)) => {
+                // XXX: inform user of error
+                return Ok(());
+            }
+            _ => return Ok(()),
+        };
+
         let mut changed = false;
-        for label_block in LABEL_RE.find_iter(&event.comment.body) {
-            let label_block = &label_block.as_str()["label: ".len()..]; // guaranteed to start with this
-            for label in label_block.split_whitespace() {
-                if label.starts_with('-') {
-                    if let Some(label) = issue_labels.iter().position(|el| el.name == &label[1..]) {
+        for delta in &deltas {
+            match delta {
+                LabelDelta::Add(label) => {
+                    if !issue_labels.iter().any(|l| l.name == label.as_str()) {
                         changed = true;
-                        issue_labels.remove(label);
-                    } else {
-                        // do nothing, if the user attempts to remove a label that's not currently
-                        // set simply skip it
+                        issue_labels.push(github::Label {
+                            name: label.to_string(),
+                        });
                     }
-                } else if label.starts_with('+') {
-                    // add this label, but without the +
-                    changed = true;
-                    issue_labels.push(Label {
-                        name: label[1..].to_string(),
-                    });
-                } else {
-                    // add this label (literally)
-                    changed = true;
-                    issue_labels.push(Label {
-                        name: label.to_string(),
-                    });
+                }
+                LabelDelta::Remove(label) => {
+                    if let Some(pos) = issue_labels.iter().position(|l| l.name == label.as_str()) {
+                        changed = true;
+                        issue_labels.remove(pos);
+                    }
                 }
             }
         }
