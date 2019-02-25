@@ -8,6 +8,21 @@ pub struct User {
     pub login: String,
 }
 
+impl User {
+    pub fn is_team_member(&self, client: &GithubClient) -> Result<bool, Error> {
+        let client = client.raw();
+        let url = format!("{}/teams.json", rust_team_data::v1::BASE_URL);
+        let permission: rust_team_data::v1::Teams = client
+            .get(&url)
+            .send()
+            .and_then(|r| r.error_for_status())
+            .and_then(|mut r| r.json())
+            .context("could not get team data")?;
+        let map = permission.teams;
+        Ok(map["all"].members.iter().any(|g| g.github == self.login))
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Label {
     pub name: String,
@@ -160,6 +175,10 @@ impl GithubClient {
             token,
             username,
         }
+    }
+
+    pub fn raw(&self) -> &Client {
+        &self.client
     }
 
     pub fn username(&self) -> &str {

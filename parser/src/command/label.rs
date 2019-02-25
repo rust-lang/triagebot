@@ -104,6 +104,13 @@ impl LabelDelta {
             ))
         }
     }
+
+    pub fn label(&self) -> &Label {
+        match self {
+            LabelDelta::Add(l) => l,
+            LabelDelta::Remove(l) => l,
+        }
+    }
 }
 
 #[test]

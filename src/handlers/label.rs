@@ -56,6 +56,11 @@ impl Handler for LabelHandler {
 
         let mut changed = false;
         for delta in &deltas {
+            let name = delta.label().as_str();
+            if let Err(msg) = check_filter(name, &event.comment.user, &self.client) {
+                ErrorComment::new(&event.issue, msg).post(&self.client)?;
+                return Ok(());
+            }
             match delta {
                 LabelDelta::Add(label) => {
                     if !issue_labels.iter().any(|l| l.name == label.as_str()) {
@@ -79,5 +84,50 @@ impl Handler for LabelHandler {
         }
 
         Ok(())
+    }
+}
+
+fn check_filter(label: &str, user: &github::User, client: &GithubClient) -> Result<(), String> {
+    let is_team_member;
+    match user.is_team_member(client) {
+        Ok(true) => return Ok(()),
+        Ok(false) => {
+            is_team_member = Ok(());
+        }
+        Err(err) => {
+            eprintln!("failed to check team membership: {:?}", err);
+            is_team_member = Err(());
+            // continue on; if we failed to check their membership assume that they are not members.
+        }
+    }
+    if label.starts_with("C-") // categories
+    || label.starts_with("A-") // areas
+    || label.starts_with("E-") // easy, mentor, etc.
+    || label.starts_with("NLL-")
+    || label.starts_with("O-") // operating systems
+    || label.starts_with("S-") // status labels
+    || label.starts_with("T-")
+    || label.starts_with("WG-")
+    {
+        return Ok(());
+    }
+    match label {
+        "I-compilemem" | "I-compiletime" | "I-crash" | "I-hang" | "I-ICE" | "I-slow" => {
+            return Ok(());
+        }
+        _ => {}
+    }
+
+    if is_team_member.is_ok() {
+        Err(format!(
+            "Label {} can only be set by Rust team members",
+            label
+        ))
+    } else {
+        Err(format!(
+            "Label {} can only be set by Rust team members;\
+             we were unable to check if you are a team member.",
+            label
+        ))
     }
 }
