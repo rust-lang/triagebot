@@ -135,7 +135,7 @@ trait RequestSend: Sized {
 impl RequestSend for RequestBuilder {
     fn configure(self, g: &GithubClient) -> RequestBuilder {
         self.header(USER_AGENT, "rust-lang-triagebot")
-            .basic_auth("rust-highfive", Some(&g.token))
+            .basic_auth(&g.username, Some(&g.token))
     }
 
     fn send_req(self) -> Result<Response, HttpError> {
@@ -154,12 +154,11 @@ pub struct GithubClient {
 }
 
 impl GithubClient {
-    pub fn new(c: Client, token: String) -> Self {
-        // XXX: configuration for username
+    pub fn new(c: Client, token: String, username: String) -> Self {
         GithubClient {
             client: c,
             token,
-            username: String::from("rust-highfive"),
+            username,
         }
     }
 

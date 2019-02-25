@@ -18,8 +18,6 @@ mod interactions;
 mod payload;
 mod team;
 
-static BOT_USER_NAME: &str = "rust-highfive";
-
 use github::{Comment, GithubClient, Issue};
 use payload::SignedPayload;
 use registry::HandleRegistry;
@@ -110,7 +108,11 @@ fn not_found(_: &Request) -> &'static str {
 fn main() {
     dotenv::dotenv().ok();
     let client = Client::new();
-    let gh = GithubClient::new(client.clone(), env::var("GITHUB_API_TOKEN").unwrap());
+    let gh = GithubClient::new(
+        client.clone(),
+        env::var("GITHUB_API_TOKEN").unwrap(),
+        env::var("GITHUB_USERNAME").unwrap(),
+    );
     let mut registry = HandleRegistry::new();
     handlers::register_all(&mut registry, gh.clone());
     rocket::ignite()
