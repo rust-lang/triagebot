@@ -16,9 +16,11 @@ use crate::{
 use failure::Error;
 use parser::command::label::{LabelCommand, LabelDelta};
 use parser::command::{Command, Input};
+use std::sync::Arc;
 
 pub struct LabelHandler {
     pub client: GithubClient,
+    pub username: Arc<String>,
 }
 
 impl Handler for LabelHandler {
@@ -33,7 +35,7 @@ impl Handler for LabelHandler {
 
         let mut issue_labels = event.issue.labels().to_owned();
 
-        let mut input = Input::new(&event.comment.body, self.client.username());
+        let mut input = Input::new(&event.comment.body, &self.username);
         let deltas = match input.parse_command() {
             Command::Label(Ok(LabelCommand(deltas))) => deltas,
             Command::Label(Err(err)) => {

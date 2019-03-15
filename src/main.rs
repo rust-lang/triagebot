@@ -9,6 +9,7 @@ use rocket::request;
 use rocket::State;
 use rocket::{http::Status, Outcome, Request};
 use std::env;
+use std::sync::Arc;
 
 mod handlers;
 mod registry;
@@ -18,7 +19,7 @@ mod interactions;
 mod payload;
 mod team;
 
-use github::{Comment, GithubClient, Issue};
+use github::{Comment, GithubClient, Issue, User};
 use payload::SignedPayload;
 use registry::HandleRegistry;
 
@@ -108,13 +109,10 @@ fn not_found(_: &Request) -> &'static str {
 fn main() {
     dotenv::dotenv().ok();
     let client = Client::new();
-    let gh = GithubClient::new(
-        client.clone(),
-        env::var("GITHUB_API_TOKEN").unwrap(),
-        env::var("GITHUB_USERNAME").unwrap(),
-    );
+    let gh = GithubClient::new(client.clone(), env::var("GITHUB_API_TOKEN").unwrap());
+    let username = Arc::new(User::current(&gh).unwrap().login);
     let mut registry = HandleRegistry::new();
-    handlers::register_all(&mut registry, gh.clone());
+    handlers::register_all(&mut registry, gh.clone(), username);
     rocket::ignite()
         .manage(gh)
         .manage(registry)

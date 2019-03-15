@@ -1,5 +1,5 @@
 use failure::{Error, ResultExt};
-use reqwest::header::USER_AGENT;
+use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::Error as HttpError;
 use reqwest::{Client, RequestBuilder, Response};
 
@@ -9,6 +9,13 @@ pub struct User {
 }
 
 impl User {
+    pub fn current(client: &GithubClient) -> Result<Self, Error> {
+        Ok(client
+            .get("https://api.github.com/user")
+            .send_req()?
+            .json()?)
+    }
+
     pub fn is_team_member(&self, client: &GithubClient) -> Result<bool, Error> {
         let client = client.raw();
         let url = format!("{}/teams.json", rust_team_data::v1::BASE_URL);
@@ -150,7 +157,7 @@ trait RequestSend: Sized {
 impl RequestSend for RequestBuilder {
     fn configure(self, g: &GithubClient) -> RequestBuilder {
         self.header(USER_AGENT, "rust-lang-triagebot")
-            .basic_auth(&g.username, Some(&g.token))
+            .header(AUTHORIZATION, format!("token {}", g.token))
     }
 
     fn send_req(self) -> Result<Response, HttpError> {
@@ -163,26 +170,17 @@ impl RequestSend for RequestBuilder {
 
 #[derive(Clone)]
 pub struct GithubClient {
-    username: String,
     token: String,
     client: Client,
 }
 
 impl GithubClient {
-    pub fn new(c: Client, token: String, username: String) -> Self {
-        GithubClient {
-            client: c,
-            token,
-            username,
-        }
+    pub fn new(client: Client, token: String) -> Self {
+        GithubClient { client, token }
     }
 
     pub fn raw(&self) -> &Client {
         &self.client
-    }
-
-    pub fn username(&self) -> &str {
-        self.username.as_str()
     }
 
     fn get(&self, url: &str) -> RequestBuilder {
