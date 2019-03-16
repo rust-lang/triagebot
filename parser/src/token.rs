@@ -72,7 +72,7 @@ impl<'a> Error<'a> {
 impl<'a> Tokenizer<'a> {
     pub fn new(input: &'a str) -> Tokenizer<'a> {
         Tokenizer {
-            input: input,
+            input,
             chars: input.char_indices().peekable(),
         }
     }

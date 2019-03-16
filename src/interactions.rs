@@ -21,7 +21,7 @@ impl<'a> ErrorComment<'a> {
     pub fn post(&self, client: &GithubClient) -> Result<(), Error> {
         let mut body = String::new();
         writeln!(body, "**Error**: {}", self.message)?;
-        writeln!(body, "")?;
+        writeln!(body)?;
         writeln!(
             body,
             "Please let **`@rust-lang/release`** know if you're having trouble with this bot."

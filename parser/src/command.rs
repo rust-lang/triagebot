@@ -28,7 +28,7 @@ impl<'a> Input<'a> {
             all: input,
             parsed: 0,
             code: ColorCodeBlocks::new(input),
-            bot: bot,
+            bot,
         }
     }
 
@@ -70,9 +70,10 @@ impl<'a> Input<'a> {
             );
         }
 
-        if let Some(_) = self
+        if self
             .code
             .overlaps_code((self.parsed)..(self.parsed + tok.position()))
+            .is_some()
         {
             return Command::None;
         }

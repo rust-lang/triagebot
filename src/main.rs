@@ -1,4 +1,5 @@
 #![feature(proc_macro_hygiene, decl_macro)]
+#![allow(clippy::new_without_default)]
 
 #[macro_use]
 extern crate rocket;
@@ -9,6 +10,7 @@ use rocket::request;
 use rocket::State;
 use rocket::{http::Status, Outcome, Request};
 use std::env;
+use std::sync::Arc;
 
 mod handlers;
 mod registry;
@@ -18,7 +20,7 @@ mod interactions;
 mod payload;
 mod team;
 
-use github::{Comment, GithubClient, Issue};
+use github::{Comment, GithubClient, Issue, User};
 use payload::SignedPayload;
 use registry::HandleRegistry;
 
@@ -48,7 +50,7 @@ impl<'a, 'r> request::FromRequest<'a, 'r> for Event {
         let ev = if let Some(ev) = req.headers().get_one("X-GitHub-Event") {
             ev
         } else {
-            return Outcome::Failure((Status::BadRequest, format!("Needs a X-GitHub-Event")));
+            return Outcome::Failure((Status::BadRequest, "Needs a X-GitHub-Event".into()));
         };
         let ev = match ev {
             "issue_comment" => Event::IssueComment,
@@ -110,11 +112,11 @@ fn main() {
     let client = Client::new();
     let gh = GithubClient::new(
         client.clone(),
-        env::var("GITHUB_API_TOKEN").unwrap(),
-        env::var("GITHUB_USERNAME").unwrap(),
+        env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"),
     );
+    let username = Arc::new(User::current(&gh).unwrap().login);
     let mut registry = HandleRegistry::new();
-    handlers::register_all(&mut registry, gh.clone());
+    handlers::register_all(&mut registry, gh.clone(), username);
     rocket::ignite()
         .manage(gh)
         .manage(registry)
