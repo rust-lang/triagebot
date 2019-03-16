@@ -110,7 +110,10 @@ fn not_found(_: &Request) -> &'static str {
 fn main() {
     dotenv::dotenv().ok();
     let client = Client::new();
-    let gh = GithubClient::new(client.clone(), env::var("GITHUB_API_TOKEN").unwrap());
+    let gh = GithubClient::new(
+        client.clone(),
+        env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"),
+    );
     let username = Arc::new(User::current(&gh).unwrap().login);
     let mut registry = HandleRegistry::new();
     handlers::register_all(&mut registry, gh.clone(), username);

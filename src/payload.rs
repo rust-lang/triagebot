@@ -46,7 +46,12 @@ impl FromDataSimple for SignedPayload {
             ));
         }
 
-        let key = PKey::hmac(env::var("GITHUB_WEBHOOK_SECRET").unwrap().as_bytes()).unwrap();
+        let key = PKey::hmac(
+            env::var("GITHUB_WEBHOOK_SECRET")
+                .expect("Missing GITHUB_WEBHOOK_SECRET")
+                .as_bytes(),
+        )
+        .unwrap();
         let mut signer = Signer::new(MessageDigest::sha1(), &key).unwrap();
         signer.update(&buf).unwrap();
         let hmac = signer.sign_to_vec().unwrap();
