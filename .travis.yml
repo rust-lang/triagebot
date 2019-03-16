@@ -1,0 +1,15 @@
+language: rust
+rust: nightly-2019-03-15
+cache:
+  - cargo
+
+script: ci/run.sh
+
+# Publish the Docker image to the infra AWS registry
+before_deploy:
+  - pip install --user awscli
+deploy:
+  provider: script
+  script: sh ci/publish-docker.sh
+  on:
+    branch: master
