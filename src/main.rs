@@ -117,7 +117,14 @@ fn main() {
     let username = Arc::new(User::current(&gh).unwrap().login);
     let mut registry = HandleRegistry::new();
     handlers::register_all(&mut registry, gh.clone(), username);
-    rocket::ignite()
+
+    let mut config = rocket::Config::active().unwrap();
+    config.set_port(
+        env::var("TRIAGEBOT_PORT")
+            .map(|port| port.parse().unwrap())
+            .unwrap_or(8000),
+    );
+    rocket::custom(config)
         .manage(gh)
         .manage(registry)
         .mount("/", routes![webhook])
