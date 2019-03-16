@@ -1,7 +1,6 @@
 use failure::{Error, ResultExt};
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
-use reqwest::Error as HttpError;
-use reqwest::{Client, RequestBuilder, Response};
+use reqwest::{Client, Error as HttpError, RequestBuilder, Response};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct User {
@@ -22,7 +21,7 @@ impl User {
         let permission: rust_team_data::v1::Teams = client
             .get(&url)
             .send()
-            .and_then(|r| r.error_for_status())
+            .and_then(Response::error_for_status)
             .and_then(|mut r| r.json())
             .context("could not get team data")?;
         let map = permission.teams;
@@ -37,6 +36,7 @@ pub struct Label {
 
 impl Label {
     fn exists(&self, repo_api_prefix: &str, client: &GithubClient) -> bool {
+        #[allow(clippy::redundant_pattern_matching)]
         match client
             .get(&format!("{}/labels/{}", repo_api_prefix, self.name))
             .send_req()
@@ -75,7 +75,7 @@ impl Issue {
         }
         client
             .post(&self.comments_url)
-            .json(&PostComment { body: body })
+            .json(&PostComment { body })
             .send_req()
             .context("failed to post comment")?;
         Ok(())

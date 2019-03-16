@@ -19,7 +19,7 @@ impl FromDataSimple for SignedPayload {
             None => {
                 return Outcome::Failure((
                     Status::Unauthorized,
-                    format!("Unauthorized, no signature"),
+                    "Unauthorized, no signature".into(),
                 ));
             }
         };
@@ -52,7 +52,7 @@ impl FromDataSimple for SignedPayload {
         let hmac = signer.sign_to_vec().unwrap();
 
         if !memcmp::eq(&hmac, &signature) {
-            return Outcome::Failure((Status::Unauthorized, format!("HMAC not correct")));
+            return Outcome::Failure((Status::Unauthorized, "HMAC not correct".into()));
         }
 
         Outcome::Success(SignedPayload(buf))
