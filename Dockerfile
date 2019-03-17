@@ -53,4 +53,4 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 
 COPY --from=build /tmp/source/target/release/triagebot /usr/local/bin/
 ENV TRIAGEBOT_PORT=80
-CMD ["triagebot"]
+CMD triagebot
