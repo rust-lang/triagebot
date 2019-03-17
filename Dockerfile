@@ -52,4 +52,5 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ca-certificates
 
 COPY --from=build /tmp/source/target/release/triagebot /usr/local/bin/
-CMD ["triagebot"]
+ENV TRIAGEBOT_PORT=80
+CMD triagebot
