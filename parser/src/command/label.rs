@@ -160,7 +160,7 @@ impl LabelCommand {
                 toks.next_token()?;
             }
 
-            if let Some(Token::Dot) = toks.peek_token()? {
+            if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
                 *input = toks;
                 return Ok(Some(LabelCommand(deltas)));
@@ -216,13 +216,13 @@ fn parse_no_label_paragraph() {
 }
 
 #[test]
-fn parse_no_end() {
+fn parse_no_dot() {
     assert_eq!(
-        parse("modify labels to +T-compiler -T-lang bug")
-            .unwrap_err()
-            .source()
-            .unwrap()
-            .downcast_ref(),
-        Some(&ParseError::ExpectedLabelDelta),
+        parse("modify labels to +T-compiler -T-lang bug"),
+        Ok(Some(vec![
+            LabelDelta::Add(Label("T-compiler".into())),
+            LabelDelta::Remove(Label("T-lang".into())),
+            LabelDelta::Add(Label("bug".into())),
+        ]))
     );
 }
