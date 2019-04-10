@@ -11,6 +11,7 @@ pub enum Token<'a> {
     Exclamation,
     Question,
     Colon,
+    EndOfLine,
     Quote(&'a str),
     Word(&'a str),
 }
@@ -24,6 +25,7 @@ impl fmt::Display for Token<'_> {
             Token::Exclamation => write!(f, "!"),
             Token::Question => write!(f, "?"),
             Token::Colon => write!(f, ":"),
+            Token::EndOfLine => Ok(()),
             Token::Quote(body) => write!(f, r#""{}""#, body),
             Token::Word(word) => write!(f, "{}", word),
         }
@@ -34,6 +36,7 @@ impl fmt::Display for Token<'_> {
 pub struct Tokenizer<'a> {
     input: &'a str,
     chars: Peekable<CharIndices<'a>>,
+    end_of_input_emitted: bool,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -74,6 +77,7 @@ impl<'a> Tokenizer<'a> {
         Tokenizer {
             input,
             chars: input.char_indices().peekable(),
+            end_of_input_emitted: false,
         }
     }
 
@@ -86,7 +90,10 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn consume_whitespace(&mut self) {
-        while self.cur().map_or(false, |c| c.1.is_whitespace()) {
+        while self
+            .cur()
+            .map_or(false, |c| c.1 != '\n' && c.1.is_whitespace())
+        {
             self.advance();
         }
     }
@@ -100,6 +107,7 @@ impl<'a> Tokenizer<'a> {
             '!' => Some(Token::Exclamation),
             '?' => Some(Token::Question),
             ';' => Some(Token::Semi),
+            '\n' => Some(Token::EndOfLine),
             _ => None,
         }
     }
@@ -162,7 +170,12 @@ impl<'a> Tokenizer<'a> {
     pub fn next_token(&mut self) -> Result<Option<Token<'a>>, Error<'a>> {
         self.consume_whitespace();
         if self.at_end() {
-            return Ok(None);
+            if self.end_of_input_emitted {
+                return Ok(None);
+            } else {
+                self.end_of_input_emitted = true;
+                return Ok(Some(Token::EndOfLine));
+            }
         }
         if let Some(punct) = self.consume_punct() {
             return Ok(Some(punct));
@@ -205,8 +218,17 @@ fn tokenize<'a>(input: &'a str) -> Result<Vec<Token<'a>>, Error<'a>> {
 #[test]
 fn tokenize_1() {
     assert_eq!(
-        tokenize("foo\t\r\n bar\nbaz").unwrap(),
-        [Token::Word("foo"), Token::Word("bar"), Token::Word("baz"),]
+        tokenize("foo\t\r\n\n bar\nbaz\n").unwrap(),
+        [
+            Token::Word("foo"),
+            Token::EndOfLine,
+            Token::EndOfLine,
+            Token::Word("bar"),
+            Token::EndOfLine,
+            Token::Word("baz"),
+            Token::EndOfLine,
+            Token::EndOfLine,
+        ]
     );
 }
 
@@ -221,7 +243,8 @@ fn tokenize_2() {
             Token::Dot,
             Token::Comma,
             Token::Dot,
-            Token::Comma
+            Token::Comma,
+            Token::EndOfLine,
         ]
     );
 }
@@ -234,7 +257,8 @@ fn tokenize_whitespace_dots() {
             Token::Word("baz"),
             Token::Dot,
             Token::Comma,
-            Token::Word("bar")
+            Token::Word("bar"),
+            Token::EndOfLine,
         ]
     );
 }
@@ -248,6 +272,7 @@ fn tokenize_3() {
             Token::Comma,
             Token::Word("and"),
             Token::Word("-baz"),
+            Token::EndOfLine,
         ]
     );
 }
@@ -256,13 +281,21 @@ fn tokenize_3() {
 fn tokenize_4() {
     assert_eq!(
         tokenize(", , b").unwrap(),
-        [Token::Comma, Token::Comma, Token::Word("b")]
+        [
+            Token::Comma,
+            Token::Comma,
+            Token::Word("b"),
+            Token::EndOfLine,
+        ]
     );
 }
 
 #[test]
 fn tokenize_5() {
-    assert_eq!(tokenize(r#""testing""#).unwrap(), [Token::Quote("testing")]);
+    assert_eq!(
+        tokenize(r#""testing""#).unwrap(),
+        [Token::Quote("testing"), Token::EndOfLine,]
+    );
 }
 
 #[test]
