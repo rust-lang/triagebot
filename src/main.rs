@@ -15,6 +15,7 @@ use std::sync::Arc;
 mod handlers;
 mod registry;
 
+mod config;
 mod github;
 mod interactions;
 mod payload;
@@ -37,6 +38,12 @@ pub struct IssueCommentEvent {
     action: IssueCommentAction,
     issue: Issue,
     comment: Comment,
+    repository: Repository,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct Repository {
+    full_name: String,
 }
 
 enum Event {

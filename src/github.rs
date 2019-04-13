@@ -1,6 +1,7 @@
 use failure::{Error, ResultExt};
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
-use reqwest::{Client, Error as HttpError, RequestBuilder, Response};
+use reqwest::{Client, Error as HttpError, RequestBuilder, Response, StatusCode};
+use std::io::Read;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct User {
@@ -181,6 +182,23 @@ impl GithubClient {
 
     pub fn raw(&self) -> &Client {
         &self.client
+    }
+
+    pub fn raw_file(&self, repo: &str, branch: &str, path: &str) -> Result<Option<Vec<u8>>, Error> {
+        let url = format!(
+            "https://raw.githubusercontent.com/{}/{}/{}",
+            repo, branch, path
+        );
+        let mut resp = self.get(&url).send()?;
+        match resp.status() {
+            StatusCode::OK => {
+                let mut buf = Vec::with_capacity(resp.content_length().unwrap_or(4) as usize);
+                resp.read_to_end(&mut buf)?;
+                Ok(Some(buf))
+            }
+            StatusCode::NOT_FOUND => Ok(None),
+            status => failure::bail!("failed to GET {}: {}", url, status),
+        }
     }
 
     fn get(&self, url: &str) -> RequestBuilder {

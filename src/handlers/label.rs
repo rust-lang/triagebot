@@ -33,6 +33,7 @@ impl Handler for LabelHandler {
             return Ok(());
         };
 
+        let repo = &event.repository.full_name;
         let mut issue_labels = event.issue.labels().to_owned();
 
         let mut input = Input::new(&event.comment.body, &self.username);
@@ -59,8 +60,8 @@ impl Handler for LabelHandler {
         let mut changed = false;
         for delta in &deltas {
             let name = delta.label().as_str();
-            if let Err(msg) = check_filter(name, &event.comment.user, &self.client) {
-                ErrorComment::new(&event.issue, msg).post(&self.client)?;
+            if let Err(msg) = check_filter(name, repo, &event.comment.user, &self.client) {
+                ErrorComment::new(&event.issue, msg.to_string()).post(&self.client)?;
                 return Ok(());
             }
             match delta {
@@ -89,7 +90,12 @@ impl Handler for LabelHandler {
     }
 }
 
-fn check_filter(label: &str, user: &github::User, client: &GithubClient) -> Result<(), String> {
+fn check_filter(
+    label: &str,
+    repo: &str,
+    user: &github::User,
+    client: &GithubClient,
+) -> Result<(), Error> {
     let is_team_member;
     match user.is_team_member(client) {
         Ok(true) => return Ok(()),
@@ -102,34 +108,20 @@ fn check_filter(label: &str, user: &github::User, client: &GithubClient) -> Resu
             // continue on; if we failed to check their membership assume that they are not members.
         }
     }
-    if label.starts_with("C-") // categories
-    || label.starts_with("A-") // areas
-    || label.starts_with("E-") // easy, mentor, etc.
-    || label.starts_with("NLL-")
-    || label.starts_with("O-") // operating systems
-    || label.starts_with("S-") // status labels
-    || label.starts_with("T-")
-    || label.starts_with("WG-")
-    {
-        return Ok(());
-    }
-    match label {
-        "I-compilemem" | "I-compiletime" | "I-crash" | "I-hang" | "I-ICE" | "I-slow" => {
+    let config = crate::config::get(client, repo)?;
+    for pattern in &config.label.as_ref().unwrap().allow_unauthenticated {
+        let pattern = glob::Pattern::new(pattern)?;
+        if pattern.matches(label) {
             return Ok(());
         }
-        _ => {}
     }
-
     if is_team_member.is_ok() {
-        Err(format!(
-            "Label {} can only be set by Rust team members",
-            label
-        ))
+        failure::bail!("Label {} can only be set by Rust team members", label);
     } else {
-        Err(format!(
+        failure::bail!(
             "Label {} can only be set by Rust team members;\
              we were unable to check if you are a team member.",
             label
-        ))
+        );
     }
 }
