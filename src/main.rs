@@ -10,7 +10,6 @@ use rocket::request;
 use rocket::State;
 use rocket::{http::Status, Outcome, Request};
 use std::env;
-use std::sync::Arc;
 
 mod handlers;
 mod registry;
@@ -99,9 +98,12 @@ fn main() {
         client.clone(),
         env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"),
     );
-    let username = Arc::new(github::User::current(&gh).unwrap().login);
-    let mut registry = HandleRegistry::new();
-    handlers::register_all(&mut registry, gh.clone(), username);
+    let ctx = handlers::Context {
+        github: gh.clone(),
+        username: github::User::current(&gh).unwrap().login,
+    };
+    let mut registry = HandleRegistry::new(ctx);
+    handlers::register_all(&mut registry);
 
     let mut config = rocket::Config::active().unwrap();
     config.set_port(

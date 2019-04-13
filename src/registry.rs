@@ -1,14 +1,17 @@
 use crate::github::Event;
+use crate::handlers::Context;
 use failure::Error;
 
 pub struct HandleRegistry {
     handlers: Vec<Box<dyn Handler>>,
+    ctx: Context,
 }
 
 impl HandleRegistry {
-    pub fn new() -> HandleRegistry {
+    pub fn new(ctx: Context) -> HandleRegistry {
         HandleRegistry {
             handlers: Vec::new(),
+            ctx,
         }
     }
 
@@ -19,7 +22,7 @@ impl HandleRegistry {
     pub fn handle(&self, event: &Event) -> Result<(), Error> {
         let mut last_error = None;
         for h in &self.handlers {
-            match h.handle_event(event) {
+            match h.handle_event(&self.ctx, event) {
                 Ok(()) => {}
                 Err(e) => {
                     eprintln!("event handling failed: {:?}", e);
@@ -36,5 +39,5 @@ impl HandleRegistry {
 }
 
 pub trait Handler: Sync + Send {
-    fn handle_event(&self, event: &Event) -> Result<(), Error>;
+    fn handle_event(&self, ctx: &Context, event: &Event) -> Result<(), Error>;
 }
