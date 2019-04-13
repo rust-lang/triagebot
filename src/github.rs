@@ -182,6 +182,12 @@ impl Event {
             Event::IssueComment(event) => &event.repository.full_name,
         }
     }
+
+    pub fn issue(&self) -> Option<&Issue> {
+        match self {
+            Event::IssueComment(event) => Some(&event.issue),
+        }
+    }
 }
 
 trait RequestSend: Sized {

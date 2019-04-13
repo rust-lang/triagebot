@@ -37,18 +37,9 @@ impl Handler for LabelHandler {
         match input.parse_command() {
             Command::Label(Ok(command)) => Ok(Some(command)),
             Command::Label(Err(err)) => {
-                ErrorComment::new(
-                    &event.issue,
-                    format!(
-                        "Parsing label command in [comment]({}) failed: {}",
-                        event.comment.html_url, err
-                    ),
-                )
-                .post(&ctx.github)?;
                 failure::bail!(
-                    "label parsing failed for issue #{}, error: {:?}",
-                    event.issue.number,
-                    err
+                    "Parsing label command in [comment]({}) failed: {}",
+                    event.comment.html_url, err
                 );
             }
             _ => Ok(None),

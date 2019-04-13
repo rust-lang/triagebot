@@ -11,13 +11,14 @@ use rocket::State;
 use rocket::{http::Status, Outcome, Request};
 use std::env;
 
-mod handlers;
 mod config;
 mod github;
+mod handlers;
 mod interactions;
 mod payload;
 mod team;
 
+use interactions::ErrorComment;
 use payload::SignedPayload;
 
 enum EventName {
@@ -75,7 +76,12 @@ fn webhook(
                 .map_err(Error::from)?;
 
             let event = github::Event::IssueComment(payload);
-            handlers::handle(&ctx, &event)?;
+            if let Err(err) = handlers::handle(&ctx, &event) {
+                if let Some(issue) = event.issue() {
+                    ErrorComment::new(issue, err.to_string()).post(&ctx.github)?;
+                }
+                return Err(err.into());
+            }
         }
         // Other events need not be handled
         EventName::Other => {}
