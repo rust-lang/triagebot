@@ -9,33 +9,33 @@
 //! notification noise.
 
 use crate::{
+    config::LabelConfig,
     github::{self, Event, GithubClient},
-    handlers::Context,
+    handlers::{Context, Handler},
     interactions::ErrorComment,
-    registry::Handler,
 };
 use failure::Error;
 use parser::command::label::{LabelCommand, LabelDelta};
 use parser::command::{Command, Input};
 
-pub struct LabelHandler;
+pub(super) struct LabelHandler;
 
 impl Handler for LabelHandler {
-    fn handle_event(&self, ctx: &Context, event: &Event) -> Result<(), Error> {
+    type Input = LabelCommand;
+    type Config = LabelConfig;
+
+    fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, Error> {
         #[allow(irrefutable_let_patterns)]
         let event = if let Event::IssueComment(e) = event {
             e
         } else {
             // not interested in other events
-            return Ok(());
+            return Ok(None);
         };
 
-        let repo = &event.repository.full_name;
-        let mut issue_labels = event.issue.labels().to_owned();
-
         let mut input = Input::new(&event.comment.body, &ctx.username);
-        let deltas = match input.parse_command() {
-            Command::Label(Ok(LabelCommand(deltas))) => deltas,
+        match input.parse_command() {
+            Command::Label(Ok(command)) => Ok(Some(command)),
             Command::Label(Err(err)) => {
                 ErrorComment::new(
                     &event.issue,
@@ -51,13 +51,30 @@ impl Handler for LabelHandler {
                     err
                 );
             }
-            _ => return Ok(()),
+            _ => Ok(None),
+        }
+    }
+
+    fn handle_input(
+        &self,
+        ctx: &Context,
+        config: &LabelConfig,
+        event: &Event,
+        input: LabelCommand,
+    ) -> Result<(), Error> {
+        #[allow(irrefutable_let_patterns)]
+        let event = if let Event::IssueComment(e) = event {
+            e
+        } else {
+            // not interested in other events
+            return Ok(());
         };
 
+        let mut issue_labels = event.issue.labels().to_owned();
         let mut changed = false;
-        for delta in &deltas {
+        for delta in &input.0 {
             let name = delta.label().as_str();
-            if let Err(msg) = check_filter(name, repo, &event.comment.user, &ctx.github) {
+            if let Err(msg) = check_filter(name, config, &event.comment.user, &ctx.github) {
                 ErrorComment::new(&event.issue, msg.to_string()).post(&ctx.github)?;
                 return Ok(());
             }
@@ -89,7 +106,7 @@ impl Handler for LabelHandler {
 
 fn check_filter(
     label: &str,
-    repo: &str,
+    config: &LabelConfig,
     user: &github::User,
     client: &GithubClient,
 ) -> Result<(), Error> {
@@ -105,8 +122,7 @@ fn check_filter(
             // continue on; if we failed to check their membership assume that they are not members.
         }
     }
-    let config = crate::config::get(client, repo)?;
-    for pattern in &config.label.as_ref().unwrap().allow_unauthenticated {
+    for pattern in &config.allow_unauthenticated {
         let pattern = glob::Pattern::new(pattern)?;
         if pattern.matches(label) {
             return Ok(());

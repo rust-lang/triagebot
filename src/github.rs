@@ -176,6 +176,14 @@ pub enum Event {
     IssueComment(IssueCommentEvent),
 }
 
+impl Event {
+    pub fn repo_name(&self) -> &str {
+        match self {
+            Event::IssueComment(event) => &event.repository.full_name,
+        }
+    }
+}
+
 trait RequestSend: Sized {
     fn configure(self, g: &GithubClient) -> Self;
     fn send_req(self) -> Result<Response, HttpError>;

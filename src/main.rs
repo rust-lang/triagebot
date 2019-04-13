@@ -12,8 +12,6 @@ use rocket::{http::Status, Outcome, Request};
 use std::env;
 
 mod handlers;
-mod registry;
-
 mod config;
 mod github;
 mod interactions;
@@ -21,7 +19,6 @@ mod payload;
 mod team;
 
 use payload::SignedPayload;
-use registry::HandleRegistry;
 
 enum EventName {
     IssueComment,
@@ -68,7 +65,7 @@ impl From<Error> for WebhookError {
 fn webhook(
     event: EventName,
     payload: SignedPayload,
-    reg: State<HandleRegistry>,
+    ctx: State<handlers::Context>,
 ) -> Result<(), WebhookError> {
     match event {
         EventName::IssueComment => {
@@ -78,7 +75,7 @@ fn webhook(
                 .map_err(Error::from)?;
 
             let event = github::Event::IssueComment(payload);
-            reg.handle(&event).map_err(Error::from)?;
+            handlers::handle(&ctx, &event)?;
         }
         // Other events need not be handled
         EventName::Other => {}
@@ -102,8 +99,6 @@ fn main() {
         github: gh.clone(),
         username: github::User::current(&gh).unwrap().login,
     };
-    let mut registry = HandleRegistry::new(ctx);
-    handlers::register_all(&mut registry);
 
     let mut config = rocket::Config::active().unwrap();
     config.set_port(
@@ -113,7 +108,7 @@ fn main() {
     );
     rocket::custom(config)
         .manage(gh)
-        .manage(registry)
+        .manage(ctx)
         .mount("/", routes![webhook])
         .register(catchers![not_found])
         .launch();
