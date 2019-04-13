@@ -3,26 +3,26 @@
 //! Labels are checked against the labels in the project; the bot does not support creating new
 //! labels.
 //!
-//! Parsing is done in the `parser::command::label` module.
+//! Parsing is done in the `parser::command::relabel` module.
 //!
 //! If the command was successful, there will be no feedback beyond the label change to reduce
 //! notification noise.
 
 use crate::{
-    config::LabelConfig,
+    config::RelabelConfig,
     github::{self, Event, GithubClient},
     handlers::{Context, Handler},
     interactions::ErrorComment,
 };
 use failure::Error;
-use parser::command::label::{LabelCommand, LabelDelta};
+use parser::command::relabel::{RelabelCommand, LabelDelta};
 use parser::command::{Command, Input};
 
-pub(super) struct LabelHandler;
+pub(super) struct RelabelHandler;
 
-impl Handler for LabelHandler {
-    type Input = LabelCommand;
-    type Config = LabelConfig;
+impl Handler for RelabelHandler {
+    type Input = RelabelCommand;
+    type Config = RelabelConfig;
 
     fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, Error> {
         #[allow(irrefutable_let_patterns)]
@@ -35,8 +35,8 @@ impl Handler for LabelHandler {
 
         let mut input = Input::new(&event.comment.body, &ctx.username);
         match input.parse_command() {
-            Command::Label(Ok(command)) => Ok(Some(command)),
-            Command::Label(Err(err)) => {
+            Command::Relabel(Ok(command)) => Ok(Some(command)),
+            Command::Relabel(Err(err)) => {
                 failure::bail!(
                     "Parsing label command in [comment]({}) failed: {}",
                     event.comment.html_url, err
@@ -49,9 +49,9 @@ impl Handler for LabelHandler {
     fn handle_input(
         &self,
         ctx: &Context,
-        config: &LabelConfig,
+        config: &RelabelConfig,
         event: &Event,
-        input: LabelCommand,
+        input: RelabelCommand,
     ) -> Result<(), Error> {
         #[allow(irrefutable_let_patterns)]
         let event = if let Event::IssueComment(e) = event {
@@ -97,7 +97,7 @@ impl Handler for LabelHandler {
 
 fn check_filter(
     label: &str,
-    config: &LabelConfig,
+    config: &RelabelConfig,
     user: &github::User,
     client: &GithubClient,
 ) -> Result<(), Error> {

@@ -14,12 +14,12 @@ lazy_static::lazy_static! {
 
 #[derive(serde::Deserialize)]
 pub(crate) struct Config {
-    pub(crate) label: Option<LabelConfig>,
+    pub(crate) relabel: Option<RelabelConfig>,
 }
 
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct LabelConfig {
+pub(crate) struct RelabelConfig {
     #[serde(default)]
     pub(crate) allow_unauthenticated: Vec<String>,
 }

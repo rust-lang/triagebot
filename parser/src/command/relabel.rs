@@ -30,7 +30,7 @@ use std::error::Error as _;
 use std::fmt;
 
 #[derive(Debug)]
-pub struct LabelCommand(pub Vec<LabelDelta>);
+pub struct RelabelCommand(pub Vec<LabelDelta>);
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum LabelDelta {
@@ -124,7 +124,7 @@ fn delta_empty() {
     assert_eq!(err.position(), 1);
 }
 
-impl LabelCommand {
+impl RelabelCommand {
     pub fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
         let mut toks = input.clone();
         if let Some(Token::Word("modify")) = toks.next_token()? {
@@ -163,7 +163,7 @@ impl LabelCommand {
             if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
                 *input = toks;
-                return Ok(Some(LabelCommand(deltas)));
+                return Ok(Some(RelabelCommand(deltas)));
             }
         }
     }
@@ -172,7 +172,7 @@ impl LabelCommand {
 #[cfg(test)]
 fn parse<'a>(input: &'a str) -> Result<Option<Vec<LabelDelta>>, Error<'a>> {
     let mut toks = Tokenizer::new(input);
-    Ok(LabelCommand::parse(&mut toks)?.map(|c| c.0))
+    Ok(RelabelCommand::parse(&mut toks)?.map(|c| c.0))
 }
 
 #[test]
