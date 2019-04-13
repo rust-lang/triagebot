@@ -9,9 +9,9 @@
 //! notification noise.
 
 use crate::{
-    github::{self, GithubClient},
+    github::{self, Event, GithubClient},
     interactions::ErrorComment,
-    registry::{Event, Handler},
+    registry::Handler,
 };
 use failure::Error;
 use parser::command::label::{LabelCommand, LabelDelta};

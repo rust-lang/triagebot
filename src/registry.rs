@@ -1,4 +1,4 @@
-use crate::IssueCommentEvent;
+use crate::github::Event;
 use failure::Error;
 
 pub struct HandleRegistry {
@@ -33,11 +33,6 @@ impl HandleRegistry {
             Ok(())
         }
     }
-}
-
-#[derive(Debug)]
-pub enum Event {
-    IssueComment(IssueCommentEvent),
 }
 
 pub trait Handler: Sync + Send {

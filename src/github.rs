@@ -150,6 +150,32 @@ impl Issue {
     }
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum IssueCommentAction {
+    Created,
+    Edited,
+    Deleted,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct IssueCommentEvent {
+    pub action: IssueCommentAction,
+    pub issue: Issue,
+    pub comment: Comment,
+    pub repository: Repository,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct Repository {
+    pub full_name: String,
+}
+
+#[derive(Debug)]
+pub enum Event {
+    IssueComment(IssueCommentEvent),
+}
+
 trait RequestSend: Sized {
     fn configure(self, g: &GithubClient) -> Self;
     fn send_req(self) -> Result<Response, HttpError>;
