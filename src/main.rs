@@ -10,41 +10,23 @@ use rocket::request;
 use rocket::State;
 use rocket::{http::Status, Outcome, Request};
 use std::env;
-use std::sync::Arc;
 
-mod handlers;
-mod registry;
-
+mod config;
 mod github;
+mod handlers;
 mod interactions;
 mod payload;
 mod team;
 
-use github::{Comment, GithubClient, Issue, User};
+use interactions::ErrorComment;
 use payload::SignedPayload;
-use registry::HandleRegistry;
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum IssueCommentAction {
-    Created,
-    Edited,
-    Deleted,
-}
-
-#[derive(Debug, serde::Deserialize)]
-pub struct IssueCommentEvent {
-    action: IssueCommentAction,
-    issue: Issue,
-    comment: Comment,
-}
-
-enum Event {
+enum EventName {
     IssueComment,
     Other,
 }
 
-impl<'a, 'r> request::FromRequest<'a, 'r> for Event {
+impl<'a, 'r> request::FromRequest<'a, 'r> for EventName {
     type Error = String;
     fn from_request(req: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
         let ev = if let Some(ev) = req.headers().get_one("X-GitHub-Event") {
@@ -53,8 +35,8 @@ impl<'a, 'r> request::FromRequest<'a, 'r> for Event {
             return Outcome::Failure((Status::BadRequest, "Needs a X-GitHub-Event".into()));
         };
         let ev = match ev {
-            "issue_comment" => Event::IssueComment,
-            _ => Event::Other,
+            "issue_comment" => EventName::IssueComment,
+            _ => EventName::Other,
         };
         Outcome::Success(ev)
     }
@@ -82,22 +64,27 @@ impl From<Error> for WebhookError {
 
 #[post("/github-hook", data = "<payload>")]
 fn webhook(
-    event: Event,
+    event: EventName,
     payload: SignedPayload,
-    reg: State<HandleRegistry>,
+    ctx: State<handlers::Context>,
 ) -> Result<(), WebhookError> {
     match event {
-        Event::IssueComment => {
+        EventName::IssueComment => {
             let payload = payload
-                .deserialize::<IssueCommentEvent>()
+                .deserialize::<github::IssueCommentEvent>()
                 .context("IssueCommentEvent failed to deserialize")
                 .map_err(Error::from)?;
 
-            let event = registry::Event::IssueComment(payload);
-            reg.handle(&event).map_err(Error::from)?;
+            let event = github::Event::IssueComment(payload);
+            if let Err(err) = handlers::handle(&ctx, &event) {
+                if let Some(issue) = event.issue() {
+                    ErrorComment::new(issue, err.to_string()).post(&ctx.github)?;
+                }
+                return Err(err.into());
+            }
         }
         // Other events need not be handled
-        Event::Other => {}
+        EventName::Other => {}
     }
     Ok(())
 }
@@ -110,13 +97,14 @@ fn not_found(_: &Request) -> &'static str {
 fn main() {
     dotenv::dotenv().ok();
     let client = Client::new();
-    let gh = GithubClient::new(
+    let gh = github::GithubClient::new(
         client.clone(),
         env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"),
     );
-    let username = Arc::new(User::current(&gh).unwrap().login);
-    let mut registry = HandleRegistry::new();
-    handlers::register_all(&mut registry, gh.clone(), username);
+    let ctx = handlers::Context {
+        github: gh.clone(),
+        username: github::User::current(&gh).unwrap().login,
+    };
 
     let mut config = rocket::Config::active().unwrap();
     config.set_port(
@@ -126,7 +114,7 @@ fn main() {
     );
     rocket::custom(config)
         .manage(gh)
-        .manage(registry)
+        .manage(ctx)
         .mount("/", routes![webhook])
         .register(catchers![not_found])
         .launch();

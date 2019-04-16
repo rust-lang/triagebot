@@ -2,7 +2,7 @@ use crate::code_block::ColorCodeBlocks;
 use crate::error::Error;
 use crate::token::{Token, Tokenizer};
 
-pub mod label;
+pub mod relabel;
 
 pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
     input.find(&format!("@{}", bot))
@@ -10,7 +10,7 @@ pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
 
 #[derive(Debug)]
 pub enum Command<'a> {
-    Label(Result<label::LabelCommand, Error<'a>>),
+    Relabel(Result<relabel::RelabelCommand, Error<'a>>),
     None,
 }
 
@@ -50,14 +50,14 @@ impl<'a> Input<'a> {
 
         {
             let mut tok = original_tokenizer.clone();
-            let res = label::LabelCommand::parse(&mut tok);
+            let res = relabel::RelabelCommand::parse(&mut tok);
             match res {
                 Ok(None) => {}
                 Ok(Some(cmd)) => {
-                    success.push((tok, Command::Label(Ok(cmd))));
+                    success.push((tok, Command::Relabel(Ok(cmd))));
                 }
                 Err(err) => {
-                    success.push((tok, Command::Label(Err(err))));
+                    success.push((tok, Command::Relabel(Err(err))));
                 }
             }
         }
@@ -94,7 +94,7 @@ impl<'a> Input<'a> {
 impl<'a> Command<'a> {
     pub fn is_ok(&self) -> bool {
         match self {
-            Command::Label(r) => r.is_ok(),
+            Command::Relabel(r) => r.is_ok(),
             Command::None => true,
         }
     }

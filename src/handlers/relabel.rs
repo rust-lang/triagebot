@@ -3,28 +3,56 @@
 //! Labels are checked against the labels in the project; the bot does not support creating new
 //! labels.
 //!
-//! Parsing is done in the `parser::command::label` module.
+//! Parsing is done in the `parser::command::relabel` module.
 //!
 //! If the command was successful, there will be no feedback beyond the label change to reduce
 //! notification noise.
 
 use crate::{
-    github::{self, GithubClient},
+    config::RelabelConfig,
+    github::{self, Event, GithubClient},
+    handlers::{Context, Handler},
     interactions::ErrorComment,
-    registry::{Event, Handler},
 };
 use failure::Error;
-use parser::command::label::{LabelCommand, LabelDelta};
+use parser::command::relabel::{RelabelCommand, LabelDelta};
 use parser::command::{Command, Input};
-use std::sync::Arc;
 
-pub struct LabelHandler {
-    pub client: GithubClient,
-    pub username: Arc<String>,
-}
+pub(super) struct RelabelHandler;
 
-impl Handler for LabelHandler {
-    fn handle_event(&self, event: &Event) -> Result<(), Error> {
+impl Handler for RelabelHandler {
+    type Input = RelabelCommand;
+    type Config = RelabelConfig;
+
+    fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, Error> {
+        #[allow(irrefutable_let_patterns)]
+        let event = if let Event::IssueComment(e) = event {
+            e
+        } else {
+            // not interested in other events
+            return Ok(None);
+        };
+
+        let mut input = Input::new(&event.comment.body, &ctx.username);
+        match input.parse_command() {
+            Command::Relabel(Ok(command)) => Ok(Some(command)),
+            Command::Relabel(Err(err)) => {
+                failure::bail!(
+                    "Parsing label command in [comment]({}) failed: {}",
+                    event.comment.html_url, err
+                );
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn handle_input(
+        &self,
+        ctx: &Context,
+        config: &RelabelConfig,
+        event: &Event,
+        input: RelabelCommand,
+    ) -> Result<(), Error> {
         #[allow(irrefutable_let_patterns)]
         let event = if let Event::IssueComment(e) = event {
             e
@@ -34,33 +62,11 @@ impl Handler for LabelHandler {
         };
 
         let mut issue_labels = event.issue.labels().to_owned();
-
-        let mut input = Input::new(&event.comment.body, &self.username);
-        let deltas = match input.parse_command() {
-            Command::Label(Ok(LabelCommand(deltas))) => deltas,
-            Command::Label(Err(err)) => {
-                ErrorComment::new(
-                    &event.issue,
-                    format!(
-                        "Parsing label command in [comment]({}) failed: {}",
-                        event.comment.html_url, err
-                    ),
-                )
-                .post(&self.client)?;
-                failure::bail!(
-                    "label parsing failed for issue #{}, error: {:?}",
-                    event.issue.number,
-                    err
-                );
-            }
-            _ => return Ok(()),
-        };
-
         let mut changed = false;
-        for delta in &deltas {
+        for delta in &input.0 {
             let name = delta.label().as_str();
-            if let Err(msg) = check_filter(name, &event.comment.user, &self.client) {
-                ErrorComment::new(&event.issue, msg).post(&self.client)?;
+            if let Err(msg) = check_filter(name, config, &event.comment.user, &ctx.github) {
+                ErrorComment::new(&event.issue, msg.to_string()).post(&ctx.github)?;
                 return Ok(());
             }
             match delta {
@@ -82,14 +88,19 @@ impl Handler for LabelHandler {
         }
 
         if changed {
-            event.issue.set_labels(&self.client, issue_labels)?;
+            event.issue.set_labels(&ctx.github, issue_labels)?;
         }
 
         Ok(())
     }
 }
 
-fn check_filter(label: &str, user: &github::User, client: &GithubClient) -> Result<(), String> {
+fn check_filter(
+    label: &str,
+    config: &RelabelConfig,
+    user: &github::User,
+    client: &GithubClient,
+) -> Result<(), Error> {
     let is_team_member;
     match user.is_team_member(client) {
         Ok(true) => return Ok(()),
@@ -102,34 +113,19 @@ fn check_filter(label: &str, user: &github::User, client: &GithubClient) -> Resu
             // continue on; if we failed to check their membership assume that they are not members.
         }
     }
-    if label.starts_with("C-") // categories
-    || label.starts_with("A-") // areas
-    || label.starts_with("E-") // easy, mentor, etc.
-    || label.starts_with("NLL-")
-    || label.starts_with("O-") // operating systems
-    || label.starts_with("S-") // status labels
-    || label.starts_with("T-")
-    || label.starts_with("WG-")
-    {
-        return Ok(());
-    }
-    match label {
-        "I-compilemem" | "I-compiletime" | "I-crash" | "I-hang" | "I-ICE" | "I-slow" => {
+    for pattern in &config.allow_unauthenticated {
+        let pattern = glob::Pattern::new(pattern)?;
+        if pattern.matches(label) {
             return Ok(());
         }
-        _ => {}
     }
-
     if is_team_member.is_ok() {
-        Err(format!(
-            "Label {} can only be set by Rust team members",
-            label
-        ))
+        failure::bail!("Label {} can only be set by Rust team members", label);
     } else {
-        Err(format!(
+        failure::bail!(
             "Label {} can only be set by Rust team members;\
              we were unable to check if you are a team member.",
             label
-        ))
+        );
     }
 }

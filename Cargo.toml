@@ -21,6 +21,8 @@ hex = "0.3.2"
 env_logger = "0.6"
 parser = { path = "parser" }
 rust_team_data = { git = "https://github.com/rust-lang/team" }
+glob = "0.3.0"
+toml = "0.5.0"
 
 [dependencies.serde]
 version = "1"

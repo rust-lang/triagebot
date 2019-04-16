@@ -1,6 +1,7 @@
 use failure::{Error, ResultExt};
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
-use reqwest::{Client, Error as HttpError, RequestBuilder, Response};
+use reqwest::{Client, Error as HttpError, RequestBuilder, Response, StatusCode};
+use std::io::Read;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct User {
@@ -149,6 +150,46 @@ impl Issue {
     }
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum IssueCommentAction {
+    Created,
+    Edited,
+    Deleted,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct IssueCommentEvent {
+    pub action: IssueCommentAction,
+    pub issue: Issue,
+    pub comment: Comment,
+    pub repository: Repository,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct Repository {
+    pub full_name: String,
+}
+
+#[derive(Debug)]
+pub enum Event {
+    IssueComment(IssueCommentEvent),
+}
+
+impl Event {
+    pub fn repo_name(&self) -> &str {
+        match self {
+            Event::IssueComment(event) => &event.repository.full_name,
+        }
+    }
+
+    pub fn issue(&self) -> Option<&Issue> {
+        match self {
+            Event::IssueComment(event) => Some(&event.issue),
+        }
+    }
+}
+
 trait RequestSend: Sized {
     fn configure(self, g: &GithubClient) -> Self;
     fn send_req(self) -> Result<Response, HttpError>;
@@ -181,6 +222,23 @@ impl GithubClient {
 
     pub fn raw(&self) -> &Client {
         &self.client
+    }
+
+    pub fn raw_file(&self, repo: &str, branch: &str, path: &str) -> Result<Option<Vec<u8>>, Error> {
+        let url = format!(
+            "https://raw.githubusercontent.com/{}/{}/{}",
+            repo, branch, path
+        );
+        let mut resp = self.get(&url).send()?;
+        match resp.status() {
+            StatusCode::OK => {
+                let mut buf = Vec::with_capacity(resp.content_length().unwrap_or(4) as usize);
+                resp.read_to_end(&mut buf)?;
+                Ok(Some(buf))
+            }
+            StatusCode::NOT_FOUND => Ok(None),
+            status => failure::bail!("failed to GET {}: {}", url, status),
+        }
     }
 
     fn get(&self, url: &str) -> RequestBuilder {
