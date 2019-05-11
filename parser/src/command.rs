@@ -3,6 +3,7 @@ use crate::error::Error;
 use crate::token::{Token, Tokenizer};
 
 pub mod relabel;
+pub mod assign;
 
 pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
     input.find(&format!("@{}", bot))
@@ -11,6 +12,7 @@ pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
 #[derive(Debug)]
 pub enum Command<'a> {
     Relabel(Result<relabel::RelabelCommand, Error<'a>>),
+    Assign(Result<assign::AssignCommand, Error<'a>>),
     None,
 }
 
@@ -62,6 +64,21 @@ impl<'a> Input<'a> {
             }
         }
 
+        {
+            let mut tok = original_tokenizer.clone();
+            let res = assign::AssignCommand::parse(&mut tok);
+            match res {
+                Ok(None) => {}
+                Ok(Some(cmd)) => {
+                    success.push((tok, Command::Assign(Ok(cmd))));
+                }
+                Err(err) => {
+                    success.push((tok, Command::Assign(Err(err))));
+                }
+            }
+        }
+
+
         if success.len() > 1 {
             panic!(
                 "succeeded parsing {:?} to multiple commands: {:?}",
@@ -95,6 +112,7 @@ impl<'a> Command<'a> {
     pub fn is_ok(&self) -> bool {
         match self {
             Command::Relabel(r) => r.is_ok(),
+            Command::Assign(r) => r.is_ok(),
             Command::None => true,
         }
     }

@@ -1,10 +1,6 @@
 //! Permit assignment of any user to issues, without requiring "write" access to the repository.
 //!
-//! It is unknown which approach is needed here: we may need to fake-assign ourselves and add a
-//! 'claimed by' section to the top-level comment. That would be very unideal.
-//!
-//! The ideal workflow here is that the user is added to a read-only team with no access to the
-//! repository and immediately thereafter assigned to the issue.
+//! We need to fake-assign ourselves and add a 'claimed by' section to the top-level comment.
 //!
 //! Such assigned issues should also be placed in a queue to ensure that the user remains
 //! active; the assigned user will be asked for a status report every 2 weeks (XXX: timing).
@@ -13,7 +9,7 @@
 //! been given for the past 2 weeks, the bot will de-assign the user. They can once more claim
 //! the issue if necessary.
 //!
-//! Assign users with `/assign @gh-user` or `/claim` (self-claim).
+//! Assign users with `@rustbot assign @gh-user` or `@rustbot claim` (self-claim).
 
 use crate::{
     github::GithubClient,
