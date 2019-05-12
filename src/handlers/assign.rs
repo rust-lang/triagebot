@@ -82,10 +82,8 @@ impl Handler for AssignmentHandler {
         let to_assign = match cmd {
             AssignCommand::Own => event.comment.user.login.clone(),
             AssignCommand::User { username } => {
-                if is_team_member {
-                    if username != event.comment.user.login {
-                        failure::bail!("Only Rust team members can assign other users");
-                    }
+                if !is_team_member && username != event.comment.user.login {
+                    failure::bail!("Only Rust team members can assign other users");
                 }
                 username.clone()
             }

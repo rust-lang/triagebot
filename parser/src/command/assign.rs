@@ -53,7 +53,7 @@ impl AssignCommand {
         } else if let Some(Token::Word("assign")) = toks.peek_token()? {
             toks.next_token()?;
             if let Some(Token::Word(user)) = toks.next_token()? {
-                if user.starts_with("@") && user.len() != 1 {
+                if user.starts_with('@') && user.len() != 1 {
                     Ok(Some(AssignCommand::User {
                         username: user[1..].to_owned(),
                     }))
