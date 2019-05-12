@@ -75,8 +75,8 @@ impl Handler for AssignmentHandler {
             }
         };
 
-        let e = EditIssueBody::new(&event.issue, "ASSIGN", String::new());
-        e.apply(&ctx.github)?;
+        let e = EditIssueBody::new(&event.issue, "ASSIGN");
+        e.apply(&ctx.github, String::new(), ())?;
 
         match event.issue.set_assignee(&ctx.github, &to_assign) {
             Ok(()) => return Ok(()), // we are done
@@ -85,15 +85,14 @@ impl Handler for AssignmentHandler {
                     .issue
                     .set_assignee(&ctx.github, &ctx.username)
                     .context("self-assignment failed")?;
-                let e = EditIssueBody::new(
-                    &event.issue,
-                    "ASSIGN",
+                e.apply(
+                    &ctx.github,
                     format!(
                         "This issue has been assigned to @{} via [this comment]({}).",
                         to_assign, event.comment.html_url
                     ),
-                );
-                e.apply(&ctx.github)?;
+                    (),
+                )?;
             }
             Err(e) => return Err(e.into()),
         }
