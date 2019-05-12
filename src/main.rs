@@ -106,13 +106,7 @@ fn main() {
         username: github::User::current(&gh).unwrap().login,
     };
 
-    let mut config = rocket::Config::active().unwrap();
-    config.set_port(
-        env::var("TRIAGEBOT_PORT")
-            .map(|port| port.parse().unwrap())
-            .unwrap_or(8000),
-    );
-    rocket::custom(config)
+    rocket::ignite()
         .manage(gh)
         .manage(ctx)
         .mount("/", routes![webhook])
