@@ -15,6 +15,13 @@ lazy_static::lazy_static! {
 #[derive(serde::Deserialize)]
 pub(crate) struct Config {
     pub(crate) relabel: Option<RelabelConfig>,
+    pub(crate) assign: Option<AssignConfig>,
+}
+
+#[derive(serde::Deserialize)]
+pub(crate) struct AssignConfig {
+    #[serde(default)]
+    _empty: (),
 }
 
 #[derive(serde::Deserialize)]
