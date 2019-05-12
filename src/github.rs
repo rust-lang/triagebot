@@ -1,6 +1,7 @@
 use failure::{Error, ResultExt};
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Error as HttpError, RequestBuilder, Response, StatusCode};
+use std::fmt;
 use std::io::Read;
 
 #[derive(Debug, serde::Deserialize)]
@@ -52,6 +53,7 @@ impl Label {
 #[derive(Debug, serde::Deserialize)]
 pub struct Issue {
     pub number: u64,
+    pub body: String,
     title: String,
     user: User,
     labels: Vec<Label>,
@@ -68,7 +70,73 @@ pub struct Comment {
     pub user: User,
 }
 
+#[derive(Debug)]
+pub enum AssignmentError {
+    InvalidAssignee,
+    Http(HttpError),
+}
+
+impl fmt::Display for AssignmentError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AssignmentError::InvalidAssignee => write!(f, "invalid assignee"),
+            AssignmentError::Http(e) => write!(f, "cannot assign: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for AssignmentError {}
+
+impl From<HttpError> for AssignmentError {
+    fn from(h: HttpError) -> AssignmentError {
+        AssignmentError::Http(h)
+    }
+}
+
 impl Issue {
+    pub fn get_comment(&self, client: &GithubClient, id: usize) -> Result<Comment, Error> {
+        let comment_url = format!("{}/issues/comments/{}", self.repository_url, id);
+        let comment = client
+            .get(&comment_url)
+            .send_req()
+            .context("failed to get comment")?
+            .json()?;
+        Ok(comment)
+    }
+
+    pub fn edit_body(&self, client: &GithubClient, body: &str) -> Result<(), Error> {
+        let edit_url = format!("{}/issues/{}", self.repository_url, self.number);
+        #[derive(serde::Serialize)]
+        struct ChangedIssue<'a> {
+            body: &'a str,
+        }
+        client
+            .patch(&edit_url)
+            .json(&ChangedIssue { body })
+            .send_req()
+            .context("failed to edit issue body")?;
+        Ok(())
+    }
+
+    pub fn edit_comment(
+        &self,
+        client: &GithubClient,
+        id: usize,
+        new_body: &str,
+    ) -> Result<(), Error> {
+        let comment_url = format!("{}/issues/comments/{}", self.repository_url, id);
+        #[derive(serde::Serialize)]
+        struct NewComment<'a> {
+            body: &'a str,
+        }
+        client
+            .patch(&comment_url)
+            .json(&NewComment { body: new_body })
+            .send_req()
+            .context("failed to edit comment")?;
+        Ok(())
+    }
+
     pub fn post_comment(&self, client: &GithubClient, body: &str) -> Result<(), Error> {
         #[derive(serde::Serialize)]
         struct PostComment<'a> {
@@ -112,7 +180,7 @@ impl Issue {
         &self.labels
     }
 
-    pub fn add_assignee(&self, client: &GithubClient, user: &str) -> Result<(), Error> {
+    pub fn set_assignee(&self, client: &GithubClient, user: &str) -> Result<(), AssignmentError> {
         let url = format!(
             "{repo_url}/issues/{number}/assignees",
             repo_url = self.repository_url,
@@ -130,10 +198,10 @@ impl Issue {
                 if resp.status() == reqwest::StatusCode::NO_CONTENT {
                     // all okay
                 } else if resp.status() == reqwest::StatusCode::NOT_FOUND {
-                    failure::bail!("invalid assignee {:?}", user);
+                    return Err(AssignmentError::InvalidAssignee);
                 }
             }
-            Err(e) => failure::bail!("unable to check assignee validity: {:?}", e),
+            Err(e) => return Err(AssignmentError::Http(e)),
         }
 
         #[derive(serde::Serialize)]
@@ -141,10 +209,22 @@ impl Issue {
             assignees: &'a [&'a str],
         }
         client
+            .delete(&url)
+            .json(&AssigneeReq {
+                assignees: &self
+                    .assignees
+                    .iter()
+                    .map(|u| u.login.as_str())
+                    .collect::<Vec<_>>()[..],
+            })
+            .send_req()
+            .map_err(AssignmentError::Http)?;
+
+        client
             .post(&url)
             .json(&AssigneeReq { assignees: &[user] })
             .send_req()
-            .context("failed to add assignee")?;
+            .map_err(AssignmentError::Http)?;
 
         Ok(())
     }
@@ -244,6 +324,16 @@ impl GithubClient {
     fn get(&self, url: &str) -> RequestBuilder {
         log::trace!("get {:?}", url);
         self.client.get(url).configure(self)
+    }
+
+    fn patch(&self, url: &str) -> RequestBuilder {
+        log::trace!("patch {:?}", url);
+        self.client.patch(url).configure(self)
+    }
+
+    fn delete(&self, url: &str) -> RequestBuilder {
+        log::trace!("delete {:?}", url);
+        self.client.delete(url).configure(self)
     }
 
     fn post(&self, url: &str) -> RequestBuilder {

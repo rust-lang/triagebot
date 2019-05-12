@@ -12,19 +12,51 @@
 //! Assign users with `@rustbot assign @gh-user` or `@rustbot claim` (self-claim).
 
 use crate::{
-    github::GithubClient,
-    registry::{Event, Handler},
+    config::AssignConfig,
+    github::{self, Event},
+    handlers::{Context, Handler},
+    interactions::EditIssueBody,
 };
-use failure::Error;
-use lazy_static::lazy_static;
-use regex::Regex;
+use failure::{Error, ResultExt};
+use parser::command::assign::AssignCommand;
+use parser::command::{Command, Input};
 
-pub struct AssignmentHandler {
-    pub client: GithubClient,
-}
+pub(super) struct AssignmentHandler;
 
 impl Handler for AssignmentHandler {
-    fn handle_event(&self, event: &Event) -> Result<(), Error> {
+    type Input = AssignCommand;
+    type Config = AssignConfig;
+
+    fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, Error> {
+        #[allow(irrefutable_let_patterns)]
+        let event = if let Event::IssueComment(e) = event {
+            e
+        } else {
+            // not interested in other events
+            return Ok(None);
+        };
+
+        let mut input = Input::new(&event.comment.body, &ctx.username);
+        match input.parse_command() {
+            Command::Assign(Ok(command)) => Ok(Some(command)),
+            Command::Assign(Err(err)) => {
+                failure::bail!(
+                    "Parsing assign command in [comment]({}) failed: {}",
+                    event.comment.html_url,
+                    err
+                );
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn handle_input(
+        &self,
+        ctx: &Context,
+        _config: &AssignConfig,
+        event: &Event,
+        cmd: AssignCommand,
+    ) -> Result<(), Error> {
         #[allow(irrefutable_let_patterns)]
         let event = if let Event::IssueComment(e) = event {
             e
@@ -33,34 +65,33 @@ impl Handler for AssignmentHandler {
             return Ok(());
         };
 
-        lazy_static! {
-            static ref RE_ASSIGN: Regex = Regex::new(r"/assign @(\S+)").unwrap();
-            static ref RE_CLAIM: Regex = Regex::new(r"/claim").unwrap();
-        }
+        let to_assign = match cmd {
+            AssignCommand::Own => event.comment.user.login.clone(),
+            AssignCommand::User { username } => username.clone(),
+        };
 
-        if RE_CLAIM.is_match(&event.comment.body) {
-            log::trace!(
-                "comment {:?} matched claim regex, assigning {:?}",
-                event.comment.body,
-                event.comment.user.login
-            );
-            event
-                .issue
-                .add_assignee(&self.client, &event.comment.user.login)?;
-        } else {
-            if let Some(capture) = RE_ASSIGN.captures(&event.comment.body) {
-                log::trace!(
-                    "comment {:?} matched assignment regex, assigning {:?}",
-                    event.comment.body,
-                    &capture[1]
+        let e = EditIssueBody::new(&event.issue, "ASSIGN", String::new());
+        e.apply(&ctx.github)?;
+
+        match event.issue.set_assignee(&ctx.github, &to_assign) {
+            Ok(()) => return Ok(()), // we are done
+            Err(github::AssignmentError::InvalidAssignee) => {
+                event
+                    .issue
+                    .set_assignee(&ctx.github, &ctx.username)
+                    .context("self-assignment failed")?;
+                let e = EditIssueBody::new(
+                    &event.issue,
+                    "ASSIGN",
+                    format!(
+                        "This issue has been assigned to @{} via [this comment]({}).",
+                        to_assign, event.comment.html_url
+                    ),
                 );
-                event.issue.add_assignee(&self.client, &capture[1])?;
+                e.apply(&ctx.github)?;
             }
+            Err(e) => return Err(e.into()),
         }
-
-        // TODO: Enqueue a check-in in two weeks.
-        // TODO: Post a comment documenting the biweekly check-in? Maybe just give them two weeks
-        //       without any commentary from us.
 
         Ok(())
     }
