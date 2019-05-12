@@ -35,7 +35,7 @@ pub struct EditIssueBody<'a> {
     id: &'static str,
 }
 
-static START_BOT: &str = "<!-- TRIAGEBOT_START -->\n\n----\n";
+static START_BOT: &str = "<!-- TRIAGEBOT_START -->\n\n";
 static END_BOT: &str = "<!-- TRIAGEBOT_END -->";
 
 impl<'a> EditIssueBody<'a> {
