@@ -67,7 +67,12 @@ impl Handler for AssignmentHandler {
 
         let to_assign = match cmd {
             AssignCommand::Own => event.comment.user.login.clone(),
-            AssignCommand::User { username } => username.clone(),
+            AssignCommand::User { username } => {
+                if let Err(_) | Ok(false) = event.comment.user.is_team_member(&ctx.github) {
+                    failure::bail!("Only Rust team members can assign other users");
+                }
+                username.clone()
+            }
         };
 
         let e = EditIssueBody::new(&event.issue, "ASSIGN", String::new());
