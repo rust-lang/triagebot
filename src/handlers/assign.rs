@@ -70,11 +70,19 @@ impl Handler for AssignmentHandler {
             return Ok(());
         };
 
+        let is_team_member =
+            if let Err(_) | Ok(false) = event.comment.user.is_team_member(&ctx.github) {
+                false
+            } else {
+                true
+            };
+
         let e = EditIssueBody::new(&event.issue, "ASSIGN");
+
         let to_assign = match cmd {
             AssignCommand::Own => event.comment.user.login.clone(),
             AssignCommand::User { username } => {
-                if let Err(_) | Ok(false) = event.comment.user.is_team_member(&ctx.github) {
+                if is_team_member {
                     if username != event.comment.user.login {
                         failure::bail!("Only Rust team members can assign other users");
                     }
@@ -82,19 +90,17 @@ impl Handler for AssignmentHandler {
                 username.clone()
             }
             AssignCommand::Release => {
-                let current = e.current_data();
-                if current
-                    == Some(AssignData {
-                        user: Some(event.comment.user.login.clone()),
-                    })
-                {
+                let current = if let Some(AssignData { user: Some(user) }) = e.current_data() {
+                    user
+                } else {
+                    failure::bail!("Cannot release unassigned issue");
+                };
+                if current == event.comment.user.login || is_team_member {
                     event.issue.remove_assignees(&ctx.github)?;
                     e.apply(&ctx.github, String::new(), AssignData { user: None })?;
                     return Ok(());
-                } else if current.map(|d| d.user.is_some()).unwrap_or(false) {
-                    failure::bail!("Cannot release another user's assignment");
                 } else {
-                    failure::bail!("Cannot release unassigned issue");
+                    failure::bail!("Cannot release another user's assignment");
                 }
             }
         };
