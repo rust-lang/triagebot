@@ -4,6 +4,7 @@ use crate::token::{Token, Tokenizer};
 
 pub mod assign;
 pub mod relabel;
+pub mod triage;
 
 pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
     input.find(&format!("@{}", bot))
@@ -13,6 +14,7 @@ pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
 pub enum Command<'a> {
     Relabel(Result<relabel::RelabelCommand, Error<'a>>),
     Assign(Result<assign::AssignCommand, Error<'a>>),
+    Triage(Result<triage::TriageCommand, Error<'a>>),
     None,
 }
 
@@ -50,33 +52,45 @@ impl<'a> Input<'a> {
 
         let original_tokenizer = tok.clone();
 
+        fn attempt_parse<'a, F, E, T>(
+            original: &Tokenizer<'a>,
+            success: &mut Vec<(Tokenizer<'a>, Command<'a>)>,
+            cmd: F,
+            transform: E,
+        ) where
+            F: Fn(&mut Tokenizer<'a>) -> Result<Option<T>, Error<'a>>,
+            E: Fn(Result<T, Error<'a>>) -> Command<'a>,
         {
-            let mut tok = original_tokenizer.clone();
-            let res = relabel::RelabelCommand::parse(&mut tok);
+            let mut tok = original.clone();
+            let res = cmd(&mut tok);
             match res {
                 Ok(None) => {}
                 Ok(Some(cmd)) => {
-                    success.push((tok, Command::Relabel(Ok(cmd))));
+                    success.push((tok, transform(Ok(cmd))));
                 }
                 Err(err) => {
-                    success.push((tok, Command::Relabel(Err(err))));
+                    success.push((tok, transform(Err(err))));
                 }
             }
         }
-
-        {
-            let mut tok = original_tokenizer.clone();
-            let res = assign::AssignCommand::parse(&mut tok);
-            match res {
-                Ok(None) => {}
-                Ok(Some(cmd)) => {
-                    success.push((tok, Command::Assign(Ok(cmd))));
-                }
-                Err(err) => {
-                    success.push((tok, Command::Assign(Err(err))));
-                }
-            }
-        }
+        attempt_parse(
+            &original_tokenizer,
+            &mut success,
+            relabel::RelabelCommand::parse,
+            Command::Relabel,
+        );
+        attempt_parse(
+            &original_tokenizer,
+            &mut success,
+            assign::AssignCommand::parse,
+            Command::Assign,
+        );
+        attempt_parse(
+            &original_tokenizer,
+            &mut success,
+            triage::TriageCommand::parse,
+            Command::Triage,
+        );
 
         if success.len() > 1 {
             panic!(
@@ -112,6 +126,7 @@ impl<'a> Command<'a> {
         match self {
             Command::Relabel(r) => r.is_ok(),
             Command::Assign(r) => r.is_ok(),
+            Command::Triage(r) => r.is_ok(),
             Command::None => true,
         }
     }

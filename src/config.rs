@@ -16,6 +16,7 @@ lazy_static::lazy_static! {
 pub(crate) struct Config {
     pub(crate) relabel: Option<RelabelConfig>,
     pub(crate) assign: Option<AssignConfig>,
+    pub(crate) triage: Option<TriageConfig>,
 }
 
 #[derive(serde::Deserialize)]
@@ -29,6 +30,14 @@ pub(crate) struct AssignConfig {
 pub(crate) struct RelabelConfig {
     #[serde(default)]
     pub(crate) allow_unauthenticated: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
+pub(crate) struct TriageConfig {
+    pub(crate) remove: Vec<String>,
+    pub(crate) high: String,
+    pub(crate) medium: String,
+    pub(crate) low: String,
 }
 
 pub(crate) fn get(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, Error> {

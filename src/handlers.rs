@@ -27,6 +27,7 @@ macro_rules! handlers {
 handlers! {
     assign = assign::AssignmentHandler,
     relabel = relabel::RelabelHandler,
+    triage = triage::TriageHandler,
     //tracking_issue = tracking_issue::TrackingIssueHandler,
 }
 
