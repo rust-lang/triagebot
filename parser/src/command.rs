@@ -2,8 +2,8 @@ use crate::code_block::ColorCodeBlocks;
 use crate::error::Error;
 use crate::token::{Token, Tokenizer};
 
-pub mod relabel;
 pub mod assign;
+pub mod relabel;
 
 pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
     input.find(&format!("@{}", bot))
@@ -77,7 +77,6 @@ impl<'a> Input<'a> {
                 }
             }
         }
-
 
         if success.len() > 1 {
             panic!(
