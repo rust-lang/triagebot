@@ -30,6 +30,7 @@ pub(crate) struct Config {
     pub(crate) github_releases: Option<GitHubReleasesConfig>,
     pub(crate) review_submitted: Option<ReviewSubmittedConfig>,
     pub(crate) shortcut: Option<ShortcutConfig>,
+    pub(crate) triage: Option<TriageConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -156,6 +157,14 @@ pub(crate) struct CloseConfig {}
 pub(crate) struct ReviewSubmittedConfig {
     pub(crate) review_labels: Vec<String>,
     pub(crate) reviewed_label: String,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct TriageConfig {
+    pub(crate) remove: Vec<String>,
+    pub(crate) high: String,
+    pub(crate) medium: String,
+    pub(crate) low: String,
 }
 
 pub(crate) async fn get(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, ConfigurationError> {
@@ -310,6 +319,7 @@ mod tests {
                 notify_zulip: None,
                 github_releases: None,
                 review_submitted: None,
+                triage: None,
             }
         );
     }
