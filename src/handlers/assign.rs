@@ -23,6 +23,11 @@ use parser::command::{Command, Input};
 
 pub(super) struct AssignmentHandler;
 
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct AssignData {
+    user: Option<String>,
+}
+
 impl Handler for AssignmentHandler {
     type Input = AssignCommand;
     type Config = AssignConfig;
@@ -65,18 +70,39 @@ impl Handler for AssignmentHandler {
             return Ok(());
         };
 
+        let e = EditIssueBody::new(&event.issue, "ASSIGN");
         let to_assign = match cmd {
             AssignCommand::Own => event.comment.user.login.clone(),
             AssignCommand::User { username } => {
                 if let Err(_) | Ok(false) = event.comment.user.is_team_member(&ctx.github) {
-                    failure::bail!("Only Rust team members can assign other users");
+                    if username != event.comment.user.login {
+                        failure::bail!("Only Rust team members can assign other users");
+                    }
                 }
                 username.clone()
             }
+            AssignCommand::Release => {
+                let current = e.current_data();
+                if current
+                    == Some(AssignData {
+                        user: Some(event.comment.user.login.clone()),
+                    })
+                {
+                    event.issue.remove_assignees(&ctx.github)?;
+                    e.apply(&ctx.github, String::new(), AssignData { user: None })?;
+                    return Ok(());
+                } else if current.map(|d| d.user.is_some()).unwrap_or(false) {
+                    failure::bail!("Cannot release another user's assignment");
+                } else {
+                    failure::bail!("Cannot release unassigned issue");
+                }
+            }
+        };
+        let data = AssignData {
+            user: Some(to_assign.clone()),
         };
 
-        let e = EditIssueBody::new(&event.issue, "ASSIGN");
-        e.apply(&ctx.github, String::new(), ())?;
+        e.apply(&ctx.github, String::new(), &data)?;
 
         match event.issue.set_assignee(&ctx.github, &to_assign) {
             Ok(()) => return Ok(()), // we are done
@@ -91,7 +117,7 @@ impl Handler for AssignmentHandler {
                         "This issue has been assigned to @{} via [this comment]({}).",
                         to_assign, event.comment.html_url
                     ),
-                    (),
+                    &data,
                 )?;
             }
             Err(e) => return Err(e.into()),

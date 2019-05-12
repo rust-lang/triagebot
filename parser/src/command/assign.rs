@@ -5,7 +5,7 @@
 //! The grammar is as follows:
 //!
 //! ```text
-//! Command: `@bot claim` or `@bot assign @user`.
+//! Command: `@bot claim`, `@bot release-assignment`, or `@bot assign @user`.
 //! ```
 
 use crate::error::Error;
@@ -15,6 +15,7 @@ use std::fmt;
 #[derive(PartialEq, Eq, Debug)]
 pub enum AssignCommand {
     Own,
+    Release,
     User { username: String },
 }
 
@@ -62,6 +63,15 @@ impl AssignCommand {
             } else {
                 return Err(toks.error(ParseError::NoUser));
             }
+        } else if let Some(Token::Word("release-assignment")) = toks.peek_token()? {
+            toks.next_token()?;
+            if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
+                toks.next_token()?;
+                *input = toks;
+                return Ok(Some(AssignCommand::Release));
+            } else {
+                return Err(toks.error(ParseError::ExpectedEnd));
+            }
         } else {
             return Ok(None);
         }
@@ -76,25 +86,21 @@ fn parse<'a>(input: &'a str) -> Result<Option<AssignCommand>, Error<'a>> {
 
 #[test]
 fn test_1() {
-    assert_eq!(
-        parse("claim."),
-        Ok(Some(AssignCommand::Own)),
-    );
+    assert_eq!(parse("claim."), Ok(Some(AssignCommand::Own)),);
 }
 
 #[test]
 fn test_2() {
-    assert_eq!(
-        parse("claim"),
-        Ok(Some(AssignCommand::Own)),
-    );
+    assert_eq!(parse("claim"), Ok(Some(AssignCommand::Own)),);
 }
 
 #[test]
 fn test_3() {
     assert_eq!(
         parse("assign @user"),
-        Ok(Some(AssignCommand::User { username: "user".to_owned() })),
+        Ok(Some(AssignCommand::User {
+            username: "user".to_owned()
+        })),
     );
 }
 

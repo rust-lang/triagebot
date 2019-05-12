@@ -180,6 +180,31 @@ impl Issue {
         &self.labels
     }
 
+    pub fn remove_assignees(&self, client: &GithubClient) -> Result<(), AssignmentError> {
+        let url = format!(
+            "{repo_url}/issues/{number}/assignees",
+            repo_url = self.repository_url,
+            number = self.number
+        );
+
+        #[derive(serde::Serialize)]
+        struct AssigneeReq<'a> {
+            assignees: &'a [&'a str],
+        }
+        client
+            .delete(&url)
+            .json(&AssigneeReq {
+                assignees: &self
+                    .assignees
+                    .iter()
+                    .map(|u| u.login.as_str())
+                    .collect::<Vec<_>>()[..],
+            })
+            .send_req()
+            .map_err(AssignmentError::Http)?;
+        Ok(())
+    }
+
     pub fn set_assignee(&self, client: &GithubClient, user: &str) -> Result<(), AssignmentError> {
         let url = format!(
             "{repo_url}/issues/{number}/assignees",
@@ -204,21 +229,12 @@ impl Issue {
             Err(e) => return Err(AssignmentError::Http(e)),
         }
 
+        self.remove_assignees(client)?;
+
         #[derive(serde::Serialize)]
         struct AssigneeReq<'a> {
             assignees: &'a [&'a str],
         }
-        client
-            .delete(&url)
-            .json(&AssigneeReq {
-                assignees: &self
-                    .assignees
-                    .iter()
-                    .map(|u| u.login.as_str())
-                    .collect::<Vec<_>>()[..],
-            })
-            .send_req()
-            .map_err(AssignmentError::Http)?;
 
         client
             .post(&url)
