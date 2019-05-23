@@ -4,7 +4,7 @@ use reqwest::{Client, Error as HttpError, RequestBuilder, Response, StatusCode};
 use std::fmt;
 use std::io::Read;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct User {
     pub login: String,
 }
@@ -74,6 +74,11 @@ pub struct Comment {
 pub enum AssignmentError {
     InvalidAssignee,
     Http(HttpError),
+}
+
+pub enum Selection<'a, T> {
+    All,
+    One(&'a T),
 }
 
 impl fmt::Display for AssignmentError {
@@ -180,12 +185,29 @@ impl Issue {
         &self.labels
     }
 
-    pub fn remove_assignees(&self, client: &GithubClient) -> Result<(), AssignmentError> {
+    pub fn contain_assignee(&self, user: &User) -> bool {
+        self.assignees.contains(user)
+    }
+
+    pub fn remove_assignees(
+        &self,
+        client: &GithubClient,
+        selection: Selection<User>,
+    ) -> Result<(), AssignmentError> {
         let url = format!(
             "{repo_url}/issues/{number}/assignees",
             repo_url = self.repository_url,
             number = self.number
         );
+
+        let assignees = match selection {
+            Selection::All => self
+                .assignees
+                .iter()
+                .map(|u| u.login.as_str())
+                .collect::<Vec<_>>(),
+            Selection::One(user) => vec![user.login.as_str()],
+        };
 
         #[derive(serde::Serialize)]
         struct AssigneeReq<'a> {
@@ -194,11 +216,7 @@ impl Issue {
         client
             .delete(&url)
             .json(&AssigneeReq {
-                assignees: &self
-                    .assignees
-                    .iter()
-                    .map(|u| u.login.as_str())
-                    .collect::<Vec<_>>()[..],
+                assignees: &assignees[..],
             })
             .send_req()
             .map_err(AssignmentError::Http)?;
@@ -229,7 +247,7 @@ impl Issue {
             Err(e) => return Err(AssignmentError::Http(e)),
         }
 
-        self.remove_assignees(client)?;
+        self.remove_assignees(client, Selection::All)?;
 
         #[derive(serde::Serialize)]
         struct AssigneeReq<'a> {
