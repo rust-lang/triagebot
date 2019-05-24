@@ -13,7 +13,7 @@
 
 use crate::{
     config::AssignConfig,
-    github::{self, Event},
+    github::{self, Event, Selection},
     handlers::{Context, Handler},
     interactions::EditIssueBody,
 };
@@ -88,18 +88,29 @@ impl Handler for AssignmentHandler {
                 username.clone()
             }
             AssignCommand::Release => {
-                let current = if let Some(AssignData { user: Some(user) }) = e.current_data() {
-                    user
+                if let Some(AssignData {
+                    user: Some(current),
+                }) = e.current_data()
+                {
+                    if current == event.comment.user.login || is_team_member {
+                        event.issue.remove_assignees(&ctx.github, Selection::All)?;
+                        e.apply(&ctx.github, String::new(), AssignData { user: None })?;
+                        return Ok(());
+                    } else {
+                        failure::bail!("Cannot release another user's assignment");
+                    }
                 } else {
-                    failure::bail!("Cannot release unassigned issue");
+                    let current = &event.comment.user;
+                    if event.issue.contain_assignee(current) {
+                        event
+                            .issue
+                            .remove_assignees(&ctx.github, Selection::One(&current))?;
+                        e.apply(&ctx.github, String::new(), AssignData { user: None })?;
+                        return Ok(());
+                    } else {
+                        failure::bail!("Cannot release unassigned issue");
+                    }
                 };
-                if current == event.comment.user.login || is_team_member {
-                    event.issue.remove_assignees(&ctx.github)?;
-                    e.apply(&ctx.github, String::new(), AssignData { user: None })?;
-                    return Ok(());
-                } else {
-                    failure::bail!("Cannot release another user's assignment");
-                }
             }
         };
         let data = AssignData {
