@@ -1,3 +1,4 @@
+#![cfg(empty)]
 use crate::{
     github::GithubClient,
     registry::{Event, Handler},
@@ -84,16 +85,8 @@ impl TrackingIssueHandler {
 
 impl Handler for TrackingIssueHandler {
     fn handle_event(&self, event: &Event) -> Result<(), Error> {
-        #[allow(irrefutable_let_patterns)]
-        let event = if let Event::IssueComment(e) = event {
-            e
-        } else {
-            // not interested in other events
-            return Ok(());
-        };
-
-        self.handle_create(&event)?;
-        self.handle_link(&event)?;
+        //self.handle_create(&event)?;
+        //self.handle_link(&event)?;
         Ok(())
     }
 }

@@ -15,7 +15,7 @@ use crate::{
     interactions::ErrorComment,
 };
 use failure::Error;
-use parser::command::relabel::{RelabelCommand, LabelDelta};
+use parser::command::relabel::{LabelDelta, RelabelCommand};
 use parser::command::{Command, Input};
 
 pub(super) struct RelabelHandler;
@@ -25,21 +25,29 @@ impl Handler for RelabelHandler {
     type Config = RelabelConfig;
 
     fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, Error> {
-        #[allow(irrefutable_let_patterns)]
-        let event = if let Event::IssueComment(e) = event {
-            e
+        let body = if let Some(b) = event.comment_body() {
+            b
         } else {
             // not interested in other events
             return Ok(None);
         };
 
-        let mut input = Input::new(&event.comment.body, &ctx.username);
+        if let Event::Issue(e) = event {
+            if e.action != github::IssuesAction::Opened {
+                // skip events other than opening the issue to avoid retriggering commands in the
+                // issue body
+                return Ok(None);
+            }
+        }
+
+        let mut input = Input::new(&body, &ctx.username);
         match input.parse_command() {
             Command::Relabel(Ok(command)) => Ok(Some(command)),
             Command::Relabel(Err(err)) => {
                 failure::bail!(
                     "Parsing label command in [comment]({}) failed: {}",
-                    event.comment.html_url, err
+                    event.html_url().expect("has html url"),
+                    err
                 );
             }
             _ => Ok(None),
@@ -53,20 +61,12 @@ impl Handler for RelabelHandler {
         event: &Event,
         input: RelabelCommand,
     ) -> Result<(), Error> {
-        #[allow(irrefutable_let_patterns)]
-        let event = if let Event::IssueComment(e) = event {
-            e
-        } else {
-            // not interested in other events
-            return Ok(());
-        };
-
-        let mut issue_labels = event.issue.labels().to_owned();
+        let mut issue_labels = event.issue().unwrap().labels().to_owned();
         let mut changed = false;
         for delta in &input.0 {
             let name = delta.label().as_str();
-            if let Err(msg) = check_filter(name, config, &event.comment.user, &ctx.github) {
-                ErrorComment::new(&event.issue, msg.to_string()).post(&ctx.github)?;
+            if let Err(msg) = check_filter(name, config, &event.user(), &ctx.github) {
+                ErrorComment::new(&event.issue().unwrap(), msg.to_string()).post(&ctx.github)?;
                 return Ok(());
             }
             match delta {
@@ -88,7 +88,10 @@ impl Handler for RelabelHandler {
         }
 
         if changed {
-            event.issue.set_labels(&ctx.github, issue_labels)?;
+            event
+                .issue()
+                .unwrap()
+                .set_labels(&ctx.github, issue_labels)?;
         }
 
         Ok(())
