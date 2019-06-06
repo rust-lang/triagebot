@@ -55,6 +55,7 @@ pub struct Issue {
     pub number: u64,
     pub body: String,
     title: String,
+    html_url: String,
     user: User,
     labels: Vec<Label>,
     assignees: Vec<User>,
@@ -280,6 +281,34 @@ pub struct IssueCommentEvent {
     pub repository: Repository,
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum IssuesAction {
+    Opened,
+    Edited,
+    Deleted,
+    Transferred,
+    Pinned,
+    Unpinned,
+    Closed,
+    Reopened,
+    Assigned,
+    Unassigned,
+    Labeled,
+    Unlabeled,
+    Locked,
+    Unlocked,
+    Milestoned,
+    Demilestoned,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct IssuesEvent {
+    pub action: IssuesAction,
+    pub issue: Issue,
+    pub repository: Repository,
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct Repository {
     pub full_name: String,
@@ -288,18 +317,43 @@ pub struct Repository {
 #[derive(Debug)]
 pub enum Event {
     IssueComment(IssueCommentEvent),
+    Issue(IssuesEvent),
 }
 
 impl Event {
     pub fn repo_name(&self) -> &str {
         match self {
             Event::IssueComment(event) => &event.repository.full_name,
+            Event::Issue(event) => &event.repository.full_name,
         }
     }
 
     pub fn issue(&self) -> Option<&Issue> {
         match self {
             Event::IssueComment(event) => Some(&event.issue),
+            Event::Issue(event) => Some(&event.issue),
+        }
+    }
+
+    /// This will both extract from IssueComment events but also Issue events
+    pub fn comment_body(&self) -> Option<&str> {
+        match self {
+            Event::Issue(e) => Some(&e.issue.body),
+            Event::IssueComment(e) => Some(&e.comment.body),
+        }
+    }
+
+    pub fn html_url(&self) -> Option<&str> {
+        match self {
+            Event::Issue(e) => Some(&e.issue.html_url),
+            Event::IssueComment(e) => Some(&e.comment.html_url),
+        }
+    }
+
+    pub fn user(&self) -> &User {
+        match self {
+            Event::Issue(e) => &e.issue.user,
+            Event::IssueComment(e) => &e.comment.user,
         }
     }
 }

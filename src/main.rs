@@ -23,6 +23,7 @@ use payload::SignedPayload;
 
 enum EventName {
     IssueComment,
+    Issue,
     Other,
 }
 
@@ -36,6 +37,7 @@ impl<'a, 'r> request::FromRequest<'a, 'r> for EventName {
         };
         let ev = match ev {
             "issue_comment" => EventName::IssueComment,
+            "issues" => EventName::Issue,
             _ => EventName::Other,
         };
         Outcome::Success(ev)
@@ -76,6 +78,20 @@ fn webhook(
                 .map_err(Error::from)?;
 
             let event = github::Event::IssueComment(payload);
+            if let Err(err) = handlers::handle(&ctx, &event) {
+                if let Some(issue) = event.issue() {
+                    ErrorComment::new(issue, err.to_string()).post(&ctx.github)?;
+                }
+                return Err(err.into());
+            }
+        }
+        EventName::Issue => {
+            let payload = payload
+                .deserialize::<github::IssuesEvent>()
+                .context("IssueCommentEvent failed to deserialize")
+                .map_err(Error::from)?;
+
+            let event = github::Event::Issue(payload);
             if let Err(err) = handlers::handle(&ctx, &event) {
                 if let Some(issue) = event.issue() {
                     ErrorComment::new(issue, err.to_string()).post(&ctx.github)?;

@@ -33,21 +33,28 @@ impl Handler for AssignmentHandler {
     type Config = AssignConfig;
 
     fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, Error> {
-        #[allow(irrefutable_let_patterns)]
-        let event = if let Event::IssueComment(e) = event {
-            e
+        let body = if let Some(b) = event.comment_body() {
+            b
         } else {
             // not interested in other events
             return Ok(None);
         };
 
-        let mut input = Input::new(&event.comment.body, &ctx.username);
+        if let Event::Issue(e) = event {
+            if e.action != github::IssuesAction::Opened {
+                // skip events other than opening the issue to avoid retriggering commands in the
+                // issue body
+                return Ok(None);
+            }
+        }
+
+        let mut input = Input::new(&body, &ctx.username);
         match input.parse_command() {
             Command::Assign(Ok(command)) => Ok(Some(command)),
             Command::Assign(Err(err)) => {
                 failure::bail!(
                     "Parsing assign command in [comment]({}) failed: {}",
-                    event.comment.html_url,
+                    event.html_url().expect("has html url"),
                     err
                 );
             }
@@ -62,27 +69,18 @@ impl Handler for AssignmentHandler {
         event: &Event,
         cmd: AssignCommand,
     ) -> Result<(), Error> {
-        #[allow(irrefutable_let_patterns)]
-        let event = if let Event::IssueComment(e) = event {
-            e
+        let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github) {
+            false
         } else {
-            // not interested in other events
-            return Ok(());
+            true
         };
 
-        let is_team_member =
-            if let Err(_) | Ok(false) = event.comment.user.is_team_member(&ctx.github) {
-                false
-            } else {
-                true
-            };
-
-        let e = EditIssueBody::new(&event.issue, "ASSIGN");
+        let e = EditIssueBody::new(&event.issue().unwrap(), "ASSIGN");
 
         let to_assign = match cmd {
-            AssignCommand::Own => event.comment.user.login.clone(),
+            AssignCommand::Own => event.user().login.clone(),
             AssignCommand::User { username } => {
-                if !is_team_member && username != event.comment.user.login {
+                if !is_team_member && username != event.user().login {
                     failure::bail!("Only Rust team members can assign other users");
                 }
                 username.clone()
@@ -92,18 +90,22 @@ impl Handler for AssignmentHandler {
                     user: Some(current),
                 }) = e.current_data()
                 {
-                    if current == event.comment.user.login || is_team_member {
-                        event.issue.remove_assignees(&ctx.github, Selection::All)?;
+                    if current == event.user().login || is_team_member {
+                        event
+                            .issue()
+                            .unwrap()
+                            .remove_assignees(&ctx.github, Selection::All)?;
                         e.apply(&ctx.github, String::new(), AssignData { user: None })?;
                         return Ok(());
                     } else {
                         failure::bail!("Cannot release another user's assignment");
                     }
                 } else {
-                    let current = &event.comment.user;
-                    if event.issue.contain_assignee(current) {
+                    let current = &event.user();
+                    if event.issue().unwrap().contain_assignee(current) {
                         event
-                            .issue
+                            .issue()
+                            .unwrap()
                             .remove_assignees(&ctx.github, Selection::One(&current))?;
                         e.apply(&ctx.github, String::new(), AssignData { user: None })?;
                         return Ok(());
@@ -119,18 +121,20 @@ impl Handler for AssignmentHandler {
 
         e.apply(&ctx.github, String::new(), &data)?;
 
-        match event.issue.set_assignee(&ctx.github, &to_assign) {
+        match event.issue().unwrap().set_assignee(&ctx.github, &to_assign) {
             Ok(()) => return Ok(()), // we are done
             Err(github::AssignmentError::InvalidAssignee) => {
                 event
-                    .issue
+                    .issue()
+                    .unwrap()
                     .set_assignee(&ctx.github, &ctx.username)
                     .context("self-assignment failed")?;
                 e.apply(
                     &ctx.github,
                     format!(
                         "This issue has been assigned to @{} via [this comment]({}).",
-                        to_assign, event.comment.html_url
+                        to_assign,
+                        event.html_url().unwrap()
                     ),
                     &data,
                 )?;
