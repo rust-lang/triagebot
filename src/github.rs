@@ -27,7 +27,10 @@ impl User {
             .and_then(|mut r| r.json())
             .context("could not get team data")?;
         let map = permission.teams;
-        Ok(map["all"].members.iter().any(|g| g.github == self.login))
+        Ok(map["all"].members.iter().any(|g| g.github == self.login)
+            || map
+                .get("wg-triage")
+                .map_or(false, |w| w.members.iter().any(|g| g.github == self.login)))
     }
 }
 
