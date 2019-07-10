@@ -4,105 +4,71 @@
 #[macro_use]
 extern crate rocket;
 
-use failure::{Error, ResultExt};
+use failure::ResultExt;
 use reqwest::Client;
-use rocket::request;
-use rocket::State;
-use rocket::{http::Status, Outcome, Request};
-use std::env;
+use rocket::{
+    data::Data,
+    http::Status,
+    request::{self, FromRequest, Request},
+    Outcome, State,
+};
+use std::{env, io::Read};
+use triagebot::{github, handlers, payload, EventName, WebhookError};
 
-mod config;
-mod github;
-mod handlers;
-mod interactions;
-mod payload;
-mod team;
+struct XGitHubEvent<'r>(&'r str);
 
-use interactions::ErrorComment;
-use payload::SignedPayload;
-
-enum EventName {
-    IssueComment,
-    Issue,
-    Other,
-}
-
-impl<'a, 'r> request::FromRequest<'a, 'r> for EventName {
-    type Error = String;
+impl<'a, 'r> FromRequest<'a, 'r> for XGitHubEvent<'a> {
+    type Error = &'static str;
     fn from_request(req: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
         let ev = if let Some(ev) = req.headers().get_one("X-GitHub-Event") {
             ev
         } else {
-            return Outcome::Failure((Status::BadRequest, "Needs a X-GitHub-Event".into()));
+            return Outcome::Failure((Status::BadRequest, "Needs a X-GitHub-Event"));
         };
-        let ev = match ev {
-            "issue_comment" => EventName::IssueComment,
-            "issues" => EventName::Issue,
-            _ => EventName::Other,
-        };
-        Outcome::Success(ev)
+        Outcome::Success(XGitHubEvent(ev))
     }
 }
 
-#[derive(Debug)]
-struct WebhookError(Error);
+struct XHubSignature<'r>(&'r str);
 
-impl<'r> rocket::response::Responder<'r> for WebhookError {
-    fn respond_to(self, _: &Request) -> rocket::response::Result<'r> {
-        let body = format!("{:?}", self.0);
-        rocket::Response::build()
-            .header(rocket::http::ContentType::Plain)
-            .status(rocket::http::Status::InternalServerError)
-            .sized_body(std::io::Cursor::new(body))
-            .ok()
-    }
-}
-
-impl From<Error> for WebhookError {
-    fn from(e: Error) -> WebhookError {
-        WebhookError(e)
+impl<'a, 'r> FromRequest<'a, 'r> for XHubSignature<'a> {
+    type Error = &'static str;
+    fn from_request(req: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
+        let ev = if let Some(ev) = req.headers().get_one("X-Hub-Signature") {
+            ev
+        } else {
+            return Outcome::Failure((Status::BadRequest, "Needs a X-Hub-Signature"));
+        };
+        Outcome::Success(XHubSignature(ev))
     }
 }
 
 #[post("/github-hook", data = "<payload>")]
 fn webhook(
-    event: EventName,
-    payload: SignedPayload,
+    signature: XHubSignature,
+    event_header: XGitHubEvent,
+    payload: Data,
     ctx: State<handlers::Context>,
 ) -> Result<(), WebhookError> {
-    match event {
-        EventName::IssueComment => {
-            let payload = payload
-                .deserialize::<github::IssueCommentEvent>()
-                .context("IssueCommentEvent failed to deserialize")
-                .map_err(Error::from)?;
+    let event = match event_header.0.parse::<EventName>() {
+        Ok(v) => v,
+        Err(_) => unreachable!(),
+    };
 
-            let event = github::Event::IssueComment(payload);
-            if let Err(err) = handlers::handle(&ctx, &event) {
-                if let Some(issue) = event.issue() {
-                    ErrorComment::new(issue, err.to_string()).post(&ctx.github)?;
-                }
-                return Err(err.into());
-            }
-        }
-        EventName::Issue => {
-            let payload = payload
-                .deserialize::<github::IssuesEvent>()
-                .context("IssueCommentEvent failed to deserialize")
-                .map_err(Error::from)?;
-
-            let event = github::Event::Issue(payload);
-            if let Err(err) = handlers::handle(&ctx, &event) {
-                if let Some(issue) = event.issue() {
-                    ErrorComment::new(issue, err.to_string()).post(&ctx.github)?;
-                }
-                return Err(err.into());
-            }
-        }
-        // Other events need not be handled
-        EventName::Other => {}
+    let mut stream = payload.open().take(1024 * 1024 * 5); // 5 Megabytes
+    let mut buf = Vec::new();
+    if let Err(err) = stream.read_to_end(&mut buf) {
+        log::trace!("failed to read request body: {:?}", err);
+        return Err(WebhookError::from(failure::err_msg(
+            "failed to read request body",
+        )));
     }
-    Ok(())
+
+    payload::assert_signed(signature.0, &buf).map_err(failure::Error::from)?;
+    let payload = String::from_utf8(buf)
+        .context("utf-8 payload required")
+        .map_err(failure::Error::from)?;
+    triagebot::webhook(event, payload, &ctx)
 }
 
 #[catch(404)]
