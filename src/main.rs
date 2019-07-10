@@ -71,11 +71,6 @@ fn webhook(
     triagebot::webhook(event, payload, &ctx)
 }
 
-#[catch(404)]
-fn not_found(_: &Request) -> &'static str {
-    "Not Found"
-}
-
 fn main() {
     dotenv::dotenv().ok();
     let client = Client::new();
@@ -92,6 +87,5 @@ fn main() {
         .manage(gh)
         .manage(ctx)
         .mount("/", routes![webhook])
-        .register(catchers![not_found])
         .launch();
 }
