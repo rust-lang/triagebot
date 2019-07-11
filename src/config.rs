@@ -31,11 +31,11 @@ pub(crate) struct RelabelConfig {
     pub(crate) allow_unauthenticated: Vec<String>,
 }
 
-pub(crate) fn get(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, Error> {
+pub(crate) async fn get(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, Error> {
     if let Some(config) = get_cached_config(repo) {
         Ok(config)
     } else {
-        get_fresh_config(gh, repo)
+        get_fresh_config(gh, repo).await
     }
 }
 
@@ -50,9 +50,9 @@ fn get_cached_config(repo: &str) -> Option<Arc<Config>> {
     })
 }
 
-fn get_fresh_config(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, Error> {
+async fn get_fresh_config(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, Error> {
     let contents = gh
-        .raw_file(repo, "master", CONFIG_FILE_NAME)?
+        .raw_file(repo, "master", CONFIG_FILE_NAME).await?
         .ok_or_else(|| {
             failure::err_msg(
                 "This repository is not enabled to use triagebot.\n\

@@ -1,15 +1,16 @@
 use crate::github::{Event, GithubClient};
 use failure::Error;
+use futures::future::BoxFuture;
 
 macro_rules! handlers {
     ($($name:ident = $handler:expr,)*) => {
         $(mod $name;)*
 
-        pub fn handle(ctx: &Context, event: &Event) -> Result<(), Error> {
+        pub async fn handle(ctx: &Context, event: &Event) -> Result<(), Error> {
+            let config = crate::config::get(&ctx.github, event.repo_name()).await?;
             $(if let Some(input) = Handler::parse_input(&$handler, ctx, event)? {
-                let config = crate::config::get(&ctx.github, event.repo_name())?;
                 if let Some(config) = &config.$name {
-                    Handler::handle_input(&$handler, ctx, config, event, input)?;
+                    Handler::handle_input(&$handler, ctx, config, event, input).await?;
                 } else {
                     failure::bail!(
                         "The feature `{}` is not enabled in this repository.\n\
@@ -39,13 +40,17 @@ pub trait Handler: Sync + Send {
     type Input;
     type Config;
 
-    fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, Error>;
-
-    fn handle_input(
+    fn parse_input(
         &self,
         ctx: &Context,
-        config: &Self::Config,
         event: &Event,
+    ) -> Result<Option<Self::Input>, Error>;
+
+    fn handle_input<'a>(
+        &self,
+        ctx: &'a Context,
+        config: &'a Self::Config,
+        event: &'a Event,
         input: Self::Input,
-    ) -> Result<(), Error>;
+    ) -> BoxFuture<'a, Result<(), Error>>;
 }

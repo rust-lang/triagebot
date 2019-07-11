@@ -1,3 +1,4 @@
+#![feature(async_await)]
 #![allow(clippy::new_without_default)]
 
 use failure::{Error, ResultExt};
@@ -41,7 +42,7 @@ pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> Result<T,
     Ok(serde_json::from_str(&v).with_context(|_| format!("input: {:?}", v))?)
 }
 
-pub fn webhook(
+pub async fn webhook(
     event: EventName,
     payload: String,
     ctx: &handlers::Context,
@@ -53,9 +54,10 @@ pub fn webhook(
                 .map_err(Error::from)?;
 
             let event = github::Event::IssueComment(payload);
-            if let Err(err) = handlers::handle(&ctx, &event) {
+            if let Err(err) = handlers::handle(&ctx, &event).await {
                 if let Some(issue) = event.issue() {
-                    ErrorComment::new(issue, err.to_string()).post(&ctx.github)?;
+                    let cmnt = ErrorComment::new(issue, err.to_string());
+                    cmnt.post(&ctx.github).await?;
                 }
                 return Err(err.into());
             }
@@ -66,9 +68,10 @@ pub fn webhook(
                 .map_err(Error::from)?;
 
             let event = github::Event::Issue(payload);
-            if let Err(err) = handlers::handle(&ctx, &event) {
+            if let Err(err) = handlers::handle(&ctx, &event).await {
                 if let Some(issue) = event.issue() {
-                    ErrorComment::new(issue, err.to_string()).post(&ctx.github)?;
+                    let cmnt = ErrorComment::new(issue, err.to_string());
+                    cmnt.post(&ctx.github).await?;
                 }
                 return Err(err.into());
             }

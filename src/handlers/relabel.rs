@@ -17,6 +17,7 @@ use crate::{
 use failure::Error;
 use parser::command::relabel::{LabelDelta, RelabelCommand};
 use parser::command::{Command, Input};
+use futures::future::{FutureExt, BoxFuture};
 
 pub(super) struct RelabelHandler;
 
@@ -54,58 +55,63 @@ impl Handler for RelabelHandler {
         }
     }
 
-    fn handle_input(
+    fn handle_input<'a>(
         &self,
-        ctx: &Context,
-        config: &RelabelConfig,
-        event: &Event,
+        ctx: &'a Context,
+        config: &'a RelabelConfig,
+        event: &'a Event,
         input: RelabelCommand,
-    ) -> Result<(), Error> {
-        let mut issue_labels = event.issue().unwrap().labels().to_owned();
-        let mut changed = false;
-        for delta in &input.0 {
-            let name = delta.label().as_str();
-            if let Err(msg) = check_filter(name, config, &event.user(), &ctx.github) {
-                ErrorComment::new(&event.issue().unwrap(), msg.to_string()).post(&ctx.github)?;
-                return Ok(());
-            }
-            match delta {
-                LabelDelta::Add(label) => {
-                    if !issue_labels.iter().any(|l| l.name == label.as_str()) {
-                        changed = true;
-                        issue_labels.push(github::Label {
-                            name: label.to_string(),
-                        });
-                    }
-                }
-                LabelDelta::Remove(label) => {
-                    if let Some(pos) = issue_labels.iter().position(|l| l.name == label.as_str()) {
-                        changed = true;
-                        issue_labels.remove(pos);
-                    }
-                }
-            }
-        }
-
-        if changed {
-            event
-                .issue()
-                .unwrap()
-                .set_labels(&ctx.github, issue_labels)?;
-        }
-
-        Ok(())
+    ) -> BoxFuture<'a, Result<(), Error>> {
+        handle_input(ctx, config, event, input).boxed()
     }
 }
 
-fn check_filter(
+async fn handle_input(ctx: &Context, config: &RelabelConfig, event: &Event, input: RelabelCommand) -> Result<(), Error> {
+    let mut issue_labels = event.issue().unwrap().labels().to_owned();
+    let mut changed = false;
+    for delta in &input.0 {
+        let name = delta.label().as_str();
+        if let Err(msg) = check_filter(name, config, &event.user(), &ctx.github).await {
+            let cmnt = ErrorComment::new(&event.issue().unwrap(), msg.to_string());
+            cmnt.post(&ctx.github).await?;
+            return Ok(());
+        }
+        match delta {
+            LabelDelta::Add(label) => {
+                if !issue_labels.iter().any(|l| l.name == label.as_str()) {
+                    changed = true;
+                    issue_labels.push(github::Label {
+                        name: label.to_string(),
+                    });
+                }
+            }
+            LabelDelta::Remove(label) => {
+                if let Some(pos) = issue_labels.iter().position(|l| l.name == label.as_str()) {
+                    changed = true;
+                    issue_labels.remove(pos);
+                }
+            }
+        }
+    }
+
+    if changed {
+        event
+            .issue()
+            .unwrap()
+            .set_labels(&ctx.github, issue_labels).await?;
+    }
+
+    Ok(())
+}
+
+async fn check_filter(
     label: &str,
     config: &RelabelConfig,
     user: &github::User,
     client: &GithubClient,
 ) -> Result<(), Error> {
     let is_team_member;
-    match user.is_team_member(client) {
+    match user.is_team_member(client).await {
         Ok(true) => return Ok(()),
         Ok(false) => {
             is_team_member = Ok(());

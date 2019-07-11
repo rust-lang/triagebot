@@ -18,7 +18,7 @@ impl<'a> ErrorComment<'a> {
         }
     }
 
-    pub fn post(&self, client: &GithubClient) -> Result<(), Error> {
+    pub async fn post(&self, client: &GithubClient) -> Result<(), Error> {
         let mut body = String::new();
         writeln!(body, "**Error**: {}", self.message)?;
         writeln!(body)?;
@@ -26,7 +26,7 @@ impl<'a> ErrorComment<'a> {
             body,
             "Please let **`@rust-lang/release`** know if you're having trouble with this bot."
         )?;
-        self.issue.post_comment(client, &body)
+        self.issue.post_comment(client, &body).await
     }
 }
 
@@ -99,7 +99,7 @@ impl<'a> EditIssueBody<'a> {
         )
     }
 
-    pub fn apply<T>(&self, client: &GithubClient, text: String, data: T) -> Result<(), Error>
+    pub async fn apply<T>(&self, client: &GithubClient, text: String, data: T) -> Result<(), Error>
     where
         T: serde::Serialize,
     {
@@ -127,16 +127,16 @@ impl<'a> EditIssueBody<'a> {
                     let end_idx = start_idx + all_new.len();
                     current_body.replace_range(start_idx..end_idx, "");
                 }
-                self.issue.edit_body(&client, &current_body)?;
+                self.issue.edit_body(&client, &current_body).await?;
             } else {
                 let end_idx = current_body.find(&END_BOT).unwrap();
                 current_body.insert_str(end_idx, &bot_section);
-                self.issue.edit_body(&client, &current_body)?;
+                self.issue.edit_body(&client, &current_body).await?;
             }
         } else {
             let new_body = format!("{}{}", current_body, all_new);
 
-            self.issue.edit_body(&client, &new_body)?;
+            self.issue.edit_body(&client, &new_body).await?;
         }
         Ok(())
     }

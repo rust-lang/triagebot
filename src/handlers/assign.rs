@@ -20,6 +20,7 @@ use crate::{
 use failure::{Error, ResultExt};
 use parser::command::assign::AssignCommand;
 use parser::command::{Command, Input};
+use futures::future::{FutureExt, BoxFuture};
 
 pub(super) struct AssignmentHandler;
 
@@ -62,14 +63,19 @@ impl Handler for AssignmentHandler {
         }
     }
 
-    fn handle_input(
+    fn handle_input<'a>(
         &self,
-        ctx: &Context,
-        _config: &AssignConfig,
-        event: &Event,
+        ctx: &'a Context,
+        _config: &'a AssignConfig,
+        event: &'a Event,
         cmd: AssignCommand,
-    ) -> Result<(), Error> {
-        let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github) {
+    ) -> BoxFuture<'a, Result<(), Error>> {
+        handle_input(ctx, event, cmd).boxed()
+    }
+}
+
+async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> Result<(), Error> {
+        let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await {
             false
         } else {
             true
@@ -94,8 +100,8 @@ impl Handler for AssignmentHandler {
                         event
                             .issue()
                             .unwrap()
-                            .remove_assignees(&ctx.github, Selection::All)?;
-                        e.apply(&ctx.github, String::new(), AssignData { user: None })?;
+                            .remove_assignees(&ctx.github, Selection::All).await?;
+                        e.apply(&ctx.github, String::new(), AssignData { user: None }).await?;
                         return Ok(());
                     } else {
                         failure::bail!("Cannot release another user's assignment");
@@ -106,8 +112,8 @@ impl Handler for AssignmentHandler {
                         event
                             .issue()
                             .unwrap()
-                            .remove_assignees(&ctx.github, Selection::One(&current))?;
-                        e.apply(&ctx.github, String::new(), AssignData { user: None })?;
+                            .remove_assignees(&ctx.github, Selection::One(&current)).await?;
+                        e.apply(&ctx.github, String::new(), AssignData { user: None }).await?;
                         return Ok(());
                     } else {
                         failure::bail!("Cannot release unassigned issue");
@@ -119,15 +125,15 @@ impl Handler for AssignmentHandler {
             user: Some(to_assign.clone()),
         };
 
-        e.apply(&ctx.github, String::new(), &data)?;
+        e.apply(&ctx.github, String::new(), &data).await?;
 
-        match event.issue().unwrap().set_assignee(&ctx.github, &to_assign) {
+        match event.issue().unwrap().set_assignee(&ctx.github, &to_assign).await {
             Ok(()) => return Ok(()), // we are done
             Err(github::AssignmentError::InvalidAssignee) => {
                 event
                     .issue()
                     .unwrap()
-                    .set_assignee(&ctx.github, &ctx.username)
+                    .set_assignee(&ctx.github, &ctx.username).await
                     .context("self-assignment failed")?;
                 e.apply(
                     &ctx.github,
@@ -137,11 +143,11 @@ impl Handler for AssignmentHandler {
                         event.html_url().unwrap()
                     ),
                     &data,
-                )?;
+                ).await?;
             }
             Err(e) => return Err(e.into()),
         }
 
         Ok(())
-    }
+
 }
