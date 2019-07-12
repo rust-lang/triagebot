@@ -7,7 +7,6 @@ edition = "2018"
 [workspace]
 
 [dependencies]
-rocket = "0.4"
 serde_json = "1"
 openssl = "0.10"
 dotenv = "0.14"
@@ -24,6 +23,7 @@ glob = "0.3.0"
 toml = "0.5.1"
 hyper = "0.12.32"
 futures-preview = { version = "=0.3.0-alpha.17", features = ["compat"] }
+uuid = { version = "0.7.4", features = ["v4"] }
 
 [dependencies.serde]
 version = "1"

@@ -10,8 +10,12 @@ use hyper::{header, service::service_fn, Body, Request, Response, Server, Status
 use reqwest::r#async::Client;
 use std::{env, net::SocketAddr, sync::Arc};
 use triagebot::{github, handlers::Context, payload, EventName};
+use uuid::Uuid;
+
+mod logger;
 
 async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Body>, hyper::Error> {
+    log::info!("request = {:?}", req);
     let (req, body_stream) = req.into_parts();
     if req.uri.path() != "/github-hook" {
         return Ok(Response::builder()
@@ -46,6 +50,7 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
             .body(Body::from("X-GitHub-Event header must be set"))
             .unwrap());
     };
+    log::debug!("event={}", event);
     let signature = if let Some(sig) = req.headers.get("X-Hub-Signature") {
         match sig.to_str().ok() {
             Some(v) => v,
@@ -62,6 +67,7 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
             .body(Body::from("X-Hub-Signature header must be set"))
             .unwrap());
     };
+    log::debug!("signature={}", signature);
 
     let mut c = body_stream.compat();
     let mut payload = Vec::new();
@@ -109,13 +115,25 @@ async fn run_server(addr: SocketAddr) {
         env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"),
     );
     let ctx = Arc::new(Context {
-        github: gh.clone(),
         username: github::User::current(&gh).await.unwrap().login,
+        github: gh,
     });
 
     let serve_future = Server::bind(&addr).serve(move || {
         let ctx = ctx.clone();
-        service_fn(move |req| serve_req(req, ctx.clone()).boxed().compat())
+        service_fn(move |req| {
+            let ctx = ctx.clone();
+            let uuid = Uuid::new_v4();
+            logger::LogFuture::new(uuid, serve_req(req, ctx).map(move |mut resp| {
+                if let Ok(resp) = &mut resp {
+                    resp.headers_mut().insert("X-Request-Id", uuid.to_string().parse().unwrap());
+                }
+                log::info!("response = {:?}", resp);
+                resp
+            }))
+                .boxed()
+                .compat()
+        })
     });
 
     if let Err(e) = serve_future.compat().await {
@@ -125,6 +143,7 @@ async fn run_server(addr: SocketAddr) {
 
 fn main() {
     dotenv::dotenv().ok();
+    logger::init();
 
     let addr = ([0, 0, 0, 0], 8002).into();
     hyper::rt::run(run_server(addr).unit_error().boxed().compat());

@@ -2,7 +2,7 @@
 #![allow(clippy::new_without_default)]
 
 use failure::{Error, ResultExt};
-
+use std::fmt;
 use interactions::ErrorComment;
 
 pub mod config;
@@ -25,6 +25,16 @@ impl std::str::FromStr for EventName {
             "issue_comment" => EventName::IssueComment,
             "issues" => EventName::Issue,
             _ => EventName::Other,
+        })
+    }
+}
+
+impl fmt::Display for EventName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", match self {
+            EventName::IssueComment => "issue_comment",
+            EventName::Issue => "issues",
+            EventName::Other => "other",
         })
     }
 }
@@ -52,6 +62,8 @@ pub async fn webhook(
             let payload = deserialize_payload::<github::IssueCommentEvent>(&payload)
                 .context("IssueCommentEvent failed to deserialize")
                 .map_err(Error::from)?;
+
+            log::info!("handling issue comment {:?}", payload);
 
             let event = github::Event::IssueComment(payload);
             if let Err(err) = handlers::handle(&ctx, &event).await {
