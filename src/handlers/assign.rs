@@ -43,6 +43,7 @@ impl Handler for AssignmentHandler {
 
         if let Event::Issue(e) = event {
             if e.action != github::IssuesAction::Opened {
+                log::debug!("skipping event, issue was {:?}", e.action);
                 // skip events other than opening the issue to avoid retriggering commands in the
                 // issue body
                 return Ok(None);

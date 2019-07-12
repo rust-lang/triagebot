@@ -79,6 +79,8 @@ pub async fn webhook(
                 .context("IssuesEvent failed to deserialize")
                 .map_err(Error::from)?;
 
+            log::info!("handling issue event {:?}", payload);
+
             let event = github::Event::Issue(payload);
             if let Err(err) = handlers::handle(&ctx, &event).await {
                 if let Some(issue) = event.issue() {

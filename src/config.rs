@@ -12,19 +12,19 @@ lazy_static::lazy_static! {
         RwLock::new(HashMap::new());
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub(crate) struct Config {
     pub(crate) relabel: Option<RelabelConfig>,
     pub(crate) assign: Option<AssignConfig>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub(crate) struct AssignConfig {
     #[serde(default)]
     _empty: (),
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct RelabelConfig {
     #[serde(default)]
@@ -33,8 +33,10 @@ pub(crate) struct RelabelConfig {
 
 pub(crate) async fn get(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, Error> {
     if let Some(config) = get_cached_config(repo) {
+        log::trace!("returning config for {} from cache", repo);
         Ok(config)
     } else {
+        log::trace!("fetching fresh config for {}", repo);
         get_fresh_config(gh, repo).await
     }
 }
@@ -60,6 +62,7 @@ async fn get_fresh_config(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, 
             )
         })?;
     let config = Arc::new(toml::from_slice::<Config>(&contents)?);
+    log::debug!("fresh configuration for {}: {:?}", repo, config);
     CONFIG_CACHE
         .write()
         .unwrap()

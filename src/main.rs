@@ -124,15 +124,19 @@ async fn run_server(addr: SocketAddr) {
         service_fn(move |req| {
             let ctx = ctx.clone();
             let uuid = Uuid::new_v4();
-            logger::LogFuture::new(uuid, serve_req(req, ctx).map(move |mut resp| {
-                if let Ok(resp) = &mut resp {
-                    resp.headers_mut().insert("X-Request-Id", uuid.to_string().parse().unwrap());
-                }
-                log::info!("response = {:?}", resp);
-                resp
-            }))
-                .boxed()
-                .compat()
+            logger::LogFuture::new(
+                uuid,
+                serve_req(req, ctx).map(move |mut resp| {
+                    if let Ok(resp) = &mut resp {
+                        resp.headers_mut()
+                            .insert("X-Request-Id", uuid.to_string().parse().unwrap());
+                    }
+                    log::info!("response = {:?}", resp);
+                    resp
+                }),
+            )
+            .boxed()
+            .compat()
         })
     });
 
