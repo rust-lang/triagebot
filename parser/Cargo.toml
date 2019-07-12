@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 pulldown-cmark = "0.2.0"
+log = "0.4"

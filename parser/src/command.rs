@@ -45,6 +45,7 @@ impl<'a> Input<'a> {
             tok.next_token().unwrap(),
             Some(Token::Word(&format!("@{}", self.bot)))
         );
+        log::info!("identified potential command");
 
         let mut success = vec![];
 
@@ -53,6 +54,7 @@ impl<'a> Input<'a> {
         {
             let mut tok = original_tokenizer.clone();
             let res = relabel::RelabelCommand::parse(&mut tok);
+            log::info!("parsed relabel command: {:?}", res);
             match res {
                 Ok(None) => {}
                 Ok(Some(cmd)) => {
@@ -67,6 +69,7 @@ impl<'a> Input<'a> {
         {
             let mut tok = original_tokenizer.clone();
             let res = assign::AssignCommand::parse(&mut tok);
+            log::info!("parsed assign command: {:?}", res);
             match res {
                 Ok(None) => {}
                 Ok(Some(cmd)) => {
@@ -91,6 +94,7 @@ impl<'a> Input<'a> {
             .overlaps_code((self.parsed)..(self.parsed + tok.position()))
             .is_some()
         {
+            log::info!("command overlaps code; code: {:?}", self.code);
             return Command::None;
         }
 
