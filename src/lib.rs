@@ -2,6 +2,7 @@
 #![allow(clippy::new_without_default)]
 
 use failure::{Error, ResultExt};
+use handlers::HandlerError;
 use interactions::ErrorComment;
 use std::fmt;
 
@@ -61,7 +62,7 @@ pub async fn webhook(
     payload: String,
     ctx: &handlers::Context,
 ) -> Result<(), WebhookError> {
-    match event {
+    let event = match event {
         EventName::IssueComment => {
             let payload = deserialize_payload::<github::IssueCommentEvent>(&payload)
                 .context("IssueCommentEvent failed to deserialize")
@@ -69,14 +70,7 @@ pub async fn webhook(
 
             log::info!("handling issue comment {:?}", payload);
 
-            let event = github::Event::IssueComment(payload);
-            if let Err(err) = handlers::handle(&ctx, &event).await {
-                if let Some(issue) = event.issue() {
-                    let cmnt = ErrorComment::new(issue, err.to_string());
-                    cmnt.post(&ctx.github).await?;
-                }
-                return Err(err.into());
-            }
+            github::Event::IssueComment(payload)
         }
         EventName::Issue => {
             let payload = deserialize_payload::<github::IssuesEvent>(&payload)
@@ -85,17 +79,28 @@ pub async fn webhook(
 
             log::info!("handling issue event {:?}", payload);
 
-            let event = github::Event::Issue(payload);
-            if let Err(err) = handlers::handle(&ctx, &event).await {
-                if let Some(issue) = event.issue() {
-                    let cmnt = ErrorComment::new(issue, err.to_string());
-                    cmnt.post(&ctx.github).await?;
-                }
-                return Err(err.into());
-            }
+            github::Event::Issue(payload)
         }
         // Other events need not be handled
-        EventName::Other => {}
+        EventName::Other => {
+            return Ok(());
+        }
+    };
+    if let Err(err) = handlers::handle(&ctx, &event).await {
+        match err {
+            HandlerError::Message(message) => {
+                if let Some(issue) = event.issue() {
+                    let cmnt = ErrorComment::new(issue, message);
+                    cmnt.post(&ctx.github).await?;
+                }
+            }
+            HandlerError::Other(err) => {
+                log::error!("handling event failed: {:?}", err);
+                return Err(WebhookError(failure::err_msg(
+                    "handling failed, error logged",
+                )));
+            }
+        }
     }
     Ok(())
 }

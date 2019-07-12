@@ -33,7 +33,7 @@ impl Handler for AssignmentHandler {
     type Input = AssignCommand;
     type Config = AssignConfig;
 
-    fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, Error> {
+    fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, String> {
         let body = if let Some(b) = event.comment_body() {
             b
         } else {
@@ -54,11 +54,11 @@ impl Handler for AssignmentHandler {
         match input.parse_command() {
             Command::Assign(Ok(command)) => Ok(Some(command)),
             Command::Assign(Err(err)) => {
-                failure::bail!(
+                return Err(format!(
                     "Parsing assign command in [comment]({}) failed: {}",
                     event.html_url().expect("has html url"),
                     err
-                );
+                ));
             }
             _ => Ok(None),
         }

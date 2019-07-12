@@ -25,7 +25,7 @@ impl Handler for RelabelHandler {
     type Input = RelabelCommand;
     type Config = RelabelConfig;
 
-    fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, Error> {
+    fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, String> {
         let body = if let Some(b) = event.comment_body() {
             b
         } else {
@@ -45,11 +45,11 @@ impl Handler for RelabelHandler {
         match input.parse_command() {
             Command::Relabel(Ok(command)) => Ok(Some(command)),
             Command::Relabel(Err(err)) => {
-                failure::bail!(
+                return Err(format!(
                     "Parsing label command in [comment]({}) failed: {}",
                     event.html_url().expect("has html url"),
                     err
-                );
+                ));
             }
             _ => Ok(None),
         }

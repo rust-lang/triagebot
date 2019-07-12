@@ -1,6 +1,7 @@
 use crate::github::GithubClient;
 use failure::Error;
 use std::collections::HashMap;
+use std::fmt;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
@@ -8,7 +9,8 @@ static CONFIG_FILE_NAME: &str = "triagebot.toml";
 const REFRESH_EVERY: Duration = Duration::from_secs(2 * 60); // Every two minutes
 
 lazy_static::lazy_static! {
-    static ref CONFIG_CACHE: RwLock<HashMap<String, (Arc<Config>, Instant)>> =
+    static ref CONFIG_CACHE:
+        RwLock<HashMap<String, (Result<Arc<Config>, ConfigurationError>, Instant)>> =
         RwLock::new(HashMap::new());
 }
 
@@ -31,17 +33,22 @@ pub(crate) struct RelabelConfig {
     pub(crate) allow_unauthenticated: Vec<String>,
 }
 
-pub(crate) async fn get(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, Error> {
+pub(crate) async fn get(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, ConfigurationError> {
     if let Some(config) = get_cached_config(repo) {
         log::trace!("returning config for {} from cache", repo);
-        Ok(config)
+        config
     } else {
         log::trace!("fetching fresh config for {}", repo);
-        get_fresh_config(gh, repo).await
+        let res = get_fresh_config(gh, repo).await;
+        CONFIG_CACHE
+            .write()
+            .unwrap()
+            .insert(repo.to_string(), (res.clone(), Instant::now()));
+        res
     }
 }
 
-fn get_cached_config(repo: &str) -> Option<Arc<Config>> {
+fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
         if fetch_time.elapsed() < REFRESH_EVERY {
@@ -52,21 +59,43 @@ fn get_cached_config(repo: &str) -> Option<Arc<Config>> {
     })
 }
 
-async fn get_fresh_config(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, Error> {
+async fn get_fresh_config(
+    gh: &GithubClient,
+    repo: &str,
+) -> Result<Arc<Config>, ConfigurationError> {
     let contents = gh
         .raw_file(repo, "master", CONFIG_FILE_NAME)
-        .await?
-        .ok_or_else(|| {
-            failure::err_msg(
-                "This repository is not enabled to use triagebot.\n\
-                 Add a `triagebot.toml` in the root of the master branch to enable it.",
-            )
-        })?;
-    let config = Arc::new(toml::from_slice::<Config>(&contents)?);
+        .await
+        .map_err(|e| ConfigurationError::Http(Arc::new(e)))?
+        .ok_or(ConfigurationError::Missing)?;
+    let config = Arc::new(toml::from_slice::<Config>(&contents).map_err(ConfigurationError::Toml)?);
     log::debug!("fresh configuration for {}: {:?}", repo, config);
-    CONFIG_CACHE
-        .write()
-        .unwrap()
-        .insert(repo.to_string(), (config.clone(), Instant::now()));
     Ok(config)
+}
+
+#[derive(Clone, Debug)]
+pub enum ConfigurationError {
+    Missing,
+    Toml(toml::de::Error),
+    Http(Arc<Error>),
+}
+
+impl std::error::Error for ConfigurationError {}
+
+impl fmt::Display for ConfigurationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ConfigurationError::Missing => write!(
+                f,
+                "This repository is not enabled to use triagebot.\n\
+                 Add a `triagebot.toml` in the root of the master branch to enable it."
+            ),
+            ConfigurationError::Toml(e) => {
+                write!(f, "Malformed `triagebot.toml` in master branch.\n{}", e)
+            }
+            ConfigurationError::Http(_) => {
+                write!(f, "Failed to query configuration for this repository.")
+            }
+        }
+    }
 }
