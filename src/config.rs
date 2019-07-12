@@ -54,7 +54,8 @@ fn get_cached_config(repo: &str) -> Option<Arc<Config>> {
 
 async fn get_fresh_config(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, Error> {
     let contents = gh
-        .raw_file(repo, "master", CONFIG_FILE_NAME).await?
+        .raw_file(repo, "master", CONFIG_FILE_NAME)
+        .await?
         .ok_or_else(|| {
             failure::err_msg(
                 "This repository is not enabled to use triagebot.\n\

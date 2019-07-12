@@ -40,11 +40,7 @@ pub trait Handler: Sync + Send {
     type Input;
     type Config;
 
-    fn parse_input(
-        &self,
-        ctx: &Context,
-        event: &Event,
-    ) -> Result<Option<Self::Input>, Error>;
+    fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, Error>;
 
     fn handle_input<'a>(
         &self,

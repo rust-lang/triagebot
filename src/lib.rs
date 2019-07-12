@@ -2,8 +2,8 @@
 #![allow(clippy::new_without_default)]
 
 use failure::{Error, ResultExt};
-use std::fmt;
 use interactions::ErrorComment;
+use std::fmt;
 
 pub mod config;
 pub mod github;
@@ -31,11 +31,15 @@ impl std::str::FromStr for EventName {
 
 impl fmt::Display for EventName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", match self {
-            EventName::IssueComment => "issue_comment",
-            EventName::Issue => "issues",
-            EventName::Other => "other",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                EventName::IssueComment => "issue_comment",
+                EventName::Issue => "issues",
+                EventName::Other => "other",
+            }
+        )
     }
 }
 

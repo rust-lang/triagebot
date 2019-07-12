@@ -15,9 +15,9 @@ use crate::{
     interactions::ErrorComment,
 };
 use failure::Error;
+use futures::future::{BoxFuture, FutureExt};
 use parser::command::relabel::{LabelDelta, RelabelCommand};
 use parser::command::{Command, Input};
-use futures::future::{FutureExt, BoxFuture};
 
 pub(super) struct RelabelHandler;
 
@@ -66,7 +66,12 @@ impl Handler for RelabelHandler {
     }
 }
 
-async fn handle_input(ctx: &Context, config: &RelabelConfig, event: &Event, input: RelabelCommand) -> Result<(), Error> {
+async fn handle_input(
+    ctx: &Context,
+    config: &RelabelConfig,
+    event: &Event,
+    input: RelabelCommand,
+) -> Result<(), Error> {
     let mut issue_labels = event.issue().unwrap().labels().to_owned();
     let mut changed = false;
     for delta in &input.0 {
@@ -98,7 +103,8 @@ async fn handle_input(ctx: &Context, config: &RelabelConfig, event: &Event, inpu
         event
             .issue()
             .unwrap()
-            .set_labels(&ctx.github, issue_labels).await?;
+            .set_labels(&ctx.github, issue_labels)
+            .await?;
     }
 
     Ok(())

@@ -18,9 +18,9 @@ use crate::{
     interactions::EditIssueBody,
 };
 use failure::{Error, ResultExt};
+use futures::future::{BoxFuture, FutureExt};
 use parser::command::assign::AssignCommand;
 use parser::command::{Command, Input};
-use futures::future::{FutureExt, BoxFuture};
 
 pub(super) struct AssignmentHandler;
 
@@ -76,79 +76,90 @@ impl Handler for AssignmentHandler {
 }
 
 async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> Result<(), Error> {
-        let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await {
-            false
-        } else {
-            true
-        };
+    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
+    {
+        false
+    } else {
+        true
+    };
 
-        let e = EditIssueBody::new(&event.issue().unwrap(), "ASSIGN");
+    let e = EditIssueBody::new(&event.issue().unwrap(), "ASSIGN");
 
-        let to_assign = match cmd {
-            AssignCommand::Own => event.user().login.clone(),
-            AssignCommand::User { username } => {
-                if !is_team_member && username != event.user().login {
-                    failure::bail!("Only Rust team members can assign other users");
-                }
-                username.clone()
+    let to_assign = match cmd {
+        AssignCommand::Own => event.user().login.clone(),
+        AssignCommand::User { username } => {
+            if !is_team_member && username != event.user().login {
+                failure::bail!("Only Rust team members can assign other users");
             }
-            AssignCommand::Release => {
-                if let Some(AssignData {
-                    user: Some(current),
-                }) = e.current_data()
-                {
-                    if current == event.user().login || is_team_member {
-                        event
-                            .issue()
-                            .unwrap()
-                            .remove_assignees(&ctx.github, Selection::All).await?;
-                        e.apply(&ctx.github, String::new(), AssignData { user: None }).await?;
-                        return Ok(());
-                    } else {
-                        failure::bail!("Cannot release another user's assignment");
-                    }
-                } else {
-                    let current = &event.user();
-                    if event.issue().unwrap().contain_assignee(current) {
-                        event
-                            .issue()
-                            .unwrap()
-                            .remove_assignees(&ctx.github, Selection::One(&current)).await?;
-                        e.apply(&ctx.github, String::new(), AssignData { user: None }).await?;
-                        return Ok(());
-                    } else {
-                        failure::bail!("Cannot release unassigned issue");
-                    }
-                };
-            }
-        };
-        let data = AssignData {
-            user: Some(to_assign.clone()),
-        };
-
-        e.apply(&ctx.github, String::new(), &data).await?;
-
-        match event.issue().unwrap().set_assignee(&ctx.github, &to_assign).await {
-            Ok(()) => return Ok(()), // we are done
-            Err(github::AssignmentError::InvalidAssignee) => {
-                event
-                    .issue()
-                    .unwrap()
-                    .set_assignee(&ctx.github, &ctx.username).await
-                    .context("self-assignment failed")?;
-                e.apply(
-                    &ctx.github,
-                    format!(
-                        "This issue has been assigned to @{} via [this comment]({}).",
-                        to_assign,
-                        event.html_url().unwrap()
-                    ),
-                    &data,
-                ).await?;
-            }
-            Err(e) => return Err(e.into()),
+            username.clone()
         }
+        AssignCommand::Release => {
+            if let Some(AssignData {
+                user: Some(current),
+            }) = e.current_data()
+            {
+                if current == event.user().login || is_team_member {
+                    event
+                        .issue()
+                        .unwrap()
+                        .remove_assignees(&ctx.github, Selection::All)
+                        .await?;
+                    e.apply(&ctx.github, String::new(), AssignData { user: None })
+                        .await?;
+                    return Ok(());
+                } else {
+                    failure::bail!("Cannot release another user's assignment");
+                }
+            } else {
+                let current = &event.user();
+                if event.issue().unwrap().contain_assignee(current) {
+                    event
+                        .issue()
+                        .unwrap()
+                        .remove_assignees(&ctx.github, Selection::One(&current))
+                        .await?;
+                    e.apply(&ctx.github, String::new(), AssignData { user: None })
+                        .await?;
+                    return Ok(());
+                } else {
+                    failure::bail!("Cannot release unassigned issue");
+                }
+            };
+        }
+    };
+    let data = AssignData {
+        user: Some(to_assign.clone()),
+    };
 
-        Ok(())
+    e.apply(&ctx.github, String::new(), &data).await?;
 
+    match event
+        .issue()
+        .unwrap()
+        .set_assignee(&ctx.github, &to_assign)
+        .await
+    {
+        Ok(()) => return Ok(()), // we are done
+        Err(github::AssignmentError::InvalidAssignee) => {
+            event
+                .issue()
+                .unwrap()
+                .set_assignee(&ctx.github, &ctx.username)
+                .await
+                .context("self-assignment failed")?;
+            e.apply(
+                &ctx.github,
+                format!(
+                    "This issue has been assigned to @{} via [this comment]({}).",
+                    to_assign,
+                    event.html_url().unwrap()
+                ),
+                &data,
+            )
+            .await?;
+        }
+        Err(e) => return Err(e.into()),
+    }
+
+    Ok(())
 }
