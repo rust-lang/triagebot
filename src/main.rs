@@ -149,6 +149,10 @@ fn main() {
     dotenv::dotenv().ok();
     logger::init();
 
-    let addr = ([0, 0, 0, 0], 8002).into();
+    let port = env::var("PORT")
+        .ok()
+        .map(|p| p.parse::<u16>().expect("parsed PORT"))
+        .unwrap_or(8000);
+    let addr = ([0, 0, 0, 0], port).into();
     hyper::rt::run(run_server(addr).unit_error().boxed().compat());
 }
