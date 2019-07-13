@@ -18,21 +18,15 @@ pub struct User {
 }
 
 impl GithubClient {
-    async fn _send_req(&self, req: RequestBuilder) -> Result<(Response, String), Error> {
-        let req = req
-            .build()
-            .with_context(|_| format!("failed to build request"))?;
+    async fn _send_req(&self, req: RequestBuilder) -> Result<(Response, String), reqwest::Error> {
+        log::debug!("_send_req with {:?}", req);
+        let req = req.build()?;
 
         let req_dbg = format!("{:?}", req);
 
-        let resp = self
-            .client
-            .execute(req)
-            .compat()
-            .await
-            .context(req_dbg.clone())?;
+        let resp = self.client.execute(req).compat().await?;
 
-        resp.error_for_status_ref().context(req_dbg.clone())?;
+        resp.error_for_status_ref()?;
 
         Ok((resp, req_dbg))
     }
@@ -132,7 +126,7 @@ pub struct Comment {
 #[derive(Debug)]
 pub enum AssignmentError {
     InvalidAssignee,
-    Http(Error),
+    Http(reqwest::Error),
 }
 
 #[derive(Debug)]
@@ -336,14 +330,20 @@ impl Issue {
         match client._send_req(client.get(&check_url)).await {
             Ok((resp, _)) => {
                 if resp.status() == reqwest::StatusCode::NO_CONTENT {
+                    // all okay
                     log::debug!("set_assignee: assignee is valid");
-                // all okay
-                } else if resp.status() == reqwest::StatusCode::NOT_FOUND {
-                    log::debug!("set_assignee: assignee is invalid, returning");
-                    return Err(AssignmentError::InvalidAssignee);
+                } else {
+                    log::error!(
+                        "unknown status for assignee check, assuming all okay: {:?}",
+                        resp
+                    );
                 }
             }
             Err(e) => {
+                if e.status() == Some(reqwest::StatusCode::NOT_FOUND) {
+                    log::debug!("set_assignee: assignee is invalid, returning");
+                    return Err(AssignmentError::InvalidAssignee);
+                }
                 log::debug!("set_assignee: get {} failed, {:?}", check_url, e);
                 return Err(AssignmentError::Http(e));
             }
