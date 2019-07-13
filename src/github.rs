@@ -101,6 +101,11 @@ impl Label {
 }
 
 #[derive(Debug, serde::Deserialize)]
+pub struct PullRequestDetails {
+    // none for now
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct Issue {
     pub number: u64,
     pub body: String,
@@ -109,6 +114,7 @@ pub struct Issue {
     user: User,
     labels: Vec<Label>,
     assignees: Vec<User>,
+    pull_request: Option<PullRequestDetails>,
     // API URL
     repository_url: String,
     comments_url: String,
@@ -175,6 +181,10 @@ impl Issue {
 
     pub fn global_id(&self) -> String {
         format!("{}#{}", self.repository(), self.number)
+    }
+
+    pub fn is_pr(&self) -> bool {
+        self.pull_request.is_some()
     }
 
     pub async fn get_comment(&self, client: &GithubClient, id: usize) -> Result<Comment, Error> {

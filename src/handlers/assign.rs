@@ -83,6 +83,34 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> Resul
         true
     };
 
+    if event.issue().unwrap().is_pr() {
+        let username = match &cmd {
+            AssignCommand::Own => event.user().login.clone(),
+            AssignCommand::User { username } => username.clone(),
+            AssignCommand::Release => {
+                log::trace!(
+                    "ignoring release on PR {:?}, must always have assignee",
+                    event.issue().unwrap().global_id()
+                );
+                return Ok(());
+            }
+        };
+        if let Err(err) = event
+            .issue()
+            .unwrap()
+            .set_assignee(&ctx.github, &username)
+            .await
+        {
+            log::warn!(
+                "failed to set assignee of PR {} to {}: {:?}",
+                event.issue().unwrap().global_id(),
+                username,
+                err
+            );
+        }
+        return Ok(());
+    }
+
     let e = EditIssueBody::new(&event.issue().unwrap(), "ASSIGN");
 
     let to_assign = match cmd {
