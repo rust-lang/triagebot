@@ -76,8 +76,18 @@ async fn handle_input(
     let mut changed = false;
     for delta in &input.0 {
         let name = delta.label().as_str();
-        if let Err(msg) = check_filter(name, config, &event.user(), &ctx.github).await {
-            let cmnt = ErrorComment::new(&event.issue().unwrap(), msg.to_string());
+        let err = match check_filter(name, config, is_member(&event.user(), &ctx.github).await) {
+            Ok(CheckFilterResult::Allow) => None,
+            Ok(CheckFilterResult::Deny) => Some(format!("Label {} can only be set by Rust team members", name)),
+            Ok(CheckFilterResult::DenyUnknown) => Some(format!(
+                "Label {} can only be set by Rust team members;\
+                 we were unable to check if you are a team member.",
+                 name
+            )),
+            Err(err) => Some(err.to_string()),
+        };
+        if let Some(msg) = err {
+            let cmnt = ErrorComment::new(&event.issue().unwrap(), msg);
             cmnt.post(&ctx.github).await?;
             return Ok(());
         }
@@ -110,37 +120,129 @@ async fn handle_input(
     Ok(())
 }
 
-async fn check_filter(
-    label: &str,
-    config: &RelabelConfig,
-    user: &github::User,
-    client: &GithubClient,
-) -> Result<(), Error> {
-    let is_team_member;
+#[derive(Debug, PartialEq, Eq)]
+enum TeamMembership {
+    Member,
+    Outsider,
+    Unknown,
+}
+
+async fn is_member(user: &github::User, client: &GithubClient) -> TeamMembership {
     match user.is_team_member(client).await {
-        Ok(true) => return Ok(()),
-        Ok(false) => {
-            is_team_member = Ok(());
-        }
+        Ok(true) => TeamMembership::Member,
+        Ok(false) => TeamMembership::Outsider,
         Err(err) => {
             eprintln!("failed to check team membership: {:?}", err);
-            is_team_member = Err(());
-            // continue on; if we failed to check their membership assume that they are not members.
+            TeamMembership::Unknown
         }
     }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+enum CheckFilterResult {
+    Allow,
+    Deny,
+    DenyUnknown,
+}
+
+fn check_filter(
+    label: &str,
+    config: &RelabelConfig,
+    is_member: TeamMembership,
+) -> Result<CheckFilterResult, Error> {
+    if is_member == TeamMembership::Member {
+        return Ok(CheckFilterResult::Allow);
+    }
+    let mut matched = false;
     for pattern in &config.allow_unauthenticated {
-        let pattern = glob::Pattern::new(pattern)?;
-        if pattern.matches(label) {
-            return Ok(());
+        match match_pattern(pattern, label)? {
+            MatchPatternResult::Allow => matched = true,
+            MatchPatternResult::Deny => {
+                // An explicit deny overrides any allowed pattern
+                matched = false;
+                break;
+            }
+            MatchPatternResult::NoMatch => {}
         }
     }
-    if is_team_member.is_ok() {
-        failure::bail!("Label {} can only be set by Rust team members", label);
+    if matched {
+        return Ok(CheckFilterResult::Allow);
+    } else if is_member == TeamMembership::Outsider {
+        return Ok(CheckFilterResult::Deny);
     } else {
-        failure::bail!(
-            "Label {} can only be set by Rust team members;\
-             we were unable to check if you are a team member.",
-            label
-        );
+        return Ok(CheckFilterResult::DenyUnknown);
+    }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
+enum MatchPatternResult {
+    Allow,
+    Deny,
+    NoMatch,
+}
+
+fn match_pattern(pattern: &str, label: &str) -> Result<MatchPatternResult, Error> {
+    let (pattern, inverse) = if pattern.starts_with('!') {
+        (&pattern[1..], true)
+    } else {
+        (pattern, false)
+    };
+    let glob = glob::Pattern::new(pattern)?;
+    Ok(match (glob.matches(label), inverse) {
+        (true, false) => MatchPatternResult::Allow,
+        (true, true) => MatchPatternResult::Deny,
+        (false, _) => MatchPatternResult::NoMatch,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TeamMembership, match_pattern, MatchPatternResult, check_filter, CheckFilterResult};
+    use crate::config::RelabelConfig;
+    use failure::Error;
+
+    #[test]
+    fn test_match_pattern() -> Result<(), Error> {
+        assert_eq!(match_pattern("I-*", "I-nominated")?, MatchPatternResult::Allow);
+        assert_eq!(match_pattern("!I-no*", "I-nominated")?, MatchPatternResult::Deny);
+        assert_eq!(match_pattern("I-*", "T-infra")?, MatchPatternResult::NoMatch);
+        assert_eq!(match_pattern("!I-no*", "T-infra")?, MatchPatternResult::NoMatch);
+        Ok(())
+    }
+
+    #[test]
+    fn test_check_filter() -> Result<(), Error> {
+        macro_rules! t {
+            ($($member:ident { $($label:expr => $res:ident,)* })*) => {
+                let config = RelabelConfig {
+                    allow_unauthenticated: vec!["T-*".into(), "I-*".into(), "!I-nominated".into()],
+                };
+                $($(assert_eq!(
+                    check_filter($label, &config, TeamMembership::$member)?,
+                    CheckFilterResult::$res
+                );)*)*
+            }
+        }
+        t! {
+            Member {
+                "T-release" => Allow,
+                "I-slow" => Allow,
+                "I-nominated" => Allow,
+                "A-spurious" => Allow,
+            }
+            Outsider {
+                "T-release" => Allow,
+                "I-slow" => Allow,
+                "I-nominated" => Deny,
+                "A-spurious" => Deny,
+            }
+            Unknown {
+                "T-release" => Allow,
+                "I-slow" => Allow,
+                "I-nominated" => DenyUnknown,
+                "A-spurious" => DenyUnknown,
+            }
+        }
+        Ok(())
     }
 }
