@@ -84,7 +84,7 @@ async fn handle_input(
                  we were unable to check if you are a team member.",
                  name
             )),
-            Err(err) => Some(err.to_string()),
+            Err(err) => Some(err),
         };
         if let Some(msg) = err {
             let cmnt = ErrorComment::new(&event.issue().unwrap(), msg);
@@ -149,20 +149,24 @@ fn check_filter(
     label: &str,
     config: &RelabelConfig,
     is_member: TeamMembership,
-) -> Result<CheckFilterResult, Error> {
+) -> Result<CheckFilterResult, String> {
     if is_member == TeamMembership::Member {
         return Ok(CheckFilterResult::Allow);
     }
     let mut matched = false;
     for pattern in &config.allow_unauthenticated {
-        match match_pattern(pattern, label)? {
-            MatchPatternResult::Allow => matched = true,
-            MatchPatternResult::Deny => {
+        match match_pattern(pattern, label) {
+            Ok(MatchPatternResult::Allow) => matched = true,
+            Ok(MatchPatternResult::Deny) => {
                 // An explicit deny overrides any allowed pattern
                 matched = false;
                 break;
             }
-            MatchPatternResult::NoMatch => {}
+            Ok(MatchPatternResult::NoMatch) => {}
+            Err(err) => {
+                eprintln!("failed to match pattern {}: {}", pattern, err);
+                return Err(format!("failed to match pattern {}", pattern));
+            }
         }
     }
     if matched {
@@ -218,7 +222,7 @@ mod tests {
                     allow_unauthenticated: vec!["T-*".into(), "I-*".into(), "!I-nominated".into()],
                 };
                 $($(assert_eq!(
-                    check_filter($label, &config, TeamMembership::$member)?,
+                    check_filter($label, &config, TeamMembership::$member).map_err(|e| failure::err_msg(e))?,
                     CheckFilterResult::$res
                 );)*)*
             }
