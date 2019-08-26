@@ -1,4 +1,3 @@
-#![feature(async_await)]
 #![allow(clippy::new_without_default)]
 
 use futures::{
