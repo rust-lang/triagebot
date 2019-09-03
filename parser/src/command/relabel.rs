@@ -141,6 +141,11 @@ impl RelabelCommand {
             toks.next_token()?;
         } else if let Some(Token::Word("to")) = toks.peek_token()? {
             toks.next_token()?;
+            // optionally eat the colon after to, e.g.:
+            // @rustbot modify labels to: -S-waiting-on-author, +S-waiting-on-review
+            if let Ok(Some(Token::Colon)) = toks.peek_token() {
+                toks.next_token()?;
+            }
         } else {
             return Err(toks.error(ParseError::NoSeparator));
         }
@@ -219,6 +224,18 @@ fn parse_no_label_paragraph() {
 fn parse_no_dot() {
     assert_eq!(
         parse("modify labels to +T-compiler -T-lang bug"),
+        Ok(Some(vec![
+            LabelDelta::Add(Label("T-compiler".into())),
+            LabelDelta::Remove(Label("T-lang".into())),
+            LabelDelta::Add(Label("bug".into())),
+        ]))
+    );
+}
+
+#[test]
+fn parse_to_colon() {
+    assert_eq!(
+        parse("modify labels to: +T-compiler -T-lang bug"),
         Ok(Some(vec![
             LabelDelta::Add(Label("T-compiler".into())),
             LabelDelta::Remove(Label("T-lang".into())),
