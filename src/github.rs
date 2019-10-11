@@ -83,10 +83,8 @@ pub struct Label {
 impl Label {
     async fn exists<'a>(&'a self, repo_api_prefix: &'a str, client: &'a GithubClient) -> bool {
         #[allow(clippy::redundant_pattern_matching)]
-        match client
-            .send_req(client.get(&format!("{}/labels/{}", repo_api_prefix, self.name)))
-            .await
-        {
+        let url = format!("{}/labels/{}", repo_api_prefix, self.name);
+        match client.send_req(client.get(&url)).await {
             Ok(_) => true,
             // XXX: Error handling if the request failed for reasons beyond 'label didn't exist'
             Err(_) => false,

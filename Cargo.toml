@@ -24,7 +24,7 @@ toml = "0.5.1"
 hyper = "0.12.32"
 futures-preview = { version = "=0.3.0-alpha.17", features = ["compat"] }
 uuid = { version = "0.7.4", features = ["v4"] }
-url = "1.7.2"
+url = "2.1.0"
 once_cell = "0.2.2"
 
 [dependencies.serde]

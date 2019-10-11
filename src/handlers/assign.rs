@@ -175,16 +175,12 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> Resul
                 .set_assignee(&ctx.github, &ctx.username)
                 .await
                 .context("self-assignment failed")?;
-            e.apply(
-                &ctx.github,
-                format!(
-                    "This issue has been assigned to @{} via [this comment]({}).",
-                    to_assign,
-                    event.html_url().unwrap()
-                ),
-                &data,
-            )
-            .await?;
+            let cmt_body = format!(
+                "This issue has been assigned to @{} via [this comment]({}).",
+                to_assign,
+                event.html_url().unwrap()
+            );
+            e.apply(&ctx.github, cmt_body, &data).await?;
         }
         Err(e) => return Err(e.into()),
     }
