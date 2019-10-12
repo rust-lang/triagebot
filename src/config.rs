@@ -25,6 +25,7 @@ pub(crate) struct Config {
 pub(crate) struct PingConfig {
     // team name -> message
     // message will have the cc string appended
+    #[serde(flatten)]
     pub(crate) teams: HashMap<String, PingTeamConfig>,
 }
 
