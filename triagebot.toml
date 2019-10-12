@@ -2,3 +2,9 @@
 allow-unauthenticated = []
 
 [assign]
+
+[ping.wg-meta]
+message = """\
+This is just testing some functionality, please ignore this ping.
+"""
+label = "help wanted"
