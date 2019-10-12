@@ -18,6 +18,20 @@ lazy_static::lazy_static! {
 pub(crate) struct Config {
     pub(crate) relabel: Option<RelabelConfig>,
     pub(crate) assign: Option<AssignConfig>,
+    pub(crate) ping: Option<PingConfig>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct PingConfig {
+    // team name -> message
+    // message will have the cc string appended
+    pub(crate) teams: HashMap<String, PingTeamConfig>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct PingTeamConfig {
+    pub(crate) message: String,
+    pub(crate) label: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]

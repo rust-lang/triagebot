@@ -75,6 +75,19 @@ impl User {
     }
 }
 
+pub async fn get_team(
+    client: &GithubClient,
+    team: &str,
+) -> Result<Option<rust_team_data::v1::Team>, Error> {
+    let url = format!("{}/teams.json", rust_team_data::v1::BASE_URL);
+    let permission: rust_team_data::v1::Teams = client
+        .json(client.raw().get(&url))
+        .await
+        .context("could not get team data")?;
+    let mut map = permission.teams;
+    Ok(map.swap_remove(team))
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Label {
     pub name: String,
@@ -145,9 +158,9 @@ impl fmt::Display for AssignmentError {
 impl std::error::Error for AssignmentError {}
 
 #[derive(Debug)]
-struct IssueRepository {
-    organization: String,
-    repository: String,
+pub struct IssueRepository {
+    pub organization: String,
+    pub repository: String,
 }
 
 impl fmt::Display for IssueRepository {
@@ -157,7 +170,7 @@ impl fmt::Display for IssueRepository {
 }
 
 impl Issue {
-    fn repository(&self) -> &IssueRepository {
+    pub fn repository(&self) -> &IssueRepository {
         self.repository.get_or_init(|| {
             log::trace!("get repository for {}", self.repository_url);
             let url = url::Url::parse(&self.repository_url).unwrap();

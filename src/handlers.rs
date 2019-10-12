@@ -60,6 +60,7 @@ macro_rules! handlers {
 handlers! {
     assign = assign::AssignmentHandler,
     relabel = relabel::RelabelHandler,
+    ping = ping::PingHandler,
     //tracking_issue = tracking_issue::TrackingIssueHandler,
 }
 
