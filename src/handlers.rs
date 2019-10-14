@@ -61,6 +61,7 @@ handlers! {
     assign = assign::AssignmentHandler,
     relabel = relabel::RelabelHandler,
     ping = ping::PingHandler,
+    nominate = nominate::NominateHandler,
     //tracking_issue = tracking_issue::TrackingIssueHandler,
 }
 

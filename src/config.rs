@@ -19,6 +19,14 @@ pub(crate) struct Config {
     pub(crate) relabel: Option<RelabelConfig>,
     pub(crate) assign: Option<AssignConfig>,
     pub(crate) ping: Option<PingConfig>,
+    pub(crate) nominate: Option<NominateConfig>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct NominateConfig {
+    // team name -> label
+    #[serde(flatten)]
+    pub(crate) teams: HashMap<String, String>,
 }
 
 #[derive(Debug, serde::Deserialize)]

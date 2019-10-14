@@ -88,7 +88,7 @@ pub async fn get_team(
     Ok(map.swap_remove(team))
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 pub struct Label {
     pub name: String,
 }

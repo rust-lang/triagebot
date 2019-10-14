@@ -3,6 +3,7 @@ use crate::error::Error;
 use crate::token::{Token, Tokenizer};
 
 pub mod assign;
+pub mod nominate;
 pub mod ping;
 pub mod relabel;
 
@@ -15,6 +16,7 @@ pub enum Command<'a> {
     Relabel(Result<relabel::RelabelCommand, Error<'a>>),
     Assign(Result<assign::AssignCommand, Error<'a>>),
     Ping(Result<ping::PingCommand, Error<'a>>),
+    Nominate(Result<nominate::NominateCommand, Error<'a>>),
     None,
 }
 
@@ -88,6 +90,11 @@ impl<'a> Input<'a> {
             Command::Ping,
             &original_tokenizer,
         ));
+        success.extend(parse_single_command(
+            nominate::NominateCommand::parse,
+            Command::Nominate,
+            &original_tokenizer,
+        ));
 
         if success.len() > 1 {
             panic!(
@@ -125,6 +132,7 @@ impl<'a> Command<'a> {
             Command::Relabel(r) => r.is_ok(),
             Command::Assign(r) => r.is_ok(),
             Command::Ping(r) => r.is_ok(),
+            Command::Nominate(r) => r.is_ok(),
             Command::None => true,
         }
     }
