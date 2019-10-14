@@ -26,6 +26,26 @@ pub struct Input<'a> {
     bot: &'a str,
 }
 
+fn parse_single_command<'a, T, F, M>(
+    parse: F,
+    mapper: M,
+    tokenizer: &Tokenizer<'a>,
+) -> Option<(Tokenizer<'a>, Command<'a>)>
+where
+    F: FnOnce(&mut Tokenizer<'a>) -> Result<Option<T>, Error<'a>>,
+    M: FnOnce(Result<T, Error<'a>>) -> Command<'a>,
+    T: std::fmt::Debug,
+{
+    let mut tok = tokenizer.clone();
+    let res = parse(&mut tok);
+    log::info!("parsed {:?} command: {:?}", std::any::type_name::<T>(), res);
+    match res {
+        Ok(None) => None,
+        Ok(Some(v)) => Some((tok, mapper(Ok(v)))),
+        Err(err) => Some((tok, mapper(Err(err)))),
+    }
+}
+
 impl<'a> Input<'a> {
     pub fn new(input: &'a str, bot: &'a str) -> Input<'a> {
         Input {
@@ -53,50 +73,21 @@ impl<'a> Input<'a> {
 
         let original_tokenizer = tok.clone();
 
-        {
-            let mut tok = original_tokenizer.clone();
-            let res = relabel::RelabelCommand::parse(&mut tok);
-            log::info!("parsed relabel command: {:?}", res);
-            match res {
-                Ok(None) => {}
-                Ok(Some(cmd)) => {
-                    success.push((tok, Command::Relabel(Ok(cmd))));
-                }
-                Err(err) => {
-                    success.push((tok, Command::Relabel(Err(err))));
-                }
-            }
-        }
-
-        {
-            let mut tok = original_tokenizer.clone();
-            let res = assign::AssignCommand::parse(&mut tok);
-            log::info!("parsed assign command: {:?}", res);
-            match res {
-                Ok(None) => {}
-                Ok(Some(cmd)) => {
-                    success.push((tok, Command::Assign(Ok(cmd))));
-                }
-                Err(err) => {
-                    success.push((tok, Command::Assign(Err(err))));
-                }
-            }
-        }
-
-        {
-            let mut tok = original_tokenizer.clone();
-            let res = ping::PingCommand::parse(&mut tok);
-            log::info!("parsed ping command: {:?}", res);
-            match res {
-                Ok(None) => {}
-                Ok(Some(cmd)) => {
-                    success.push((tok, Command::Ping(Ok(cmd))));
-                }
-                Err(err) => {
-                    success.push((tok, Command::Ping(Err(err))));
-                }
-            }
-        }
+        success.extend(parse_single_command(
+            relabel::RelabelCommand::parse,
+            Command::Relabel,
+            &original_tokenizer,
+        ));
+        success.extend(parse_single_command(
+            assign::AssignCommand::parse,
+            Command::Assign,
+            &original_tokenizer,
+        ));
+        success.extend(parse_single_command(
+            ping::PingCommand::parse,
+            Command::Ping,
+            &original_tokenizer,
+        ));
 
         if success.len() > 1 {
             panic!(
