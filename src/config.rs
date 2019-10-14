@@ -14,7 +14,7 @@ lazy_static::lazy_static! {
         RwLock::new(HashMap::new());
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct Config {
     pub(crate) relabel: Option<RelabelConfig>,
     pub(crate) assign: Option<AssignConfig>,
@@ -22,14 +22,13 @@ pub(crate) struct Config {
     pub(crate) nominate: Option<NominateConfig>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct NominateConfig {
     // team name -> label
-    #[serde(flatten)]
     pub(crate) teams: HashMap<String, String>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct PingConfig {
     // team name -> message
     // message will have the cc string appended
@@ -37,19 +36,19 @@ pub(crate) struct PingConfig {
     pub(crate) teams: HashMap<String, PingTeamConfig>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct PingTeamConfig {
     pub(crate) message: String,
     pub(crate) label: Option<String>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct AssignConfig {
     #[serde(default)]
     _empty: (),
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct RelabelConfig {
     #[serde(default)]
@@ -120,5 +119,73 @@ impl fmt::Display for ConfigurationError {
                 write!(f, "Failed to query configuration for this repository.")
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sample() {
+        let config = r#"
+            [relabel]
+            allow-unauthenticated = [
+                "C-*"
+            ]
+
+            [assign]
+
+            [ping.compiler]
+            message = """\
+            So many people!\
+            """
+            label = "T-compiler"
+
+            [ping.wg-meta]
+            message = """\
+            Testing\
+            """
+
+            [nominate.teams]
+            compiler = "T-compiler"
+            release = "T-release"
+            core = "T-core"
+            infra = "T-infra"
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        let mut ping_teams = HashMap::new();
+        ping_teams.insert(
+            "compiler".to_owned(),
+            PingTeamConfig {
+                message: "So many people!".to_owned(),
+                label: Some("T-compiler".to_owned()),
+            },
+        );
+        ping_teams.insert(
+            "wg-meta".to_owned(),
+            PingTeamConfig {
+                message: "Testing".to_owned(),
+                label: None,
+            },
+        );
+        let mut nominate_teams = HashMap::new();
+        nominate_teams.insert("compiler".to_owned(), "T-compiler".to_owned());
+        nominate_teams.insert("release".to_owned(), "T-release".to_owned());
+        nominate_teams.insert("core".to_owned(), "T-core".to_owned());
+        nominate_teams.insert("infra".to_owned(), "T-infra".to_owned());
+        assert_eq!(
+            config,
+            Config {
+                relabel: Some(RelabelConfig {
+                    allow_unauthenticated: vec!["C-*".into()],
+                }),
+                assign: Some(AssignConfig { _empty: () }),
+                ping: Some(PingConfig { teams: ping_teams }),
+                nominate: Some(NominateConfig {
+                    teams: nominate_teams
+                }),
+            }
+        );
     }
 }
