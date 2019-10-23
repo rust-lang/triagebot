@@ -68,6 +68,22 @@ async fn handle_input(
     event: &Event,
     team_name: String,
 ) -> Result<(), Error> {
+    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
+    {
+        false
+    } else {
+        true
+    };
+
+    if !is_team_member {
+        let cmnt = ErrorComment::new(
+            &event.issue().unwrap(),
+            format!("Only Rust team members can ping teams."),
+        );
+        cmnt.post(&ctx.github).await?;
+        return Ok(());
+    }
+
     if !config.teams.contains_key(&team_name) {
         let cmnt = ErrorComment::new(
             &event.issue().unwrap(),
