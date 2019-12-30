@@ -16,6 +16,12 @@ mod logger;
 async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Body>, hyper::Error> {
     log::info!("request = {:?}", req);
     let (req, body_stream) = req.into_parts();
+    if req.uri.path() == "/" {
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::from("Triagebot is awaiting triage."))
+            .unwrap());
+    }
     if req.uri.path() != "/github-hook" {
         return Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
