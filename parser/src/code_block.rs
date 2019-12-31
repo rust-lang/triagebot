@@ -9,24 +9,19 @@ pub struct ColorCodeBlocks {
 impl ColorCodeBlocks {
     pub fn new(s: &str) -> ColorCodeBlocks {
         let mut code = Vec::new();
-        let mut parser = Parser::new(s);
-        let mut before_event = parser.get_offset();
-        'outer: while let Some(event) = parser.next() {
-            if let Event::Start(Tag::Code) | Event::Start(Tag::CodeBlock(_)) = event {
-                let start = before_event;
-                loop {
-                    match parser.next() {
-                        Some(Event::End(Tag::Code)) | Some(Event::End(Tag::CodeBlock(_))) => {
-                            let end = parser.get_offset();
-                            code.push(start..end);
-                            break;
-                        }
-                        Some(_) => {}
-                        None => break 'outer,
+        let mut parser = Parser::new(s).into_offset_iter();
+        while let Some((event, range)) = parser.next() {
+            if let Event::Start(Tag::CodeBlock(_)) = event {
+                let start = range.start;
+                while let Some((event, range)) = parser.next() {
+                    if let Event::End(Tag::CodeBlock(_)) = event {
+                        code.push(start..range.end);
+                        break;
                     }
                 }
+            } else if let Event::Code(_) = event {
+                code.push(range);
             }
-            before_event = parser.get_offset();
         }
 
         ColorCodeBlocks { code }
