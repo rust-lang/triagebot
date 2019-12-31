@@ -6,7 +6,7 @@ use futures::{
     stream::StreamExt,
 };
 use hyper::{header, service::service_fn, Body, Request, Response, Server, StatusCode};
-use reqwest::r#async::Client;
+use reqwest::Client;
 use std::{env, net::SocketAddr, sync::Arc};
 use triagebot::{github, handlers::Context, payload, EventName};
 use uuid::Uuid;

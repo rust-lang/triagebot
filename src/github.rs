@@ -1,15 +1,9 @@
 use anyhow::Context;
 
-use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
-    stream::{FuturesUnordered, StreamExt},
-};
+use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
-use reqwest::{
-    r#async::{Client, RequestBuilder, Response},
-    StatusCode,
-};
+use reqwest::{Client, RequestBuilder, Response, StatusCode};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
@@ -24,18 +18,17 @@ impl GithubClient {
 
         let req_dbg = format!("{:?}", req);
 
-        let resp = self.client.execute(req).compat().await?;
+        let resp = self.client.execute(req).await?;
 
         resp.error_for_status_ref()?;
 
         Ok((resp, req_dbg))
     }
     async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<Vec<u8>> {
-        let (resp, req_dbg) = self._send_req(req).await?;
+        let (mut resp, req_dbg) = self._send_req(req).await?;
 
         let mut body = Vec::new();
-        let mut stream = resp.into_body().compat();
-        while let Some(chunk) = stream.next().await {
+        while let Some(chunk) = resp.chunk().await.transpose() {
             let chunk = chunk
                 .context("reading stream failed")
                 .map_err(anyhow::Error::from)
@@ -50,9 +43,8 @@ impl GithubClient {
     where
         T: serde::de::DeserializeOwned,
     {
-        let (mut resp, req_dbg) = self._send_req(req).await?;
-
-        Ok(resp.json().compat().await.context(req_dbg)?)
+        let (resp, req_dbg) = self._send_req(req).await?;
+        Ok(resp.json().await.context(req_dbg)?)
     }
 }
 
@@ -514,18 +506,12 @@ impl GithubClient {
         let req = req
             .build()
             .with_context(|| format!("failed to build request {:?}", req_dbg))?;
-        let resp = self
-            .client
-            .execute(req)
-            .compat()
-            .await
-            .context(req_dbg.clone())?;
+        let mut resp = self.client.execute(req).await.context(req_dbg.clone())?;
         let status = resp.status();
         match status {
             StatusCode::OK => {
                 let mut buf = Vec::with_capacity(resp.content_length().unwrap_or(4) as usize);
-                let mut stream = resp.into_body().compat();
-                while let Some(chunk) = stream.next().await {
+                while let Some(chunk) = resp.chunk().await.transpose() {
                     let chunk = chunk
                         .context("reading stream failed")
                         .map_err(anyhow::Error::from)
