@@ -23,7 +23,7 @@ fn format_record_to_buf(
     writeln!(
         f,
         "[{time} {level:<5} {module_path} {file}:{line}]{request_id} {record}",
-        time = f.precise_timestamp(),
+        time = f.timestamp_millis(),
         request_id = rid,
         level = record.level(),
         module_path = record.module_path().unwrap_or(""),

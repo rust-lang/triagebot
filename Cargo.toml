@@ -16,14 +16,14 @@ lazy_static = "1"
 log = "0.4"
 anyhow = "1"
 hex = "0.4"
-env_logger = "0.6"
+env_logger = "0.7"
 parser = { path = "parser" }
 rust_team_data = { git = "https://github.com/rust-lang/team" }
 glob = "0.3.0"
 toml = "0.5.1"
 hyper = "0.12.32"
 futures-preview = { version = "=0.3.0-alpha.17", features = ["compat"] }
-uuid = { version = "0.7.4", features = ["v4"] }
+uuid = { version = "0.8", features = ["v4"] }
 url = "2.1.0"
 once_cell = "0.2.2"
 
