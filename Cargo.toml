@@ -15,7 +15,7 @@ regex = "1"
 lazy_static = "1"
 log = "0.4"
 anyhow = "1"
-hex = "0.3.2"
+hex = "0.4"
 env_logger = "0.6"
 parser = { path = "parser" }
 rust_team_data = { git = "https://github.com/rust-lang/team" }
