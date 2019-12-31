@@ -14,11 +14,9 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     pkg-config \
     libssl-dev
 
-# Install the currently pinned toolchain with rustup
-COPY rust-toolchain /tmp/rust-toolchain
 RUN curl https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init >/tmp/rustup-init && \
     chmod +x /tmp/rustup-init && \
-    /tmp/rustup-init -y --no-modify-path --default-toolchain $(cat /tmp/rust-toolchain)
+    /tmp/rustup-init -y --no-modify-path --default-toolchain stable
 ENV PATH=/root/.cargo/bin:$PATH
 
 # Build the dependencies in a separate step to avoid rebuilding all of them
