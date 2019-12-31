@@ -1,11 +1,7 @@
 #![allow(clippy::new_without_default)]
 
-use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
-    future::{FutureExt, TryFutureExt},
-    stream::StreamExt,
-};
-use hyper::{header, service::service_fn, Body, Request, Response, Server, StatusCode};
+use futures::{future::FutureExt, stream::StreamExt};
+use hyper::{header, Body, Request, Response, Server, StatusCode};
 use reqwest::Client;
 use std::{env, net::SocketAddr, sync::Arc};
 use triagebot::{github, handlers::Context, payload, EventName};
@@ -74,7 +70,7 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
     };
     log::debug!("signature={}", signature);
 
-    let mut c = body_stream.compat();
+    let mut c = body_stream;
     let mut payload = Vec::new();
     while let Some(chunk) = c.next().await {
         let chunk = chunk?;
@@ -124,33 +120,34 @@ async fn run_server(addr: SocketAddr) {
         github: gh,
     });
 
-    let serve_future = Server::bind(&addr).serve(move || {
+    let svc = hyper::service::make_service_fn(move |_conn| {
         let ctx = ctx.clone();
-        service_fn(move |req| {
-            let ctx = ctx.clone();
+        async move {
             let uuid = Uuid::new_v4();
-            logger::LogFuture::new(
-                uuid,
-                serve_req(req, ctx).map(move |mut resp| {
-                    if let Ok(resp) = &mut resp {
-                        resp.headers_mut()
-                            .insert("X-Request-Id", uuid.to_string().parse().unwrap());
-                    }
-                    log::info!("response = {:?}", resp);
-                    resp
-                }),
-            )
-            .boxed()
-            .compat()
-        })
+            Ok::<_, hyper::Error>(hyper::service::service_fn(move |req| {
+                logger::LogFuture::new(
+                    uuid,
+                    serve_req(req, ctx.clone()).map(move |mut resp| {
+                        if let Ok(resp) = &mut resp {
+                            resp.headers_mut()
+                                .insert("X-Request-Id", uuid.to_string().parse().unwrap());
+                        }
+                        log::info!("response = {:?}", resp);
+                        resp
+                    }),
+                )
+            }))
+        }
     });
+    let serve_future = Server::bind(&addr).serve(svc);
 
-    if let Err(e) = serve_future.compat().await {
+    if let Err(e) = serve_future.await {
         eprintln!("server error: {}", e);
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     dotenv::dotenv().ok();
     logger::init();
 
@@ -159,5 +156,5 @@ fn main() {
         .map(|p| p.parse::<u16>().expect("parsed PORT"))
         .unwrap_or(8000);
     let addr = ([0, 0, 0, 0], port).into();
-    hyper::rt::run(run_server(addr).unit_error().boxed().compat());
+    run_server(addr).await;
 }
