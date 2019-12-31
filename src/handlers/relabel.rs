@@ -237,8 +237,8 @@ mod tests {
                     allow_unauthenticated: vec!["T-*".into(), "I-*".into(), "!I-nominated".into()],
                 };
                 $($(assert_eq!(
-                    check_filter($label, &config, TeamMembership::$member).map_err(|e| failure::err_msg(e))?,
-                    CheckFilterResult::$res
+                    check_filter($label, &config, TeamMembership::$member),
+                    Ok(CheckFilterResult::$res)
                 );)*)*
             }
         }

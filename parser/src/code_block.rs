@@ -104,8 +104,8 @@ nope
         ),
         [
             Code::No("\n"),
-            Code::Yes("```language_spec\ntesting\n```\n"),
-            Code::No("\nnope\n")
+            Code::Yes("```language_spec\ntesting\n```"),
+            Code::No("\n\nnope\n")
         ],
     );
 }
@@ -137,8 +137,8 @@ fn cbs_6() {
 "
         ),
         [
-            Code::No("\n"),
-            Code::Yes("    this is indented\n    this is indented too\n"),
+            Code::No("\n    "),
+            Code::Yes("this is indented\n    this is indented too\n"),
         ],
     );
 }
