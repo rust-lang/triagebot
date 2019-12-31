@@ -14,7 +14,6 @@ use crate::{
     handlers::{Context, Handler},
     interactions::ErrorComment,
 };
-use failure::Error;
 use futures::future::{BoxFuture, FutureExt};
 use parser::command::relabel::{LabelDelta, RelabelCommand};
 use parser::command::{Command, Input};
@@ -61,7 +60,7 @@ impl Handler for RelabelHandler {
         config: &'a RelabelConfig,
         event: &'a Event,
         input: RelabelCommand,
-    ) -> BoxFuture<'a, Result<(), Error>> {
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
         handle_input(ctx, config, event, input).boxed()
     }
 }
@@ -71,18 +70,21 @@ async fn handle_input(
     config: &RelabelConfig,
     event: &Event,
     input: RelabelCommand,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     let mut issue_labels = event.issue().unwrap().labels().to_owned();
     let mut changed = false;
     for delta in &input.0 {
         let name = delta.label().as_str();
         let err = match check_filter(name, config, is_member(&event.user(), &ctx.github).await) {
             Ok(CheckFilterResult::Allow) => None,
-            Ok(CheckFilterResult::Deny) => Some(format!("Label {} can only be set by Rust team members", name)),
+            Ok(CheckFilterResult::Deny) => Some(format!(
+                "Label {} can only be set by Rust team members",
+                name
+            )),
             Ok(CheckFilterResult::DenyUnknown) => Some(format!(
                 "Label {} can only be set by Rust team members;\
                  we were unable to check if you are a team member.",
-                 name
+                name
             )),
             Err(err) => Some(err),
         };
@@ -185,7 +187,7 @@ enum MatchPatternResult {
     NoMatch,
 }
 
-fn match_pattern(pattern: &str, label: &str) -> Result<MatchPatternResult, Error> {
+fn match_pattern(pattern: &str, label: &str) -> anyhow::Result<MatchPatternResult> {
     let (pattern, inverse) = if pattern.starts_with('!') {
         (&pattern[1..], true)
     } else {
@@ -201,21 +203,34 @@ fn match_pattern(pattern: &str, label: &str) -> Result<MatchPatternResult, Error
 
 #[cfg(test)]
 mod tests {
-    use super::{TeamMembership, match_pattern, MatchPatternResult, check_filter, CheckFilterResult};
+    use super::{
+        check_filter, match_pattern, CheckFilterResult, MatchPatternResult, TeamMembership,
+    };
     use crate::config::RelabelConfig;
-    use failure::Error;
 
     #[test]
-    fn test_match_pattern() -> Result<(), Error> {
-        assert_eq!(match_pattern("I-*", "I-nominated")?, MatchPatternResult::Allow);
-        assert_eq!(match_pattern("!I-no*", "I-nominated")?, MatchPatternResult::Deny);
-        assert_eq!(match_pattern("I-*", "T-infra")?, MatchPatternResult::NoMatch);
-        assert_eq!(match_pattern("!I-no*", "T-infra")?, MatchPatternResult::NoMatch);
+    fn test_match_pattern() -> anyhow::Result<()> {
+        assert_eq!(
+            match_pattern("I-*", "I-nominated")?,
+            MatchPatternResult::Allow
+        );
+        assert_eq!(
+            match_pattern("!I-no*", "I-nominated")?,
+            MatchPatternResult::Deny
+        );
+        assert_eq!(
+            match_pattern("I-*", "T-infra")?,
+            MatchPatternResult::NoMatch
+        );
+        assert_eq!(
+            match_pattern("!I-no*", "T-infra")?,
+            MatchPatternResult::NoMatch
+        );
         Ok(())
     }
 
     #[test]
-    fn test_check_filter() -> Result<(), Error> {
+    fn test_check_filter() -> anyhow::Result<()> {
         macro_rules! t {
             ($($member:ident { $($label:expr => $res:ident,)* })*) => {
                 let config = RelabelConfig {

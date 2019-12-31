@@ -14,7 +14,7 @@ reqwest = "0.9"
 regex = "1"
 lazy_static = "1"
 log = "0.4"
-failure = "0.1"
+anyhow = "1"
 hex = "0.3.2"
 env_logger = "0.6"
 parser = { path = "parser" }

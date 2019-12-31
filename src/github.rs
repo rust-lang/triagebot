@@ -1,4 +1,4 @@
-use failure::{Error, ResultExt};
+use anyhow::Context;
 
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
@@ -30,7 +30,7 @@ impl GithubClient {
 
         Ok((resp, req_dbg))
     }
-    async fn send_req(&self, req: RequestBuilder) -> Result<Vec<u8>, Error> {
+    async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<Vec<u8>> {
         let (resp, req_dbg) = self._send_req(req).await?;
 
         let mut body = Vec::new();
@@ -38,7 +38,7 @@ impl GithubClient {
         while let Some(chunk) = stream.next().await {
             let chunk = chunk
                 .context("reading stream failed")
-                .map_err(Error::from)
+                .map_err(anyhow::Error::from)
                 .context(req_dbg.clone())?;
             body.extend_from_slice(&chunk);
         }
@@ -46,7 +46,7 @@ impl GithubClient {
         Ok(body)
     }
 
-    async fn json<T>(&self, req: RequestBuilder) -> Result<T, Error>
+    async fn json<T>(&self, req: RequestBuilder) -> anyhow::Result<T>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -57,11 +57,11 @@ impl GithubClient {
 }
 
 impl User {
-    pub async fn current(client: &GithubClient) -> Result<Self, Error> {
+    pub async fn current(client: &GithubClient) -> anyhow::Result<Self> {
         client.json(client.get("https://api.github.com/user")).await
     }
 
-    pub async fn is_team_member<'a>(&'a self, client: &'a GithubClient) -> Result<bool, Error> {
+    pub async fn is_team_member<'a>(&'a self, client: &'a GithubClient) -> anyhow::Result<bool> {
         let url = format!("{}/teams.json", rust_team_data::v1::BASE_URL);
         let permission: rust_team_data::v1::Teams = client
             .json(client.raw().get(&url))
@@ -78,7 +78,7 @@ impl User {
 pub async fn get_team(
     client: &GithubClient,
     team: &str,
-) -> Result<Option<rust_team_data::v1::Team>, Error> {
+) -> anyhow::Result<Option<rust_team_data::v1::Team>> {
     let url = format!("{}/teams.json", rust_team_data::v1::BASE_URL);
     let permission: rust_team_data::v1::Teams = client
         .json(client.raw().get(&url))
@@ -192,13 +192,13 @@ impl Issue {
         self.pull_request.is_some()
     }
 
-    pub async fn get_comment(&self, client: &GithubClient, id: usize) -> Result<Comment, Error> {
+    pub async fn get_comment(&self, client: &GithubClient, id: usize) -> anyhow::Result<Comment> {
         let comment_url = format!("{}/issues/comments/{}", self.repository_url, id);
         let comment = client.json(client.get(&comment_url)).await?;
         Ok(comment)
     }
 
-    pub async fn edit_body(&self, client: &GithubClient, body: &str) -> Result<(), Error> {
+    pub async fn edit_body(&self, client: &GithubClient, body: &str) -> anyhow::Result<()> {
         let edit_url = format!("{}/issues/{}", self.repository_url, self.number);
         #[derive(serde::Serialize)]
         struct ChangedIssue<'a> {
@@ -216,7 +216,7 @@ impl Issue {
         client: &GithubClient,
         id: usize,
         new_body: &str,
-    ) -> Result<(), Error> {
+    ) -> anyhow::Result<()> {
         let comment_url = format!("{}/issues/comments/{}", self.repository_url, id);
         #[derive(serde::Serialize)]
         struct NewComment<'a> {
@@ -233,7 +233,7 @@ impl Issue {
         Ok(())
     }
 
-    pub async fn post_comment(&self, client: &GithubClient, body: &str) -> Result<(), Error> {
+    pub async fn post_comment(&self, client: &GithubClient, body: &str) -> anyhow::Result<()> {
         #[derive(serde::Serialize)]
         struct PostComment<'a> {
             body: &'a str,
@@ -245,7 +245,11 @@ impl Issue {
         Ok(())
     }
 
-    pub async fn set_labels(&self, client: &GithubClient, labels: Vec<Label>) -> Result<(), Error> {
+    pub async fn set_labels(
+        &self,
+        client: &GithubClient,
+        labels: Vec<Label>,
+    ) -> anyhow::Result<()> {
         log::info!("set_labels {} to {:?}", self.global_id(), labels);
         // PUT /repos/:owner/:repo/issues/:number/labels
         // repo_url = https://api.github.com/repos/Codertocat/Hello-World
@@ -500,7 +504,7 @@ impl GithubClient {
         repo: &str,
         branch: &str,
         path: &str,
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> anyhow::Result<Option<Vec<u8>>> {
         let url = format!(
             "https://raw.githubusercontent.com/{}/{}/{}",
             repo, branch, path
@@ -509,7 +513,7 @@ impl GithubClient {
         let req_dbg = format!("{:?}", req);
         let req = req
             .build()
-            .with_context(|_| format!("failed to build request {:?}", req_dbg))?;
+            .with_context(|| format!("failed to build request {:?}", req_dbg))?;
         let resp = self
             .client
             .execute(req)
@@ -524,14 +528,14 @@ impl GithubClient {
                 while let Some(chunk) = stream.next().await {
                     let chunk = chunk
                         .context("reading stream failed")
-                        .map_err(Error::from)
+                        .map_err(anyhow::Error::from)
                         .context(req_dbg.clone())?;
                     buf.extend_from_slice(&chunk);
                 }
                 Ok(Some(buf))
             }
             StatusCode::NOT_FOUND => Ok(None),
-            status => failure::bail!("failed to GET {}: {}", url, status),
+            status => anyhow::bail!("failed to GET {}: {}", url, status),
         }
     }
 

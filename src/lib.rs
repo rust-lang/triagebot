@@ -1,6 +1,6 @@
 #![allow(clippy::new_without_default)]
 
-use failure::{Error, ResultExt};
+use anyhow::Context;
 use handlers::HandlerError;
 use interactions::ErrorComment;
 use std::fmt;
@@ -44,16 +44,16 @@ impl fmt::Display for EventName {
 }
 
 #[derive(Debug)]
-pub struct WebhookError(Error);
+pub struct WebhookError(anyhow::Error);
 
-impl From<Error> for WebhookError {
-    fn from(e: Error) -> WebhookError {
+impl From<anyhow::Error> for WebhookError {
+    fn from(e: anyhow::Error) -> WebhookError {
         WebhookError(e)
     }
 }
 
-pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> Result<T, Error> {
-    Ok(serde_json::from_str(&v).with_context(|_| format!("input: {:?}", v))?)
+pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::Result<T> {
+    Ok(serde_json::from_str(&v).with_context(|| format!("input: {:?}", v))?)
 }
 
 pub async fn webhook(
@@ -65,7 +65,7 @@ pub async fn webhook(
         EventName::IssueComment => {
             let payload = deserialize_payload::<github::IssueCommentEvent>(&payload)
                 .context("IssueCommentEvent failed to deserialize")
-                .map_err(Error::from)?;
+                .map_err(anyhow::Error::from)?;
 
             log::info!("handling issue comment {:?}", payload);
 
@@ -74,7 +74,7 @@ pub async fn webhook(
         EventName::Issue => {
             let payload = deserialize_payload::<github::IssuesEvent>(&payload)
                 .context("IssuesEvent failed to deserialize")
-                .map_err(Error::from)?;
+                .map_err(anyhow::Error::from)?;
 
             log::info!("handling issue event {:?}", payload);
 
@@ -95,7 +95,7 @@ pub async fn webhook(
             }
             HandlerError::Other(err) => {
                 log::error!("handling event failed: {:?}", err);
-                return Err(WebhookError(failure::err_msg(
+                return Err(WebhookError(anyhow::anyhow!(
                     "handling failed, error logged",
                 )));
             }

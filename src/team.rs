@@ -1,4 +1,3 @@
-use failure::Error;
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -25,13 +24,13 @@ impl Team {
 }
 
 impl FromStr for Team {
-    type Err = Error;
+    type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
             "libs" => Team::Libs,
             "compiler" => Team::Compiler,
             "lang" => Team::Lang,
-            _ => failure::bail!("unknown team: {:?}", s),
+            _ => anyhow::bail!("unknown team: {:?}", s),
         })
     }
 }

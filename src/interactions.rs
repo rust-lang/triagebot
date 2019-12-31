@@ -1,5 +1,4 @@
 use crate::github::{GithubClient, Issue};
-use failure::Error;
 use std::fmt::Write;
 
 pub struct ErrorComment<'a> {
@@ -18,7 +17,7 @@ impl<'a> ErrorComment<'a> {
         }
     }
 
-    pub async fn post(&self, client: &GithubClient) -> Result<(), Error> {
+    pub async fn post(&self, client: &GithubClient) -> anyhow::Result<()> {
         let mut body = String::new();
         writeln!(body, "**Error**: {}", self.message)?;
         writeln!(body)?;
@@ -99,7 +98,7 @@ impl<'a> EditIssueBody<'a> {
         )
     }
 
-    pub async fn apply<T>(&self, client: &GithubClient, text: String, data: T) -> Result<(), Error>
+    pub async fn apply<T>(&self, client: &GithubClient, text: String, data: T) -> anyhow::Result<()>
     where
         T: serde::Serialize,
     {

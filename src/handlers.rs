@@ -1,13 +1,12 @@
 use crate::config::{self, ConfigurationError};
 use crate::github::{Event, GithubClient};
-use failure::Error;
 use futures::future::BoxFuture;
 use std::fmt;
 
 #[derive(Debug)]
 pub enum HandlerError {
     Message(String),
-    Other(Error),
+    Other(anyhow::Error),
 }
 
 impl std::error::Error for HandlerError {}
@@ -82,5 +81,5 @@ pub trait Handler: Sync + Send {
         config: &'a Self::Config,
         event: &'a Event,
         input: Self::Input,
-    ) -> BoxFuture<'a, Result<(), Error>>;
+    ) -> BoxFuture<'a, anyhow::Result<()>>;
 }

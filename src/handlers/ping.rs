@@ -10,7 +10,6 @@ use crate::{
     handlers::{Context, Handler},
     interactions::ErrorComment,
 };
-use failure::Error;
 use futures::future::{BoxFuture, FutureExt};
 use parser::command::ping::PingCommand;
 use parser::command::{Command, Input};
@@ -57,7 +56,7 @@ impl Handler for PingHandler {
         config: &'a PingConfig,
         event: &'a Event,
         input: PingCommand,
-    ) -> BoxFuture<'a, Result<(), Error>> {
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
         handle_input(ctx, config, event, input.team).boxed()
     }
 }
@@ -67,7 +66,7 @@ async fn handle_input(
     config: &PingConfig,
     event: &Event,
     team_name: String,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
     {
         false

@@ -17,7 +17,7 @@ use crate::{
     handlers::{Context, Handler},
     interactions::EditIssueBody,
 };
-use failure::{Error, ResultExt};
+use anyhow::Context as _;
 use futures::future::{BoxFuture, FutureExt};
 use parser::command::assign::AssignCommand;
 use parser::command::{Command, Input};
@@ -70,12 +70,12 @@ impl Handler for AssignmentHandler {
         _config: &'a AssignConfig,
         event: &'a Event,
         cmd: AssignCommand,
-    ) -> BoxFuture<'a, Result<(), Error>> {
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
         handle_input(ctx, event, cmd).boxed()
     }
 }
 
-async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> Result<(), Error> {
+async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> anyhow::Result<()> {
     let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
     {
         false
@@ -117,7 +117,7 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> Resul
         AssignCommand::Own => event.user().login.clone(),
         AssignCommand::User { username } => {
             if !is_team_member && username != event.user().login {
-                failure::bail!("Only Rust team members can assign other users");
+                anyhow::bail!("Only Rust team members can assign other users");
             }
             username.clone()
         }
@@ -136,7 +136,7 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> Resul
                         .await?;
                     return Ok(());
                 } else {
-                    failure::bail!("Cannot release another user's assignment");
+                    anyhow::bail!("Cannot release another user's assignment");
                 }
             } else {
                 let current = &event.user();
@@ -150,7 +150,7 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> Resul
                         .await?;
                     return Ok(());
                 } else {
-                    failure::bail!("Cannot release unassigned issue");
+                    anyhow::bail!("Cannot release unassigned issue");
                 }
             };
         }

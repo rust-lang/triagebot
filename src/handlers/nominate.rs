@@ -6,7 +6,6 @@ use crate::{
     handlers::{Context, Handler},
     interactions::ErrorComment,
 };
-use failure::Error;
 use futures::future::{BoxFuture, FutureExt};
 use parser::command::nominate::{NominateCommand, Style};
 use parser::command::{Command, Input};
@@ -53,7 +52,7 @@ impl Handler for NominateHandler {
         config: &'a Self::Config,
         event: &'a Event,
         input: Self::Input,
-    ) -> BoxFuture<'a, Result<(), Error>> {
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
         handle_input(ctx, config, event, input).boxed()
     }
 }
@@ -63,7 +62,7 @@ async fn handle_input(
     config: &NominateConfig,
     event: &Event,
     cmd: NominateCommand,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
     let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
     {
         false

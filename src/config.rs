@@ -1,5 +1,4 @@
 use crate::github::GithubClient;
-use failure::Error;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, RwLock};
@@ -99,7 +98,7 @@ async fn get_fresh_config(
 pub enum ConfigurationError {
     Missing,
     Toml(toml::de::Error),
-    Http(Arc<Error>),
+    Http(Arc<anyhow::Error>),
 }
 
 impl std::error::Error for ConfigurationError {}
