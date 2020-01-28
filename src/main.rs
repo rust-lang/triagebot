@@ -10,6 +10,7 @@ use std::{env, net::SocketAddr, sync::Arc};
 use triagebot::{github, handlers::Context, payload, EventName};
 use uuid::Uuid;
 
+mod db;
 mod logger;
 
 async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Body>, hyper::Error> {
@@ -160,17 +161,17 @@ async fn connect_to_db(client: Client) -> anyhow::Result<tokio_postgres::Client>
     }
 }
 
-async fn run_server(addr: SocketAddr) {
+async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     log::info!("Listening on http://{}", addr);
 
     let client = Client::new();
-    let db_client = match connect_to_db(client.clone()).await {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("failed to connect to db: {}", e);
-            return;
-        }
-    };
+    let db_client = connect_to_db(client.clone())
+        .await
+        .context("open database connection")?;
+
+    db::run_migrations(&db_client)
+        .await
+        .context("database migrations")?;
 
     let gh = github::GithubClient::new(
         client.clone(),
@@ -203,9 +204,8 @@ async fn run_server(addr: SocketAddr) {
     });
     let serve_future = Server::bind(&addr).serve(svc);
 
-    if let Err(e) = serve_future.await {
-        eprintln!("server error: {}", e);
-    }
+    serve_future.await?;
+    Ok(())
 }
 
 #[tokio::main]
@@ -218,5 +218,7 @@ async fn main() {
         .map(|p| p.parse::<u16>().expect("parsed PORT"))
         .unwrap_or(8000);
     let addr = ([0, 0, 0, 0], port).into();
-    run_server(addr).await;
+    if let Err(e) = run_server(addr).await {
+        eprintln!("Failed to run server: {}", e);
+    }
 }
