@@ -7,7 +7,7 @@ use native_tls::{Certificate, TlsConnector};
 use postgres_native_tls::MakeTlsConnector;
 use reqwest::Client;
 use std::{env, net::SocketAddr, sync::Arc};
-use triagebot::{db, github, handlers::Context, payload, EventName};
+use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
 use uuid::Uuid;
 
 mod logger;
@@ -19,6 +19,26 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
         return Ok(Response::builder()
             .status(StatusCode::OK)
             .body(Body::from("Triagebot is awaiting triage."))
+            .unwrap());
+    }
+    if req.uri.path() == "/notifications" {
+        if let Some(query) = req.uri.query() {
+            let user = url::form_urlencoded::parse(query.as_bytes()).find(|(k, _)| k == "user");
+            if let Some((_, name)) = user {
+                return Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .body(Body::from(
+                        notification_listing::render(&ctx.db, &*name).await,
+                    ))
+                    .unwrap());
+            }
+        }
+
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::from(String::from(
+                "Please provide `?user=<username>` query param on URL.",
+            )))
             .unwrap());
     }
     if req.uri.path() != "/github-hook" {

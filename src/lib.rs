@@ -10,6 +10,7 @@ pub mod db;
 pub mod github;
 pub mod handlers;
 pub mod interactions;
+pub mod notification_listing;
 pub mod payload;
 pub mod team;
 

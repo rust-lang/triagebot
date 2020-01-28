@@ -35,3 +35,42 @@ pub async fn delete_ping(db: &DbClient, user_id: i64, origin_url: &str) -> anyho
 
     Ok(())
 }
+
+#[derive(Debug, serde::Serialize)]
+pub struct NotificationData {
+    pub origin_url: String,
+    pub origin_text: String,
+    pub time: DateTime<FixedOffset>,
+}
+
+pub async fn get_notifications(
+    db: &DbClient,
+    username: &str,
+) -> anyhow::Result<Vec<NotificationData>> {
+    let notifications = db
+        .query(
+            "
+        select username, origin_url, origin_html, time from notifications
+        join users on notifications.user_id = users.user_id
+        where username = $1
+        order by time desc;",
+            &[&username],
+        )
+        .await
+        .context("Getting notification data")?;
+
+    let mut data = Vec::new();
+    for notification in notifications {
+        let origin_url: String = notification.get(1);
+        let origin_text: String = notification.get(2);
+        let time: DateTime<FixedOffset> = notification.get(3);
+
+        data.push(NotificationData {
+            origin_url,
+            origin_text,
+            time,
+        });
+    }
+
+    Ok(data)
+}
