@@ -10,6 +10,7 @@ use std::fmt;
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct User {
     pub login: String,
+    pub id: Option<i64>,
 }
 
 impl GithubClient {
@@ -125,7 +126,7 @@ pub struct Issue {
     created_at: chrono::DateTime<Utc>,
     title: String,
     html_url: String,
-    user: User,
+    pub user: User,
     labels: Vec<Label>,
     assignees: Vec<User>,
     pull_request: Option<PullRequestDetails>,
