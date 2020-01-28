@@ -55,7 +55,7 @@ macro_rules! handlers {
             })*
 
             if let Err(e) = notification::handle(ctx, event).await {
-                log::error!("failed to process event {:?} with notification handler: {}", event, e);
+                log::error!("failed to process event {:?} with notification handler: {:?}", event, e);
             }
 
             Ok(())

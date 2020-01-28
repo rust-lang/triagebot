@@ -1,3 +1,4 @@
+use anyhow::Context as _;
 use chrono::{DateTime, FixedOffset};
 use tokio_postgres::Client as DbClient;
 
@@ -14,10 +15,12 @@ pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::
         "INSERT INTO users (user_id, username) VALUES ($1, $2) ON CONFLICT DO NOTHING",
         &[&notification.user_id, &notification.username],
     )
-    .await?;
+    .await
+    .context("inserting user id / username")?;
 
     db.execute("INSERT INTO notifications (user_id, origin_url, origin_html, time) VALUES ($1, $2, $3, $4)",
-        &[&notification.user_id, &notification.origin_url, &notification.origin_html, &notification.time]).await?;
+        &[&notification.user_id, &notification.origin_url, &notification.origin_html, &notification.time],
+        ).await.context("inserting notification")?;
 
     Ok(())
 }
