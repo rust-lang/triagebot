@@ -1,5 +1,5 @@
 use anyhow::Context as _;
-use tokio_postgres::Client as DbClient;
+pub use tokio_postgres::Client as DbClient;
 
 pub mod notifications;
 
@@ -55,7 +55,7 @@ static MIGRATIONS: &[&str] = &[
     "
 CREATE TABLE notifications (
     notification_id BIGSERIAL PRIMARY KEY,
-    user_id INTEGER,
+    user_id BIGINT,
     origin_url TEXT NOT NULL,
     origin_html TEXT,
     time TIMESTAMP WITH TIME ZONE

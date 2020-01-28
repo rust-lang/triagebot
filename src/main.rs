@@ -7,10 +7,9 @@ use native_tls::{Certificate, TlsConnector};
 use postgres_native_tls::MakeTlsConnector;
 use reqwest::Client;
 use std::{env, net::SocketAddr, sync::Arc};
-use triagebot::{github, handlers::Context, payload, EventName};
+use triagebot::{db, github, handlers::Context, payload, EventName};
 use uuid::Uuid;
 
-mod db;
 mod logger;
 
 async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Body>, hyper::Error> {

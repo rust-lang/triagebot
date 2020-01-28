@@ -2,7 +2,7 @@ use chrono::{DateTime, FixedOffset};
 use tokio_postgres::Client as DbClient;
 
 pub struct Notification {
-    pub user_id: i32,
+    pub user_id: i64,
     pub username: String,
     pub origin_url: String,
     pub origin_html: String,

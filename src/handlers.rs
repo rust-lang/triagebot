@@ -24,6 +24,7 @@ impl fmt::Display for HandlerError {
 macro_rules! handlers {
     ($($name:ident = $handler:expr,)*) => {
         $(mod $name;)*
+        mod notification;
 
         pub async fn handle(ctx: &Context, event: &Event) -> Result<(), HandlerError> {
             $(
@@ -52,6 +53,11 @@ macro_rules! handlers {
                     )));
                 }
             })*
+
+            if let Err(e) = notification::handle(ctx, event).await {
+                log::error!("failed to process event {:?} with notification handler: {}", event, e);
+            }
+
             Ok(())
         }
     }

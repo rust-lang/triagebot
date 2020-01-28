@@ -1,5 +1,6 @@
 use anyhow::Context;
 
+use chrono::{FixedOffset, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
@@ -65,6 +66,21 @@ impl User {
             .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
         Ok(map["all"].members.iter().any(|g| g.github == self.login) || is_triager)
     }
+
+    // Returns the ID of the given user, if the user is in the `all` team.
+    pub async fn get_id<'a>(&'a self, client: &'a GithubClient) -> anyhow::Result<Option<usize>> {
+        let url = format!("{}/teams.json", rust_team_data::v1::BASE_URL);
+        let permission: rust_team_data::v1::Teams = client
+            .json(client.raw().get(&url))
+            .await
+            .context("could not get team data")?;
+        let map = permission.teams;
+        Ok(map["all"]
+            .members
+            .iter()
+            .find(|g| g.github == self.login)
+            .map(|u| u.github_id))
+    }
 }
 
 pub async fn get_team(
@@ -106,6 +122,7 @@ pub struct PullRequestDetails {
 pub struct Issue {
     pub number: u64,
     pub body: String,
+    created_at: chrono::DateTime<Utc>,
     title: String,
     html_url: String,
     user: User,
@@ -124,6 +141,7 @@ pub struct Comment {
     pub body: String,
     pub html_url: String,
     pub user: User,
+    pub updated_at: chrono::DateTime<Utc>,
 }
 
 #[derive(Debug)]
@@ -461,6 +479,13 @@ impl Event {
         match self {
             Event::Issue(e) => &e.issue.user,
             Event::IssueComment(e) => &e.comment.user,
+        }
+    }
+
+    pub fn time(&self) -> chrono::DateTime<FixedOffset> {
+        match self {
+            Event::Issue(e) => e.issue.created_at.into(),
+            Event::IssueComment(e) => e.comment.updated_at.into(),
         }
     }
 }

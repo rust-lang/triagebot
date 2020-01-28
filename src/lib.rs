@@ -6,6 +6,7 @@ use interactions::ErrorComment;
 use std::fmt;
 
 pub mod config;
+pub mod db;
 pub mod github;
 pub mod handlers;
 pub mod interactions;
