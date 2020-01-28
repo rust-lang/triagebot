@@ -2,6 +2,7 @@ use crate::config::{self, ConfigurationError};
 use crate::github::{Event, GithubClient};
 use futures::future::BoxFuture;
 use std::fmt;
+use tokio_postgres::Client as DbClient;
 
 #[derive(Debug)]
 pub enum HandlerError {
@@ -66,6 +67,7 @@ handlers! {
 
 pub struct Context {
     pub github: GithubClient,
+    pub db: DbClient,
     pub username: String,
 }
 
