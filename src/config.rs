@@ -19,7 +19,6 @@ pub(crate) struct Config {
     pub(crate) assign: Option<AssignConfig>,
     pub(crate) ping: Option<PingConfig>,
     pub(crate) nominate: Option<NominateConfig>,
-    pub(crate) notification: Option<()>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
