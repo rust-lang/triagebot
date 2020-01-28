@@ -47,6 +47,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         .captures_iter(body)
         .map(|c| c.get(1).unwrap().as_str().to_owned())
         .collect::<Vec<_>>();
+    log::trace!("Captured usernames in comment: {:?}", caps);
     for login in caps {
         let user = github::User { login };
         let id = user
@@ -56,7 +57,10 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         let id = match id {
             Some(id) => id,
             // If the user was not in the team(s) then just don't record it.
-            None => return Ok(()),
+            None => {
+                log::trace!("Skipping {} because no id found", user.login);
+                return Ok(());
+            }
         };
         notifications::record_ping(
             &ctx.db,
