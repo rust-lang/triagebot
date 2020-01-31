@@ -41,6 +41,32 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
             )))
             .unwrap());
     }
+    if req.uri.path() == "/zulip-hook" {
+        let mut c = body_stream;
+        let mut payload = Vec::new();
+        while let Some(chunk) = c.next().await {
+            let chunk = chunk?;
+            payload.extend_from_slice(&chunk);
+        }
+
+        let req = match serde_json::from_slice(&payload) {
+            Ok(r) => r,
+            Err(e) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(Body::from(format!(
+                        "Did not send valid JSON request: {}",
+                        e
+                    )))
+                    .unwrap());
+            }
+        };
+
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::from(triagebot::zulip::respond(&ctx, req).await))
+            .unwrap());
+    }
     if req.uri.path() != "/github-hook" {
         return Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)

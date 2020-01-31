@@ -13,6 +13,7 @@ pub mod interactions;
 pub mod notification_listing;
 pub mod payload;
 pub mod team;
+pub mod zulip;
 
 pub enum EventName {
     IssueComment,

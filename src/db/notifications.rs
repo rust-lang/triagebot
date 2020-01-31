@@ -27,11 +27,11 @@ pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::
 
 pub async fn delete_ping(db: &DbClient, user_id: i64, origin_url: &str) -> anyhow::Result<()> {
     db.execute(
-        "DELETE FROM notifications WHERE user_id = $1, origin_url = $2",
+        "DELETE FROM notifications WHERE user_id = $1 and origin_url = $2",
         &[&user_id, &origin_url],
     )
     .await
-    .context("deleting notification")?;
+    .context("delete notification query")?;
 
     Ok(())
 }
