@@ -7,6 +7,7 @@ pub struct Notification {
     pub username: String,
     pub origin_url: String,
     pub origin_html: String,
+    pub short_description: Option<String>,
     pub time: DateTime<FixedOffset>,
 }
 
@@ -18,8 +19,8 @@ pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::
     .await
     .context("inserting user id / username")?;
 
-    db.execute("INSERT INTO notifications (user_id, origin_url, origin_html, time) VALUES ($1, $2, $3, $4)",
-        &[&notification.user_id, &notification.origin_url, &notification.origin_html, &notification.time],
+    db.execute("INSERT INTO notifications (user_id, origin_url, origin_html, time, short_description) VALUES ($1, $2, $3, $4, $5)",
+        &[&notification.user_id, &notification.origin_url, &notification.origin_html, &notification.time, &notification.short_description],
         ).await.context("inserting notification")?;
 
     Ok(())
@@ -36,10 +37,11 @@ pub async fn delete_ping(db: &DbClient, user_id: i64, origin_url: &str) -> anyho
     Ok(())
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug)]
 pub struct NotificationData {
     pub origin_url: String,
     pub origin_text: String,
+    pub short_description: Option<String>,
     pub time: DateTime<FixedOffset>,
 }
 
@@ -50,7 +52,8 @@ pub async fn get_notifications(
     let notifications = db
         .query(
             "
-        select username, origin_url, origin_html, time from notifications
+        select username, origin_url, origin_html, time, short_description
+        from notifications
         join users on notifications.user_id = users.user_id
         where username = $1
         order by time desc;",
@@ -64,10 +67,12 @@ pub async fn get_notifications(
         let origin_url: String = notification.get(1);
         let origin_text: String = notification.get(2);
         let time: DateTime<FixedOffset> = notification.get(3);
+        let short_description: Option<String> = notification.get(4);
 
         data.push(NotificationData {
             origin_url,
             origin_text,
+            short_description,
             time,
         });
     }

@@ -67,4 +67,5 @@ CREATE TABLE users (
     username TEXT NOT NULL
 );
 ",
+    "ALTER TABLE notifications ADD COLUMN short_description TEXT;",
 ];

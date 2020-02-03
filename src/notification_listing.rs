@@ -22,7 +22,11 @@ pub async fn render(db: &DbClient, user: &str) -> String {
     for notification in notifications {
         out.push_str(&format!(
             "<li><a href='{}'>{}</a></li>",
-            notification.origin_url, notification.origin_url,
+            notification.origin_url,
+            notification
+                .short_description
+                .as_ref()
+                .unwrap_or(&notification.origin_url),
         ));
     }
     out.push_str("</ul>");

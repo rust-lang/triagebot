@@ -76,6 +76,11 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         }
     }
 
+    let short_description = match event {
+        Event::Issue(e) => e.issue.title.clone(),
+        Event::IssueComment(e) => format!("Comment on {}", e.issue.title),
+    };
+
     let caps = PING_RE
         .captures_iter(body)
         .map(|c| c.get(1).unwrap().as_str().to_owned())
@@ -104,6 +109,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 origin_url: event.html_url().unwrap().to_owned(),
                 origin_html: body.to_owned(),
                 time: event.time(),
+                short_description: Some(short_description.clone()),
             },
         )
         .await

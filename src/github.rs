@@ -124,7 +124,7 @@ pub struct Issue {
     pub number: u64,
     pub body: String,
     created_at: chrono::DateTime<Utc>,
-    title: String,
+    pub title: String,
     html_url: String,
     pub user: User,
     labels: Vec<Label>,
