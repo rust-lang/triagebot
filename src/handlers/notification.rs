@@ -11,6 +11,7 @@ use crate::{
 };
 use anyhow::Context as _;
 use regex::Regex;
+use std::collections::HashSet;
 use std::convert::TryFrom;
 
 lazy_static::lazy_static! {
@@ -78,7 +79,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let caps = PING_RE
         .captures_iter(body)
         .map(|c| c.get(1).unwrap().as_str().to_owned())
-        .collect::<Vec<_>>();
+        .collect::<HashSet<_>>();
     log::trace!("Captured usernames in comment: {:?}", caps);
     for login in caps {
         let user = github::User { login, id: None };
