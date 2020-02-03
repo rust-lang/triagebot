@@ -41,7 +41,7 @@ impl GithubClient {
         Ok(body)
     }
 
-    async fn json<T>(&self, req: RequestBuilder) -> anyhow::Result<T>
+    pub async fn json<T>(&self, req: RequestBuilder) -> anyhow::Result<T>
     where
         T: serde::de::DeserializeOwned,
     {

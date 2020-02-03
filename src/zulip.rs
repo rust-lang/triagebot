@@ -1,5 +1,7 @@
 use crate::db::notifications::delete_ping;
+use crate::github::GithubClient;
 use crate::handlers::Context;
+use anyhow::Context as _;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Request {
@@ -24,10 +26,14 @@ struct Response<'a> {
     content: &'a str,
 }
 
-// Zulip User ID to GH User ID
-//
-// FIXME: replace with https://github.com/rust-lang/team/pull/222 once it lands
-static MAPPING: &[(usize, i64)] = &[(116122, 5047365), (119235, 1940490)];
+pub async fn to_github_id(client: &GithubClient, zulip_id: usize) -> anyhow::Result<Option<i64>> {
+    let url = format!("{}/zulip-map.json", rust_team_data::v1::BASE_URL);
+    let map: rust_team_data::v1::ZulipMapping = client
+        .json(client.raw().get(&url))
+        .await
+        .context("could not get team data")?;
+    Ok(map.users.get(&zulip_id).map(|v| *v as i64))
+}
 
 pub async fn respond(ctx: &Context, req: Request) -> String {
     let expected_token = std::env::var("ZULIP_TOKEN").expect("`ZULIP_TOKEN` set for authorization");
@@ -40,16 +46,19 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
     }
 
     log::trace!("zulip hook: {:?}", req);
-    let gh_id = match MAPPING
-        .iter()
-        .find(|(zulip, _)| *zulip == req.message.sender_id)
-    {
-        Some((_, gh_id)) => *gh_id,
-        None => {
+    let gh_id = match to_github_id(&ctx.github, req.message.sender_id).await {
+        Ok(Some(gh_id)) => gh_id,
+        Ok(None) => {
             return serde_json::to_string(&Response {
                 content: &format!(
                 "Unknown Zulip user. Please add `zulip-id = {}` to your file in rust-lang/team.",
                 req.message.sender_id),
+            })
+            .unwrap();
+        }
+        Err(e) => {
+            return serde_json::to_string(&Response {
+                content: &format!("Failed to query team API: {:?}", e),
             })
             .unwrap();
         }
