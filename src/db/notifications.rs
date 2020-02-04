@@ -43,12 +43,16 @@ pub async fn delete_ping(
 ) -> anyhow::Result<()> {
     match identifier {
         Identifier::Url(origin_url) => {
-            db.execute(
-                "DELETE FROM notifications WHERE user_id = $1 and origin_url = $2",
-                &[&user_id, &origin_url],
-            )
-            .await
-            .context("delete notification query")?;
+            let count = db
+                .execute(
+                    "DELETE FROM notifications WHERE user_id = $1 and origin_url = $2",
+                    &[&user_id, &origin_url],
+                )
+                .await
+                .context("delete notification query")?;
+            if count == 0 {
+                anyhow::bail!("Did not delete any rows");
+            }
         }
         Identifier::Index(idx) => loop {
             let t = db

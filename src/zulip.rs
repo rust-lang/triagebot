@@ -70,7 +70,7 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
             Ok(r) => r,
             Err(e) => serde_json::to_string(&Response {
                 content: &format!(
-                    "Failed to parse acknowledgement, expected `acknowledge <url>`: {:?}.",
+                    "Failed to parse acknowledgement, expected `acknowledge <identifier>`: {:?}.",
                     e
                 ),
             })
