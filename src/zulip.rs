@@ -1,4 +1,4 @@
-use crate::db::notifications::{delete_ping, move_indices};
+use crate::db::notifications::{delete_ping, move_indices, Identifier};
 use crate::github::GithubClient;
 use crate::handlers::Context;
 use anyhow::Context as _;
@@ -107,7 +107,21 @@ async fn acknowledge(
         }
         None => anyhow::bail!("not enough words"),
     };
-    match delete_ping(&ctx.db, gh_id, url).await {
+    let ident = if let Ok(number) = url.parse::<usize>() {
+        Identifier::Index(
+            std::num::NonZeroUsize::new(number)
+                .ok_or_else(|| anyhow::anyhow!("index must be at least 1"))?,
+        )
+    } else {
+        Identifier::Url(url)
+    };
+    match delete_ping(
+        &mut Context::make_db_client(&ctx.github.raw()).await?,
+        gh_id,
+        ident,
+    )
+    .await
+    {
         Ok(()) => Ok(serde_json::to_string(&Response {
             content: &format!("Acknowledged {}.", url),
         })

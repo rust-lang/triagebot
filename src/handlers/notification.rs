@@ -47,7 +47,13 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             }
         };
 
-        if let Err(e) = notifications::delete_ping(&ctx.db, id, &url).await {
+        if let Err(e) = notifications::delete_ping(
+            &mut Context::make_db_client(&ctx.github.raw()).await?,
+            id,
+            notifications::Identifier::Url(&url),
+        )
+        .await
+        {
             log::warn!(
                 "failed to delete notification: url={}, user={:?}: {:?}",
                 url,
