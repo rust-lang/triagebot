@@ -18,7 +18,7 @@ pub async fn render(db: &DbClient, user: &str) -> String {
 
     out.push_str(&format!("<h3>Pending notifications for {}</h3>", user));
 
-    out.push_str("<ul>");
+    out.push_str("<ol>");
     for notification in notifications {
         out.push_str(&format!(
             "<li><a href='{}'>{}</a></li>",
@@ -29,7 +29,7 @@ pub async fn render(db: &DbClient, user: &str) -> String {
                 .unwrap_or(&notification.origin_url),
         ));
     }
-    out.push_str("</ul>");
+    out.push_str("</ol>");
 
     out.push_str("</body>");
     out.push_str("</html>");
