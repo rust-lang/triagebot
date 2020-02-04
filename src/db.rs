@@ -69,4 +69,5 @@ CREATE TABLE users (
 ",
     "ALTER TABLE notifications ADD COLUMN short_description TEXT;",
     "ALTER TABLE notifications ADD COLUMN team_name TEXT;",
+    "ALTER TABLE notifications ADD COLUMN idx INTEGER;",
 ];

@@ -56,11 +56,11 @@ pub async fn get_notifications(
     let notifications = db
         .query(
             "
-        select username, origin_url, origin_html, time, short_description
+        select username, origin_url, origin_html, time, short_description, idx
         from notifications
         join users on notifications.user_id = users.user_id
         where username = $1
-        order by time desc;",
+        order by notifications.idx desc, notifications.time desc;",
             &[&username],
         )
         .await
