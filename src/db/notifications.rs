@@ -68,7 +68,7 @@ pub async fn move_indices(
                 "select notification_id, idx, user_id
         from notifications
         where user_id = $1
-        order by notifications.idx desc, notifications.time desc;",
+        order by idx desc, time desc;",
                 &[&user_id],
             )
             .await
@@ -101,9 +101,9 @@ pub async fn move_indices(
 
         for (idx, id) in notifications.into_iter().enumerate() {
             t.execute(
-                "update notifications SET notifications.idx = $2
-                 where notifications.notification_id = $1",
-                &[&id, &(idx as i64)],
+                "update notifications SET idx = $2
+                 where notification_id = $1",
+                &[&id, &(idx as i32)],
             )
             .await
             .context("update notification id")?;

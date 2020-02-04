@@ -132,8 +132,16 @@ async fn move_notification(
         Some(idx) => idx,
         None => anyhow::bail!("from idx not present"),
     };
-    let from = from.parse::<usize>().context("from index")?;
-    let to = to.parse::<usize>().context("to index")?;
+    let from = from
+        .parse::<usize>()
+        .context("from index")?
+        .checked_sub(1)
+        .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
+    let to = to
+        .parse::<usize>()
+        .context("to index")?
+        .checked_sub(1)
+        .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
     match move_indices(
         &mut Context::make_db_client(&ctx.github.raw()).await?,
         gh_id,
