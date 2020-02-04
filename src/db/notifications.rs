@@ -49,6 +49,83 @@ pub struct NotificationData {
     pub time: DateTime<FixedOffset>,
 }
 
+pub async fn move_indices(
+    db: &mut DbClient,
+    user_id: i64,
+    from: usize,
+    to: usize,
+) -> anyhow::Result<()> {
+    loop {
+        let t = db
+            .build_transaction()
+            .isolation_level(tokio_postgres::IsolationLevel::Serializable)
+            .start()
+            .await
+            .context("begin transaction")?;
+
+        let notifications = t
+            .query(
+                "select notification_id, idx, user_id
+        from notifications
+        where user_id = $1
+        order by notifications.idx desc, notifications.time desc;",
+                &[&user_id],
+            )
+            .await
+            .context("failed to get initial ordering")?;
+
+        let mut notifications = notifications
+            .into_iter()
+            .map(|n| n.get(0))
+            .collect::<Vec<i64>>();
+
+        if notifications.get(from).is_none() {
+            anyhow::bail!(
+                "`from` index not present, must be less than {}",
+                notifications.len()
+            );
+        }
+
+        if notifications.get(to).is_none() {
+            anyhow::bail!(
+                "`to` index not present, must be less than {}",
+                notifications.len()
+            );
+        }
+
+        if from < to {
+            notifications[from..=to].rotate_left(1);
+        } else if to < from {
+            notifications[to..=from].rotate_right(1);
+        }
+
+        for (idx, id) in notifications.into_iter().enumerate() {
+            t.execute(
+                "update notifications SET notifications.idx = $2
+                 where notifications.notification_id = $1",
+                &[&id, &(idx as i64)],
+            )
+            .await
+            .context("update notification id")?;
+        }
+
+        if let Err(e) = t.commit().await {
+            if e.code().map_or(false, |c| {
+                *c == tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE
+            }) {
+                log::trace!("serialization failure, restarting index movement");
+                continue;
+            } else {
+                return Err(e).context("transaction commit failure");
+            }
+        } else {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn get_notifications(
     db: &DbClient,
     username: &str,
@@ -60,7 +137,7 @@ pub async fn get_notifications(
         from notifications
         join users on notifications.user_id = users.user_id
         where username = $1
-        order by notifications.idx desc, notifications.time desc;",
+        order by notifications.idx desc nulls last, notifications.time desc;",
             &[&username],
         )
         .await

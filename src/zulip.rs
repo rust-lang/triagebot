@@ -1,4 +1,4 @@
-use crate::db::notifications::delete_ping;
+use crate::db::notifications::{delete_ping, move_indices};
 use crate::github::GithubClient;
 use crate::handlers::Context;
 use anyhow::Context as _;
@@ -64,14 +64,25 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
         }
     };
 
-    match two_words(&req.data) {
-        Some(["acknowledge", url]) => match delete_ping(&ctx.db, gh_id, url).await {
-            Ok(()) => serde_json::to_string(&Response {
-                content: &format!("Acknowledged {}.", url),
+    let mut words = req.data.split_whitespace();
+    match words.next() {
+        Some("acknowledge") => match acknowledge(&ctx, gh_id, words).await {
+            Ok(r) => r,
+            Err(e) => serde_json::to_string(&Response {
+                content: &format!(
+                    "Failed to parse acknowledgement, expected `acknowledge <url>`: {:?}.",
+                    e
+                ),
             })
             .unwrap(),
+        },
+        Some("move") => match move_notification(&ctx, gh_id, words).await {
+            Ok(r) => r,
             Err(e) => serde_json::to_string(&Response {
-                content: &format!("Failed to acknowledge {}: {:?}.", url, e),
+                content: &format!(
+                    "Failed to parse movement, expected `move <from> <to>`: {:?}.",
+                    e
+                ),
             })
             .unwrap(),
         },
@@ -82,13 +93,62 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
     }
 }
 
-fn two_words(s: &str) -> Option<[&str; 2]> {
-    let mut iter = s.split_whitespace();
-    let first = iter.next()?;
-    let second = iter.next()?;
-    if iter.next().is_some() {
-        return None;
+async fn acknowledge(
+    ctx: &Context,
+    gh_id: i64,
+    mut words: impl Iterator<Item = &str>,
+) -> anyhow::Result<String> {
+    let url = match words.next() {
+        Some(url) => {
+            if words.next().is_some() {
+                anyhow::bail!("too many words");
+            }
+            url
+        }
+        None => anyhow::bail!("not enough words"),
+    };
+    match delete_ping(&ctx.db, gh_id, url).await {
+        Ok(()) => Ok(serde_json::to_string(&Response {
+            content: &format!("Acknowledged {}.", url),
+        })
+        .unwrap()),
+        Err(e) => Ok(serde_json::to_string(&Response {
+            content: &format!("Failed to acknowledge {}: {:?}.", url, e),
+        })
+        .unwrap()),
     }
+}
 
-    return Some([first, second]);
+async fn move_notification(
+    ctx: &Context,
+    gh_id: i64,
+    mut words: impl Iterator<Item = &str>,
+) -> anyhow::Result<String> {
+    let from = match words.next() {
+        Some(idx) => idx,
+        None => anyhow::bail!("from idx not present"),
+    };
+    let to = match words.next() {
+        Some(idx) => idx,
+        None => anyhow::bail!("from idx not present"),
+    };
+    let from = from.parse::<usize>().context("from index")?;
+    let to = to.parse::<usize>().context("to index")?;
+    match move_indices(
+        &mut Context::make_db_client(&ctx.github.raw()).await?,
+        gh_id,
+        from,
+        to,
+    )
+    .await
+    {
+        Ok(()) => Ok(serde_json::to_string(&Response {
+            content: &format!("Moved {} to {}.", from, to),
+        })
+        .unwrap()),
+        Err(e) => Ok(serde_json::to_string(&Response {
+            content: &format!("Failed to move: {:?}.", e),
+        })
+        .unwrap()),
+    }
 }

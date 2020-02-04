@@ -3,8 +3,6 @@
 use anyhow::Context as _;
 use futures::{future::FutureExt, stream::StreamExt};
 use hyper::{header, Body, Request, Response, Server, StatusCode};
-use native_tls::{Certificate, TlsConnector};
-use postgres_native_tls::MakeTlsConnector;
 use reqwest::Client;
 use std::{env, net::SocketAddr, sync::Arc};
 use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
@@ -156,64 +154,13 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
     Ok(Response::new(Body::from("processed request")))
 }
 
-const CERT_URL: &str = "https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem";
-
-async fn connect_to_db(client: Client) -> anyhow::Result<tokio_postgres::Client> {
-    let db_url = env::var("DATABASE_URL").expect("needs DATABASE_URL");
-    if db_url.contains("rds.amazonaws.com") {
-        let resp = client
-            .get(CERT_URL)
-            .send()
-            .await
-            .context("failed to get RDS cert")?;
-        let cert = resp.bytes().await.context("faield to get RDS cert body")?;
-        let cert = Certificate::from_pem(&cert).context("made certificate")?;
-        let connector = TlsConnector::builder()
-            .add_root_certificate(cert)
-            .build()
-            .context("built TlsConnector")?;
-        let connector = MakeTlsConnector::new(connector);
-
-        let (db_client, connection) = match tokio_postgres::connect(&db_url, connector).await {
-            Ok(v) => v,
-            Err(e) => {
-                anyhow::bail!("failed to connect to DB: {}", e);
-            }
-        };
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                eprintln!("database connection error: {}", e);
-            }
-        });
-
-        Ok(db_client)
-    } else {
-        eprintln!("Warning: Non-TLS connection to non-RDS DB");
-        let (db_client, connection) =
-            match tokio_postgres::connect(&db_url, tokio_postgres::NoTls).await {
-                Ok(v) => v,
-                Err(e) => {
-                    anyhow::bail!("failed to connect to DB: {}", e);
-                }
-            };
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                eprintln!("database connection error: {}", e);
-            }
-        });
-
-        Ok(db_client)
-    }
-}
-
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     log::info!("Listening on http://{}", addr);
 
     let client = Client::new();
-    let db_client = connect_to_db(client.clone())
+    let db_client = Context::make_db_client(&client)
         .await
         .context("open database connection")?;
-
     db::run_migrations(&db_client)
         .await
         .context("database migrations")?;
