@@ -73,7 +73,10 @@ pub async fn delete_ping(
                 .await
                 .context("failed to get ordering")?;
 
-            let notification_id: i64 = notifications[idx.get() - 1].get(0);
+            let notification_id: i64 = notifications
+                .get(idx.get() - 1)
+                .ok_or_else(|| anyhow::anyhow!("No such notification with index {}", idx.get()))?
+                .get(0);
 
             t.execute(
                 "DELETE FROM notifications WHERE notification_id = $1",
