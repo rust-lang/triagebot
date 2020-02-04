@@ -15,7 +15,7 @@ use std::collections::HashSet;
 use std::convert::TryFrom;
 
 lazy_static::lazy_static! {
-    static ref PING_RE: Regex = Regex::new(r#"@([-\w\d]+)"#,).unwrap();
+    static ref PING_RE: Regex = Regex::new(r#"@([-\w\d/]+)"#,).unwrap();
     static ref ACKNOWLEDGE_RE: Regex = Regex::new(r#"acknowledge (https?://[^ ]+)"#,).unwrap();
 }
 
@@ -87,33 +87,104 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         .collect::<HashSet<_>>();
     log::trace!("Captured usernames in comment: {:?}", caps);
     for login in caps {
-        let user = github::User { login, id: None };
-        let id = user
-            .get_id(&ctx.github)
-            .await
-            .with_context(|| format!("failed to get user {} ID", user.login))?;
-        let id = match id {
-            Some(id) => id,
-            // If the user was not in the team(s) then just don't record it.
-            None => {
-                log::trace!("Skipping {} because no id found", user.login);
-                return Ok(());
+        let (users, team_name) = if login.contains('/') {
+            // This is a team ping. For now, just add it to everyone's agenda on
+            // that team, but also mark it as such (i.e., a team ping) for
+            // potentially different prioritization and so forth.
+            //
+            // In order to properly handle this down the road, we will want to
+            // distinguish between "everyone must pay attention" and "someone
+            // needs to take a look."
+            //
+            // We may also want to be able to categorize into these buckets
+            // *after* the ping occurs and is initially processed.
+
+            let mut iter = login.split('/');
+            let _rust_lang = iter.next().unwrap();
+            let team = iter.next().unwrap();
+            let team = match github::get_team(&ctx.github, team).await {
+                Ok(Some(team)) => team,
+                Ok(None) => {
+                    log::error!("team ping ({}) failed to resolve to a known team", login);
+                    continue;
+                }
+                Err(err) => {
+                    log::error!(
+                        "team ping ({}) failed to resolve to a known team: {:?}",
+                        login,
+                        err
+                    );
+                    continue;
+                }
+            };
+
+            (
+                team.members
+                    .into_iter()
+                    .map(|member| {
+                        let id = i64::try_from(member.github_id).with_context(|| {
+                            format!("user id {} out of bounds", member.github_id)
+                        })?;
+                        Ok(github::User {
+                            id: Some(id),
+                            login: member.github,
+                        })
+                    })
+                    .collect::<anyhow::Result<Vec<github::User>>>(),
+                Some(team.name),
+            )
+        } else {
+            let user = github::User { login, id: None };
+            let id = user
+                .get_id(&ctx.github)
+                .await
+                .with_context(|| format!("failed to get user {} ID", user.login))?;
+            let id = match id {
+                Some(id) => id,
+                // If the user was not in the team(s) then just don't record it.
+                None => {
+                    log::trace!("Skipping {} because no id found", user.login);
+                    continue;
+                }
+            };
+            let id = i64::try_from(id).with_context(|| format!("user id {} out of bounds", id));
+            (
+                id.map(|id| {
+                    vec![github::User {
+                        login: user.login.clone(),
+                        id: Some(id),
+                    }]
+                }),
+                None,
+            )
+        };
+
+        let users = match users {
+            Ok(users) => users,
+            Err(err) => {
+                log::error!("getting users failed: {:?}", err);
+                continue;
             }
         };
-        notifications::record_ping(
-            &ctx.db,
-            &notifications::Notification {
-                user_id: i64::try_from(id)
-                    .with_context(|| format!("user id {} out of bounds", id))?,
-                username: user.login,
-                origin_url: event.html_url().unwrap().to_owned(),
-                origin_html: body.to_owned(),
-                time: event.time(),
-                short_description: Some(short_description.clone()),
-            },
-        )
-        .await
-        .context("failed to record ping")?;
+
+        for user in users {
+            if let Err(err) = notifications::record_ping(
+                &ctx.db,
+                &notifications::Notification {
+                    user_id: user.id.unwrap(),
+                    username: user.login,
+                    origin_url: event.html_url().unwrap().to_owned(),
+                    origin_html: body.to_owned(),
+                    time: event.time(),
+                    short_description: Some(short_description.clone()),
+                },
+            )
+            .await
+            .context("failed to record ping")
+            {
+                log::error!("record ping: {:?}", err);
+            }
+        }
     }
 
     Ok(())
