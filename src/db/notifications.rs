@@ -9,6 +9,10 @@ pub struct Notification {
     pub origin_html: String,
     pub short_description: Option<String>,
     pub time: DateTime<FixedOffset>,
+
+    /// If this is Some, then the notification originated in a team-wide ping
+    /// (e.g., @rust-lang/libs). The String is the team name (e.g., libs).
+    pub team_name: Option<String>,
 }
 
 pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::Result<()> {
@@ -19,8 +23,8 @@ pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::
     .await
     .context("inserting user id / username")?;
 
-    db.execute("INSERT INTO notifications (user_id, origin_url, origin_html, time, short_description) VALUES ($1, $2, $3, $4, $5)",
-        &[&notification.user_id, &notification.origin_url, &notification.origin_html, &notification.time, &notification.short_description],
+    db.execute("INSERT INTO notifications (user_id, origin_url, origin_html, time, short_description, team_name) VALUES ($1, $2, $3, $4, $5, $6)",
+        &[&notification.user_id, &notification.origin_url, &notification.origin_html, &notification.time, &notification.short_description, &notification.team_name],
         ).await.context("inserting notification")?;
 
     Ok(())

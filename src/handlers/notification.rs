@@ -177,6 +177,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                     origin_html: body.to_owned(),
                     time: event.time(),
                     short_description: Some(short_description.clone()),
+                    team_name: team_name.clone(),
                 },
             )
             .await
