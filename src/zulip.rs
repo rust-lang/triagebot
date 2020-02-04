@@ -151,7 +151,8 @@ async fn move_notification(
     .await
     {
         Ok(()) => Ok(serde_json::to_string(&Response {
-            content: &format!("Moved {} to {}.", from, to),
+            // to 1-base indices
+            content: &format!("Moved {} to {}.", from + 1, to + 1),
         })
         .unwrap()),
         Err(e) => Ok(serde_json::to_string(&Response {
