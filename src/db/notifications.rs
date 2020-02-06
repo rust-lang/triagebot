@@ -192,6 +192,69 @@ pub async fn move_indices(
     Ok(())
 }
 
+pub async fn add_metadata(
+    db: &mut DbClient,
+    user_id: i64,
+    idx: usize,
+    metadata: Option<&str>,
+) -> anyhow::Result<()> {
+    loop {
+        let t = db
+            .build_transaction()
+            .isolation_level(tokio_postgres::IsolationLevel::Serializable)
+            .start()
+            .await
+            .context("begin transaction")?;
+
+        let notifications = t
+            .query(
+                "select notification_id, idx, user_id
+        from notifications
+        where user_id = $1
+        order by idx desc nulls last, time desc;",
+                &[&user_id],
+            )
+            .await
+            .context("failed to get initial ordering")?;
+
+        let notifications = notifications
+            .into_iter()
+            .map(|n| n.get(0))
+            .collect::<Vec<i64>>();
+
+        match notifications.get(idx) {
+            None => anyhow::bail!(
+                "index not present, must be less than {}",
+                notifications.len()
+            ),
+            Some(id) => {
+                t.execute(
+                    "update notifications SET idx = $2, metadata = $3
+                 where notification_id = $1",
+                    &[&id, &(idx as i32), &metadata],
+                )
+                .await
+                .context("update notification id")?;
+            }
+        }
+
+        if let Err(e) = t.commit().await {
+            if e.code().map_or(false, |c| {
+                *c == tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE
+            }) {
+                log::trace!("serialization failure, restarting index movement");
+                continue;
+            } else {
+                return Err(e).context("transaction commit failure");
+            }
+        } else {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn get_notifications(
     db: &DbClient,
     username: &str,

@@ -1,3 +1,4 @@
+use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
 use crate::github::GithubClient;
 use crate::handlers::Context;
@@ -96,6 +97,16 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
             })
             .unwrap(),
         },
+        Some("meta") => match add_meta_notification(&ctx, gh_id, words).await {
+            Ok(r) => r,
+            Err(e) => serde_json::to_string(&Response {
+                content: &format!(
+                    "Failed to parse movement, expected `move <idx> <meta...>`: {:?}.",
+                    e
+                ),
+            })
+            .unwrap(),
+        },
         _ => serde_json::to_string(&Response {
             content: "Unknown command.",
         })
@@ -186,6 +197,51 @@ async fn add_notification(
         .unwrap()),
     }
 }
+
+async fn add_meta_notification(
+    ctx: &Context,
+    gh_id: i64,
+    mut words: impl Iterator<Item = &str>,
+) -> anyhow::Result<String> {
+    let idx = match words.next() {
+        Some(idx) => idx,
+        None => anyhow::bail!("idx not present"),
+    };
+    let idx = idx
+        .parse::<usize>()
+        .context("index")?
+        .checked_sub(1)
+        .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
+    let mut description = words.fold(String::new(), |mut acc, piece| {
+        acc.push_str(piece);
+        acc.push(' ');
+        acc
+    });
+    let description = if description.is_empty() {
+        None
+    } else {
+        assert_eq!(description.pop(), Some(' ')); // pop trailing space
+        Some(description)
+    };
+    match add_metadata(
+        &mut Context::make_db_client(&ctx.github.raw()).await?,
+        gh_id,
+        idx,
+        description.as_deref(),
+    )
+    .await
+    {
+        Ok(()) => Ok(serde_json::to_string(&Response {
+            content: "Added metadata!",
+        })
+        .unwrap()),
+        Err(e) => Ok(serde_json::to_string(&Response {
+            content: &format!("Failed to add: {:?}", e),
+        })
+        .unwrap()),
+    }
+}
+
 async fn move_notification(
     ctx: &Context,
     gh_id: i64,
