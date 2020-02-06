@@ -1,4 +1,4 @@
-use crate::db::notifications::{delete_ping, move_indices, Identifier};
+use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
 use crate::github::GithubClient;
 use crate::handlers::Context;
 use anyhow::Context as _;
@@ -76,6 +76,16 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
             })
             .unwrap(),
         },
+        Some("add") => match add_notification(&ctx, gh_id, words).await {
+            Ok(r) => r,
+            Err(e) => serde_json::to_string(&Response {
+                content: &format!(
+                    "Failed to parse movement, expected `add <url> <description (multiple words)>`: {:?}.",
+                    e
+                ),
+            })
+            .unwrap(),
+        },
         Some("move") => match move_notification(&ctx, gh_id, words).await {
             Ok(r) => r,
             Err(e) => serde_json::to_string(&Response {
@@ -133,6 +143,49 @@ async fn acknowledge(
     }
 }
 
+async fn add_notification(
+    ctx: &Context,
+    gh_id: i64,
+    mut words: impl Iterator<Item = &str>,
+) -> anyhow::Result<String> {
+    let url = match words.next() {
+        Some(idx) => idx,
+        None => anyhow::bail!("url not present"),
+    };
+    let mut description = words.fold(String::new(), |mut acc, piece| {
+        acc.push_str(piece);
+        acc.push(' ');
+        acc
+    });
+    let description = if description.is_empty() {
+        None
+    } else {
+        assert_eq!(description.pop(), Some(' ')); // pop trailing space
+        Some(description)
+    };
+    match record_ping(
+        &ctx.db,
+        &notifications::Notification {
+            user_id: gh_id,
+            origin_url: url.to_owned(),
+            origin_html: String::new(),
+            short_description: description,
+            time: chrono::Utc::now().into(),
+            team_name: None,
+        },
+    )
+    .await
+    {
+        Ok(()) => Ok(serde_json::to_string(&Response {
+            content: "Created!",
+        })
+        .unwrap()),
+        Err(e) => Ok(serde_json::to_string(&Response {
+            content: &format!("Failed to create: {:?}", e),
+        })
+        .unwrap()),
+    }
+}
 async fn move_notification(
     ctx: &Context,
     gh_id: i64,

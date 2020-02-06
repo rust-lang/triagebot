@@ -4,7 +4,6 @@ use tokio_postgres::Client as DbClient;
 
 pub struct Notification {
     pub user_id: i64,
-    pub username: String,
     pub origin_url: String,
     pub origin_html: String,
     pub short_description: Option<String>,
@@ -15,14 +14,17 @@ pub struct Notification {
     pub team_name: Option<String>,
 }
 
-pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::Result<()> {
+pub async fn record_username(db: &DbClient, user_id: i64, username: String) -> anyhow::Result<()> {
     db.execute(
         "INSERT INTO users (user_id, username) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-        &[&notification.user_id, &notification.username],
+        &[&user_id, &username],
     )
     .await
     .context("inserting user id / username")?;
+    Ok(())
+}
 
+pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::Result<()> {
     db.execute("INSERT INTO notifications (user_id, origin_url, origin_html, time, short_description, team_name) VALUES ($1, $2, $3, $4, $5, $6)",
         &[&notification.user_id, &notification.origin_url, &notification.origin_html, &notification.time, &notification.short_description, &notification.team_name],
         ).await.context("inserting notification")?;

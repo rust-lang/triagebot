@@ -91,6 +91,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         .captures_iter(body)
         .map(|c| c.get(1).unwrap().as_str().to_owned())
         .collect::<HashSet<_>>();
+    let mut users_notified = HashSet::new();
     log::trace!("Captured usernames in comment: {:?}", caps);
     for login in caps {
         let (users, team_name) = if login.contains('/') {
@@ -174,11 +175,22 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         };
 
         for user in users {
+            if !users_notified.insert(user.id.unwrap()) {
+                // Skip users already associated with this event.
+                continue;
+            }
+
+            if let Err(err) = notifications::record_username(&ctx.db, user.id.unwrap(), user.login)
+                .await
+                .context("failed to record username")
+            {
+                log::error!("record username: {:?}", err);
+            }
+
             if let Err(err) = notifications::record_ping(
                 &ctx.db,
                 &notifications::Notification {
                     user_id: user.id.unwrap(),
-                    username: user.login,
                     origin_url: event.html_url().unwrap().to_owned(),
                     origin_html: body.to_owned(),
                     time: event.time(),
