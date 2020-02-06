@@ -1,8 +1,9 @@
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
-use crate::github::GithubClient;
+use crate::github::{self, GithubClient};
 use crate::handlers::Context;
 use anyhow::Context as _;
+use std::convert::TryInto;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Request {
@@ -65,53 +66,113 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
         }
     };
 
-    let mut words = req.data.split_whitespace();
-    match words.next() {
-        Some("acknowledge") => match acknowledge(&ctx, gh_id, words).await {
-            Ok(r) => r,
-            Err(e) => serde_json::to_string(&Response {
-                content: &format!(
-                    "Failed to parse acknowledgement, expected `acknowledge <identifier>`: {:?}.",
-                    e
-                ),
+    handle_command(ctx, gh_id, &req.data).await
+}
+
+fn handle_command<'a>(
+    ctx: &'a Context,
+    gh_id: i64,
+    words: &'a str,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = String> + Send + 'a>> {
+    Box::pin(async move {
+        let mut words = words.split_whitespace();
+        match words.next() {
+            Some("as") => match execute_for_other_user(&ctx, gh_id, words).await {
+                Ok(r) => r,
+                Err(e) => serde_json::to_string(&Response {
+                    content: &format!(
+                        "Failed to parse; expected `as <username> <command...>`: {:?}.",
+                        e
+                    ),
+                })
+                .unwrap(),
+            },
+            Some("acknowledge") => match acknowledge(&ctx, gh_id, words).await {
+                Ok(r) => r,
+                Err(e) => serde_json::to_string(&Response {
+                    content: &format!(
+                        "Failed to parse acknowledgement, expected `acknowledge <identifier>`: {:?}.",
+                        e
+                    ),
+                })
+                .unwrap(),
+            },
+            Some("add") => match add_notification(&ctx, gh_id, words).await {
+                Ok(r) => r,
+                Err(e) => serde_json::to_string(&Response {
+                    content: &format!(
+                        "Failed to parse description addition, expected `add <url> <description (multiple words)>`: {:?}.",
+                        e
+                    ),
+                })
+                .unwrap(),
+            },
+            Some("move") => match move_notification(&ctx, gh_id, words).await {
+                Ok(r) => r,
+                Err(e) => serde_json::to_string(&Response {
+                    content: &format!(
+                        "Failed to parse movement, expected `move <from> <to>`: {:?}.",
+                        e
+                    ),
+                })
+                .unwrap(),
+            },
+            Some("meta") => match add_meta_notification(&ctx, gh_id, words).await {
+                Ok(r) => r,
+                Err(e) => serde_json::to_string(&Response {
+                    content: &format!(
+                        "Failed to parse movement, expected `move <idx> <meta...>`: {:?}.",
+                        e
+                    ),
+                })
+                .unwrap(),
+            },
+            _ => serde_json::to_string(&Response {
+                content: "Unknown command.",
             })
             .unwrap(),
-        },
-        Some("add") => match add_notification(&ctx, gh_id, words).await {
-            Ok(r) => r,
-            Err(e) => serde_json::to_string(&Response {
-                content: &format!(
-                    "Failed to parse movement, expected `add <url> <description (multiple words)>`: {:?}.",
-                    e
-                ),
+        }
+    })
+}
+
+async fn execute_for_other_user(
+    ctx: &Context,
+    _original_id: i64,
+    mut words: impl Iterator<Item = &str>,
+) -> anyhow::Result<String> {
+    // username is a GitHub username, not a Zulip username
+    let username = match words.next() {
+        Some(username) => username,
+        None => anyhow::bail!("no username provided"),
+    };
+    let user_id = match (github::User {
+        login: username.to_owned(),
+        id: None,
+    })
+    .get_id(&ctx.github)
+    .await
+    .context("getting ID of github user")?
+    {
+        Some(id) => id.try_into().unwrap(),
+        None => {
+            return Ok(serde_json::to_string(&Response {
+                content: "Can only authorize for other GitHub users.",
             })
-            .unwrap(),
-        },
-        Some("move") => match move_notification(&ctx, gh_id, words).await {
-            Ok(r) => r,
-            Err(e) => serde_json::to_string(&Response {
-                content: &format!(
-                    "Failed to parse movement, expected `move <from> <to>`: {:?}.",
-                    e
-                ),
-            })
-            .unwrap(),
-        },
-        Some("meta") => match add_meta_notification(&ctx, gh_id, words).await {
-            Ok(r) => r,
-            Err(e) => serde_json::to_string(&Response {
-                content: &format!(
-                    "Failed to parse movement, expected `move <idx> <meta...>`: {:?}.",
-                    e
-                ),
-            })
-            .unwrap(),
-        },
-        _ => serde_json::to_string(&Response {
-            content: "Unknown command.",
-        })
-        .unwrap(),
-    }
+            .unwrap());
+        }
+    };
+    let mut command = words.fold(String::new(), |mut acc, piece| {
+        acc.push_str(piece);
+        acc.push(' ');
+        acc
+    });
+    let command = if command.is_empty() {
+        anyhow::bail!("no command provided")
+    } else {
+        assert_eq!(command.pop(), Some(' ')); // pop trailing space
+        command
+    };
+    Ok(handle_command(ctx, user_id, &command).await)
 }
 
 async fn acknowledge(
