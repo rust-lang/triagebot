@@ -73,7 +73,7 @@ pub async fn delete_ping(
                     "select notification_id, idx, user_id
                     from notifications
                     where user_id = $1
-                    order by idx desc nulls last;",
+                    order by idx asc nulls last;",
                     &[&user_id],
                 )
                 .await
@@ -139,7 +139,7 @@ pub async fn move_indices(
                 "select notification_id, idx, user_id
         from notifications
         where user_id = $1
-        order by idx desc nulls last;",
+        order by idx asc nulls last;",
                 &[&user_id],
             )
             .await
@@ -216,7 +216,7 @@ pub async fn add_metadata(
                 "select notification_id, idx, user_id
         from notifications
         where user_id = $1
-        order by idx desc nulls last;",
+        order by idx asc nulls last;",
                 &[&user_id],
             )
             .await
@@ -271,7 +271,7 @@ pub async fn get_notifications(
         from notifications
         join users on notifications.user_id = users.user_id
         where username = $1
-        order by notifications.idx desc nulls last;",
+        order by notifications.idx asc nulls last;",
             &[&username],
         )
         .await
