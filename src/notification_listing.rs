@@ -20,14 +20,19 @@ pub async fn render(db: &DbClient, user: &str) -> String {
 
     out.push_str("<ol>");
     for notification in notifications {
+        out.push_str("<li>");
         out.push_str(&format!(
-            "<li><a href='{}'>{}</a></li>",
+            "<a href='{}'>{}</a>",
             notification.origin_url,
             notification
                 .short_description
                 .as_ref()
                 .unwrap_or(&notification.origin_url),
         ));
+        if let Some(metadata) = &notification.metadata {
+            out.push_str(&format!("<ul><li>{}</li></ul>", metadata));
+        }
+        out.push_str("</li>");
     }
     out.push_str("</ol>");
 

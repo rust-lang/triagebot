@@ -113,6 +113,7 @@ pub struct NotificationData {
     pub origin_text: String,
     pub short_description: Option<String>,
     pub time: DateTime<FixedOffset>,
+    pub metadata: Option<String>,
 }
 
 pub async fn move_indices(
@@ -262,7 +263,7 @@ pub async fn get_notifications(
     let notifications = db
         .query(
             "
-        select username, origin_url, origin_html, time, short_description, idx
+        select username, origin_url, origin_html, time, short_description, idx, metadata
         from notifications
         join users on notifications.user_id = users.user_id
         where username = $1
@@ -278,12 +279,14 @@ pub async fn get_notifications(
         let origin_text: String = notification.get(2);
         let time: DateTime<FixedOffset> = notification.get(3);
         let short_description: Option<String> = notification.get(4);
+        let metadata: Option<String> = notification.get(6);
 
         data.push(NotificationData {
             origin_url,
             origin_text,
             short_description,
             time,
+            metadata,
         });
     }
 
