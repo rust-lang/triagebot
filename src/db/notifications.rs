@@ -25,7 +25,11 @@ pub async fn record_username(db: &DbClient, user_id: i64, username: String) -> a
 }
 
 pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::Result<()> {
-    db.execute("INSERT INTO notifications (user_id, origin_url, origin_html, time, short_description, team_name) VALUES ($1, $2, $3, $4, $5, $6)",
+    db.execute("INSERT INTO notifications (user_id, origin_url, origin_html, time, short_description, team_name, idx)
+        VALUES (
+            $1, $2, $3, $4, $5, $6,
+            (SELECT max(notifications.idx) + 1 from notifications where notifications.user_id = $1)
+        )",
         &[&notification.user_id, &notification.origin_url, &notification.origin_html, &notification.time, &notification.short_description, &notification.team_name],
         ).await.context("inserting notification")?;
 
@@ -69,7 +73,7 @@ pub async fn delete_ping(
                     "select notification_id, idx, user_id
                     from notifications
                     where user_id = $1
-                    order by idx desc nulls last, time desc;",
+                    order by idx desc nulls last;",
                     &[&user_id],
                 )
                 .await
@@ -135,7 +139,7 @@ pub async fn move_indices(
                 "select notification_id, idx, user_id
         from notifications
         where user_id = $1
-        order by idx desc nulls last, time desc;",
+        order by idx desc nulls last;",
                 &[&user_id],
             )
             .await
@@ -212,7 +216,7 @@ pub async fn add_metadata(
                 "select notification_id, idx, user_id
         from notifications
         where user_id = $1
-        order by idx desc nulls last, time desc;",
+        order by idx desc nulls last;",
                 &[&user_id],
             )
             .await
@@ -267,7 +271,7 @@ pub async fn get_notifications(
         from notifications
         join users on notifications.user_id = users.user_id
         where username = $1
-        order by notifications.idx desc nulls last, notifications.time desc;",
+        order by notifications.idx desc nulls last;",
             &[&username],
         )
         .await
