@@ -391,6 +391,15 @@ impl Issue {
     }
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct PullRequestReviewComment {
+    pub action: IssueCommentAction,
+    #[serde(rename = "pull_request")]
+    pub issue: Issue,
+    pub comment: Comment,
+    pub repository: Repository,
+}
+
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum IssueCommentAction {

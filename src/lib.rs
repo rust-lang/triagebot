@@ -16,6 +16,7 @@ pub mod team;
 pub mod zulip;
 
 pub enum EventName {
+    PullRequestReviewComment,
     IssueComment,
     Issue,
     Other,
@@ -25,6 +26,7 @@ impl std::str::FromStr for EventName {
     type Err = std::convert::Infallible;
     fn from_str(s: &str) -> Result<EventName, Self::Err> {
         Ok(match s {
+            "pull_request_review_comment" => EventName::PullRequestReviewComment,
             "issue_comment" => EventName::IssueComment,
             "issues" => EventName::Issue,
             _ => EventName::Other,
@@ -38,6 +40,7 @@ impl fmt::Display for EventName {
             f,
             "{}",
             match self {
+                EventName::PullRequestReviewComment => "pull_request_review_comment",
                 EventName::IssueComment => "issue_comment",
                 EventName::Issue => "issues",
                 EventName::Other => "other",
@@ -65,6 +68,22 @@ pub async fn webhook(
     ctx: &handlers::Context,
 ) -> Result<(), WebhookError> {
     let event = match event {
+        EventName::PullRequestReviewComment => {
+            let payload = deserialize_payload::<github::PullRequestReviewComment>(&payload)
+                .context("IssueCommentEvent failed to deserialize")
+                .map_err(anyhow::Error::from)?;
+
+            log::info!("handling pull request review comment {:?}", payload);
+
+            // Treat pull request review comments exactly like pull request
+            // review comments.
+            github::Event::IssueComment(github::IssueCommentEvent {
+                action: payload.action,
+                issue: payload.issue,
+                comment: payload.comment,
+                repository: payload.repository,
+            })
+        }
         EventName::IssueComment => {
             let payload = deserialize_payload::<github::IssueCommentEvent>(&payload)
                 .context("IssueCommentEvent failed to deserialize")
