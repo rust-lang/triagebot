@@ -16,6 +16,7 @@ pub mod team;
 pub mod zulip;
 
 pub enum EventName {
+    PullRequestReview,
     PullRequestReviewComment,
     IssueComment,
     Issue,
@@ -26,6 +27,7 @@ impl std::str::FromStr for EventName {
     type Err = std::convert::Infallible;
     fn from_str(s: &str) -> Result<EventName, Self::Err> {
         Ok(match s {
+            "pull_request_review" => EventName::PullRequestReview,
             "pull_request_review_comment" => EventName::PullRequestReviewComment,
             "issue_comment" => EventName::IssueComment,
             "issues" => EventName::Issue,
@@ -40,6 +42,7 @@ impl fmt::Display for EventName {
             f,
             "{}",
             match self {
+                EventName::PullRequestReview => "pull_request_review",
                 EventName::PullRequestReviewComment => "pull_request_review_comment",
                 EventName::IssueComment => "issue_comment",
                 EventName::Issue => "issues",
@@ -68,6 +71,30 @@ pub async fn webhook(
     ctx: &handlers::Context,
 ) -> Result<(), WebhookError> {
     let event = match event {
+        EventName::PullRequestReview => {
+            let payload = deserialize_payload::<github::PullRequestReviewEvent>(&payload)
+                .context("IssueCommentEvent failed to deserialize")
+                .map_err(anyhow::Error::from)?;
+
+            log::info!("handling pull request review comment {:?}", payload);
+
+            // Treat pull request review comments exactly like pull request
+            // review comments.
+            github::Event::IssueComment(github::IssueCommentEvent {
+                action: match payload.action {
+                    github::PullRequestReviewAction::Submitted => {
+                        github::IssueCommentAction::Created
+                    }
+                    github::PullRequestReviewAction::Edited => github::IssueCommentAction::Edited,
+                    github::PullRequestReviewAction::Dismissed => {
+                        github::IssueCommentAction::Deleted
+                    }
+                },
+                issue: payload.pull_request,
+                comment: payload.review,
+                repository: payload.repository,
+            })
+        }
         EventName::PullRequestReviewComment => {
             let payload = deserialize_payload::<github::PullRequestReviewComment>(&payload)
                 .context("IssueCommentEvent failed to deserialize")

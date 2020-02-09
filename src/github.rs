@@ -142,6 +142,7 @@ pub struct Comment {
     pub body: String,
     pub html_url: String,
     pub user: User,
+    #[serde(alias = "submitted_at")] // for pull request reviews
     pub updated_at: chrono::DateTime<Utc>,
 }
 
@@ -389,6 +390,22 @@ impl Issue {
 
         Ok(())
     }
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PullRequestReviewAction {
+    Submitted,
+    Edited,
+    Dismissed,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct PullRequestReviewEvent {
+    pub action: PullRequestReviewAction,
+    pub pull_request: Issue,
+    pub review: Comment,
+    pub repository: Repository,
 }
 
 #[derive(Debug, serde::Deserialize)]
