@@ -234,7 +234,7 @@ pub async fn add_metadata(
             ),
             Some(id) => {
                 t.execute(
-                    "update notifications SET metadata = $3
+                    "update notifications SET metadata = $2
                  where notification_id = $1",
                     &[&id, &metadata],
                 )
