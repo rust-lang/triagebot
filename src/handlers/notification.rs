@@ -12,7 +12,7 @@ use crate::{
 use anyhow::Context as _;
 use regex::Regex;
 use std::collections::HashSet;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 lazy_static::lazy_static! {
     static ref PING_RE: Regex = Regex::new(r#"@([-\w\d/]+)"#,).unwrap();
@@ -98,10 +98,12 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     // If the user intended to ping themselves, they can add the GitHub comment
     // via the Zulip interface.
     match event.user().get_id(&ctx.github).await {
-        Ok(Some(id)) => users_notified.insert(id),
+        Ok(Some(id)) => {
+            users_notified.insert(id.try_into().unwrap());
+        }
         Ok(None) => {}
         Err(err) => {
-            log::error!("Failed to query ID for {:?}", event.user());
+            log::error!("Failed to query ID for {:?}: {:?}", event.user(), err);
         }
     }
     log::trace!("Captured usernames in comment: {:?}", caps);
