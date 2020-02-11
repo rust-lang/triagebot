@@ -92,6 +92,18 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         .map(|c| c.get(1).unwrap().as_str().to_owned())
         .collect::<HashSet<_>>();
     let mut users_notified = HashSet::new();
+    // We've implicitly notified the user that is submitting the notification:
+    // they already know that they left this comment.
+    //
+    // If the user intended to ping themselves, they can add the GitHub comment
+    // via the Zulip interface.
+    match event.user().get_id(&ctx.github).await {
+        Ok(Some(id)) => users_notified.insert(id),
+        Ok(None) => {}
+        Err(err) => {
+            log::error!("Failed to query ID for {:?}", event.user());
+        }
+    }
     log::trace!("Captured usernames in comment: {:?}", caps);
     for login in caps {
         let (users, team_name) = if login.contains('/') {
