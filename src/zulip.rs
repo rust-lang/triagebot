@@ -4,6 +4,7 @@ use crate::github::{self, GithubClient};
 use crate::handlers::Context;
 use anyhow::Context as _;
 use std::convert::TryInto;
+use std::env;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Request {
@@ -20,10 +21,11 @@ pub struct Request {
 #[derive(Debug, serde::Deserialize)]
 struct Message {
     sender_id: usize,
+    sender_short_name: String,
     sender_full_name: String,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct Response<'a> {
     content: &'a str,
 }
@@ -35,6 +37,19 @@ pub async fn to_github_id(client: &GithubClient, zulip_id: usize) -> anyhow::Res
         .await
         .context("could not get team data")?;
     Ok(map.users.get(&zulip_id).map(|v| *v as i64))
+}
+
+pub async fn to_zulip_id(client: &GithubClient, github_id: i64) -> anyhow::Result<Option<usize>> {
+    let url = format!("{}/zulip-map.json", rust_team_data::v1::BASE_URL);
+    let map: rust_team_data::v1::ZulipMapping = client
+        .json(client.raw().get(&url))
+        .await
+        .context("could not get team data")?;
+    Ok(map
+        .users
+        .iter()
+        .find(|(_, github)| **github == github_id as usize)
+        .map(|v| *v.0))
 }
 
 pub async fn respond(ctx: &Context, req: Request) -> String {
@@ -66,18 +81,19 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
         }
     };
 
-    handle_command(ctx, gh_id, &req.data).await
+    handle_command(ctx, gh_id, &req.data, &req.message).await
 }
 
 fn handle_command<'a>(
     ctx: &'a Context,
     gh_id: i64,
     words: &'a str,
+    message_data: &'a Message,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = String> + Send + 'a>> {
     Box::pin(async move {
         let mut words = words.split_whitespace();
         match words.next() {
-            Some("as") => match execute_for_other_user(&ctx, gh_id, words).await {
+            Some("as") => match execute_for_other_user(&ctx, gh_id, words, message_data).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
                     content: &format!(
@@ -135,10 +151,15 @@ fn handle_command<'a>(
     })
 }
 
+// This does two things:
+//  * execute the command for the other user
+//  * tell the user executed for that a command was run as them by the user
+//    given.
 async fn execute_for_other_user(
     ctx: &Context,
-    _original_id: i64,
+    _original_gh_id: i64,
     mut words: impl Iterator<Item = &str>,
+    message_data: &Message,
 ) -> anyhow::Result<String> {
     // username is a GitHub username, not a Zulip username
     let username = match words.next() {
@@ -172,7 +193,117 @@ async fn execute_for_other_user(
         assert_eq!(command.pop(), Some(' ')); // pop trailing space
         command
     };
-    Ok(handle_command(ctx, user_id, &command).await)
+    let bot_email = "triage-rust-lang-bot@zulipchat.com"; // FIXME: don't hardcode
+    let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
+
+    let members = ctx
+        .github
+        .raw()
+        .get("https://rust-lang.zulipchat.com/api/v1/users")
+        .basic_auth(bot_email, Some(&bot_api_token))
+        .send()
+        .await;
+    let members = match members {
+        Ok(members) => members,
+        Err(e) => {
+            return Ok(serde_json::to_string(&Response {
+                content: &format!("Failed to get list of zulip users: {:?}.", e),
+            })
+            .unwrap());
+        }
+    };
+    let members = members.json::<Vec<Member>>().await;
+    let members = match members {
+        Ok(members) => members,
+        Err(e) => {
+            return Ok(serde_json::to_string(&Response {
+                content: &format!("Failed to get list of zulip users: {:?}.", e),
+            })
+            .unwrap());
+        }
+    };
+
+    // Map GitHub `user_id` to `zulip_user_id`.
+    let zulip_user_id = match to_github_id(&ctx.github, user_id).await {
+        Ok(Some(id)) => id,
+        Ok(None) => {
+            return Ok(serde_json::to_string(&Response {
+                content: &format!("Could not find GitHub ID for Zulip ID: {}", user_id),
+            })
+            .unwrap());
+        }
+        Err(e) => {
+            return Ok(serde_json::to_string(&Response {
+                content: &format!("Could not find Zulip ID for github id {}: {:?}", user_id, e),
+            })
+            .unwrap());
+        }
+    };
+
+    let user_email = match members.iter().find(|m| m.user_id == zulip_user_id) {
+        Some(m) => &m.email,
+        None => {
+            return Ok(serde_json::to_string(&Response {
+                content: &format!("Could not find Zulip user email."),
+            })
+            .unwrap());
+        }
+    };
+
+    let output = handle_command(ctx, user_id as i64, &command, message_data).await;
+    let output_msg: Response = serde_json::from_str(&output).expect("result should always be JSON");
+    let output_msg = output_msg.content;
+
+    // At this point, the command has been run (FIXME: though it may have
+    // errored, it's hard to determine that currently, so we'll just give the
+    // output fromt he command as well as the command itself).
+
+    let message = format!(
+        "{} ({}) ran `{}` with output `{}` as you.",
+        message_data.sender_full_name, message_data.sender_short_name, command, output_msg
+    );
+
+    let res = ctx
+        .github
+        .raw()
+        .post("https://rust-lang.zulipchat.com/api/v1/messages")
+        .basic_auth(bot_email, Some(&bot_api_token))
+        .form(&MessageApiRequest {
+            type_: "private",
+            to: &user_email,
+            content: &message,
+        })
+        .send()
+        .await;
+    match res {
+        Ok(resp) => {
+            if !resp.status().is_success() {
+                log::error!(
+                    "Failed to notify real user about command: response: {:?}",
+                    resp
+                );
+            }
+        }
+        Err(err) => {
+            log::error!("Failed to notify real user about command: {:?}", err);
+        }
+    }
+
+    Ok(output)
+}
+
+#[derive(serde::Deserialize)]
+struct Member {
+    email: String,
+    user_id: i64,
+}
+
+#[derive(serde::Serialize)]
+struct MessageApiRequest<'a> {
+    #[serde(rename = "type")]
+    type_: &'a str,
+    to: &'a str,
+    content: &'a str,
 }
 
 async fn acknowledge(
