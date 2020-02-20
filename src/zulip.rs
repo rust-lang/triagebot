@@ -212,9 +212,9 @@ async fn execute_for_other_user(
             .unwrap());
         }
     };
-    let members = members.json::<Vec<Member>>().await;
+    let members = members.json::<MembersApiResponse>().await;
     let members = match members {
-        Ok(members) => members,
+        Ok(members) => members.members,
         Err(e) => {
             return Ok(serde_json::to_string(&Response {
                 content: &format!("Failed to get list of zulip users: {:?}.", e),
@@ -290,6 +290,11 @@ async fn execute_for_other_user(
     }
 
     Ok(output)
+}
+
+#[derive(serde::Deserialize)]
+struct MembersApiResponse {
+    members: Vec<Member>,
 }
 
 #[derive(serde::Deserialize)]
