@@ -224,17 +224,17 @@ async fn execute_for_other_user(
     };
 
     // Map GitHub `user_id` to `zulip_user_id`.
-    let zulip_user_id = match to_github_id(&ctx.github, user_id).await {
-        Ok(Some(id)) => id,
+    let zulip_user_id = match to_zulip_id(&ctx.github, user_id).await {
+        Ok(Some(id)) => id as i64,
         Ok(None) => {
             return Ok(serde_json::to_string(&Response {
-                content: &format!("Could not find GitHub ID for Zulip ID: {}", user_id),
+                content: &format!("Could not find Zulip ID for GitHub ID: {}", user_id),
             })
             .unwrap());
         }
         Err(e) => {
             return Ok(serde_json::to_string(&Response {
-                content: &format!("Could not find Zulip ID for github id {}: {:?}", user_id, e),
+                content: &format!("Could not find Zulip ID for GitHub id {}: {:?}", user_id, e),
             })
             .unwrap());
         }
