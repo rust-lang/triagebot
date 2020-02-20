@@ -103,11 +103,11 @@ fn handle_command<'a>(
                 })
                 .unwrap(),
             },
-            Some("acknowledge") => match acknowledge(&ctx, gh_id, words).await {
+            Some("acknowledge") | Some("ack") => match acknowledge(&ctx, gh_id, words).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
                     content: &format!(
-                        "Failed to parse acknowledgement, expected `acknowledge <identifier>`: {:?}.",
+                        "Failed to parse acknowledgement, expected `(acknowledge|ack) <identifier>`: {:?}.",
                         e
                     ),
                 })
