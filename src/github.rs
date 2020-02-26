@@ -138,6 +138,7 @@ pub struct Issue {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Comment {
+    #[serde(default)]
     pub body: String,
     pub html_url: String,
     pub user: User,
