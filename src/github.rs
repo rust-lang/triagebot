@@ -131,7 +131,6 @@ pub struct Issue {
     assignees: Vec<User>,
     pull_request: Option<PullRequestDetails>,
     // API URL
-    repository_url: String,
     comments_url: String,
     #[serde(skip)]
     repository: OnceCell<IssueRepository>,
@@ -181,14 +180,24 @@ impl fmt::Display for IssueRepository {
     }
 }
 
+impl IssueRepository {
+    fn url(&self) -> String {
+        format!(
+            "https://api.github.com/repos/{}/{}",
+            self.organization, self.repository
+        )
+    }
+}
+
 impl Issue {
     pub fn repository(&self) -> &IssueRepository {
         self.repository.get_or_init(|| {
-            log::trace!("get repository for {}", self.repository_url);
-            let url = url::Url::parse(&self.repository_url).unwrap();
+            // https://api.github.com/repos/rust-lang/rust/issues/69257/comments
+            log::trace!("get repository for {}", self.comments_url);
+            let url = url::Url::parse(&self.comments_url).unwrap();
             let mut segments = url.path_segments().unwrap();
-            let repository = segments.nth_back(0).unwrap();
-            let organization = segments.nth_back(1).unwrap();
+            let repository = segments.nth_back(3).unwrap();
+            let organization = segments.nth_back(4).unwrap();
             IssueRepository {
                 organization: organization.into(),
                 repository: repository.into(),
@@ -205,13 +214,13 @@ impl Issue {
     }
 
     pub async fn get_comment(&self, client: &GithubClient, id: usize) -> anyhow::Result<Comment> {
-        let comment_url = format!("{}/issues/comments/{}", self.repository_url, id);
+        let comment_url = format!("{}/issues/comments/{}", self.repository().url(), id);
         let comment = client.json(client.get(&comment_url)).await?;
         Ok(comment)
     }
 
     pub async fn edit_body(&self, client: &GithubClient, body: &str) -> anyhow::Result<()> {
-        let edit_url = format!("{}/issues/{}", self.repository_url, self.number);
+        let edit_url = format!("{}/issues/{}", self.repository().url(), self.number);
         #[derive(serde::Serialize)]
         struct ChangedIssue<'a> {
             body: &'a str,
@@ -229,7 +238,7 @@ impl Issue {
         id: usize,
         new_body: &str,
     ) -> anyhow::Result<()> {
-        let comment_url = format!("{}/issues/comments/{}", self.repository_url, id);
+        let comment_url = format!("{}/issues/comments/{}", self.repository().url(), id);
         #[derive(serde::Serialize)]
         struct NewComment<'a> {
             body: &'a str,
@@ -267,13 +276,13 @@ impl Issue {
         // repo_url = https://api.github.com/repos/Codertocat/Hello-World
         let url = format!(
             "{repo_url}/issues/{number}/labels",
-            repo_url = self.repository_url,
+            repo_url = self.repository().url(),
             number = self.number
         );
 
         let mut stream = labels
             .into_iter()
-            .map(|label| async { (label.exists(&self.repository_url, &client).await, label) })
+            .map(|label| async { (label.exists(&self.repository().url(), &client).await, label) })
             .collect::<FuturesUnordered<_>>();
         let mut labels = Vec::new();
         while let Some((true, label)) = stream.next().await {
@@ -310,7 +319,7 @@ impl Issue {
         log::info!("remove {:?} assignees for {}", selection, self.global_id());
         let url = format!(
             "{repo_url}/issues/{number}/assignees",
-            repo_url = self.repository_url,
+            repo_url = self.repository().url(),
             number = self.number
         );
 
@@ -344,13 +353,13 @@ impl Issue {
         log::info!("set_assignee for {} to {}", self.global_id(), user);
         let url = format!(
             "{repo_url}/issues/{number}/assignees",
-            repo_url = self.repository_url,
+            repo_url = self.repository().url(),
             number = self.number
         );
 
         let check_url = format!(
             "{repo_url}/assignees/{name}",
-            repo_url = self.repository_url,
+            repo_url = self.repository().url(),
             name = user,
         );
 
