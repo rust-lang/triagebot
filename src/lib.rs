@@ -73,7 +73,7 @@ pub async fn webhook(
     let event = match event {
         EventName::PullRequestReview => {
             let payload = deserialize_payload::<github::PullRequestReviewEvent>(&payload)
-                .context("IssueCommentEvent failed to deserialize")
+                .context("PullRequestReview failed to deserialize")
                 .map_err(anyhow::Error::from)?;
 
             log::info!("handling pull request review comment {:?}", payload);
@@ -97,7 +97,7 @@ pub async fn webhook(
         }
         EventName::PullRequestReviewComment => {
             let payload = deserialize_payload::<github::PullRequestReviewComment>(&payload)
-                .context("IssueCommentEvent failed to deserialize")
+                .context("PullRequestReview(Comment) failed to deserialize")
                 .map_err(anyhow::Error::from)?;
 
             log::info!("handling pull request review comment {:?}", payload);
