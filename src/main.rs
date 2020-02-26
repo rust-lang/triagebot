@@ -146,7 +146,7 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
             log::error!("request failed: {:?}", err);
             return Ok(Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::from("request failed"))
+                .body(Body::from(format!("request failed: {:?}", err)))
                 .unwrap());
         }
     }
