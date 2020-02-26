@@ -62,7 +62,15 @@ impl From<anyhow::Error> for WebhookError {
 }
 
 pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::Result<T> {
-    Ok(serde_json::from_str(&v).with_context(|| format!("input: {:?}", v))?)
+    let mut deserializer = serde_json::Deserializer::from_str(&v);
+    let res: Result<T, _> = serde_path_to_error::deserialize(&mut deserializer);
+    match res {
+        Ok(r) => Ok(r),
+        Err(e) => {
+            let ctx = format!("at {:?}", e.path());
+            Err(e.into_inner()).context(ctx)
+        }
+    }
 }
 
 pub async fn webhook(
