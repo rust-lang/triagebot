@@ -138,12 +138,23 @@ pub struct Issue {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Comment {
-    #[serde(default)]
+    #[serde(deserialize_with = "opt_string")]
     pub body: String,
     pub html_url: String,
     pub user: User,
     #[serde(alias = "submitted_at")] // for pull request reviews
     pub updated_at: chrono::DateTime<Utc>,
+}
+
+fn opt_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    use serde::de::Deserialize;
+    match <Option<String>>::deserialize(deserializer) {
+        Ok(v) => Ok(v.unwrap_or_default()),
+        Err(e) => Err(e),
+    }
 }
 
 #[derive(Debug)]
