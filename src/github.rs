@@ -473,11 +473,15 @@ pub enum IssuesAction {
     Unlocked,
     Milestoned,
     Demilestoned,
+    ReviewRequested,
+    ReviewRequestRemoved,
+    ReadyForReview,
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct IssuesEvent {
     pub action: IssuesAction,
+    #[serde(alias = "pull_request")]
     pub issue: Issue,
     pub repository: Repository,
 }

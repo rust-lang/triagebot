@@ -15,7 +15,9 @@ pub mod payload;
 pub mod team;
 pub mod zulip;
 
+#[derive(Debug)]
 pub enum EventName {
+    PullRequest,
     PullRequestReview,
     PullRequestReviewComment,
     IssueComment,
@@ -30,6 +32,7 @@ impl std::str::FromStr for EventName {
             "pull_request_review" => EventName::PullRequestReview,
             "pull_request_review_comment" => EventName::PullRequestReviewComment,
             "issue_comment" => EventName::IssueComment,
+            "pull_request" => EventName::PullRequest,
             "issues" => EventName::Issue,
             _ => EventName::Other,
         })
@@ -46,6 +49,7 @@ impl fmt::Display for EventName {
                 EventName::PullRequestReviewComment => "pull_request_review_comment",
                 EventName::IssueComment => "issue_comment",
                 EventName::Issue => "issues",
+                EventName::PullRequest => "pull_request",
                 EventName::Other => "other",
             }
         )
@@ -128,9 +132,9 @@ pub async fn webhook(
 
             github::Event::IssueComment(payload)
         }
-        EventName::Issue => {
+        EventName::Issue | EventName::PullRequest => {
             let payload = deserialize_payload::<github::IssuesEvent>(&payload)
-                .context("IssuesEvent failed to deserialize")
+                .context(format!("{:?} failed to deserialize", event))
                 .map_err(anyhow::Error::from)?;
 
             log::info!("handling issue event {:?}", payload);
