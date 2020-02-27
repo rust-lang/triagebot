@@ -42,7 +42,7 @@ pub fn init() {
     ))
     .unwrap();
     log::set_max_level(log::LevelFilter::Trace);
-    log::error!("initialized logging infra");
+    log::trace!("initialized logging infra");
 }
 
 pub struct LogFuture<F> {
