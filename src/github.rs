@@ -479,6 +479,7 @@ pub enum IssuesAction {
     ReviewRequested,
     ReviewRequestRemoved,
     ReadyForReview,
+    Synchronize,
 }
 
 #[derive(Debug, serde::Deserialize)]
