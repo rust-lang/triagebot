@@ -15,7 +15,6 @@ use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
 
 lazy_static::lazy_static! {
-    static ref PING_RE: Regex = Regex::new(r#"@([-\w\d/]+)"#,).unwrap();
     static ref ACKNOWLEDGE_RE: Regex = Regex::new(r#"acknowledge (https?://[^ ]+)"#,).unwrap();
 }
 
@@ -87,9 +86,8 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         Event::IssueComment(e) => format!("Comment on {}", e.issue.title),
     };
 
-    let caps = PING_RE
-        .captures_iter(body)
-        .map(|c| c.get(1).unwrap().as_str().to_owned())
+    let caps = parser::get_mentions(body)
+        .into_iter()
         .collect::<HashSet<_>>();
     let mut users_notified = HashSet::new();
     // We've implicitly notified the user that is submitting the notification:
@@ -155,7 +153,10 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 Some(team.name),
             )
         } else {
-            let user = github::User { login, id: None };
+            let user = github::User {
+                login: login.to_owned(),
+                id: None,
+            };
             let id = user
                 .get_id(&ctx.github)
                 .await
