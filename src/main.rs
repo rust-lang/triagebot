@@ -141,17 +141,16 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
     };
 
     match triagebot::webhook(event, payload, &ctx).await {
-        Ok(()) => {}
+        Ok(true) => Ok(Response::new(Body::from("processed request"))),
+        Ok(false) => Ok(Response::new(Body::from("ignored request"))),
         Err(err) => {
             log::error!("request failed: {:?}", err);
-            return Ok(Response::builder()
+            Ok(Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                 .body(Body::from(format!("request failed: {:?}", err)))
-                .unwrap());
+                .unwrap())
         }
     }
-
-    Ok(Response::new(Body::from("processed request")))
 }
 
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {

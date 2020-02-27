@@ -81,7 +81,7 @@ pub async fn webhook(
     event: EventName,
     payload: String,
     ctx: &handlers::Context,
-) -> Result<(), WebhookError> {
+) -> Result<bool, WebhookError> {
     let event = match event {
         EventName::PullRequestReview => {
             let payload = deserialize_payload::<github::PullRequestReviewEvent>(&payload)
@@ -143,7 +143,7 @@ pub async fn webhook(
         }
         // Other events need not be handled
         EventName::Other => {
-            return Ok(());
+            return Ok(false);
         }
     };
     if let Err(err) = handlers::handle(&ctx, &event).await {
@@ -162,5 +162,5 @@ pub async fn webhook(
             }
         }
     }
-    Ok(())
+    Ok(true)
 }
