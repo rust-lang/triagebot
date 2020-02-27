@@ -208,8 +208,11 @@ impl Issue {
             log::trace!("get repository for {}", self.comments_url);
             let url = url::Url::parse(&self.comments_url).unwrap();
             let mut segments = url.path_segments().unwrap();
-            let repository = segments.nth_back(3).unwrap();
-            let organization = segments.nth_back(4).unwrap();
+            let _comments = segments.next_back().unwrap();
+            let _number = segments.next_back().unwrap();
+            let _issues_or_prs = segments.next_back().unwrap();
+            let repository = segments.next_back().unwrap();
+            let organization = segments.next_back().unwrap();
             IssueRepository {
                 organization: organization.into(),
                 repository: repository.into(),
