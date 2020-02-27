@@ -86,7 +86,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         Event::IssueComment(e) => format!("Comment on {}", e.issue.title),
     };
 
-    let caps = parser::get_mentions(body)
+    let mut caps = parser::get_mentions(body)
         .into_iter()
         .collect::<HashSet<_>>();
 
