@@ -89,6 +89,13 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let caps = parser::get_mentions(body)
         .into_iter()
         .collect::<HashSet<_>>();
+
+    // FIXME: Remove this hardcoding. Ideally we need organization-wide
+    // configuration, but it's unclear where to put it.
+    if event.issue().unwrap().repository().organization == "serde-rs" {
+        caps.insert("dtolnay");
+    }
+
     let mut users_notified = HashSet::new();
     // We've implicitly notified the user that is submitting the notification:
     // they already know that they left this comment.
