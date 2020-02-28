@@ -56,11 +56,7 @@ impl User {
     }
 
     pub async fn is_team_member<'a>(&'a self, client: &'a GithubClient) -> anyhow::Result<bool> {
-        let url = format!("{}/teams.json", rust_team_data::v1::BASE_URL);
-        let permission: rust_team_data::v1::Teams = client
-            .json(client.raw().get(&url))
-            .await
-            .context("could not get team data")?;
+        let permission = crate::team_data::teams(client).await?;
         let map = permission.teams;
         let is_triager = map
             .get("wg-triage")
@@ -70,11 +66,7 @@ impl User {
 
     // Returns the ID of the given user, if the user is in the `all` team.
     pub async fn get_id<'a>(&'a self, client: &'a GithubClient) -> anyhow::Result<Option<usize>> {
-        let url = format!("{}/teams.json", rust_team_data::v1::BASE_URL);
-        let permission: rust_team_data::v1::Teams = client
-            .json(client.raw().get(&url))
-            .await
-            .context("could not get team data")?;
+        let permission = crate::team_data::teams(client).await?;
         let map = permission.teams;
         Ok(map["all"]
             .members
@@ -88,11 +80,7 @@ pub async fn get_team(
     client: &GithubClient,
     team: &str,
 ) -> anyhow::Result<Option<rust_team_data::v1::Team>> {
-    let url = format!("{}/teams.json", rust_team_data::v1::BASE_URL);
-    let permission: rust_team_data::v1::Teams = client
-        .json(client.raw().get(&url))
-        .await
-        .context("could not get team data")?;
+    let permission = crate::team_data::teams(client).await?;
     let mut map = permission.teams;
     Ok(map.swap_remove(team))
 }

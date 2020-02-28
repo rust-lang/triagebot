@@ -31,20 +31,12 @@ struct Response<'a> {
 }
 
 pub async fn to_github_id(client: &GithubClient, zulip_id: usize) -> anyhow::Result<Option<i64>> {
-    let url = format!("{}/zulip-map.json", rust_team_data::v1::BASE_URL);
-    let map: rust_team_data::v1::ZulipMapping = client
-        .json(client.raw().get(&url))
-        .await
-        .context("could not get team data")?;
+    let map = crate::team_data::zulip_map(client).await?;
     Ok(map.users.get(&zulip_id).map(|v| *v as i64))
 }
 
 pub async fn to_zulip_id(client: &GithubClient, github_id: i64) -> anyhow::Result<Option<usize>> {
-    let url = format!("{}/zulip-map.json", rust_team_data::v1::BASE_URL);
-    let map: rust_team_data::v1::ZulipMapping = client
-        .json(client.raw().get(&url))
-        .await
-        .context("could not get team data")?;
+    let map = crate::team_data::zulip_map(client).await?;
     Ok(map
         .users
         .iter()
