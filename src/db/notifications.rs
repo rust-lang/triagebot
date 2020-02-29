@@ -46,19 +46,36 @@ pub async fn delete_ping(
     db: &mut DbClient,
     user_id: i64,
     identifier: Identifier<'_>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<NotificationData>> {
     match identifier {
         Identifier::Url(origin_url) => {
-            let count = db
-                .execute(
-                    "DELETE FROM notifications WHERE user_id = $1 and origin_url = $2",
+            let rows = db
+                .query(
+                    "DELETE FROM notifications WHERE user_id = $1 and origin_url = $2
+                    RETURNING origin_html, time, short_description, metadata",
                     &[&user_id, &origin_url],
                 )
                 .await
                 .context("delete notification query")?;
-            if count == 0 {
-                anyhow::bail!("Did not delete any rows");
+            if rows.is_empty() {
+                anyhow::bail!("Did not delete any notifications");
             }
+            Ok(rows
+                .into_iter()
+                .map(|row| {
+                    let origin_text: String = row.get(0);
+                    let time: DateTime<FixedOffset> = row.get(1);
+                    let short_description: Option<String> = row.get(2);
+                    let metadata: Option<String> = row.get(3);
+                    NotificationData {
+                        origin_url: origin_url.to_owned(),
+                        origin_text,
+                        time,
+                        short_description,
+                        metadata,
+                    }
+                })
+                .collect())
         }
         Identifier::Index(idx) => loop {
             let t = db
@@ -84,15 +101,30 @@ pub async fn delete_ping(
                 .ok_or_else(|| anyhow::anyhow!("No such notification with index {}", idx.get()))?
                 .get(0);
 
-            t.execute(
-                "DELETE FROM notifications WHERE notification_id = $1",
-                &[&notification_id],
-            )
-            .await
-            .context(format!(
-                "Failed to delete notification with id {}",
-                notification_id
-            ))?;
+            let row = t
+                .query_one(
+                    "DELETE FROM notifications WHERE notification_id = $1
+                RETURNING origin_url, origin_html, time, short_description, metadata",
+                    &[&notification_id],
+                )
+                .await
+                .context(format!(
+                    "Failed to delete notification with id {}",
+                    notification_id
+                ))?;
+
+            let origin_url: String = row.get(0);
+            let origin_text: String = row.get(1);
+            let time: DateTime<FixedOffset> = row.get(2);
+            let short_description: Option<String> = row.get(3);
+            let metadata: Option<String> = row.get(4);
+            let deleted_notification = NotificationData {
+                origin_url,
+                origin_text,
+                time,
+                short_description,
+                metadata,
+            };
 
             if let Err(e) = t.commit().await {
                 if e.code().map_or(false, |c| {
@@ -104,11 +136,10 @@ pub async fn delete_ping(
                     return Err(e).context("transaction commit failure");
                 }
             } else {
-                break;
+                return Ok(vec![deleted_notification]);
             }
         },
     }
-    Ok(())
 }
 
 #[derive(Debug)]

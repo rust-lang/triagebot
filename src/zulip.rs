@@ -332,10 +332,23 @@ async fn acknowledge(
     )
     .await
     {
-        Ok(()) => Ok(serde_json::to_string(&Response {
-            content: &format!("Acknowledged {}.", url),
-        })
-        .unwrap()),
+        Ok(deleted) => {
+            let mut resp = format!("Acknowledged:\n");
+            for deleted in deleted {
+                resp.push_str(&format!(
+                    " * [{}]({}){}\n",
+                    deleted
+                        .short_description
+                        .as_deref()
+                        .unwrap_or(&deleted.origin_url),
+                    deleted.origin_url,
+                    deleted
+                        .metadata
+                        .map_or(String::new(), |m| format!(" ({})", m)),
+                ));
+            }
+            Ok(serde_json::to_string(&Response { content: &resp }).unwrap())
+        }
         Err(e) => Ok(serde_json::to_string(&Response {
             content: &format!("Failed to acknowledge {}: {:?}.", url, e),
         })
