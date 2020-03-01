@@ -30,6 +30,11 @@ struct Response<'a> {
     content: &'a str,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ResponseOwned {
+    content: String,
+}
+
 pub async fn to_github_id(client: &GithubClient, zulip_id: usize) -> anyhow::Result<Option<i64>> {
     let map = crate::team_data::zulip_map(client).await?;
     Ok(map.users.get(&zulip_id).map(|v| *v as i64))
@@ -243,7 +248,8 @@ async fn execute_for_other_user(
     };
 
     let output = handle_command(ctx, user_id as i64, &command, message_data).await;
-    let output_msg: Response = serde_json::from_str(&output).expect("result should always be JSON");
+    let output_msg: ResponseOwned =
+        serde_json::from_str(&output).expect("result should always be JSON");
     let output_msg = output_msg.content;
 
     // At this point, the command has been run (FIXME: though it may have
