@@ -51,7 +51,13 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     // FIXME: Remove this hardcoding. Ideally we need organization-wide
     // configuration, but it's unclear where to put it.
     if event.issue().unwrap().repository().organization == "serde-rs" {
-        caps.insert("dtolnay");
+        // Only add dtolnay on new issues/PRs, not on comments to old PRs and
+        // issues.
+        if let Event::Issue(e) = event {
+            if e.action == github::IssuesAction::Opened {
+                caps.insert("dtolnay");
+            }
+        }
     }
 
     let mut users_notified = HashSet::new();
