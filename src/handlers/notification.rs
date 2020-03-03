@@ -10,13 +10,8 @@ use crate::{
     handlers::Context,
 };
 use anyhow::Context as _;
-use regex::Regex;
 use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
-
-lazy_static::lazy_static! {
-    static ref ACKNOWLEDGE_RE: Regex = Regex::new(r#"acknowledge (https?://[^ ]+)"#,).unwrap();
-}
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let body = match event.comment_body() {
@@ -24,43 +19,6 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         // Skip events that don't have comment bodies associated
         None => return Ok(()),
     };
-
-    // Permit editing acknowledgement
-
-    let acks = ACKNOWLEDGE_RE
-        .captures_iter(body)
-        .map(|c| c.get(1).unwrap().as_str().to_owned())
-        .collect::<Vec<_>>();
-    log::trace!("Captured acknowledgements: {:?}", acks);
-    for url in acks {
-        let user = match event {
-            Event::Issue(e) => &e.issue.user,
-            Event::IssueComment(e) => &e.comment.user,
-        };
-        let id = match user.id {
-            Some(id) => id,
-            // If the user was not in the team(s) then just don't record it.
-            None => {
-                log::trace!("Skipping {} because no id found", user.login);
-                return Ok(());
-            }
-        };
-
-        if let Err(e) = notifications::delete_ping(
-            &mut Context::make_db_client(&ctx.github.raw()).await?,
-            id,
-            notifications::Identifier::Url(&url),
-        )
-        .await
-        {
-            log::warn!(
-                "failed to delete notification: url={}, user={:?}: {:?}",
-                url,
-                user,
-                e
-            );
-        }
-    }
 
     if let Event::Issue(e) = event {
         if e.action != github::IssuesAction::Opened {
