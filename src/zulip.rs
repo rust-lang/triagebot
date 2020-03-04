@@ -61,15 +61,14 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
 
     log::trace!("zulip hook: {:?}", req);
     let gh_id = match to_github_id(&ctx.github, req.message.sender_id).await {
-        Ok(Some(gh_id)) => gh_id,
-        Ok(None) => {
-            return serde_json::to_string(&Response {
-                content: &format!(
+        Ok(Some(gh_id)) => Ok(gh_id),
+        Ok(None) => Err(serde_json::to_string(&Response {
+            content: &format!(
                 "Unknown Zulip user. Please add `zulip-id = {}` to your file in rust-lang/team.",
-                req.message.sender_id),
-            })
-            .unwrap();
-        }
+                req.message.sender_id
+            ),
+        })
+        .unwrap()),
         Err(e) => {
             return serde_json::to_string(&Response {
                 content: &format!("Failed to query team API: {:?}", e),
@@ -83,14 +82,16 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
 
 fn handle_command<'a>(
     ctx: &'a Context,
-    gh_id: i64,
+    gh_id: Result<i64, String>,
     words: &'a str,
     message_data: &'a Message,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = String> + Send + 'a>> {
     Box::pin(async move {
         let mut words = words.split_whitespace();
-        match words.next() {
-            Some("as") => match execute_for_other_user(&ctx, gh_id, words, message_data).await {
+        let next = words.next();
+
+        if let Some("as") = next {
+            return match execute_for_other_user(&ctx, words, message_data).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
                     content: &format!(
@@ -99,7 +100,14 @@ fn handle_command<'a>(
                     ),
                 })
                 .unwrap(),
-            },
+            }
+        }
+        let gh_id = match gh_id {
+            Ok(id) => id,
+            Err(e) => return e,
+        };
+
+        match next {
             Some("acknowledge") | Some("ack") => match acknowledge(&ctx, gh_id, words).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
@@ -154,7 +162,6 @@ fn handle_command<'a>(
 //    given.
 async fn execute_for_other_user(
     ctx: &Context,
-    _original_gh_id: i64,
     mut words: impl Iterator<Item = &str>,
     message_data: &Message,
 ) -> anyhow::Result<String> {
@@ -247,7 +254,7 @@ async fn execute_for_other_user(
         }
     };
 
-    let output = handle_command(ctx, user_id as i64, &command, message_data).await;
+    let output = handle_command(ctx, Ok(user_id as i64), &command, message_data).await;
     let output_msg: ResponseOwned =
         serde_json::from_str(&output).expect("result should always be JSON");
     let output_msg = output_msg.content;
