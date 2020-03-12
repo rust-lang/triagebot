@@ -177,6 +177,7 @@ mod tests {
             PingTeamConfig {
                 message: "So many people!".to_owned(),
                 label: Some("T-compiler".to_owned()),
+                alias: HashSet::new(),
             },
         );
         ping_teams.insert(
@@ -184,6 +185,7 @@ mod tests {
             PingTeamConfig {
                 message: "Testing".to_owned(),
                 label: None,
+                alias: HashSet::new(),
             },
         );
         let mut nominate_teams = HashMap::new();
