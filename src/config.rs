@@ -1,5 +1,5 @@
 use crate::github::GithubClient;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -32,12 +32,30 @@ pub(crate) struct PingConfig {
     // team name -> message
     // message will have the cc string appended
     #[serde(flatten)]
-    pub(crate) teams: HashMap<String, PingTeamConfig>,
+    teams: HashMap<String, PingTeamConfig>,
+}
+
+impl PingConfig {
+    pub(crate) fn get_by_name(&self, team: &str) -> Option<(&str, &PingTeamConfig)> {
+        if let Some((team, cfg)) = self.teams.get_key_value(team) {
+            return Some((team, cfg));
+        }
+
+        for (name, cfg) in self.teams.iter() {
+            if cfg.alias.contains(team) {
+                return Some((name, cfg));
+            }
+        }
+
+        None
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct PingTeamConfig {
     pub(crate) message: String,
+    #[serde(default)]
+    pub(crate) alias: HashSet<String>,
     pub(crate) label: Option<String>,
 }
 

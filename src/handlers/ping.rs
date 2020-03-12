@@ -83,19 +83,22 @@ async fn handle_input(
         return Ok(());
     }
 
-    if !config.teams.contains_key(&team_name) {
-        let cmnt = ErrorComment::new(
-            &event.issue().unwrap(),
-            format!(
-                "This team (`{}`) cannot be pinged via this command;\
+    let (gh_team, config) = match config.get_by_name(&team_name) {
+        Some(v) => v,
+        None => {
+            let cmnt = ErrorComment::new(
+                &event.issue().unwrap(),
+                format!(
+                    "This team (`{}`) cannot be pinged via this command;\
                  it may need to be added to `triagebot.toml` on the master branch.",
-                team_name,
-            ),
-        );
-        cmnt.post(&ctx.github).await?;
-        return Ok(());
-    }
-    let team = github::get_team(&ctx.github, &team_name).await?;
+                    team_name,
+                ),
+            );
+            cmnt.post(&ctx.github).await?;
+            return Ok(());
+        }
+    };
+    let team = github::get_team(&ctx.github, &gh_team).await?;
     let team = match team {
         Some(team) => team,
         None => {
@@ -111,7 +114,7 @@ async fn handle_input(
         }
     };
 
-    if let Some(label) = config.teams[&team_name].label.clone() {
+    if let Some(label) = config.label.clone() {
         let issue_labels = event.issue().unwrap().labels();
         if !issue_labels.iter().any(|l| l.name == label) {
             let mut issue_labels = issue_labels.to_owned();
@@ -145,7 +148,7 @@ async fn handle_input(
     } else {
         format!("cc {}", users.join(" "))
     };
-    let comment = format!("{}\n\n{}", config.teams[&team_name].message, ping_msg);
+    let comment = format!("{}\n\n{}", config.message, ping_msg);
     event
         .issue()
         .expect("issue")
