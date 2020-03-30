@@ -28,11 +28,20 @@ impl Handler for PingHandler {
             return Ok(None);
         };
 
-        if let Event::Issue(e) = event {
-            if e.action != github::IssuesAction::Opened {
-                // skip events other than opening the issue to avoid retriggering commands in the
-                // issue body
-                return Ok(None);
+        match event {
+            Event::Issue(e) => {
+                if e.action != github::IssuesAction::Opened {
+                    // skip events other than opening the issue to avoid retriggering commands in the
+                    // issue body
+                    return Ok(None);
+                }
+            }
+            Event::IssueComment(e) => {
+                // Especially on ping commands, which ping tons of folks, this
+                // is quite noisy.
+                if e.action != github::IssueCommentAction::Created {
+                    return Ok(None);
+                }
             }
         }
 
