@@ -2,14 +2,10 @@
 //!
 //! We need to fake-assign ourselves and add a 'claimed by' section to the top-level comment.
 //!
-//! Such assigned issues should also be placed in a queue to ensure that the user remains
-//! active; the assigned user will be asked for a status report every 2 weeks (XXX: timing).
-//!
-//! If we're intending to ask for a status report but no comments from the assigned user have
-//! been given for the past 2 weeks, the bot will de-assign the user. They can once more claim
-//! the issue if necessary.
-//!
 //! Assign users with `@rustbot assign @gh-user` or `@rustbot claim` (self-claim).
+//!
+//! This also gets invoked by `r?` in comments, with equivalent handling to
+//! `rustbot assign @gh-user`.
 
 use crate::{
     config::AssignConfig,
