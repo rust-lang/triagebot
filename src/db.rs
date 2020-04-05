@@ -1,7 +1,65 @@
 use anyhow::Context as _;
+use native_tls::{Certificate, TlsConnector};
+use postgres_native_tls::MakeTlsConnector;
 pub use tokio_postgres::Client as DbClient;
 
 pub mod notifications;
+
+const CERT_URL: &str = "https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem";
+
+lazy_static::lazy_static! {
+    static ref CERTIFICATE_PEM: Vec<u8> = {
+        let client = reqwest::blocking::Client::new();
+        let resp = client
+            .get(CERT_URL)
+            .send()
+            .expect("failed to get RDS cert");
+         resp.bytes().expect("failed to get RDS cert body").to_vec()
+    };
+}
+
+pub async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
+    let db_url = std::env::var("DATABASE_URL").expect("needs DATABASE_URL");
+    if db_url.contains("rds.amazonaws.com") {
+        let cert = &CERTIFICATE_PEM[..];
+        let cert = Certificate::from_pem(&cert).context("made certificate")?;
+        let connector = TlsConnector::builder()
+            .add_root_certificate(cert)
+            .build()
+            .context("built TlsConnector")?;
+        let connector = MakeTlsConnector::new(connector);
+
+        let (db_client, connection) = match tokio_postgres::connect(&db_url, connector).await {
+            Ok(v) => v,
+            Err(e) => {
+                anyhow::bail!("failed to connect to DB: {}", e);
+            }
+        };
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("database connection error: {}", e);
+            }
+        });
+
+        Ok(db_client)
+    } else {
+        eprintln!("Warning: Non-TLS connection to non-RDS DB");
+        let (db_client, connection) =
+            match tokio_postgres::connect(&db_url, tokio_postgres::NoTls).await {
+                Ok(v) => v,
+                Err(e) => {
+                    anyhow::bail!("failed to connect to DB: {}", e);
+                }
+            };
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("database connection error: {}", e);
+            }
+        });
+
+        Ok(db_client)
+    }
+}
 
 pub async fn run_migrations(client: &DbClient) -> anyhow::Result<()> {
     client

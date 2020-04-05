@@ -100,7 +100,7 @@ fn handle_command<'a>(
                     ),
                 })
                 .unwrap(),
-            }
+            };
         }
         let gh_id = match gh_id {
             Ok(id) => id,
@@ -108,7 +108,7 @@ fn handle_command<'a>(
         };
 
         match next {
-            Some("acknowledge") | Some("ack") => match acknowledge(&ctx, gh_id, words).await {
+            Some("acknowledge") | Some("ack") => match acknowledge(gh_id, words).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
                     content: &format!(
@@ -128,7 +128,7 @@ fn handle_command<'a>(
                 })
                 .unwrap(),
             },
-            Some("move") => match move_notification(&ctx, gh_id, words).await {
+            Some("move") => match move_notification(gh_id, words).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
                     content: &format!(
@@ -138,7 +138,7 @@ fn handle_command<'a>(
                 })
                 .unwrap(),
             },
-            Some("meta") => match add_meta_notification(&ctx, gh_id, words).await {
+            Some("meta") => match add_meta_notification(gh_id, words).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
                     content: &format!(
@@ -316,11 +316,7 @@ struct MessageApiRequest<'a> {
     content: &'a str,
 }
 
-async fn acknowledge(
-    ctx: &Context,
-    gh_id: i64,
-    mut words: impl Iterator<Item = &str>,
-) -> anyhow::Result<String> {
+async fn acknowledge(gh_id: i64, mut words: impl Iterator<Item = &str>) -> anyhow::Result<String> {
     let url = match words.next() {
         Some(url) => {
             if words.next().is_some() {
@@ -338,13 +334,7 @@ async fn acknowledge(
     } else {
         Identifier::Url(url)
     };
-    match delete_ping(
-        &mut Context::make_db_client(&ctx.github.raw()).await?,
-        gh_id,
-        ident,
-    )
-    .await
-    {
+    match delete_ping(&mut crate::db::make_client().await?, gh_id, ident).await {
         Ok(deleted) => {
             let mut resp = format!("Acknowledged:\n");
             for deleted in deleted {
@@ -414,7 +404,6 @@ async fn add_notification(
 }
 
 async fn add_meta_notification(
-    ctx: &Context,
     gh_id: i64,
     mut words: impl Iterator<Item = &str>,
 ) -> anyhow::Result<String> {
@@ -439,7 +428,7 @@ async fn add_meta_notification(
         Some(description)
     };
     match add_metadata(
-        &mut Context::make_db_client(&ctx.github.raw()).await?,
+        &mut crate::db::make_client().await?,
         gh_id,
         idx,
         description.as_deref(),
@@ -458,7 +447,6 @@ async fn add_meta_notification(
 }
 
 async fn move_notification(
-    ctx: &Context,
     gh_id: i64,
     mut words: impl Iterator<Item = &str>,
 ) -> anyhow::Result<String> {
@@ -480,14 +468,7 @@ async fn move_notification(
         .context("to index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
-    match move_indices(
-        &mut Context::make_db_client(&ctx.github.raw()).await?,
-        gh_id,
-        from,
-        to,
-    )
-    .await
-    {
+    match move_indices(&mut crate::db::make_client().await?, gh_id, from, to).await {
         Ok(()) => Ok(serde_json::to_string(&Response {
             // to 1-base indices
             content: &format!("Moved {} to {}.", from + 1, to + 1),

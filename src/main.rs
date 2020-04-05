@@ -156,14 +156,14 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     log::info!("Listening on http://{}", addr);
 
-    let client = Client::new();
-    let db_client = Context::make_db_client(&client)
+    let db_client = db::make_client()
         .await
         .context("open database connection")?;
     db::run_migrations(&db_client)
         .await
         .context("database migrations")?;
 
+    let client = Client::new();
     let gh = github::GithubClient::new(
         client.clone(),
         env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"),
