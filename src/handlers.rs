@@ -71,6 +71,7 @@ handlers! {
     relabel = relabel::RelabelHandler,
     ping = ping::PingHandler,
     nominate = nominate::NominateHandler,
+    prioritize = prioritize::PrioritizeHandler,
     //tracking_issue = tracking_issue::TrackingIssueHandler,
 }
 

@@ -6,6 +6,7 @@ pub mod assign;
 pub mod nominate;
 pub mod ping;
 pub mod relabel;
+pub mod prioritize;
 
 pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
     input.find(&format!("@{}", bot))
@@ -17,6 +18,7 @@ pub enum Command<'a> {
     Assign(Result<assign::AssignCommand, Error<'a>>),
     Ping(Result<ping::PingCommand, Error<'a>>),
     Nominate(Result<nominate::NominateCommand, Error<'a>>),
+    Prioritize(Result<prioritize::PrioritizeCommand, Error<'a>>),
     None,
 }
 
@@ -95,6 +97,11 @@ impl<'a> Input<'a> {
             Command::Nominate,
             &original_tokenizer,
         ));
+        success.extend(parse_single_command(
+            prioritize::PrioritizeCommand::parse,
+            Command::Prioritize,
+            &original_tokenizer,
+        ));
 
         if success.len() > 1 {
             panic!(
@@ -133,6 +140,7 @@ impl<'a> Command<'a> {
             Command::Assign(r) => r.is_ok(),
             Command::Ping(r) => r.is_ok(),
             Command::Nominate(r) => r.is_ok(),
+            Command::Prioritize(r) => r.is_ok(),
             Command::None => true,
         }
     }
