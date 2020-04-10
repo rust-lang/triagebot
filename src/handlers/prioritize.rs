@@ -51,40 +51,32 @@ impl Handler for PrioritizeHandler {
 }
 
 async fn handle_input(ctx: &Context, config: &PrioritizeConfig, event: &Event) -> anyhow::Result<()> {
-    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await {
-        false
-    } else {
-        true
-    };
-
     let issue = event.issue().unwrap();
-    if !is_team_member {
-        let cmnt = ErrorComment::new(&issue, "Only Rust team members can prioritize issues.");
-        cmnt.post(&ctx.github).await?;
-        return Ok(());
-    }
 
-    if issue.labels().iter().any(|l| l.name == "I-prioritize") {
-        let cmnt = ErrorComment::new(&issue, "This issue is already prioritized!");
+    if issue.labels().iter().any(|l| l.name == config.label) {
+        let cmnt = ErrorComment::new(&issue, "This issue has already been requested for prioritization.");
         cmnt.post(&ctx.github).await?;
         return Ok(());
     }
 
     let mut labels = issue.labels().to_owned();
     labels.push(github::Label {
-        name: "I-prioritize".to_string(),
+        name: config.label.clone(),
     });
     let github_req = issue.set_labels(&ctx.github, labels);
 
-    let mut zulip_topic = format!("I-pri #{} {}", issue.number, issue.title);
+    let mut zulip_topic = format!("{} #{} {}", config.label, issue.number, issue.title);
     zulip_topic.truncate(60); // Zulip limitation
-    let client = reqwest::Client::new(); // TODO: have a Zulip Client akin to GithubClient
-    let zulip_req = client.post("https://rust-lang.zulipchat.com/api/v1/messages")
+
+    let zulip_req = ctx.github.raw().post("https://rust-lang.zulipchat.com/api/v1/messages")
         .form(&[
             ("type", "stream"),
-            ("to", config.zulip_stream.to_string().as_str()),
+            ("to", &config.zulip_stream.to_string()),
             ("topic", &zulip_topic),
-            ("content", "@*WG-prioritization*"),
+            ("content", &format!(
+                "@*WG-prioritization* issue [#{}]({}) has been requested for prioritization.",
+                issue.number, event.html_url().unwrap()
+            )),
         ])
         .send();
     
