@@ -19,6 +19,7 @@ pub(crate) struct Config {
     pub(crate) assign: Option<AssignConfig>,
     pub(crate) ping: Option<PingConfig>,
     pub(crate) nominate: Option<NominateConfig>,
+    pub(crate) prioritize: Option<PrioritizeConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -70,6 +71,11 @@ pub(crate) struct AssignConfig {
 pub(crate) struct RelabelConfig {
     #[serde(default)]
     pub(crate) allow_unauthenticated: Vec<String>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct PrioritizeConfig {
+    pub(crate) zulip_stream: u64,
 }
 
 pub(crate) async fn get(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, ConfigurationError> {
@@ -204,6 +210,7 @@ mod tests {
                 nominate: Some(NominateConfig {
                     teams: nominate_teams
                 }),
+                prioritize: None,
             }
         );
     }
