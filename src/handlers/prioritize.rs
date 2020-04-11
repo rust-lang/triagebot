@@ -8,7 +8,6 @@ use futures::future::{BoxFuture, FutureExt};
 use parser::command::prioritize::PrioritizeCommand;
 use parser::command::{Command, Input};
 
-
 pub(super) struct PrioritizeHandler;
 
 impl Handler for PrioritizeHandler {
@@ -50,11 +49,18 @@ impl Handler for PrioritizeHandler {
     }
 }
 
-async fn handle_input(ctx: &Context, config: &PrioritizeConfig, event: &Event) -> anyhow::Result<()> {
+async fn handle_input(
+    ctx: &Context,
+    config: &PrioritizeConfig,
+    event: &Event,
+) -> anyhow::Result<()> {
     let issue = event.issue().unwrap();
 
     if issue.labels().iter().any(|l| l.name == config.label) {
-        let cmnt = ErrorComment::new(&issue, "This issue has already been requested for prioritization.");
+        let cmnt = ErrorComment::new(
+            &issue,
+            "This issue has already been requested for prioritization.",
+        );
         cmnt.post(&ctx.github).await?;
         return Ok(());
     }
@@ -68,18 +74,21 @@ async fn handle_input(ctx: &Context, config: &PrioritizeConfig, event: &Event) -
     let mut zulip_topic = format!("{} #{} {}", config.label, issue.number, issue.title);
     zulip_topic.truncate(60); // Zulip limitation
 
-    let zulip_req = ctx.github.raw().post("https://rust-lang.zulipchat.com/api/v1/messages")
-        .form(&[
-            ("type", "stream"),
-            ("to", &config.zulip_stream.to_string()),
-            ("topic", &zulip_topic),
-            ("content", &format!(
-                "@*WG-prioritization* issue [#{}]({}) has been requested for prioritization.",
-                issue.number, event.html_url().unwrap()
-            )),
-        ])
-        .send();
-    
+    let zulip_stream = config.zulip_stream.to_string();
+    let content = format!(
+        "@*WG-prioritization* issue [#{}]({}) has been requested for prioritization.",
+        issue.number,
+        event.html_url().unwrap()
+    );
+    let zulip_req = crate::zulip::MessageApiRequest {
+        type_: "stream",
+        to: &zulip_stream,
+        topic: Some(&zulip_topic),
+        content: &content,
+    };
+
+    let zulip_req = zulip_req.send(&ctx.github.raw());
+
     let (gh_res, zulip_res) = futures::join!(github_req, zulip_req);
     gh_res?;
     zulip_res?;

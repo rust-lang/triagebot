@@ -35,6 +35,8 @@ struct ResponseOwned {
     content: String,
 }
 
+pub const BOT_EMAIL: &str = "triage-rust-lang-bot@zulipchat.com";
+
 pub async fn to_github_id(client: &GithubClient, zulip_id: usize) -> anyhow::Result<Option<i64>> {
     let map = crate::team_data::zulip_map(client).await?;
     Ok(map.users.get(&zulip_id).map(|v| *v as i64))
@@ -197,14 +199,13 @@ async fn execute_for_other_user(
         assert_eq!(command.pop(), Some(' ')); // pop trailing space
         command
     };
-    let bot_email = "triage-rust-lang-bot@zulipchat.com"; // FIXME: don't hardcode
     let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
 
     let members = ctx
         .github
         .raw()
         .get("https://rust-lang.zulipchat.com/api/v1/users")
-        .basic_auth(bot_email, Some(&bot_api_token))
+        .basic_auth(BOT_EMAIL, Some(&bot_api_token))
         .send()
         .await;
     let members = match members {
@@ -268,18 +269,14 @@ async fn execute_for_other_user(
         message_data.sender_full_name, message_data.sender_short_name, command, output_msg
     );
 
-    let res = ctx
-        .github
-        .raw()
-        .post("https://rust-lang.zulipchat.com/api/v1/messages")
-        .basic_auth(bot_email, Some(&bot_api_token))
-        .form(&MessageApiRequest {
-            type_: "private",
-            to: &user_email,
-            content: &message,
-        })
-        .send()
-        .await;
+    let res = MessageApiRequest {
+        type_: "private",
+        to: &user_email,
+        topic: None,
+        content: &message,
+    }
+    .send(ctx.github.raw())
+    .await;
     match res {
         Ok(resp) => {
             if !resp.status().is_success() {
@@ -309,11 +306,29 @@ struct Member {
 }
 
 #[derive(serde::Serialize)]
-struct MessageApiRequest<'a> {
+pub struct MessageApiRequest<'a> {
     #[serde(rename = "type")]
-    type_: &'a str,
-    to: &'a str,
-    content: &'a str,
+    pub type_: &'a str,
+    pub to: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub topic: Option<&'a str>,
+    pub content: &'a str,
+}
+
+impl MessageApiRequest<'_> {
+    pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
+        if self.type_ == "stream" {
+            assert!(self.topic.is_some());
+        }
+        let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
+
+        Ok(client
+            .post("https://rust-lang.zulipchat.com/api/v1/messages")
+            .basic_auth(BOT_EMAIL, Some(&bot_api_token))
+            .form(&self)
+            .send()
+            .await?)
+    }
 }
 
 async fn acknowledge(gh_id: i64, mut words: impl Iterator<Item = &str>) -> anyhow::Result<String> {
