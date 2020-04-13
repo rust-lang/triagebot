@@ -83,11 +83,23 @@ async fn handle_input(
                 return Ok(());
             }
 
-            if issue.labels().iter().any(|l| l.name == config.second_label) {
+            if !issue.labels().iter().any(|l| l.name == "major-change") {
                 let cmnt = ErrorComment::new(
                     &issue,
-                    "This issue has already been seconded! There is currently no need to third an issue.",
+                    "This is not a major change (it lacks the `major-change` label).",
                 );
+                cmnt.post(&ctx.github).await?;
+                return Ok(());
+            }
+            let is_team_member =
+                if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await {
+                    false
+                } else {
+                    true
+                };
+
+            if !is_team_member {
+                let cmnt = ErrorComment::new(&issue, "Only team members can second issues.");
                 cmnt.post(&ctx.github).await?;
                 return Ok(());
             }
