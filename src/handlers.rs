@@ -69,6 +69,7 @@ handlers! {
     ping = ping::PingHandler,
     nominate = nominate::NominateHandler,
     prioritize = prioritize::PrioritizeHandler,
+    major_change = major_change::MajorChangeHandler,
     //tracking_issue = tracking_issue::TrackingIssueHandler,
 }
 

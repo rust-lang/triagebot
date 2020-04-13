@@ -20,6 +20,7 @@ pub(crate) struct Config {
     pub(crate) ping: Option<PingConfig>,
     pub(crate) nominate: Option<NominateConfig>,
     pub(crate) prioritize: Option<PrioritizeConfig>,
+    pub(crate) major_change: Option<MajorChangeConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -76,6 +77,13 @@ pub(crate) struct RelabelConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct PrioritizeConfig {
     pub(crate) label: String,
+    pub(crate) zulip_stream: u64,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct MajorChangeConfig {
+    pub(crate) second_label: String,
+    pub(crate) meeting_label: String,
     pub(crate) zulip_stream: u64,
 }
 

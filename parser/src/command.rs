@@ -5,8 +5,9 @@ use crate::token::{Token, Tokenizer};
 pub mod assign;
 pub mod nominate;
 pub mod ping;
-pub mod relabel;
 pub mod prioritize;
+pub mod relabel;
+pub mod second;
 
 pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
     input.find(&format!("@{}", bot))
@@ -19,6 +20,7 @@ pub enum Command<'a> {
     Ping(Result<ping::PingCommand, Error<'a>>),
     Nominate(Result<nominate::NominateCommand, Error<'a>>),
     Prioritize(Result<prioritize::PrioritizeCommand, Error<'a>>),
+    Second(Result<second::SecondCommand, Error<'a>>),
     None,
 }
 
@@ -102,6 +104,11 @@ impl<'a> Input<'a> {
             Command::Prioritize,
             &original_tokenizer,
         ));
+        success.extend(parse_single_command(
+            second::SecondCommand::parse,
+            Command::Second,
+            &original_tokenizer,
+        ));
 
         if success.len() > 1 {
             panic!(
@@ -141,6 +148,7 @@ impl<'a> Command<'a> {
             Command::Ping(r) => r.is_ok(),
             Command::Nominate(r) => r.is_ok(),
             Command::Prioritize(r) => r.is_ok(),
+            Command::Second(r) => r.is_ok(),
             Command::None => true,
         }
     }
