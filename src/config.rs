@@ -221,6 +221,7 @@ mod tests {
                     teams: nominate_teams
                 }),
                 prioritize: None,
+                major_change: None,
             }
         );
     }
