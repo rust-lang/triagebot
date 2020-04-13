@@ -14,6 +14,7 @@ lazy_static::lazy_static! {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub(crate) struct Config {
     pub(crate) relabel: Option<RelabelConfig>,
     pub(crate) assign: Option<AssignConfig>,
