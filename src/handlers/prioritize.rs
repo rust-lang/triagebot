@@ -18,7 +18,7 @@ impl Handler for PrioritizeHandler {
         &self,
         ctx: &Context,
         event: &Event,
-        _: Option<&Self::Config>,
+        config: Option<&Self::Config>,
     ) -> Result<Option<Self::Input>, String> {
         let body = if let Some(b) = event.comment_body() {
             b
@@ -28,6 +28,15 @@ impl Handler for PrioritizeHandler {
         };
 
         if let Event::Issue(e) = event {
+            if e.action == github::IssuesAction::Labeled {
+                if let Some(config) = config {
+                    if e.label.as_ref().expect("label").name == config.label {
+                        // We need to take the exact same action in this case.
+                        return Ok(Some(PrioritizeCommand));
+                    }
+                }
+            }
+
             if e.action != github::IssuesAction::Opened {
                 log::debug!("skipping event, issue was {:?}", e.action);
                 // skip events other than opening the issue to avoid retriggering commands in the

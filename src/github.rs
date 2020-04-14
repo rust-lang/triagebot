@@ -476,6 +476,8 @@ pub struct IssuesEvent {
     #[serde(alias = "pull_request")]
     pub issue: Issue,
     pub repository: Repository,
+    /// Some if action is IssuesAction::Labeled, for example
+    pub label: Option<Label>,
 }
 
 #[derive(Debug, serde::Deserialize)]
