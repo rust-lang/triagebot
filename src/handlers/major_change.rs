@@ -131,7 +131,7 @@ async fn handle_input(
     labels.push(github::Label { name: label_to_add });
     let github_req = issue.set_labels(&ctx.github, labels);
 
-    let mut zulip_topic = format!("#{} {}", issue.number, issue.title);
+    let mut zulip_topic = format!("compiler-team#{} {}", issue.number, issue.title);
     zulip_topic.truncate(60); // Zulip limitation
 
     let zulip_stream = config.zulip_stream.to_string();
