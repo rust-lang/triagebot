@@ -190,6 +190,19 @@ impl IssueRepository {
 }
 
 impl Issue {
+    pub fn zulip_topic_reference(&self) -> String {
+        let repo = self.repository();
+        if repo.organization == "rust-lang" {
+            if repo.repository == "rust" {
+                format!("#{}", self.number)
+            } else {
+                format!("{}#{}", repo.repository, self.number)
+            }
+        } else {
+            format!("{}/{}#{}", repo.organization, repo.repository, self.number)
+        }
+    }
+
     pub fn repository(&self) -> &IssueRepository {
         self.repository.get_or_init(|| {
             // https://api.github.com/repos/rust-lang/rust/issues/69257/comments

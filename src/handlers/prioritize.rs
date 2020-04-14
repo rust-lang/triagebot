@@ -2,7 +2,6 @@ use crate::{
     config::PrioritizeConfig,
     github::{self, Event},
     handlers::{Context, Handler},
-    interactions::ErrorComment,
 };
 use futures::future::{BoxFuture, FutureExt};
 use parser::command::prioritize::PrioritizeCommand;
@@ -10,8 +9,13 @@ use parser::command::{Command, Input};
 
 pub(super) struct PrioritizeHandler;
 
+pub(crate) enum Prioritize {
+    Start,
+    End,
+}
+
 impl Handler for PrioritizeHandler {
-    type Input = PrioritizeCommand;
+    type Input = Prioritize;
     type Config = PrioritizeConfig;
 
     fn parse_input(
@@ -32,7 +36,16 @@ impl Handler for PrioritizeHandler {
                 if let Some(config) = config {
                     if e.label.as_ref().expect("label").name == config.label {
                         // We need to take the exact same action in this case.
-                        return Ok(Some(PrioritizeCommand));
+                        return Ok(Some(Prioritize::Start));
+                    }
+                }
+            }
+
+            if e.action == github::IssuesAction::Unlabeled {
+                if let Some(config) = config {
+                    if e.label.as_ref().expect("label").name == config.label {
+                        // We need to take the exact same action in this case.
+                        return Ok(Some(Prioritize::End));
                     }
                 }
             }
@@ -47,7 +60,7 @@ impl Handler for PrioritizeHandler {
 
         let mut input = Input::new(&body, &ctx.username);
         match input.parse_command() {
-            Command::Prioritize(Ok(cmd)) => Ok(Some(cmd)),
+            Command::Prioritize(Ok(PrioritizeCommand)) => Ok(Some(Prioritize::Start)),
             _ => Ok(None),
         }
     }
@@ -57,9 +70,9 @@ impl Handler for PrioritizeHandler {
         ctx: &'a Context,
         config: &'a Self::Config,
         event: &'a Event,
-        _cmd: Self::Input,
+        cmd: Self::Input,
     ) -> BoxFuture<'a, anyhow::Result<()>> {
-        handle_input(ctx, config, event).boxed()
+        handle_input(ctx, config, event, cmd).boxed()
     }
 }
 
@@ -67,33 +80,52 @@ async fn handle_input(
     ctx: &Context,
     config: &PrioritizeConfig,
     event: &Event,
+    cmd: Prioritize,
 ) -> anyhow::Result<()> {
     let issue = event.issue().unwrap();
 
-    if issue.labels().iter().any(|l| l.name == config.label) {
-        let cmnt = ErrorComment::new(
-            &issue,
-            "This issue has already been requested for prioritization.",
-        );
-        cmnt.post(&ctx.github).await?;
-        return Ok(());
-    }
-
     let mut labels = issue.labels().to_owned();
-    labels.push(github::Label {
-        name: config.label.clone(),
-    });
+    let content = match cmd {
+        Prioritize::Start => {
+            // Don't add the label if it's already there, e.g., if this is a
+            // labeled event
+            if !labels.iter().any(|l| l.name == config.label) {
+                labels.push(github::Label {
+                    name: config.label.clone(),
+                });
+            }
+            format!(
+                "@*WG-prioritization* issue [#{}]({}) has been requested for prioritization.",
+                issue.number,
+                event.html_url().unwrap()
+            )
+        }
+        Prioritize::End => {
+            // Shouldn't be necessary in practice as we only end on label
+            // removal, but if we add support in the future let's be sure to do
+            // the right thing.
+            if let Some(idx) = labels.iter().position(|l| l.name == config.label) {
+                labels.remove(idx);
+            }
+            format!(
+                "Issue [#{}]({})'s prioritization request has been removed.",
+                issue.number,
+                event.html_url().unwrap()
+            )
+        }
+    };
+
     let github_req = issue.set_labels(&ctx.github, labels);
 
-    let mut zulip_topic = format!("{} #{} {}", config.label, issue.number, issue.title);
+    let mut zulip_topic = format!(
+        "{} {} {}",
+        config.label,
+        issue.zulip_topic_reference(),
+        issue.title
+    );
     zulip_topic.truncate(60); // Zulip limitation
 
     let zulip_stream = config.zulip_stream.to_string();
-    let content = format!(
-        "@*WG-prioritization* issue [#{}]({}) has been requested for prioritization.",
-        issue.number,
-        event.html_url().unwrap()
-    );
     let zulip_req = crate::zulip::MessageApiRequest {
         type_: "stream",
         to: &zulip_stream,
