@@ -27,10 +27,13 @@ macro_rules! handlers {
         mod notification;
 
         pub async fn handle(ctx: &Context, event: &Event) -> Result<(), HandlerError> {
+            let config = config::get(&ctx.github, event.repo_name()).await;
+
             $(
             if let Some(input) = Handler::parse_input(
-                    &$handler, ctx, event).map_err(HandlerError::Message)? {
-                let config = match config::get(&ctx.github, event.repo_name()).await {
+                &$handler, ctx, event, config.as_ref().ok().and_then(|c| c.$name.as_ref()),
+            ).map_err(HandlerError::Message)? {
+                let config = match &config {
                     Ok(config) => config,
                     Err(e @ ConfigurationError::Missing) => {
                         return Err(HandlerError::Message(e.to_string()));
@@ -39,7 +42,7 @@ macro_rules! handlers {
                         return Err(HandlerError::Message(e.to_string()));
                     }
                     Err(e @ ConfigurationError::Http(_)) => {
-                        return Err(HandlerError::Other(e.into()));
+                        return Err(HandlerError::Other(e.clone().into()));
                     }
                 };
                 if let Some(config) = &config.$name {
@@ -83,7 +86,12 @@ pub trait Handler: Sync + Send {
     type Input;
     type Config;
 
-    fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, String>;
+    fn parse_input(
+        &self,
+        ctx: &Context,
+        event: &Event,
+        config: Option<&Self::Config>,
+    ) -> Result<Option<Self::Input>, String>;
 
     fn handle_input<'a>(
         &self,

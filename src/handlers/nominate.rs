@@ -16,7 +16,12 @@ impl Handler for NominateHandler {
     type Input = NominateCommand;
     type Config = NominateConfig;
 
-    fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, String> {
+    fn parse_input(
+        &self,
+        ctx: &Context,
+        event: &Event,
+        _: Option<&Self::Config>,
+    ) -> Result<Option<Self::Input>, String> {
         let body = if let Some(b) = event.comment_body() {
             b
         } else {

@@ -33,7 +33,12 @@ impl Handler for AssignmentHandler {
     type Input = AssignCommand;
     type Config = AssignConfig;
 
-    fn parse_input(&self, ctx: &Context, event: &Event) -> Result<Option<Self::Input>, String> {
+    fn parse_input(
+        &self,
+        ctx: &Context,
+        event: &Event,
+        _: Option<&AssignConfig>,
+    ) -> Result<Option<Self::Input>, String> {
         let body = if let Some(b) = event.comment_body() {
             b
         } else {
