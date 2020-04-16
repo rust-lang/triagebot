@@ -12,6 +12,8 @@ pub enum Token<'a> {
     Question,
     Colon,
     EndOfLine,
+    ParenLeft,
+    ParenRight,
     Quote(&'a str),
     Word(&'a str),
 }
@@ -25,6 +27,8 @@ impl fmt::Display for Token<'_> {
             Token::Exclamation => write!(f, "!"),
             Token::Question => write!(f, "?"),
             Token::Colon => write!(f, ":"),
+            Token::ParenRight => write!(f, ")"),
+            Token::ParenLeft => write!(f, "("),
             Token::EndOfLine => Ok(()),
             Token::Quote(body) => write!(f, r#""{}""#, body),
             Token::Word(word) => write!(f, "{}", word),
@@ -108,6 +112,8 @@ impl<'a> Tokenizer<'a> {
             '?' => Some(Token::Question),
             ';' => Some(Token::Semi),
             '\n' => Some(Token::EndOfLine),
+            ')' => Some(Token::ParenRight),
+            '(' => Some(Token::ParenLeft),
             _ => None,
         }
     }
