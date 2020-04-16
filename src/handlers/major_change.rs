@@ -34,7 +34,9 @@ impl Handler for MajorChangeHandler {
 
         match event {
             Event::Issue(e) => {
-                if e.action != github::IssuesAction::Opened {
+                if e.action != github::IssuesAction::Opened
+                    && e.action != github::IssuesAction::Reopened
+                {
                     return Ok(None);
                 }
             }
