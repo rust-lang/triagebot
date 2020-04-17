@@ -35,9 +35,9 @@ pub async fn get_commits_with_artifacts(db: &DbClient) -> anyhow::Result<Vec<Com
 
     let mut data = Vec::new();
     for commit in commits {
-        let sha: String = commit.get(1);
-        let parent_sha: String = commit.get(2);
-        let time: DateTime<FixedOffset> = commit.get(3);
+        let sha: String = commit.get(0);
+        let parent_sha: String = commit.get(1);
+        let time: DateTime<FixedOffset> = commit.get(2);
 
         data.push(Commit {
             sha,
