@@ -33,7 +33,7 @@ pub async fn get_commits_with_artifacts(db: &DbClient) -> anyhow::Result<Vec<Com
         .await
         .context("Getting commit data")?;
 
-    let mut data = Vec::new();
+    let mut data = Vec::with_capacity(commits.len());
     for commit in commits {
         let sha: String = commit.get(0);
         let parent_sha: String = commit.get(1);
