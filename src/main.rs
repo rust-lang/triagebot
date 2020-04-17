@@ -32,6 +32,7 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
         };
         return Ok(Response::builder()
             .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
             .body(Body::from(serde_json::to_string(&res).unwrap()))
             .unwrap());
     }
