@@ -1,6 +1,6 @@
 use anyhow::Context;
 
-use chrono::{FixedOffset, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
@@ -633,4 +633,38 @@ impl GithubClient {
         log::trace!("put {:?}", url);
         self.client.put(url).configure(self)
     }
+
+    /// This does not retrieve all of them, only the last several.
+    pub async fn bors_commits(&self) -> Vec<GithubCommit> {
+        let req = self.get("https://api.github.com/repos/rust-lang/rust/commits?author=bors");
+        match self.json(req).await {
+            Ok(r) => r,
+            Err(e) => {
+                log::error!("Failed to query commit list: {:?}", e);
+                Vec::new()
+            }
+        }
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct GithubCommit {
+    pub sha: String,
+    pub commit: GitCommit,
+    pub parents: Vec<Parent>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct GitCommit {
+    pub author: GitUser,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct GitUser {
+    pub date: DateTime<FixedOffset>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct Parent {
+    pub sha: String,
 }

@@ -4,6 +4,7 @@ use postgres_native_tls::MakeTlsConnector;
 pub use tokio_postgres::Client as DbClient;
 
 pub mod notifications;
+pub mod rustc_commits;
 
 const CERT_URL: &str = "https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem";
 
@@ -129,4 +130,11 @@ CREATE TABLE users (
     "ALTER TABLE notifications ADD COLUMN team_name TEXT;",
     "ALTER TABLE notifications ADD COLUMN idx INTEGER;",
     "ALTER TABLE notifications ADD COLUMN metadata TEXT;",
+    "
+CREATE TABLE rustc_commits (
+    sha PRIMARY KEY,
+    parent_sha TEXT NOT NULL,
+    time TIMESTAMP WITH TIME ZONE
+);
+",
 ];

@@ -21,10 +21,12 @@ impl fmt::Display for HandlerError {
     }
 }
 
+mod notification;
+mod rustc_commits;
+
 macro_rules! handlers {
     ($($name:ident = $handler:expr,)*) => {
         $(mod $name;)*
-        mod notification;
 
         pub async fn handle(ctx: &Context, event: &Event) -> Result<(), HandlerError> {
             let config = config::get(&ctx.github, event.repo_name()).await;
@@ -59,6 +61,10 @@ macro_rules! handlers {
 
             if let Err(e) = notification::handle(ctx, event).await {
                 log::error!("failed to process event {:?} with notification handler: {:?}", event, e);
+            }
+
+            if let Err(e) = rustc_commits::handle(ctx, event).await {
+                log::error!("failed to process event {:?} with rustc_commits handler: {:?}", event, e);
             }
 
             Ok(())

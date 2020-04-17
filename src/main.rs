@@ -19,6 +19,22 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
             .body(Body::from("Triagebot is awaiting triage."))
             .unwrap());
     }
+    if req.uri.path() == "/bors-commit-list" {
+        let res = db::rustc_commits::get_commits_with_artifacts(&ctx.db).await;
+        let res = match res {
+            Ok(r) => r,
+            Err(e) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Body::from(format!("{:?}", e)))
+                    .unwrap());
+            }
+        };
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::from(serde_json::to_string(&res).unwrap()))
+            .unwrap());
+    }
     if req.uri.path() == "/notifications" {
         if let Some(query) = req.uri.query() {
             let user = url::form_urlencoded::parse(query.as_bytes()).find(|(k, _)| k == "user");
