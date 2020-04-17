@@ -226,6 +226,6 @@ async fn main() {
         .unwrap_or(8000);
     let addr = ([0, 0, 0, 0], port).into();
     if let Err(e) = run_server(addr).await {
-        eprintln!("Failed to run server: {}", e);
+        eprintln!("Failed to run server: {:?}", e);
     }
 }

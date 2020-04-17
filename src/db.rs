@@ -132,7 +132,7 @@ CREATE TABLE users (
     "ALTER TABLE notifications ADD COLUMN metadata TEXT;",
     "
 CREATE TABLE rustc_commits (
-    sha PRIMARY KEY,
+    sha TEXT PRIMARY KEY,
     parent_sha TEXT NOT NULL,
     time TIMESTAMP WITH TIME ZONE
 );
