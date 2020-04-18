@@ -18,13 +18,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Install Rust
-        run: rustup update stable && rustup default stable
-
-      - name: Run the test suite
-        run: cargo test
-
-      - name: Build the Docker container
+      - name: Test and build
         run: docker build -t triagebot .
 
       - name: Deploy to production
