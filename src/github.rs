@@ -61,7 +61,10 @@ impl User {
         let is_triager = map
             .get("wg-triage")
             .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
-        Ok(map["all"].members.iter().any(|g| g.github == self.login) || is_triager)
+        let is_pri_member = map
+            .get("wg-prioritization")
+            .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
+        Ok(map["all"].members.iter().any(|g| g.github == self.login) || is_triager || is_pri_member)
     }
 
     // Returns the ID of the given user, if the user is in the `all` team.
