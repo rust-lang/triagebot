@@ -501,6 +501,25 @@ pub struct Repository {
     pub full_name: String,
 }
 
+impl Repository {
+    fn url(&self) -> String {
+        format!("https://api.github.com/repos/{}", self.full_name)
+    }
+
+    pub async fn get_issues(&self, client: &GithubClient, label_filter: &[&Label]) -> anyhow::Result<Vec<Issue>> {
+        let label_filter = label_filter
+            .iter()
+            .map(|label| label.name.as_str())
+            .collect::<Vec<&str>>()
+            .join(",");
+        let url = format!("{}/issues?labels={}", self.url(), label_filter);
+        client
+            .json(client.get(&url))
+            .await
+            .with_context(|| format!("failed to list issues from repo {}", self.url()))
+    }
+}
+
 #[derive(Debug)]
 pub enum Event {
     IssueComment(IssueCommentEvent),

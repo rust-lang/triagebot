@@ -1,6 +1,6 @@
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
-use crate::github::{self, GithubClient};
+use crate::github::{self, GithubClient, Label, Repository};
 use crate::handlers::Context;
 use anyhow::Context as _;
 use std::convert::TryInto;
@@ -150,6 +150,15 @@ fn handle_command<'a>(
                 })
                 .unwrap(),
             },
+            Some("promoted") => {
+                let content = &match promote_regression_issues(&ctx.github, words).await {
+                    Ok(()) => "Updated issues successfully!".to_string(),
+                    Err(e) => {
+                        format!("**Error:** {:?}\nCommand usage: `@rustbot promoted <past> to <current> [repo]", e)
+                    },
+                };
+                serde_json::to_string(&Response { content }).unwrap()
+            }
             _ => serde_json::to_string(&Response {
                 content: "Unknown command.",
             })
@@ -494,4 +503,46 @@ async fn move_notification(
         })
         .unwrap()),
     }
+}
+
+async fn promote_regression_issues(gh_client: &GithubClient, mut words: impl Iterator<Item = &str>) -> anyhow::Result<()> {
+    let past = match words.next() {
+        Some(past) => Label { name: format!("regression-from-stable-to-{}", past) },
+        None => anyhow::bail!("past state not present")
+    };
+
+    anyhow::ensure!(words.next() == Some("to"), "invalid syntax");
+
+    let current = match words.next() {
+        Some(current) => Label { name: format!("regression-from-stable-to-{}", current) },
+        None => anyhow::bail!("current state not present")
+    };
+
+    let repo = match words.next() {
+        Some(repo) => {
+            if repo.contains("/") {
+                repo.to_string()
+            } else {
+                format!("rust-lang/{}", repo)
+            }
+        },
+        None => "rust-lang/rust".to_string()
+    };
+    let repo = Repository { full_name: repo };
+    
+    let issues = repo
+        .get_issues(&gh_client, &[&past])
+        .await?;
+    let fut = issues
+        .iter()
+        .map(|issue| {
+            let mut labels = issue.labels().to_owned();
+            if let Some(pos) = labels.iter().position(|l| l == &past) {
+                labels.remove(pos);
+            }
+            labels.push(current.clone());
+            issue.set_labels(&gh_client, labels)
+        });
+    futures::future::join_all(fut).await;
+    Ok(())
 }
