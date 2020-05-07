@@ -67,13 +67,23 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         log::trace!("Ignoring bors merge, not on master");
         return Ok(());
     }
-    // We get the last several commits, and insert all of them. Our database
-    // handling just skips over commits that already existed, so we're not going
-    // to run into trouble, and this way we mostly self-heal (unless we're down
-    // for a long time).
+
+    let sha = bors.merge_sha;
+
+    // FIXME: ideally we would pull in all the commits here, but unfortunately
+    // in rust-lang/rust's case there's bors-authored commits that aren't
+    // actually from rust-lang/rust as they were merged into the clippy repo.
+    //
+    // For now we just ignore everything returned by this query other than the
+    // commit we *know* to be good (the one from the bors comment) but
+    // eventually we will want to be smarter here.
     let resp = ctx.github.bors_commits().await;
 
-    for mut gc in resp {
+    for mut gc in resp.into_iter() {
+        // Only insert the just pushed commit
+        if gc.sha != sha {
+            continue;
+        }
         let res = rustc_commits::record_commit(
             &ctx.db,
             rustc_commits::Commit {
