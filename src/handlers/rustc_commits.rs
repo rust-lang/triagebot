@@ -73,31 +73,27 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     // FIXME: ideally we would pull in all the commits here, but unfortunately
     // in rust-lang/rust's case there's bors-authored commits that aren't
     // actually from rust-lang/rust as they were merged into the clippy repo.
-    //
-    // For now we just ignore everything returned by this query other than the
-    // commit we *know* to be good (the one from the bors comment) but
-    // eventually we will want to be smarter here.
-    let resp = ctx.github.bors_commits().await;
-
-    for mut gc in resp.into_iter() {
-        // Only insert the just pushed commit
-        if gc.sha != sha {
-            continue;
+    let mut gc = match ctx.github.rust_commit(&sha).await {
+        Some(c) => c,
+        None => {
+            log::error!("Could not find bors-reported sha: {:?}", sha);
+            return Ok(());
         }
-        let res = rustc_commits::record_commit(
-            &ctx.db,
-            rustc_commits::Commit {
-                sha: gc.sha,
-                parent_sha: gc.parents.remove(0).sha,
-                time: gc.commit.author.date,
-            },
-        )
-        .await;
-        match res {
-            Ok(()) => {}
-            Err(e) => {
-                log::error!("Failed to record commit {:?}", e);
-            }
+    };
+
+    let res = rustc_commits::record_commit(
+        &ctx.db,
+        rustc_commits::Commit {
+            sha: gc.sha,
+            parent_sha: gc.parents.remove(0).sha,
+            time: gc.commit.author.date,
+        },
+    )
+    .await;
+    match res {
+        Ok(()) => {}
+        Err(e) => {
+            log::error!("Failed to record commit {:?}", e);
         }
     }
 

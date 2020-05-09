@@ -64,7 +64,11 @@ impl User {
         let is_pri_member = map
             .get("wg-prioritization")
             .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
-        Ok(map["all"].members.iter().any(|g| g.github == self.login) || is_triager || is_pri_member)
+        Ok(
+            map["all"].members.iter().any(|g| g.github == self.login)
+                || is_triager
+                || is_pri_member,
+        )
     }
 
     // Returns the ID of the given user, if the user is in the `all` team.
@@ -635,6 +639,20 @@ impl GithubClient {
     fn put(&self, url: &str) -> RequestBuilder {
         log::trace!("put {:?}", url);
         self.client.put(url).configure(self)
+    }
+
+    pub async fn rust_commit(&self, sha: &str) -> Option<GithubCommit> {
+        let req = self.get(&format!(
+            "https://api.github.com/repos/rust-lang/rust/commits/{}",
+            sha
+        ));
+        match self.json(req).await {
+            Ok(r) => Some(r),
+            Err(e) => {
+                log::error!("Failed to query commit {:?}: {:?}", sha, e);
+                None
+            }
+        }
     }
 
     /// This does not retrieve all of them, only the last several.
