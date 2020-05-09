@@ -6,12 +6,10 @@ use interactions::ErrorComment;
 use std::fmt;
 
 pub mod config;
-#[cfg(feature = "db")]
 pub mod db;
 pub mod github;
 pub mod handlers;
 pub mod interactions;
-#[cfg(feature = "db")]
 pub mod notification_listing;
 pub mod payload;
 pub mod team;

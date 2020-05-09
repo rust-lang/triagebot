@@ -1,12 +1,11 @@
 #![allow(clippy::new_without_default)]
 
-#[cfg(feature = "db")]
 use anyhow::Context as _;
 use futures::{future::FutureExt, stream::StreamExt};
 use hyper::{header, Body, Request, Response, Server, StatusCode};
 use reqwest::Client;
 use std::{env, net::SocketAddr, sync::Arc};
-use triagebot::{github, handlers::Context, payload, EventName};
+use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
 use uuid::Uuid;
 
 mod logger;
@@ -20,9 +19,8 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
             .body(Body::from("Triagebot is awaiting triage."))
             .unwrap());
     }
-    #[cfg(feature = "db")]
     if req.uri.path() == "/bors-commit-list" {
-        let res = triagebot::db::rustc_commits::get_commits_with_artifacts(&ctx.db).await;
+        let res = db::rustc_commits::get_commits_with_artifacts(&ctx.db).await;
         let res = match res {
             Ok(r) => r,
             Err(e) => {
@@ -38,7 +36,6 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
             .body(Body::from(serde_json::to_string(&res).unwrap()))
             .unwrap());
     }
-    #[cfg(feature = "db")]
     if req.uri.path() == "/notifications" {
         if let Some(query) = req.uri.query() {
             let user = url::form_urlencoded::parse(query.as_bytes()).find(|(k, _)| k == "user");
@@ -46,7 +43,7 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
                     .body(Body::from(
-                        triagebot::notification_listing::render(&ctx.db, &*name).await,
+                        notification_listing::render(&ctx.db, &*name).await,
                     ))
                     .unwrap());
             }
@@ -176,12 +173,10 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     log::info!("Listening on http://{}", addr);
 
-    #[cfg(feature = "db")]
-    let db_client = triagebot::db::make_client()
+    let db_client = db::make_client()
         .await
         .context("open database connection")?;
-    #[cfg(feature = "db")]
-    triagebot::db::run_migrations(&db_client)
+    db::run_migrations(&db_client)
         .await
         .context("database migrations")?;
 
@@ -192,7 +187,6 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     );
     let ctx = Arc::new(Context {
         username: github::User::current(&gh).await.unwrap().login,
-        #[cfg(feature = "db")]
         db: db_client,
         github: gh,
     });

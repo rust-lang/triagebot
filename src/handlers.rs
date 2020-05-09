@@ -2,6 +2,7 @@ use crate::config::{self, ConfigurationError};
 use crate::github::{Event, GithubClient};
 use futures::future::BoxFuture;
 use std::fmt;
+use tokio_postgres::Client as DbClient;
 
 #[derive(Debug)]
 pub enum HandlerError {
@@ -20,9 +21,7 @@ impl fmt::Display for HandlerError {
     }
 }
 
-#[cfg(feature = "db")]
 mod notification;
-#[cfg(feature = "db")]
 mod rustc_commits;
 
 macro_rules! handlers {
@@ -60,12 +59,10 @@ macro_rules! handlers {
                 }
             })*
 
-            #[cfg(feature = "db")]
             if let Err(e) = notification::handle(ctx, event).await {
                 log::error!("failed to process event {:?} with notification handler: {:?}", event, e);
             }
 
-            #[cfg(feature = "db")]
             if let Err(e) = rustc_commits::handle(ctx, event).await {
                 log::error!("failed to process event {:?} with rustc_commits handler: {:?}", event, e);
             }
@@ -87,8 +84,7 @@ handlers! {
 
 pub struct Context {
     pub github: GithubClient,
-    #[cfg(feature = "db")]
-    pub db: tokio_postgres::Client,
+    pub db: DbClient,
     pub username: String,
 }
 

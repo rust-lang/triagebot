@@ -1,6 +1,4 @@
-#[cfg(feature = "db")]
 use crate::db::notifications::add_metadata;
-#[cfg(feature = "db")]
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
 use crate::github::{self, GithubClient};
 use crate::handlers::Context;
@@ -112,7 +110,6 @@ fn handle_command<'a>(
         };
 
         match next {
-            #[cfg(feature = "db")]
             Some("acknowledge") | Some("ack") => match acknowledge(gh_id, words).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
@@ -123,7 +120,6 @@ fn handle_command<'a>(
                 })
                 .unwrap(),
             },
-            #[cfg(feature = "db")]
             Some("add") => match add_notification(&ctx, gh_id, words).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
@@ -134,7 +130,6 @@ fn handle_command<'a>(
                 })
                 .unwrap(),
             },
-            #[cfg(feature = "db")]
             Some("move") => match move_notification(gh_id, words).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
@@ -145,7 +140,6 @@ fn handle_command<'a>(
                 })
                 .unwrap(),
             },
-            #[cfg(feature = "db")]
             Some("meta") => match add_meta_notification(gh_id, words).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
@@ -337,7 +331,6 @@ impl MessageApiRequest<'_> {
     }
 }
 
-#[cfg(feature = "db")]
 async fn acknowledge(gh_id: i64, mut words: impl Iterator<Item = &str>) -> anyhow::Result<String> {
     let url = match words.next() {
         Some(url) => {
@@ -381,7 +374,6 @@ async fn acknowledge(gh_id: i64, mut words: impl Iterator<Item = &str>) -> anyho
     }
 }
 
-#[cfg(feature = "db")]
 async fn add_notification(
     ctx: &Context,
     gh_id: i64,
@@ -426,7 +418,6 @@ async fn add_notification(
     }
 }
 
-#[cfg(feature = "db")]
 async fn add_meta_notification(
     gh_id: i64,
     mut words: impl Iterator<Item = &str>,
@@ -470,7 +461,6 @@ async fn add_meta_notification(
     }
 }
 
-#[cfg(feature = "db")]
 async fn move_notification(
     gh_id: i64,
     mut words: impl Iterator<Item = &str>,
