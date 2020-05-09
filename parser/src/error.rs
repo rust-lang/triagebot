@@ -32,7 +32,7 @@ impl<'a> fmt::Display for Error<'a> {
         let end = std::cmp::min(self.input.len(), self.position + space);
         write!(
             f,
-            "...{}|error: {} at >|{}...",
+            "...'{}' | error: {} at >| '{}'...",
             &self.input[self.position.saturating_sub(space)..self.position],
             self.source,
             &self.input[self.position..end],

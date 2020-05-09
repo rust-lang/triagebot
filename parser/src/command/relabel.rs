@@ -56,8 +56,8 @@ impl fmt::Display for ParseError {
         match self {
             ParseError::EmptyLabel => write!(f, "empty label"),
             ParseError::ExpectedLabelDelta => write!(f, "a label delta"),
-            ParseError::MisleadingTo => write!(f, "forbidden to, use +to"),
-            ParseError::NoSeparator => write!(f, "must have : or to as label starter"),
+            ParseError::MisleadingTo => write!(f, "forbidden `to`, use `+to`"),
+            ParseError::NoSeparator => write!(f, "must have `:` or `to` as label starter"),
         }
     }
 }
