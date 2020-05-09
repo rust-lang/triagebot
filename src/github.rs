@@ -449,6 +449,21 @@ pub struct PullRequestReviewComment {
     pub repository: Repository,
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct CheckRunEvent {
+    pub check_run: CheckRun,
+    pub repository: Repository,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct CheckRun {
+    pub html_url: String,
+    pub head_sha: String,
+    pub started_at: chrono::DateTime<Utc>,
+    #[serde(default)]
+    pub completed_at: Option<chrono::DateTime<Utc>>,
+}
+
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum IssueCommentAction {
@@ -509,6 +524,7 @@ pub struct Repository {
 pub enum Event {
     IssueComment(IssueCommentEvent),
     Issue(IssuesEvent),
+    CheckRun(CheckRunEvent),
 }
 
 impl Event {
@@ -516,6 +532,7 @@ impl Event {
         match self {
             Event::IssueComment(event) => &event.repository.full_name,
             Event::Issue(event) => &event.repository.full_name,
+            Event::CheckRun(event) => &event.repository.full_name,
         }
     }
 
@@ -523,6 +540,7 @@ impl Event {
         match self {
             Event::IssueComment(event) => Some(&event.issue),
             Event::Issue(event) => Some(&event.issue),
+            Event::CheckRun(_event) => None,
         }
     }
 
@@ -531,6 +549,7 @@ impl Event {
         match self {
             Event::Issue(e) => Some(&e.issue.body),
             Event::IssueComment(e) => Some(&e.comment.body),
+            Event::CheckRun(_) => None,
         }
     }
 
@@ -538,6 +557,7 @@ impl Event {
         match self {
             Event::Issue(e) => Some(&e.issue.html_url),
             Event::IssueComment(e) => Some(&e.comment.html_url),
+            Event::CheckRun(e) => Some(&e.check_run.html_url),
         }
     }
 
@@ -545,6 +565,7 @@ impl Event {
         match self {
             Event::Issue(e) => &e.issue.user,
             Event::IssueComment(e) => &e.comment.user,
+            Event::CheckRun(_e) => todo!(),
         }
     }
 
@@ -552,6 +573,7 @@ impl Event {
         match self {
             Event::Issue(e) => e.issue.created_at.into(),
             Event::IssueComment(e) => e.comment.updated_at.into(),
+            Event::CheckRun(e) => e.check_run.completed_at.unwrap_or(e.check_run.started_at).into(),
         }
     }
 }

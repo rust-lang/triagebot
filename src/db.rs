@@ -1,7 +1,57 @@
 use anyhow::Context as _;
+#[cfg(feature = "postgres")]
 use native_tls::{Certificate, TlsConnector};
+#[cfg(feature = "postgres")]
 use postgres_native_tls::MakeTlsConnector;
+#[cfg(feature = "postgres")]
 pub use tokio_postgres::Client as DbClient;
+
+#[cfg(not(feature = "postgres"))]
+#[derive(Debug)]
+pub struct DbError;
+
+#[cfg(not(feature = "postgres"))]
+impl std::fmt::Display for DbError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
+#[cfg(not(feature = "postgres"))]
+impl std::error::Error for DbError {}
+
+#[cfg(not(feature = "postgres"))]
+pub enum Row {}
+
+#[cfg(not(feature = "postgres"))]
+impl Row {
+    fn get<T>(&self, _idx: usize) -> T {
+        match *self {}
+    }
+}
+
+#[cfg(not(feature = "postgres"))]
+pub struct DbClient(());
+
+#[cfg(not(feature = "postgres"))]
+impl DbClient {
+    pub async fn execute(&self, sql: &str, params: &'_ [&'_ (dyn std::any::Any + Sync)]) -> Result<usize, DbError> {
+        Err(DbError)
+    }
+
+    pub async fn query<'a>(&self, sql: &str, params: &'_ [&'_ (dyn std::any::Any + Sync)]) -> Result<Vec<Row>, DbError> {
+        Err(DbError)
+    }
+
+    pub async fn query_one(&self, sql: &str, params: &'_ [&'_ (dyn std::any::Any + Sync)]) -> Result<Row, DbError> {
+        Err(DbError)
+    }
+}
+
+#[cfg(not(feature = "postgres"))]
+pub async fn make_client() -> anyhow::Result<DbClient> {
+    Ok(DbClient(()))
+}
 
 pub mod notifications;
 pub mod rustc_commits;
@@ -19,6 +69,7 @@ lazy_static::lazy_static! {
     };
 }
 
+#[cfg(feature = "postgres")]
 pub async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
     let db_url = std::env::var("DATABASE_URL").expect("needs DATABASE_URL");
     if db_url.contains("rds.amazonaws.com") {

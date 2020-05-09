@@ -1,8 +1,8 @@
 use crate::config::{self, ConfigurationError};
+use crate::db::DbClient;
 use crate::github::{Event, GithubClient};
 use futures::future::BoxFuture;
 use std::fmt;
-use tokio_postgres::Client as DbClient;
 
 #[derive(Debug)]
 pub enum HandlerError {

@@ -1,6 +1,6 @@
 use anyhow::Context as _;
 use chrono::{DateTime, FixedOffset};
-use tokio_postgres::Client as DbClient;
+use crate::db::DbClient;
 
 pub struct Notification {
     pub user_id: i64,

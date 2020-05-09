@@ -42,6 +42,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let short_description = match event {
         Event::Issue(e) => e.issue.title.clone(),
         Event::IssueComment(e) => format!("Comment on {}", e.issue.title),
+        Event::CheckRun(e) => format!("Check run for commit {}", e.check_run.head_sha),
     };
 
     let mut caps = parser::get_mentions(body)

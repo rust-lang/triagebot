@@ -23,6 +23,7 @@ pub enum EventName {
     PullRequestReviewComment,
     IssueComment,
     Issue,
+    CheckRun,
     Other,
 }
 
@@ -35,6 +36,7 @@ impl std::str::FromStr for EventName {
             "issue_comment" => EventName::IssueComment,
             "pull_request" => EventName::PullRequest,
             "issues" => EventName::Issue,
+            "check_run" => EventName::CheckRun,
             _ => EventName::Other,
         })
     }
@@ -51,6 +53,7 @@ impl fmt::Display for EventName {
                 EventName::IssueComment => "issue_comment",
                 EventName::Issue => "issues",
                 EventName::PullRequest => "pull_request",
+                EventName::CheckRun => "check_run",
                 EventName::Other => "other",
             }
         )
@@ -141,6 +144,15 @@ pub async fn webhook(
             log::info!("handling issue event {:?}", payload);
 
             github::Event::Issue(payload)
+        }
+        EventName::CheckRun => {
+            let payload = deserialize_payload::<github::CheckRunEvent>(&payload)
+                .context(format!("{:?} failed to deserialize", event))
+                .map_err(anyhow::Error::from)?;
+
+            log::info!("handling check run event {:?}", payload);
+
+            github::Event::CheckRun(payload)
         }
         // Other events need not be handled
         EventName::Other => {

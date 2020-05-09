@@ -48,6 +48,7 @@ impl Handler for PingHandler {
                     return Ok(None);
                 }
             }
+            Event::CheckRun(_) => return Ok(None),
         }
 
         let mut input = Input::new(&body, &ctx.username);

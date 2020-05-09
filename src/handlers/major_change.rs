@@ -45,6 +45,7 @@ impl Handler for MajorChangeHandler {
                     return Ok(None);
                 }
             }
+            Event::CheckRun(_) => return Ok(None),
         }
 
         if let Event::Issue(e) = event {
