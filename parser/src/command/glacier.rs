@@ -14,7 +14,6 @@
 use std::fmt;
 use crate::error::Error;
 use crate::token::{Token, Tokenizer};
-use regex::Regex;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct GlacierCommand {
@@ -46,8 +45,7 @@ impl GlacierCommand {
             match toks.next_token()? {
                 Some(Token::Quote(s)) => {
                     let source = s.to_owned();
-                    let playground_url = Regex::new("https://play.rust-lang.org/.*").unwrap();
-                    if playground_url.is_match(&source) {
+                    if source.starts_with("https://play.rust-lang.org/") {
                         return Ok(Some(GlacierCommand{source}));
                     } else {
                         return Err(toks.error(ParseError::InvalidLink));
