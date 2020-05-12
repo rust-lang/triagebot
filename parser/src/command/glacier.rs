@@ -5,7 +5,7 @@
 //! The grammar is as follows:
 //!
 //! ```text
-//! Command: `@bot glacier add <code-source>?`
+//! Command: `@bot glacier <code-source>`
 //!
 //! <code-source>:
 //!   - "https://play.rust-lang.org/.*"
