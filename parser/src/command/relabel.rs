@@ -147,7 +147,8 @@ impl RelabelCommand {
                 toks.next_token()?;
             }
         } else {
-            return Err(toks.error(ParseError::NoSeparator));
+            // It's okay if there's no to or colon, we can just eat labels
+            // afterwards.
         }
         if let Some(Token::Word("to")) = toks.peek_token()? {
             return Err(toks.error(ParseError::MisleadingTo));
@@ -165,7 +166,9 @@ impl RelabelCommand {
                 toks.next_token()?;
             }
 
-            if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
+            if let Some(Token::Semi) | Some(Token::Dot) | Some(Token::EndOfLine) =
+                toks.peek_token()?
+            {
                 toks.next_token()?;
                 *input = toks;
                 return Ok(Some(RelabelCommand(deltas)));
@@ -207,16 +210,8 @@ fn parse_leading_to_label() {
 #[test]
 fn parse_no_label_paragraph() {
     assert_eq!(
-        parse("modify labels yep; Labels do in fact exist but this is not a label paragraph.")
-            .unwrap_err()
-            .source()
-            .unwrap()
-            .downcast_ref(),
-        Some(&ParseError::NoSeparator)
-    );
-    assert_eq!(
-        parse("Labels do in fact exist but this is not a label paragraph."),
-        Ok(None),
+        parse("modify labels yep; Labels do in fact exist but this is not a label paragraph."),
+        Ok(Some(vec![LabelDelta::Add(Label("yep".into())),]))
     );
 }
 
