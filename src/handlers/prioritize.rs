@@ -10,6 +10,7 @@ use parser::command::{Command, Input};
 pub(super) struct PrioritizeHandler;
 
 pub(crate) enum Prioritize {
+    Label,
     Start,
     End,
 }
@@ -60,7 +61,7 @@ impl Handler for PrioritizeHandler {
 
         let mut input = Input::new(&body, &ctx.username);
         match input.parse_command() {
-            Command::Prioritize(Ok(PrioritizeCommand)) => Ok(Some(Prioritize::Start)),
+            Command::Prioritize(Ok(PrioritizeCommand)) => Ok(Some(Prioritize::Label)),
             _ => Ok(None),
         }
     }
@@ -86,19 +87,25 @@ async fn handle_input(
 
     let mut labels = issue.labels().to_owned();
     let content = match cmd {
-        Prioritize::Start => {
-            // Don't add the label if it's already there, e.g., if this is a
-            // labeled event
+        Prioritize::Label => {
+            // Don't add the label if it's already there
             if !labels.iter().any(|l| l.name == config.label) {
                 labels.push(github::Label {
                     name: config.label.clone(),
                 });
+            } else {
+                // TODO maybe send a GitHub message if the label is already there,
+                // i.e. the issue has already been requested for prioritization?
+                return Ok(());
             }
-            format!(
+            None
+        }
+        Prioritize::Start => {
+            Some(format!(
                 "@*WG-prioritization* issue [#{}]({}) has been requested for prioritization.",
                 issue.number,
                 event.html_url().unwrap()
-            )
+            ))
         }
         Prioritize::End => {
             // Shouldn't be necessary in practice as we only end on label
@@ -107,36 +114,39 @@ async fn handle_input(
             if let Some(idx) = labels.iter().position(|l| l.name == config.label) {
                 labels.remove(idx);
             }
-            format!(
+            Some(format!(
                 "Issue [#{}]({})'s prioritization request has been removed.",
                 issue.number,
                 event.html_url().unwrap()
-            )
+            ))
         }
     };
 
     let github_req = issue.set_labels(&ctx.github, labels);
 
-    let mut zulip_topic = format!(
-        "{} {} {}",
-        config.label,
-        issue.zulip_topic_reference(),
-        issue.title
-    );
-    zulip_topic.truncate(60); // Zulip limitation
+    if let Some(content) = content {
+        let mut zulip_topic = format!(
+            "{} {} {}",
+            config.label,
+            issue.zulip_topic_reference(),
+            issue.title
+        );
+        zulip_topic.truncate(60); // Zulip limitation
 
-    let zulip_stream = config.zulip_stream.to_string();
-    let zulip_req = crate::zulip::MessageApiRequest {
-        type_: "stream",
-        to: &zulip_stream,
-        topic: Some(&zulip_topic),
-        content: &content,
-    };
-
-    let zulip_req = zulip_req.send(&ctx.github.raw());
-
-    let (gh_res, zulip_res) = futures::join!(github_req, zulip_req);
-    gh_res?;
-    zulip_res?;
-    Ok(())
+        let zulip_stream = config.zulip_stream.to_string();
+        let zulip_req = crate::zulip::MessageApiRequest {
+            type_: "stream",
+            to: &zulip_stream,
+            topic: Some(&zulip_topic),
+            content: &content,
+        };
+        let zulip_req = zulip_req.send(&ctx.github.raw());
+        let (gh_res, zulip_res) = futures::join!(github_req, zulip_req);
+        gh_res?;
+        zulip_res?;
+        Ok(())
+    } else {
+        github_req.await?;
+        Ok(())
+    }
 }
