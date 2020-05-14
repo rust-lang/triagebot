@@ -78,6 +78,10 @@ pub(crate) struct RelabelConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct PrioritizeConfig {
     pub(crate) label: String,
+    #[serde(default)]
+    pub(crate) prioritize_on: Vec<String>,
+    #[serde(default)]
+    pub(crate) priority_labels: String,
     pub(crate) zulip_stream: u64,
 }
 
