@@ -114,13 +114,11 @@ async fn handle_input(
             }
             None
         }
-        Prioritize::Start => {
-            Some(format!(
-                "@*WG-prioritization* issue [#{}]({}) has been requested for prioritization.",
-                issue.number,
-                event.html_url().unwrap()
-            ))
-        }
+        Prioritize::Start => Some(format!(
+            "@*WG-prioritization* issue [#{}]({}) has been requested for prioritization.",
+            issue.number,
+            event.html_url().unwrap()
+        )),
         Prioritize::End => {
             // Shouldn't be necessary in practice as we only end on label
             // removal, but if we add support in the future let's be sure to do
