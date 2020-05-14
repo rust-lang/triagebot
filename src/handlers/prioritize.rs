@@ -38,6 +38,20 @@ impl Handler for PrioritizeHandler {
                     if e.label.as_ref().expect("label").name == config.label {
                         // We need to take the exact same action in this case.
                         return Ok(Some(Prioritize::Start));
+                    } else {
+                        match glob::Pattern::new(&config.priority_labels) {
+                            Ok(glob) => {
+                                let issue_labels = event.issue().unwrap().labels();
+                                let label_name = &e.label.as_ref().expect("label").name;
+
+                                if issue_labels.iter().all(|l| !glob.matches(&l.name))
+                                    && config.prioritize_on.iter().any(|l| l == label_name)
+                                {
+                                    return Ok(Some(Prioritize::Label));
+                                }
+                            }
+                            Err(error) => log::error!("Invalid glob pattern: {}", error),
+                        }
                     }
                 }
             }
