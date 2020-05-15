@@ -1,0 +1,45 @@
+## Stable nominations
+
+- [All stable nominations](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=+label%3Astable-nominated)
+    - Add T-compiler, libs-impl or T-rustdoc tag when it corresponds.
+    - Do a sanity check on them.
+
+### Issues
+
+{nominations.stable_nominated}
+
+## Beta nominations
+
+- [All beta nominations](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated)
+    - Add T-compiler, libs-impl or T-rustdoc tag when it corresponds.
+    - Do a sanity check on them.
+
+### Issues
+
+{nominations.beta_nominated}
+
+## I-nominated
+
+1. [All I-nominated](https://github.com/rust-lang/rust/labels/I-nominated)
+    - Add T-compiler or libs-impl tag when it corresponds.
+    - Do a sanity check on them.
+
+### Issues
+
+{nominations.i_nominated}
+
+2. [I-nominated T-compiler](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AI-nominated+label%3AT-compiler)
+    - Remove leftovers from last meeting.
+    - Do a sanity check on them.
+
+### Issues
+
+{nominations.i_nominated_t_compiler}
+
+3. [I-nominated libs-impl](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AI-nominated+label%3Alibs-impl)
+    - Remove leftovers from last meeting.
+    - Do a sanity check on them.
+
+### Issues
+
+{nominations.i_nominated_libs_impl}

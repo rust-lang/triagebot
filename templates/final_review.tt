@@ -1,0 +1,26 @@
+## Announcements
+
+- Check the compiler calendar to see if there's an outstanding event to announce.
+
+## Nominate issues
+
+Check how packed the agenda looks like and if there's room for more, consider the following ...
+
+- [All Stable-to-beta regressions](https://github.com/rust-lang/rust/labels/regression-from-stable-to-beta)
+  - Check if there are relevant issues that are worth raising awareness.
+  - Assign if possible; if it remains unassigned, add it to agenda so we can assign during the meeting.
+- [All Stable-to-nightly regressions](https://github.com/rust-lang/rust/labels/regression-from-stable-to-nightly)
+  - Check if there are relevant issues that are worth raising awareness.
+  - Assign if possible; if it remains unassigned, add it to agenda so we can assign during the meeting.
+- [P-high issues](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3AT-compiler+label%3AP-high+)
+  - [unassigned](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3AT-compiler+label%3AP-high+no%3Aassignee)
+
+## Toolstate
+
+- Check [toolstate](https://rust-lang-nursery.github.io/rust-toolstate/) for outstanding tool breakage.
+  - Notify teams in the corresponding channels
+
+## Performance regressions
+
+- Check [perf regressions](http://perf.rust-lang.org/index.html).
+  - Notify involved actors.

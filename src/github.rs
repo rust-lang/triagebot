@@ -5,7 +5,10 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, RequestBuilder, Response, StatusCode};
-use std::fmt;
+use std::{
+    fmt,
+    time::{Duration, SystemTime},
+};
 
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct User {
@@ -20,7 +23,41 @@ impl GithubClient {
 
         let req_dbg = format!("{:?}", req);
 
-        let resp = self.client.execute(req).await?;
+        let mut resp = self.client.execute(req.try_clone().unwrap()).await?;
+
+        if resp.status().as_u16() == 403 {
+            let headers = dbg!(resp.headers());
+            if headers.contains_key("X-RateLimit-Remaining")
+                && headers.contains_key("X-RateLimit-Reset")
+            {
+                if headers["X-RateLimit-Remaining"] == "0" {
+                    let epoch_time = dbg!(SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs());
+                    let reset_time = dbg!(headers["X-RateLimit-Reset"]
+                        .to_str()
+                        .unwrap()
+                        .parse::<u64>()
+                        .unwrap());
+                    tokio::time::delay_for(Duration::from_secs(dbg!(
+                        reset_time.saturating_sub(epoch_time) + 5
+                    )))
+                    .await;
+                    dbg!(SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs());
+                    resp = self.client.execute(req.try_clone().unwrap()).await?;
+                    if resp.status().as_u16() == 403 {
+                        dbg!(resp.headers());
+                        tokio::time::delay_for(Duration::from_secs(60)).await;
+                        resp = self.client.execute(req).await?;
+                        dbg!(resp.headers());
+                    }
+                }
+            }
+        }
 
         resp.error_for_status_ref()?;
 
@@ -120,7 +157,7 @@ pub struct Issue {
     pub body: String,
     created_at: chrono::DateTime<Utc>,
     pub title: String,
-    html_url: String,
+    pub html_url: String,
     pub user: User,
     labels: Vec<Label>,
     assignees: Vec<User>,
@@ -501,8 +538,37 @@ pub struct IssuesEvent {
 }
 
 #[derive(Debug, serde::Deserialize)]
+pub struct IssueSearchResult {
+    pub total_count: usize,
+    pub incomplete_results: bool,
+    pub items: Vec<Issue>,
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct Repository {
     pub full_name: String,
+}
+
+impl Repository {
+    fn base_url(&self) -> &str {
+        "https://api.github.com"
+    }
+
+    pub async fn get_issues(
+        &self,
+        client: &GithubClient,
+        filters: &Vec<&str>,
+    ) -> anyhow::Result<IssueSearchResult> {
+        let filters = filters.join("+");
+
+        let url = format!("{}/search/issues?q={}", self.base_url(), filters);
+
+        let result = client.get(&url);
+        client
+            .json(result)
+            .await
+            .with_context(|| format!("failed to list issues from {}", url))
+    }
 }
 
 #[derive(Debug)]

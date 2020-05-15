@@ -1,0 +1,23 @@
+## PR's waiting for on team
+
+1. [All PR's waiting on team](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+is%3Apr+label%3AS-waiting-on-team)
+    - Add T-compiler or libs-impl tag when it corresponds.
+    - Do a sanity check on them.
+
+### Issues
+
+{prs_waiting_on_team.all}
+
+2. [PR's waiting on T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+is%3Apr+label%3AS-waiting-on-team+label%3AT-compiler)
+    - Explicitly nominate any that you think may be able to be resolved *quickly* in triage meeting.
+
+### Issues
+
+{prs_waiting_on_team.t_compiler}
+
+3. [PR's waiting on libs-impl](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+is%3Apr+label%3AS-waiting-on-team+label%3Alibs-impl)
+    - Explicitly nominate any that you think may be able to be resolved *quickly* in triage meeting.
+
+### Issues
+
+{prs_waiting_on_team.libs_impl}

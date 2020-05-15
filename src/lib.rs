@@ -12,6 +12,7 @@ pub mod handlers;
 pub mod interactions;
 pub mod notification_listing;
 pub mod payload;
+pub mod prioritization;
 pub mod team;
 mod team_data;
 pub mod zulip;
