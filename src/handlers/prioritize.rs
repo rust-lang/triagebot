@@ -35,22 +35,38 @@ impl Handler for PrioritizeHandler {
         if let Event::Issue(e) = event {
             if e.action == github::IssuesAction::Labeled {
                 if let Some(config) = config {
-                    if e.label.as_ref().expect("label").name == config.label {
+                    let applied_label = &e.label.as_ref().expect("label").name;
+
+                    if *applied_label == config.label {
                         // We need to take the exact same action in this case.
                         return Ok(Some(Prioritize::Start));
                     } else {
-                        match glob::Pattern::new(&config.priority_labels) {
-                            Ok(glob) => {
-                                let issue_labels = event.issue().unwrap().labels();
-                                let label_name = &e.label.as_ref().expect("label").name;
+                        // Checks if an `applied_label` needs prioritization according to the
+                        // labels the issue already have and the config's `exclude_labels` pattern
+                        // which are the ones we don't want to prioritize.
+                        if config.prioritize_on.iter().any(|l| l == applied_label) {
+                            let mut prioritize = false;
 
-                                if issue_labels.iter().all(|l| !glob.matches(&l.name))
-                                    && config.prioritize_on.iter().any(|l| l == label_name)
-                                {
-                                    return Ok(Some(Prioritize::Label));
+                            for label in event.issue().unwrap().labels() {
+                                for exclude_label in &config.exclude_labels {
+                                    match glob::Pattern::new(exclude_label) {
+                                        Ok(exclude_glob) => {
+                                            prioritize = !exclude_glob.matches(&label.name);
+                                        }
+                                        Err(error) => {
+                                            log::error!("Invalid glob pattern: {}", error);
+                                        }
+                                    }
+
+                                    if !prioritize {
+                                        break;
+                                    }
                                 }
                             }
-                            Err(error) => log::error!("Invalid glob pattern: {}", error),
+
+                            if prioritize {
+                                return Ok(Some(Prioritize::Label));
+                            }
                         }
                     }
                 }
