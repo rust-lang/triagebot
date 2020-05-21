@@ -221,6 +221,11 @@ async fn main() {
     dotenv::dotenv().ok();
     logger::init();
 
+    let _octocrab = octocrab::OctocrabBuilder::new()
+        .personal_token(env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"))
+        .build()
+        .expect("Failed to build octograb.");
+
     let port = env::var("PORT")
         .ok()
         .map(|p| p.parse::<u16>().expect("parsed PORT"))

@@ -80,6 +80,7 @@ handlers! {
     prioritize = prioritize::PrioritizeHandler,
     major_change = major_change::MajorChangeHandler,
     //tracking_issue = tracking_issue::TrackingIssueHandler,
+    glacier = glacier::GlacierHandler,
 }
 
 pub struct Context {

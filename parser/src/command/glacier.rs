@@ -11,13 +11,13 @@
 //!   - "https://play.rust-lang.org/.*"
 //! ```
 
-use std::fmt;
 use crate::error::Error;
 use crate::token::{Token, Tokenizer};
+use std::fmt;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct GlacierCommand {
-    source: String
+    source: String,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -46,7 +46,7 @@ impl GlacierCommand {
                 Some(Token::Quote(s)) => {
                     let source = s.to_owned();
                     if source.starts_with("https://play.rust-lang.org/") {
-                        return Ok(Some(GlacierCommand{source}));
+                        return Ok(Some(GlacierCommand { source }));
                     } else {
                         return Err(toks.error(ParseError::InvalidLink));
                     }
@@ -58,13 +58,11 @@ impl GlacierCommand {
                     return Err(toks.error(ParseError::NoLink));
                 }
             }
-
         } else {
             Ok(None)
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -110,5 +108,4 @@ mod test {
             }))
         );
     }
-
 }
