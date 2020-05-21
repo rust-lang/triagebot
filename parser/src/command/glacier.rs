@@ -8,7 +8,7 @@
 //! Command: `@bot glacier <code-source>`
 //!
 //! <code-source>:
-//!   - "https://play.rust-lang.org/.*"
+//!   - "https://gist.github.com/.*"
 //! ```
 
 use crate::error::Error;
@@ -17,7 +17,7 @@ use std::fmt;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct GlacierCommand {
-    source: String,
+    pub source: String,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -45,7 +45,7 @@ impl GlacierCommand {
             match toks.next_token()? {
                 Some(Token::Quote(s)) => {
                     let source = s.to_owned();
-                    if source.starts_with("https://play.rust-lang.org/") {
+                    if source.starts_with("https://gist.github.com/") {
                         return Ok(Some(GlacierCommand { source }));
                     } else {
                         return Err(toks.error(ParseError::InvalidLink));
@@ -102,9 +102,9 @@ mod test {
     #[test]
     fn glacier_valid() {
         assert_eq!(
-            parse(r#"glacier "https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=a85913678bee64a3262db9a4a59463c2""#),
+            parse(r#"glacier "https://gist.github.com/rust-play/89d6c8a2398dd2dd5fcb7ef3e8109c7b""#),
             Ok(Some(GlacierCommand {
-                source: "https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=a85913678bee64a3262db9a4a59463c2".into()
+                source: "https://gist.github.com/rust-play/89d6c8a2398dd2dd5fcb7ef3e8109c7b".into()
             }))
         );
     }

@@ -9,6 +9,8 @@ use crate::{
 use futures::future::{BoxFuture, FutureExt};
 use parser::command::glacier::GlacierCommand;
 use parser::command::{Command, Input};
+use octocrab::params::repos::Reference;
+use octocrab::models::Object;
 
 pub(super) struct GlacierHandler;
 
@@ -59,6 +61,47 @@ impl Handler for GlacierHandler {
     }
 }
 
-async fn handle_input(_ctx: &Context, _event: &Event, _cmd: GlacierCommand) -> anyhow::Result<()> {
+async fn handle_input(ctx: &Context, event: &Event, cmd: GlacierCommand) -> anyhow::Result<()> {
+    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
+    {
+        false
+    } else {
+        true
+    };
+
+    if !is_team_member {
+        return Ok(())
+    };
+
+    let url = cmd.source;
+    let response = reqwest::get(&format!("{}{}", url.replace("github", "githubusercontent"), "/playground.rs")).await?;
+    let body = response.text().await?;
+
+    let number = event.issue().unwrap().number;
+    let user = event.user();
+
+    let octocrab = octocrab::instance();
+
+    let fork = octocrab.repos("rust-lang", "glacier");
+    let base = octocrab.repos("rust-lang", "glacier");
+
+    let master = base.get_ref(&Reference::Branch("master".to_string())).await?.object;
+    let master = if let Object::Commit { sha, ..} = master {
+        sha
+    } else {
+        panic!()
+    };
+
+    fork.create_ref(&Reference::Branch(format!("triagebot-ice-{}", number)), master).await?;
+    fork.create_file(format!("ices/{}.rs", number), format!("This PR was created by {} on issue {}.", user.login, number), body)
+        .branch("triagebot-ice")
+        .send()
+        .await?;
+
+    octocrab.pulls("rust-lang", "glacier")
+        .create(format!("ICE - {}", number), format!("triagebot-ice-{}", number), "master")
+        .body("This is a fake new catastrophic avalanche of ICE!")
+        .send()
+        .await?;
     Ok(())
 }
