@@ -230,6 +230,7 @@ mod tests {
                 }),
                 prioritize: None,
                 major_change: None,
+                glacier: None,
             }
         );
     }
