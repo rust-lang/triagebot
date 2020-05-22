@@ -22,6 +22,7 @@ pub(crate) struct Config {
     pub(crate) nominate: Option<NominateConfig>,
     pub(crate) prioritize: Option<PrioritizeConfig>,
     pub(crate) major_change: Option<MajorChangeConfig>,
+    pub(crate) glacier: Option<GlacierConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -91,6 +92,9 @@ pub(crate) struct MajorChangeConfig {
     pub(crate) meeting_label: String,
     pub(crate) zulip_stream: u64,
 }
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct GlacierConfig {}
 
 pub(crate) async fn get(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, ConfigurationError> {
     if let Some(config) = get_cached_config(repo) {
@@ -226,6 +230,7 @@ mod tests {
                 }),
                 prioritize: None,
                 major_change: None,
+                glacier: None,
             }
         );
     }

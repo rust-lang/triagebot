@@ -3,6 +3,7 @@ use crate::error::Error;
 use crate::token::{Token, Tokenizer};
 
 pub mod assign;
+pub mod glacier;
 pub mod nominate;
 pub mod ping;
 pub mod prioritize;
@@ -21,6 +22,7 @@ pub enum Command<'a> {
     Nominate(Result<nominate::NominateCommand, Error<'a>>),
     Prioritize(Result<prioritize::PrioritizeCommand, Error<'a>>),
     Second(Result<second::SecondCommand, Error<'a>>),
+    Glacier(Result<glacier::GlacierCommand, Error<'a>>),
     None,
 }
 
@@ -109,6 +111,11 @@ impl<'a> Input<'a> {
             Command::Second,
             &original_tokenizer,
         ));
+        success.extend(parse_single_command(
+            glacier::GlacierCommand::parse,
+            Command::Glacier,
+            &original_tokenizer,
+        ));
 
         if success.len() > 1 {
             panic!(
@@ -149,6 +156,7 @@ impl<'a> Command<'a> {
             Command::Nominate(r) => r.is_ok(),
             Command::Prioritize(r) => r.is_ok(),
             Command::Second(r) => r.is_ok(),
+            Command::Glacier(r) => r.is_ok(),
             Command::None => true,
         }
     }
