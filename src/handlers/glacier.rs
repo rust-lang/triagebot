@@ -31,17 +31,12 @@ impl Handler for GlacierHandler {
             return Ok(None);
         };
 
-        match event {
-            Event::IssueComment(_) => (),
-            _ => {return Ok(None);}
-        };
-
         let mut input = Input::new(&body, &ctx.username);
         match input.parse_command() {
             Command::Glacier(Ok(command)) => Ok(Some(command)),
             Command::Glacier(Err(err)) => {
                 return Err(format!(
-                    "Parsing assign command in [comment]({}) failed: {}",
+                    "Parsing glacier command in [comment]({}) failed: {}",
                     event.html_url().expect("has html url"),
                     err
                 ));
@@ -89,7 +84,8 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: GlacierCommand) -> anyh
     let master = if let Object::Commit { sha, ..} = master {
         sha
     } else {
-        panic!()
+        log::error!("invalid commit sha - master {:?}", master);
+        unreachable!()
     };
 
     fork.create_ref(&Reference::Branch(format!("triagebot-ice-{}", number)), master).await?;

@@ -1,6 +1,7 @@
 //! The glacier command parser.
 //!
 //! This adds the option to track ICEs. Do note that the gist must be from a playground link.
+//! The link must also be in quotes.
 //!
 //! The grammar is as follows:
 //!
@@ -31,8 +32,8 @@ impl std::error::Error for ParseError {}
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::NoLink => write!(f, "no link provided"),
-            Self::InvalidLink => write!(f, "invalid link"),
+            Self::NoLink => write!(f, "no link provided - did you forget the quotes around it?"),
+            Self::InvalidLink => write!(f, "invalid link - must be from a playground gist"),
         }
     }
 }
