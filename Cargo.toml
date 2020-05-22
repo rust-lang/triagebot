@@ -32,7 +32,7 @@ tokio-postgres = { version = "0.5", features = ["with-chrono-0_4"] }
 postgres-native-tls = "0.3"
 native-tls = "0.2"
 serde_path_to_error = "0.1.2"
-octocrab = { git = "https://github.com/XAMPPRocky/octocrab", branch = "master" }
+octocrab = "0.3"
 
 [dependencies.serde]
 version = "1"
