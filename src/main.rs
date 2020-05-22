@@ -185,10 +185,15 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         client.clone(),
         env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"),
     );
+    let oc = octocrab::OctocrabBuilder::new()
+        .personal_token(env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"))
+        .build()
+        .expect("Failed to build octograb.");
     let ctx = Arc::new(Context {
         username: github::User::current(&gh).await.unwrap().login,
         db: db_client,
         github: gh,
+        octocrab: oc,
     });
 
     let svc = hyper::service::make_service_fn(move |_conn| {
@@ -220,11 +225,6 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 async fn main() {
     dotenv::dotenv().ok();
     logger::init();
-
-    let _octocrab = octocrab::OctocrabBuilder::new()
-        .personal_token(env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"))
-        .build()
-        .expect("Failed to build octograb.");
 
     let port = env::var("PORT")
         .ok()

@@ -1,6 +1,7 @@
 use crate::config::{self, ConfigurationError};
 use crate::github::{Event, GithubClient};
 use futures::future::BoxFuture;
+use octocrab::Octocrab;
 use std::fmt;
 use tokio_postgres::Client as DbClient;
 
@@ -87,6 +88,7 @@ pub struct Context {
     pub github: GithubClient,
     pub db: DbClient,
     pub username: String,
+    pub octocrab: Octocrab,
 }
 
 pub trait Handler: Sync + Send {

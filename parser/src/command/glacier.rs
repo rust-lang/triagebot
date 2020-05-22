@@ -1,6 +1,6 @@
 //! The glacier command parser.
 //!
-//! This adds the option to track ICEs.
+//! This adds the option to track ICEs. Do note that the gist must be from a playground link.
 //!
 //! The grammar is as follows:
 //!
@@ -102,7 +102,9 @@ mod test {
     #[test]
     fn glacier_valid() {
         assert_eq!(
-            parse(r#"glacier "https://gist.github.com/rust-play/89d6c8a2398dd2dd5fcb7ef3e8109c7b""#),
+            parse(
+                r#"glacier "https://gist.github.com/rust-play/89d6c8a2398dd2dd5fcb7ef3e8109c7b""#
+            ),
             Ok(Some(GlacierCommand {
                 source: "https://gist.github.com/rust-play/89d6c8a2398dd2dd5fcb7ef3e8109c7b".into()
             }))

@@ -74,15 +74,15 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: GlacierCommand) -> anyh
     };
 
     let url = cmd.source;
-    let response = reqwest::get(&format!("{}{}", url.replace("github", "githubusercontent"), "/playground.rs")).await?;
+    let response = ctx.github.raw().get(&format!("{}{}", url.replace("github", "githubusercontent"), "/playground.rs")).send().await?;
     let body = response.text().await?;
 
     let number = event.issue().unwrap().number;
     let user = event.user();
 
-    let octocrab = octocrab::instance();
+    let octocrab = &ctx.octocrab;
 
-    let fork = octocrab.repos("rust-lang", "glacier");
+    let fork = octocrab.repos("rustbot", "glacier");
     let base = octocrab.repos("rust-lang", "glacier");
 
     let master = base.get_ref(&Reference::Branch("master".to_string())).await?.object;
@@ -93,14 +93,14 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: GlacierCommand) -> anyh
     };
 
     fork.create_ref(&Reference::Branch(format!("triagebot-ice-{}", number)), master).await?;
-    fork.create_file(format!("ices/{}.rs", number), format!("This PR was created by {} on issue {}.", user.login, number), body)
-        .branch("triagebot-ice")
+    fork.create_file(format!("ices/{}.rs", number), format!("Add ICE reproduction for issue #{}.", number), body)
+        .branch(format!("triagebot-ice-{}", number))
         .send()
         .await?;
 
     octocrab.pulls("rust-lang", "glacier")
-        .create(format!("ICE - {}", number), format!("triagebot-ice-{}", number), "master")
-        .body("This is a fake new catastrophic avalanche of ICE!")
+        .create(format!("ICE - {}", number), format!("rustbot:triagebot-ice-{}", number), "master")
+        .body(format!("Automatically created by @{} in issue #{}", user.login, number),)
         .send()
         .await?;
     Ok(())
