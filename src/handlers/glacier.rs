@@ -57,12 +57,7 @@ impl Handler for GlacierHandler {
 }
 
 async fn handle_input(ctx: &Context, event: &Event, cmd: GlacierCommand) -> anyhow::Result<()> {
-    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
-    {
-        false
-    } else {
-        true
-    };
+    let is_team_member = event.user().is_team_member(&ctx.github).await.unwrap_or(false);
 
     if !is_team_member {
         return Ok(())
