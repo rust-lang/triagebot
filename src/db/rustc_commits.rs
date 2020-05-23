@@ -27,7 +27,7 @@ pub async fn get_commits_with_artifacts(db: &DbClient) -> anyhow::Result<Vec<Com
         select sha, parent_sha, time
         from rustc_commits
         where time >= current_date - interval '168 days'
-        order by time desc;",
+        order by time desc limit 50;",
             &[],
         )
         .await
