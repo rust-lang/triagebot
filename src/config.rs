@@ -82,7 +82,7 @@ pub(crate) struct PrioritizeConfig {
     #[serde(default)]
     pub(crate) prioritize_on: Vec<String>,
     #[serde(default)]
-    pub(crate) priority_labels: String,
+    pub(crate) exclude_labels: Vec<String>,
     pub(crate) zulip_stream: u64,
 }
 
