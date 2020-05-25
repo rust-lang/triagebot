@@ -85,10 +85,17 @@ impl<'a> Action for Step<'a> {
                         let issues_search_result = block_on(
                             repository
                                 .get_issues(&gh, &filters.iter().map(|s| s.as_ref()).collect()),
-                        )
-                        .unwrap();
+                        );
 
-                        (*name, issues_search_result.items)
+                        if let Err(err) = issues_search_result {
+                            eprintln!("ERROR: {}", err);
+                            err.chain()
+                                .skip(1)
+                                .for_each(|cause| eprintln!("because: {}", cause));
+                            std::process::exit(1);
+                        }
+
+                        (*name, issues_search_result.unwrap().items)
                     })
                     .collect::<Vec<_>>()
             })
