@@ -32,7 +32,7 @@ pub struct NamedQuery<'a> {
 }
 
 pub struct Query<'a> {
-    pub filters: Vec<&'a str>,
+    pub filters: Vec<(&'a str, &'a str)>,
     pub include_labels: Vec<&'a str>,
     pub exclude_labels: Vec<&'a str>,
 }
@@ -64,38 +64,23 @@ impl<'a> Action for Step<'a> {
                 queries
                     .iter()
                     .map(|NamedQuery { name, query }| {
-                        let filters = query
-                            .filters
-                            .iter()
-                            .map(|s| s.to_string())
-                            .chain(
-                                query
-                                    .include_labels
-                                    .iter()
-                                    .map(|label| format!("label:{}", label)),
-                            )
-                            .chain(
-                                query
-                                    .exclude_labels
-                                    .iter()
-                                    .map(|label| format!("-label:{}", label)),
-                            )
-                            .chain(std::iter::once(format!("repo:{}", repository.full_name)))
-                            .collect::<Vec<_>>();
-                        let issues_search_result = block_on(
-                            repository
-                                .get_issues(&gh, &filters.iter().map(|s| s.as_ref()).collect()),
-                        );
+                        let issues_search_result = block_on(repository.get_issues(
+                            &gh,
+                            &query.filters,
+                            &query.include_labels,
+                            &query.exclude_labels,
+                        ));
 
-                        if let Err(err) = issues_search_result {
-                            eprintln!("ERROR: {}", err);
-                            err.chain()
-                                .skip(1)
-                                .for_each(|cause| eprintln!("because: {}", cause));
-                            std::process::exit(1);
+                        match issues_search_result {
+                            Ok(issues) => (*name, issues),
+                            Err(err) => {
+                                eprintln!("ERROR: {}", err);
+                                err.chain()
+                                    .skip(1)
+                                    .for_each(|cause| eprintln!("because: {}", cause));
+                                std::process::exit(1);
+                            }
                         }
-
-                        (*name, issues_search_result.unwrap().items)
                     })
                     .collect::<Vec<_>>()
             })

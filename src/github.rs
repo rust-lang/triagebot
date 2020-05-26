@@ -26,11 +26,7 @@ impl GithubClient {
 
         let mut resp = self.client.execute(req.try_clone().unwrap()).await?;
         if let Some(sleep) = Self::needs_retry(&resp).await {
-            eprintln!(
-                "Need to retry request {}. Sleeping for {}",
-                req_dbg,
-                sleep.as_secs()
-            );
+            drop(resp);
             resp = self.retry(req, sleep, MAX_ATTEMPTS).await?;
         }
 
@@ -99,9 +95,7 @@ impl GithubClient {
         }
 
         async move {
-            eprintln!("Sleeping for {}", sleep.as_secs());
             tokio::time::delay_for(sleep).await;
-            eprintln!("Done sleeping");
 
             // check rate limit
             let rate_resp = self
@@ -114,17 +108,24 @@ impl GithubClient {
                         .unwrap(),
                 )
                 .await?;
-            let search_rate_limit = rate_resp
-                .json::<RateLimitResponse>()
-                .await?
-                .resources
-                .search;
-            eprintln!("search rate limit info: {:?}", search_rate_limit);
+            let rate_limit_response = rate_resp.json::<RateLimitResponse>().await?;
+
+            // Check url for search path because github has different rate limits for the search api
+            let rate_limit = if req
+                .url()
+                .path_segments()
+                .map(|mut segments| matches!(segments.next(), Some("search")))
+                .unwrap_or(false)
+            {
+                rate_limit_response.resources.search
+            } else {
+                rate_limit_response.resources.core
+            };
 
             // If we still don't have any more remaining attempts, try sleeping for the remaining
             // period of time
-            if search_rate_limit.remaining == 0 {
-                let sleep = Self::calc_sleep(search_rate_limit.reset);
+            if rate_limit.remaining == 0 {
+                let sleep = Self::calc_sleep(rate_limit.reset);
                 if sleep > 0 {
                     tokio::time::delay_for(Duration::from_secs(sleep)).await;
                 }
@@ -637,17 +638,85 @@ impl Repository {
     pub async fn get_issues(
         &self,
         client: &GithubClient,
-        filters: &Vec<&str>,
-    ) -> anyhow::Result<IssueSearchResult> {
-        let filters = filters.join("+");
-
-        let url = format!("{}/search/issues?q={}", self.base_url(), filters);
+        filters: &Vec<(&str, &str)>,
+        include_labels: &Vec<&str>,
+        exclude_labels: &Vec<&str>,
+    ) -> anyhow::Result<Vec<Issue>> {
+        let use_issues = exclude_labels.is_empty() || filters.iter().any(|&(key, _)| key == "no");
+        // negating filters can only be handled by the search api
+        let url = if use_issues {
+            self.build_issues_url(filters, include_labels)
+        } else {
+            self.build_search_issues_url(filters, include_labels, exclude_labels)
+        };
 
         let result = client.get(&url);
-        client
-            .json(result)
-            .await
-            .with_context(|| format!("failed to list issues from {}", url))
+        if use_issues {
+            client
+                .json(result)
+                .await
+                .with_context(|| format!("failed to list issues from {}", url))
+        } else {
+            let result = client
+                .json::<IssueSearchResult>(result)
+                .await
+                .with_context(|| format!("failed to list issues from {}", url))?;
+            Ok(result.items)
+        }
+    }
+
+    fn build_issues_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
+        let filters = filters
+            .iter()
+            .map(|(key, val)| format!("{}={}", key, val))
+            .chain(std::iter::once(format!(
+                "labels={}",
+                include_labels.join(",")
+            )))
+            // if no state is defined, assume `state=all` so we don't fall back to the
+            // `state=open` default of github.
+            .chain(
+                if filters.iter().any(|&(key, _)| key == "state") {
+                    None
+                } else {
+                    Some("state=all".to_owned())
+                }
+                .into_iter(),
+            )
+            .chain(std::iter::once("filter=all".to_owned()))
+            .collect::<Vec<_>>()
+            .join("&");
+        format!(
+            "{}/repos/{}/issues?{}",
+            self.base_url(),
+            self.full_name,
+            filters
+        )
+    }
+
+    fn build_search_issues_url(
+        &self,
+        filters: &Vec<(&str, &str)>,
+        include_labels: &Vec<&str>,
+        exclude_labels: &Vec<&str>,
+    ) -> String {
+        let filters = filters
+            .iter()
+            .map(|(key, val)| format!("{}:{}", key, val))
+            .chain(
+                include_labels
+                    .iter()
+                    .map(|label| format!("label:{}", label)),
+            )
+            .chain(
+                exclude_labels
+                    .iter()
+                    .map(|label| format!("-label:{}", label)),
+            )
+            .chain(std::iter::once(format!("repo:{}", self.full_name)))
+            .collect::<Vec<_>>()
+            .join("+");
+        format!("{}/search/issues?q={}", self.base_url(), filters)
     }
 }
 
