@@ -6,7 +6,7 @@ async fn main() {
     let meeting = prioritization::config::prepare_meeting();
 
     for step in &meeting.steps {
-        println!("{}", step.call());
+        println!("{}", step.call().await);
 
         //press_key_to_continue();
     }
