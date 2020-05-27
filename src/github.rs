@@ -26,13 +26,10 @@ impl GithubClient {
 
         let mut resp = self.client.execute(req.try_clone().unwrap()).await?;
         if let Some(sleep) = Self::needs_retry(&resp).await {
-            drop(resp);
             resp = self.retry(req, sleep, MAX_ATTEMPTS).await?;
         }
 
-        if let Err(e) = resp.error_for_status_ref() {
-            return Err(e);
-        }
+        resp.error_for_status_ref()?;
 
         Ok((resp, req_dbg))
     }
@@ -134,7 +131,6 @@ impl GithubClient {
             let resp = self.client.execute(req.try_clone().unwrap()).await?;
             if let Some(sleep) = Self::needs_retry(&resp).await {
                 if remaining_attempts > 0 {
-                    drop(resp);
                     return self.retry(req, sleep, remaining_attempts - 1).await;
                 }
             }
