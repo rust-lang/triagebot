@@ -669,16 +669,6 @@ impl Repository {
                 "labels={}",
                 include_labels.join(",")
             )))
-            // if no state is defined, assume `state=all` so we don't fall back to the
-            // `state=open` default of github.
-            .chain(
-                if filters.iter().any(|&(key, _)| key == "state") {
-                    None
-                } else {
-                    Some("state=all".to_owned())
-                }
-                .into_iter(),
-            )
             .chain(std::iter::once("filter=all".to_owned()))
             .collect::<Vec<_>>()
             .join("&");
