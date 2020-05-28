@@ -706,11 +706,13 @@ impl Repository {
                     .map(|label| format!("-label:{}", label)),
             )
             .chain(std::iter::once(format!("repo:{}", self.full_name)))
-            .chain(std::iter::once(format!("sort:created")))
-            .chain(std::iter::once(format!("order:asc")))
             .collect::<Vec<_>>()
             .join("+");
-        format!("{}/search/issues?q={}", self.base_url(), filters)
+        format!(
+            "{}/search/issues?q={}&sort=created&order=asc",
+            self.base_url(),
+            filters
+        )
     }
 }
 
