@@ -5,7 +5,7 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 
-use crate::github::{GithubClient, Issue, Repository};
+use crate::github::{GithubClient, Issue, Query, Repository};
 
 pub mod config;
 
@@ -33,12 +33,6 @@ pub struct NamedQuery<'a> {
     pub query: Query<'a>,
 }
 
-pub struct Query<'a> {
-    pub filters: Vec<(&'a str, &'a str)>,
-    pub include_labels: Vec<&'a str>,
-    pub exclude_labels: Vec<&'a str>,
-}
-
 pub trait Template {
     fn render(&self) -> String;
 }
@@ -64,14 +58,7 @@ impl<'a> Action for Step<'a> {
             };
 
             for NamedQuery { name, query } in queries {
-                let issues_search_result = repository
-                    .get_issues(
-                        &gh,
-                        &query.filters,
-                        &query.include_labels,
-                        &query.exclude_labels,
-                    )
-                    .await;
+                let issues_search_result = repository.get_issues(&gh, &query).await;
 
                 match issues_search_result {
                     Ok(issues) => map.push((*name, issues)),

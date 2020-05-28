@@ -1,4 +1,6 @@
-use super::{Meeting, NamedQuery, Query, RepoQuery, Step};
+use crate::github::Query;
+
+use super::{Meeting, NamedQuery, RepoQuery, Step};
 
 pub fn prepare_meeting<'a>() -> Meeting<Step<'a>> {
     Meeting {
@@ -92,7 +94,7 @@ pub fn regressions<'a>() -> Step<'a> {
     queries.push(NamedQuery {
         name: "regressions.stable_to_stable",
         query: Query {
-            filters: vec![("state", "open"), ("per_page","100")],
+            filters: vec![("state", "open"), ("per_page", "100")],
             include_labels: vec!["regression-from-stable-to-stable"],
             exclude_labels: vec![
                 "P-critical",

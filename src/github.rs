@@ -631,13 +631,17 @@ impl Repository {
         "https://api.github.com"
     }
 
-    pub async fn get_issues(
+    pub async fn get_issues<'a>(
         &self,
         client: &GithubClient,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
-        exclude_labels: &Vec<&str>,
+        query: &Query<'a>,
     ) -> anyhow::Result<Vec<Issue>> {
+        let Query {
+            filters,
+            include_labels,
+            exclude_labels,
+        } = query;
+
         let use_issues = exclude_labels.is_empty() || filters.iter().any(|&(key, _)| key == "no");
         // negating filters can only be handled by the search api
         let url = if use_issues {
@@ -704,6 +708,13 @@ impl Repository {
             .join("+");
         format!("{}/search/issues?q={}", self.base_url(), filters)
     }
+}
+
+pub struct Query<'a> {
+    // key/value filter
+    pub filters: Vec<(&'a str, &'a str)>,
+    pub include_labels: Vec<&'a str>,
+    pub exclude_labels: Vec<&'a str>,
 }
 
 #[derive(Debug)]
