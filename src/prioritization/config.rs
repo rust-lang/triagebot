@@ -94,7 +94,7 @@ pub fn regressions<'a>() -> Step<'a> {
     queries.push(NamedQuery {
         name: "regressions.stable_to_stable",
         query: Query {
-            filters: vec![("state", "open"), ("per_page", "100")],
+            filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-stable"],
             exclude_labels: vec![
                 "P-critical",
