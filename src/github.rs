@@ -674,6 +674,8 @@ impl Repository {
                 include_labels.join(",")
             )))
             .chain(std::iter::once("filter=all".to_owned()))
+            .chain(std::iter::once(format!("sort=created")))
+            .chain(std::iter::once(format!("direction=asc")))
             .collect::<Vec<_>>()
             .join("&");
         format!(
@@ -704,6 +706,8 @@ impl Repository {
                     .map(|label| format!("-label:{}", label)),
             )
             .chain(std::iter::once(format!("repo:{}", self.full_name)))
+            .chain(std::iter::once(format!("sort:created")))
+            .chain(std::iter::once(format!("order:asc")))
             .collect::<Vec<_>>()
             .join("+");
         format!("{}/search/issues?q={}", self.base_url(), filters)
