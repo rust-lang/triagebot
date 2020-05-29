@@ -5,10 +5,8 @@ use futures::{future::FutureExt, stream::StreamExt};
 use hyper::{header, Body, Request, Response, Server, StatusCode};
 use reqwest::Client;
 use std::{env, net::SocketAddr, sync::Arc};
-use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
+use triagebot::{db, github, handlers::Context, logger, notification_listing, payload, EventName};
 use uuid::Uuid;
-
-mod logger;
 
 async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Body>, hyper::Error> {
     log::info!("request = {:?}", req);

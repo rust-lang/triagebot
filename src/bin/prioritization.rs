@@ -1,9 +1,11 @@
 use std::io::{self, Write};
-use triagebot::meeting::Action;
-use triagebot::prioritization;
+use triagebot::{logger, meeting::Action, prioritization};
 
 #[tokio::main]
 async fn main() {
+    dotenv::dotenv().ok();
+    logger::init();
+
     let meeting = prioritization::prepare_meeting();
 
     for step in &meeting.steps {
