@@ -640,6 +640,7 @@ impl Repository {
             filters,
             include_labels,
             exclude_labels,
+            ..
         } = query;
 
         let use_issues = exclude_labels.is_empty() || filters.iter().any(|&(key, _)| key == "no");
@@ -663,6 +664,14 @@ impl Repository {
                 .with_context(|| format!("failed to list issues from {}", url))?;
             Ok(result.items)
         }
+    }
+
+    pub async fn get_issues_count<'a>(
+        &self,
+        client: &GithubClient,
+        query: &Query<'a>,
+    ) -> anyhow::Result<usize> {
+        Ok(self.get_issues(client, query).await?.len())
     }
 
     fn build_issues_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
@@ -717,10 +726,16 @@ impl Repository {
 }
 
 pub struct Query<'a> {
+    pub kind: QueryKind,
     // key/value filter
     pub filters: Vec<(&'a str, &'a str)>,
     pub include_labels: Vec<&'a str>,
     pub exclude_labels: Vec<&'a str>,
+}
+
+pub enum QueryKind {
+    List,
+    Count,
 }
 
 #[derive(Debug)]

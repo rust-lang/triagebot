@@ -31,13 +31,21 @@ pub struct QueryMap<'a> {
     pub query: github::Query<'a>,
 }
 
-pub trait Template {
+pub trait Template: Send {
     fn render(&self) -> String;
 }
 
 pub struct FileTemplate<'a> {
     name: &'a str,
-    map: Vec<(&'a str, Vec<Issue>)>,
+    map: Vec<(&'a str, Box<dyn Template>)>,
+}
+
+pub struct IssuesTemplate {
+    issues: Vec<Issue>,
+}
+
+pub struct IssueCountTemplate {
+    count: usize,
 }
 
 #[async_trait]
@@ -48,7 +56,7 @@ impl<'a> Action for Step<'a> {
             env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"),
         );
 
-        let mut map = Vec::new();
+        let mut map: Vec<(&str, Box<dyn Template>)> = Vec::new();
 
         for Query { repo, queries } in &self.actions {
             let repository = Repository {
@@ -56,18 +64,41 @@ impl<'a> Action for Step<'a> {
             };
 
             for QueryMap { name, query } in queries {
-                let issues_search_result = repository.get_issues(&gh, &query).await;
+                match query.kind {
+                    github::QueryKind::List => {
+                        let issues_search_result = repository.get_issues(&gh, &query).await;
 
-                match issues_search_result {
-                    Ok(issues) => map.push((*name, issues)),
-                    Err(err) => {
-                        eprintln!("ERROR: {}", err);
-                        err.chain()
-                            .skip(1)
-                            .for_each(|cause| eprintln!("because: {}", cause));
-                        std::process::exit(1);
+                        match issues_search_result {
+                            Ok(issues) => {
+                                map.push((*name, Box::new(IssuesTemplate::new(issues))));
+                            }
+                            Err(err) => {
+                                eprintln!("ERROR: {}", err);
+                                err.chain()
+                                    .skip(1)
+                                    .for_each(|cause| eprintln!("because: {}", cause));
+                                std::process::exit(1);
+                            }
+                        }
                     }
-                }
+
+                    github::QueryKind::Count => {
+                        let count = repository.get_issues_count(&gh, &query).await;
+
+                        match count {
+                            Ok(count) => {
+                                map.push((*name, Box::new(IssueCountTemplate::new(count))));
+                            }
+                            Err(err) => {
+                                eprintln!("ERROR: {}", err);
+                                err.chain()
+                                    .skip(1)
+                                    .for_each(|cause| eprintln!("because: {}", cause));
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                };
             }
         }
 
@@ -77,7 +108,7 @@ impl<'a> Action for Step<'a> {
 }
 
 impl<'a> FileTemplate<'a> {
-    fn new(name: &'a str, map: Vec<(&'a str, Vec<Issue>)>) -> Self {
+    fn new(name: &'a str, map: Vec<(&'a str, Box<dyn Template>)>) -> Self {
         Self { name, map }
     }
 }
@@ -91,25 +122,48 @@ impl<'a> Template for FileTemplate<'a> {
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
 
-        for (var, issues) in &self.map {
+        for (var, template) in &self.map {
             let var = format!("{{{}}}", var);
-            if !issues.is_empty() {
-                let issues = issues
-                    .iter()
-                    .map(|issue| {
-                        format!(
-                            "- \"{}\" [#{}]({})",
-                            issue.title, issue.number, issue.html_url
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                contents = contents.replace(&var, &format!("{}", issues));
-            } else {
-                contents = contents.replace(&var, &format!("Empty"));
-            }
+            contents = contents.replace(&var, &template.render());
         }
 
         contents
+    }
+}
+
+impl IssuesTemplate {
+    fn new(issues: Vec<Issue>) -> Self {
+        Self { issues }
+    }
+}
+
+impl Template for IssuesTemplate {
+    fn render(&self) -> String {
+        let mut out = String::new();
+
+        if !self.issues.is_empty() {
+            for issue in &self.issues {
+                out.push_str(&format!(
+                    "\"{}\" [#{}]({})\n",
+                    issue.title, issue.number, issue.html_url,
+                ));
+            }
+        } else {
+            out = format!("Empty");
+        }
+
+        out
+    }
+}
+
+impl IssueCountTemplate {
+    fn new(count: usize) -> Self {
+        Self { count }
+    }
+}
+
+impl Template for IssueCountTemplate {
+    fn render(&self) -> String {
+        format!("\"{}\"", self.count)
     }
 }
