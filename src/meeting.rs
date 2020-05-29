@@ -5,9 +5,7 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 
-use crate::github::{GithubClient, Issue, Query, Repository};
-
-pub mod config;
+use crate::github::{self, GithubClient, Issue, Repository};
 
 pub struct Meeting<A: Action> {
     pub steps: Vec<A>,
@@ -20,17 +18,17 @@ pub trait Action {
 
 pub struct Step<'a> {
     pub name: &'a str,
-    pub actions: Vec<RepoQuery<'a>>,
+    pub actions: Vec<Query<'a>>,
 }
 
-pub struct RepoQuery<'a> {
+pub struct Query<'a> {
     pub repo: &'a str,
-    pub queries: Vec<NamedQuery<'a>>,
+    pub queries: Vec<QueryMap<'a>>,
 }
 
-pub struct NamedQuery<'a> {
+pub struct QueryMap<'a> {
     pub name: &'a str,
-    pub query: Query<'a>,
+    pub query: github::Query<'a>,
 }
 
 pub trait Template {
@@ -52,12 +50,12 @@ impl<'a> Action for Step<'a> {
 
         let mut map = Vec::new();
 
-        for RepoQuery { repo, queries } in &self.actions {
+        for Query { repo, queries } in &self.actions {
             let repository = Repository {
                 full_name: repo.to_string(),
             };
 
-            for NamedQuery { name, query } in queries {
+            for QueryMap { name, query } in queries {
                 let issues_search_result = repository.get_issues(&gh, &query).await;
 
                 match issues_search_result {

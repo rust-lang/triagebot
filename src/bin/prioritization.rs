@@ -1,9 +1,10 @@
 use std::io::{self, Write};
-use triagebot::prioritization::{self, Action};
+use triagebot::meeting::Action;
+use triagebot::prioritization;
 
 #[tokio::main]
 async fn main() {
-    let meeting = prioritization::config::prepare_meeting();
+    let meeting = prioritization::prepare_meeting();
 
     for step in &meeting.steps {
         println!("{}", step.call().await);
