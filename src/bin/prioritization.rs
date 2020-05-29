@@ -9,7 +9,7 @@ async fn main() {
     for step in &meeting.steps {
         println!("{}", step.call().await);
 
-        //press_key_to_continue();
+        press_key_to_continue();
     }
 }
 
