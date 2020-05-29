@@ -236,8 +236,8 @@ pub struct Issue {
     pub title: String,
     pub html_url: String,
     pub user: User,
-    labels: Vec<Label>,
-    assignees: Vec<User>,
+    pub labels: Vec<Label>,
+    pub assignees: Vec<User>,
     pull_request: Option<PullRequestDetails>,
     // API URL
     comments_url: String,

@@ -158,8 +158,24 @@ impl Template for IssuesTemplate {
         if !self.issues.is_empty() {
             for issue in &self.issues {
                 out.push_str(&format!(
-                    "{}\"{}\" [#{}]({}){}\n",
-                    pre, issue.title, issue.number, issue.html_url, post,
+                    "{}\"{}\" [#{}]({}) labels=[{}] assignees=[{}]{}\n",
+                    pre,
+                    issue.title,
+                    issue.number,
+                    issue.html_url,
+                    issue
+                        .labels
+                        .iter()
+                        .map(|l| l.name.as_ref())
+                        .collect::<Vec<_>>()
+                        .join(" | "),
+                    issue
+                        .assignees
+                        .iter()
+                        .map(|u| u.login.as_ref())
+                        .collect::<Vec<_>>()
+                        .join(" | "),
+                    post,
                 ));
             }
         } else {
