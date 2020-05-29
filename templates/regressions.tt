@@ -7,7 +7,7 @@
 
 ### Issues
 
-{regressions.stable_to_beta}
+- {regressions.stable_to_beta}
 
 2. [Nightly regressions without P-label](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3Aregression-from-stable-to-nightly+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low+-label%3AT-infra+-label%3AT-release)
     - Prioritize.
@@ -16,7 +16,7 @@
 
 ### Issues
 
-{regressions.stable_to_nightly}
+- {regressions.stable_to_nightly}
 
 3. [Stable regressions without P-label](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3Aregression-from-stable-to-stable+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low+-label%3AT-infra+-label%3AT-release)
     - Prioritize (once we have this under control).
@@ -25,4 +25,4 @@
 
 ### Issues
 
-{regressions.stable_to_stable}
+- {regressions.stable_to_stable}

@@ -10,11 +10,11 @@ tags: prioritization, rustc
 
 - Major Changes Proposals:
   - Seconded proposals (in FCP)
-{mcp.seconded}
+    - {mcp.seconded}
   - New proposals (not seconded)
-{mcp.new_not_seconded}
+    - {mcp.new_not_seconded}
   - Old proposals (not seconded)
-{mcp.old_not_seconded}
+    - {mcp.old_not_seconded}
 
 ## Beta-nominations
 

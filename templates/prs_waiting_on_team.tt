@@ -6,18 +6,18 @@
 
 ### Issues
 
-{prs_waiting_on_team.all}
+- {prs_waiting_on_team.all}
 
 2. [PR's waiting on T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+is%3Apr+label%3AS-waiting-on-team+label%3AT-compiler)
     - Explicitly nominate any that you think may be able to be resolved *quickly* in triage meeting.
 
 ### Issues
 
-{prs_waiting_on_team.t_compiler}
+- {prs_waiting_on_team.t_compiler}
 
 3. [PR's waiting on libs-impl](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+is%3Apr+label%3AS-waiting-on-team+label%3Alibs-impl)
     - Explicitly nominate any that you think may be able to be resolved *quickly* in triage meeting.
 
 ### Issues
 
-{prs_waiting_on_team.libs_impl}
+- {prs_waiting_on_team.libs_impl}

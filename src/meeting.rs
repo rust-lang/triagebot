@@ -32,7 +32,7 @@ pub struct QueryMap<'a> {
 }
 
 pub trait Template: Send {
-    fn render(&self) -> String;
+    fn render(&self, pre: &str, post: &str) -> String;
 }
 
 pub struct FileTemplate<'a> {
@@ -103,7 +103,7 @@ impl<'a> Action for Step<'a> {
         }
 
         let template = FileTemplate::new(self.name, map);
-        template.render()
+        template.render("", "")
     }
 }
 
@@ -114,7 +114,7 @@ impl<'a> FileTemplate<'a> {
 }
 
 impl<'a> Template for FileTemplate<'a> {
-    fn render(&self) -> String {
+    fn render(&self, _pre: &str, _post: &str) -> String {
         let relative_path = format!("templates/{}.tt", self.name);
         let path = env::current_dir().unwrap().join(relative_path);
         let path = path.as_path();
@@ -122,9 +122,23 @@ impl<'a> Template for FileTemplate<'a> {
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
 
+        let mut replacements = Vec::new();
+
         for (var, template) in &self.map {
             let var = format!("{{{}}}", var);
-            contents = contents.replace(&var, &template.render());
+            for line in contents.lines() {
+                if line.contains(&var) {
+                    if let Some(var_idx) = line.find(&var) {
+                        let pre = &line[..var_idx];
+                        let post = &line[var_idx + var.len()..];
+                        replacements.push((line.to_string(), template.render(pre, post)));
+                    }
+                }
+            }
+        }
+
+        for (line, content) in replacements {
+            contents = contents.replace(&line, &content);
         }
 
         contents
@@ -138,14 +152,14 @@ impl IssuesTemplate {
 }
 
 impl Template for IssuesTemplate {
-    fn render(&self) -> String {
+    fn render(&self, pre: &str, post: &str) -> String {
         let mut out = String::new();
 
         if !self.issues.is_empty() {
             for issue in &self.issues {
                 out.push_str(&format!(
-                    "\"{}\" [#{}]({})\n",
-                    issue.title, issue.number, issue.html_url,
+                    "{}\"{}\" [#{}]({}){}\n",
+                    pre, issue.title, issue.number, issue.html_url, post,
                 ));
             }
         } else {
@@ -163,7 +177,7 @@ impl IssueCountTemplate {
 }
 
 impl Template for IssueCountTemplate {
-    fn render(&self) -> String {
-        format!("\"{}\"", self.count)
+    fn render(&self, pre: &str, post: &str) -> String {
+        format!("{}{}{}", pre, self.count, post)
     }
 }
