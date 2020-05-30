@@ -63,8 +63,7 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: GlacierCommand) -> anyh
         return Ok(())
     };
 
-    let url = cmd.source;
-    let response = ctx.github.raw().get(&format!("{}{}", url, "/raw")).send().await?;
+    let response = ctx.github.raw().get(&cmd.source).send().await?;
     let body = response.text().await?;
 
     let number = event.issue().unwrap().number;
