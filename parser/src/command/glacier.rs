@@ -1,7 +1,6 @@
 //! The glacier command parser.
 //!
-//! This adds the option to track ICEs. Do note that the gist must be from a playground link.
-//! The link must also be in quotes.
+//! This adds the option to track ICEs. The link must be in quotes.
 //!
 //! The grammar is as follows:
 //!
