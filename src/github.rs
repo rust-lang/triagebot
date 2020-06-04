@@ -88,6 +88,12 @@ impl GithubClient {
             pub source_import: RateLimit,
         }
 
+        log::warn!(
+            "Retrying after {} seconds, remaining attepts {}",
+            sleep.as_secs(),
+            remaining_attempts,
+        );
+
         async move {
             tokio::time::delay_for(sleep).await;
 
