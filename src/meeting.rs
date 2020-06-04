@@ -157,12 +157,21 @@ impl Template for IssuesTemplate {
 
         if !self.issues.is_empty() {
             for issue in &self.issues {
+                let pr = if issue.pull_request.is_some() {
+                    // FIXME: link to PR.
+                    // We need to tweak PullRequestDetails for this
+                    "[has_pr] "
+                } else {
+                    ""
+                };
+
                 out.push_str(&format!(
-                    "{}\"{}\" [#{}]({}) labels=[{}] assignees=[{}]{}\n",
+                    "{}\"{}\" [#{}]({}) {}labels=[{}] assignees=[{}]{}\n",
                     pre,
                     issue.title,
                     issue.number,
                     issue.html_url,
+                    pr,
                     issue
                         .labels
                         .iter()

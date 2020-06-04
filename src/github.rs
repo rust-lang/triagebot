@@ -241,7 +241,7 @@ pub struct Issue {
     pub user: User,
     pub labels: Vec<Label>,
     pub assignees: Vec<User>,
-    pull_request: Option<PullRequestDetails>,
+    pub pull_request: Option<PullRequestDetails>,
     // API URL
     comments_url: String,
     #[serde(skip)]
