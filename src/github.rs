@@ -630,9 +630,7 @@ pub struct Repository {
 }
 
 impl Repository {
-    fn base_url(&self) -> &str {
-        "https://api.github.com"
-    }
+    const GITHUB_API_URL: &'static str = "https://api.github.com";
 
     pub async fn get_issues<'a>(
         &self,
@@ -692,7 +690,7 @@ impl Repository {
             .join("&");
         format!(
             "{}/repos/{}/issues?{}",
-            self.base_url(),
+            Repository::GITHUB_API_URL,
             self.full_name,
             filters
         )
@@ -722,7 +720,7 @@ impl Repository {
             .join("+");
         format!(
             "{}/search/issues?q={}&sort=created&order=asc",
-            self.base_url(),
+            Repository::GITHUB_API_URL,
             filters
         )
     }
