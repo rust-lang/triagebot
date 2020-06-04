@@ -58,10 +58,7 @@ impl GithubClient {
     }
 
     fn calc_sleep(reset_time: u64) -> u64 {
-        let epoch_time = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let epoch_time = SystemTime::UNIX_EPOCH.elapsed().unwrap().as_secs();
         reset_time.saturating_sub(epoch_time)
     }
 
