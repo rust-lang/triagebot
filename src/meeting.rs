@@ -168,13 +168,13 @@ impl Template for IssuesTemplate {
                         .iter()
                         .map(|l| l.name.as_ref())
                         .collect::<Vec<_>>()
-                        .join(" | "),
+                        .join(", "),
                     issue
                         .assignees
                         .iter()
                         .map(|u| u.login.as_ref())
                         .collect::<Vec<_>>()
-                        .join(" | "),
+                        .join(", "),
                     post,
                 ));
             }
