@@ -47,7 +47,7 @@ impl Handler for PrioritizeHandler {
                         if config.prioritize_on.iter().any(|l| l == applied_label) {
                             let mut prioritize = false;
 
-                            for label in event.issue().unwrap().labels() {
+                            'outer: for label in event.issue().unwrap().labels() {
                                 for exclude_label in &config.exclude_labels {
                                     match glob::Pattern::new(exclude_label) {
                                         Ok(exclude_glob) => {
@@ -59,7 +59,7 @@ impl Handler for PrioritizeHandler {
                                     }
 
                                     if !prioritize {
-                                        break;
+                                        break 'outer;
                                     }
                                 }
                             }
