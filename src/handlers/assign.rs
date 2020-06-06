@@ -88,27 +88,35 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> anyho
         true
     };
 
-    if event.issue().unwrap().is_pr() {
+    let issue = event.issue().unwrap();
+    if issue.is_pr() {
         let username = match &cmd {
             AssignCommand::Own => event.user().login.clone(),
             AssignCommand::User { username } => username.clone(),
             AssignCommand::Release => {
                 log::trace!(
                     "ignoring release on PR {:?}, must always have assignee",
-                    event.issue().unwrap().global_id()
+                    issue.global_id()
                 );
                 return Ok(());
             }
         };
-        if let Err(err) = event
-            .issue()
-            .unwrap()
+        // Don't re-assign if aleady assigned, e.g. on comment edit
+        if issue.contain_assignee(&username) {
+            log::trace!(
+                "ignoring assign PR {} to {}, already assigned",
+                issue.global_id(),
+                username,
+            );
+            return Ok(());
+        }
+        if let Err(err) = issue
             .set_assignee(&ctx.github, &username)
             .await
         {
             log::warn!(
                 "failed to set assignee of PR {} to {}: {:?}",
-                event.issue().unwrap().global_id(),
+                issue.global_id(),
                 username,
                 err
             );
@@ -116,7 +124,7 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> anyho
         return Ok(());
     }
 
-    let e = EditIssueBody::new(&event.issue().unwrap(), "ASSIGN");
+    let e = EditIssueBody::new(&issue, "ASSIGN");
 
     let to_assign = match cmd {
         AssignCommand::Own => event.user().login.clone(),
@@ -132,9 +140,7 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> anyho
             }) = e.current_data()
             {
                 if current == event.user().login || is_team_member {
-                    event
-                        .issue()
-                        .unwrap()
+                    issue
                         .remove_assignees(&ctx.github, Selection::All)
                         .await?;
                     e.apply(&ctx.github, String::new(), AssignData { user: None })
@@ -144,11 +150,9 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> anyho
                     anyhow::bail!("Cannot release another user's assignment");
                 }
             } else {
-                let current = &event.user();
-                if event.issue().unwrap().contain_assignee(current) {
-                    event
-                        .issue()
-                        .unwrap()
+                let current = &event.user().login;
+                if issue.contain_assignee(current) {
+                    issue
                         .remove_assignees(&ctx.github, Selection::One(&current))
                         .await?;
                     e.apply(&ctx.github, String::new(), AssignData { user: None })
@@ -160,23 +164,28 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> anyho
             };
         }
     };
+    // Don't re-assign if aleady assigned, e.g. on comment edit
+    if issue.contain_assignee(&to_assign) {
+        log::trace!(
+            "ignoring assign issue {} to {}, already assigned",
+            issue.global_id(),
+            to_assign,
+        );
+        return Ok(());
+    }
     let data = AssignData {
         user: Some(to_assign.clone()),
     };
 
     e.apply(&ctx.github, String::new(), &data).await?;
 
-    match event
-        .issue()
-        .unwrap()
+    match issue
         .set_assignee(&ctx.github, &to_assign)
         .await
     {
         Ok(()) => return Ok(()), // we are done
         Err(github::AssignmentError::InvalidAssignee) => {
-            event
-                .issue()
-                .unwrap()
+            issue
                 .set_assignee(&ctx.github, &ctx.username)
                 .await
                 .context("self-assignment failed")?;

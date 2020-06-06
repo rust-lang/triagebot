@@ -330,14 +330,14 @@ impl Issue {
         &self.labels
     }
 
-    pub fn contain_assignee(&self, user: &User) -> bool {
-        self.assignees.contains(user)
+    pub fn contain_assignee(&self, user: &str) -> bool {
+        self.assignees.iter().any(|a| a.login == user)
     }
 
     pub async fn remove_assignees(
         &self,
         client: &GithubClient,
-        selection: Selection<'_, User>,
+        selection: Selection<'_, String>,
     ) -> Result<(), AssignmentError> {
         log::info!("remove {:?} assignees for {}", selection, self.global_id());
         let url = format!(
@@ -352,7 +352,7 @@ impl Issue {
                 .iter()
                 .map(|u| u.login.as_str())
                 .collect::<Vec<_>>(),
-            Selection::One(user) => vec![user.login.as_str()],
+            Selection::One(user) => vec![user.as_str()],
         };
 
         #[derive(serde::Serialize)]
