@@ -101,6 +101,15 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> anyho
                 return Ok(());
             }
         };
+        // Don't re-assign if aleady assigned, e.g. on comment edit
+        if issue.contain_assignee(&username) {
+            log::trace!(
+                "ignoring assign PR {} to {}, already assigned",
+                issue.global_id(),
+                username,
+            );
+            return Ok(());
+        }
         if let Err(err) = issue
             .set_assignee(&ctx.github, &username)
             .await
@@ -155,6 +164,15 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> anyho
             };
         }
     };
+    // Don't re-assign if aleady assigned, e.g. on comment edit
+    if issue.contain_assignee(&to_assign) {
+        log::trace!(
+            "ignoring assign issue {} to {}, already assigned",
+            issue.global_id(),
+            to_assign,
+        );
+        return Ok(());
+    }
     let data = AssignData {
         user: Some(to_assign.clone()),
     };
