@@ -141,7 +141,7 @@ async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> anyho
                     anyhow::bail!("Cannot release another user's assignment");
                 }
             } else {
-                let current = &event.user();
+                let current = &event.user().login;
                 if issue.contain_assignee(current) {
                     issue
                         .remove_assignees(&ctx.github, Selection::One(&current))
