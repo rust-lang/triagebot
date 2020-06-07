@@ -2,36 +2,36 @@ use pulldown_cmark::{Event, Parser, Tag};
 use std::ops::Range;
 
 #[derive(Debug)]
-pub struct ColorCodeBlocks {
-    code: Vec<Range<usize>>,
+pub struct IgnoreBlocks {
+    ignore: Vec<Range<usize>>,
 }
 
-impl ColorCodeBlocks {
-    pub fn new(s: &str) -> ColorCodeBlocks {
-        let mut code = Vec::new();
+impl IgnoreBlocks {
+    pub fn new(s: &str) -> IgnoreBlocks {
+        let mut ignore = Vec::new();
         let mut parser = Parser::new(s).into_offset_iter();
         while let Some((event, range)) = parser.next() {
             if let Event::Start(Tag::CodeBlock(_)) = event {
                 let start = range.start;
                 while let Some((event, range)) = parser.next() {
                     if let Event::End(Tag::CodeBlock(_)) = event {
-                        code.push(start..range.end);
+                        ignore.push(start..range.end);
                         break;
                     }
                 }
             } else if let Event::Code(_) = event {
-                code.push(range);
+                ignore.push(range);
             }
         }
 
-        ColorCodeBlocks { code }
+        IgnoreBlocks { ignore }
     }
 
-    pub fn overlaps_code(&self, region: Range<usize>) -> Option<Range<usize>> {
-        for code in &self.code {
+    pub fn overlaps_ignore(&self, region: Range<usize>) -> Option<Range<usize>> {
+        for ignore in &self.ignore {
             // See https://stackoverflow.com/questions/3269434.
-            if code.start <= region.end && region.start <= code.end {
-                return Some(code.clone());
+            if ignore.start <= region.end && region.start <= ignore.end {
+                return Some(ignore.clone());
             }
         }
         None
@@ -40,27 +40,27 @@ impl ColorCodeBlocks {
 
 #[cfg(test)]
 #[derive(Debug, PartialEq, Eq)]
-enum Code<'a> {
+enum Ignore<'a> {
     Yes(&'a str),
     No(&'a str),
 }
 
 #[cfg(test)]
-fn bodies(s: &str) -> Vec<Code<'_>> {
+fn bodies(s: &str) -> Vec<Ignore<'_>> {
     let mut bodies = Vec::new();
-    let cbs = ColorCodeBlocks::new(s);
+    let cbs = IgnoreBlocks::new(s);
     let mut previous = 0..0;
-    for range in &cbs.code {
+    for range in &cbs.ignore {
         let range = range.clone();
         if previous.end != range.start {
-            bodies.push(Code::No(&s[previous.end..range.start]));
+            bodies.push(Ignore::No(&s[previous.end..range.start]));
         }
-        bodies.push(Code::Yes(&s[range.clone()]));
+        bodies.push(Ignore::Yes(&s[range.clone()]));
         previous = range.clone();
     }
-    if let Some(range) = cbs.code.last() {
+    if let Some(range) = cbs.ignore.last() {
         if range.end != s.len() {
-            bodies.push(Code::No(&s[range.end..]));
+            bodies.push(Ignore::No(&s[range.end..]));
         }
     }
     bodies
@@ -70,7 +70,7 @@ fn bodies(s: &str) -> Vec<Code<'_>> {
 fn cbs_1() {
     assert_eq!(
         bodies("`hey you`bar me too"),
-        [Code::Yes("`hey you`"), Code::No("bar me too")]
+        [Ignore::Yes("`hey you`"), Ignore::No("bar me too")]
     );
 }
 
@@ -78,7 +78,7 @@ fn cbs_1() {
 fn cbs_2() {
     assert_eq!(
         bodies("`hey you` <b>me too</b>"),
-        [Code::Yes("`hey you`"), Code::No(" <b>me too</b>")]
+        [Ignore::Yes("`hey you`"), Ignore::No(" <b>me too</b>")]
     );
 }
 
@@ -86,7 +86,7 @@ fn cbs_2() {
 fn cbs_3() {
     assert_eq!(
         bodies(r"`hey you\` <b>`me too</b>"),
-        [Code::Yes(r"`hey you\`"), Code::No(" <b>`me too</b>")]
+        [Ignore::Yes(r"`hey you\`"), Ignore::No(" <b>`me too</b>")]
     );
 }
 
@@ -103,9 +103,9 @@ nope
 "
         ),
         [
-            Code::No("\n"),
-            Code::Yes("```language_spec\ntesting\n```"),
-            Code::No("\n\nnope\n")
+            Ignore::No("\n"),
+            Ignore::Yes("```language_spec\ntesting\n```"),
+            Ignore::No("\n\nnope\n")
         ],
     );
 }
@@ -121,8 +121,8 @@ testing
             "           "
         )),
         [
-            Code::No("\n"),
-            Code::Yes("```     tag_after_space\ntesting\n```           "),
+            Ignore::No("\n"),
+            Ignore::Yes("```     tag_after_space\ntesting\n```           "),
         ],
     );
 }
@@ -137,8 +137,8 @@ fn cbs_6() {
 "
         ),
         [
-            Code::No("\n    "),
-            Code::Yes("this is indented\n    this is indented too\n"),
+            Ignore::No("\n    "),
+            Ignore::Yes("this is indented\n    this is indented too\n"),
         ],
     );
 }
@@ -152,7 +152,7 @@ fn cbs_7() {
 testing unclosed
 "
         ),
-        [Code::No("\n"), Code::Yes("```\ntesting unclosed\n"),],
+        [Ignore::No("\n"), Ignore::Yes("```\ntesting unclosed\n"),],
     );
 }
 
@@ -160,6 +160,10 @@ testing unclosed
 fn cbs_8() {
     assert_eq!(
         bodies("`one` not `two`"),
-        [Code::Yes("`one`"), Code::No(" not "), Code::Yes("`two`")]
+        [
+            Ignore::Yes("`one`"),
+            Ignore::No(" not "),
+            Ignore::Yes("`two`")
+        ]
     );
 }
