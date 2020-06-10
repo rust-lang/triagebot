@@ -82,6 +82,8 @@ handlers! {
     major_change = major_change::MajorChangeHandler,
     //tracking_issue = tracking_issue::TrackingIssueHandler,
     glacier = glacier::GlacierHandler,
+    autolabel = autolabel::AutolabelHandler,
+    notify_zulip = notify_zulip::NotifyZulipHandler,
 }
 
 pub struct Context {

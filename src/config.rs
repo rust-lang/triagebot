@@ -23,6 +23,8 @@ pub(crate) struct Config {
     pub(crate) prioritize: Option<PrioritizeConfig>,
     pub(crate) major_change: Option<MajorChangeConfig>,
     pub(crate) glacier: Option<GlacierConfig>,
+    pub(crate) autolabel: Option<AutolabelConfig>,
+    pub(crate) notify_zulip: Option<NotifyZulipConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -79,11 +81,45 @@ pub(crate) struct RelabelConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct PrioritizeConfig {
     pub(crate) label: String,
-    #[serde(default)]
-    pub(crate) prioritize_on: Vec<String>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct AutolabelConfig {
+    #[serde(flatten)]
+    pub(crate) labels: HashMap<String, AutolabelLabelConfig>,
+}
+
+impl AutolabelConfig {
+    pub(crate) fn get_by_trigger(&self, trigger: &str) -> Vec<(&str, &AutolabelLabelConfig)> {
+        let mut results = Vec::new();
+        for (label, cfg) in self.labels.iter() {
+            if cfg.trigger_labels.iter().any(|l| l == trigger) {
+                results.push((label.as_str(), cfg));
+            }
+        }
+        results
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct AutolabelLabelConfig {
+    pub(crate) trigger_labels: Vec<String>,
     #[serde(default)]
     pub(crate) exclude_labels: Vec<String>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct NotifyZulipConfig {
+    #[serde(flatten)]
+    pub(crate) labels: HashMap<String, NotifyZulipLabelConfig>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) zulip_stream: u64,
+    pub(crate) topic: String,
+    pub(crate) message_on_add: Option<String>,
+    pub(crate) message_on_remove: Option<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -231,6 +267,8 @@ mod tests {
                 prioritize: None,
                 major_change: None,
                 glacier: None,
+                autolabel: None,
+                notify_zulip: None,
             }
         );
     }
