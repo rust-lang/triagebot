@@ -2,10 +2,14 @@ use anyhow::Context;
 
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
+use futures::{future::BoxFuture, FutureExt};
 use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
-use reqwest::{Client, RequestBuilder, Response, StatusCode};
-use std::fmt;
+use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
+use std::{
+    fmt,
+    time::{Duration, SystemTime},
+};
 
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct User {
@@ -15,17 +19,130 @@ pub struct User {
 
 impl GithubClient {
     async fn _send_req(&self, req: RequestBuilder) -> Result<(Response, String), reqwest::Error> {
+        const MAX_ATTEMPTS: usize = 2;
         log::debug!("_send_req with {:?}", req);
         let req = req.build()?;
-
         let req_dbg = format!("{:?}", req);
 
-        let resp = self.client.execute(req).await?;
+        let mut resp = self.client.execute(req.try_clone().unwrap()).await?;
+        if let Some(sleep) = Self::needs_retry(&resp).await {
+            resp = self.retry(req, sleep, MAX_ATTEMPTS).await?;
+        }
 
         resp.error_for_status_ref()?;
 
         Ok((resp, req_dbg))
     }
+
+    async fn needs_retry(resp: &Response) -> Option<Duration> {
+        const REMAINING: &str = "X-RateLimit-Remaining";
+        const RESET: &str = "X-RateLimit-Reset";
+
+        if resp.status().is_success() {
+            return None;
+        }
+
+        let headers = resp.headers();
+        if !(headers.contains_key(REMAINING) && headers.contains_key(RESET)) {
+            return None;
+        }
+
+        // Weird github api behavior. It asks us to retry but also has a remaining count above 1
+        // Try again immediately and hope for the best...
+        if headers[REMAINING] != "0" {
+            return Some(Duration::from_secs(0));
+        }
+
+        let reset_time = headers[RESET].to_str().unwrap().parse::<u64>().unwrap();
+        Some(Duration::from_secs(Self::calc_sleep(reset_time) + 10))
+    }
+
+    fn calc_sleep(reset_time: u64) -> u64 {
+        let epoch_time = SystemTime::UNIX_EPOCH.elapsed().unwrap().as_secs();
+        reset_time.saturating_sub(epoch_time)
+    }
+
+    fn retry(
+        &self,
+        req: Request,
+        sleep: Duration,
+        remaining_attempts: usize,
+    ) -> BoxFuture<Result<Response, reqwest::Error>> {
+        #[derive(Debug, serde::Deserialize)]
+        struct RateLimit {
+            pub limit: u64,
+            pub remaining: u64,
+            pub reset: u64,
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        struct RateLimitResponse {
+            pub resources: Resources,
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        struct Resources {
+            pub core: RateLimit,
+            pub search: RateLimit,
+            pub graphql: RateLimit,
+            pub source_import: RateLimit,
+        }
+
+        log::warn!(
+            "Retrying after {} seconds, remaining attepts {}",
+            sleep.as_secs(),
+            remaining_attempts,
+        );
+
+        async move {
+            tokio::time::delay_for(sleep).await;
+
+            // check rate limit
+            let rate_resp = self
+                .client
+                .execute(
+                    self.client
+                        .get("https://api.github.com/rate_limit")
+                        .configure(self)
+                        .build()
+                        .unwrap(),
+                )
+                .await?;
+            let rate_limit_response = rate_resp.json::<RateLimitResponse>().await?;
+
+            // Check url for search path because github has different rate limits for the search api
+            let rate_limit = if req
+                .url()
+                .path_segments()
+                .map(|mut segments| matches!(segments.next(), Some("search")))
+                .unwrap_or(false)
+            {
+                rate_limit_response.resources.search
+            } else {
+                rate_limit_response.resources.core
+            };
+
+            // If we still don't have any more remaining attempts, try sleeping for the remaining
+            // period of time
+            if rate_limit.remaining == 0 {
+                let sleep = Self::calc_sleep(rate_limit.reset);
+                if sleep > 0 {
+                    tokio::time::delay_for(Duration::from_secs(sleep)).await;
+                }
+            }
+
+            let resp = self.client.execute(req.try_clone().unwrap()).await?;
+            if let Some(sleep) = Self::needs_retry(&resp).await {
+                if remaining_attempts > 0 {
+                    return self.retry(req, sleep, remaining_attempts - 1).await;
+                }
+            }
+
+            Ok(resp)
+        }
+        .boxed()
+    }
+
     async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<Vec<u8>> {
         let (mut resp, req_dbg) = self._send_req(req).await?;
 
@@ -120,11 +237,11 @@ pub struct Issue {
     pub body: String,
     created_at: chrono::DateTime<Utc>,
     pub title: String,
-    html_url: String,
+    pub html_url: String,
     pub user: User,
-    labels: Vec<Label>,
-    assignees: Vec<User>,
-    pull_request: Option<PullRequestDetails>,
+    pub labels: Vec<Label>,
+    pub assignees: Vec<User>,
+    pub pull_request: Option<PullRequestDetails>,
     // API URL
     comments_url: String,
     #[serde(skip)]
@@ -501,8 +618,125 @@ pub struct IssuesEvent {
 }
 
 #[derive(Debug, serde::Deserialize)]
+pub struct IssueSearchResult {
+    pub total_count: usize,
+    pub incomplete_results: bool,
+    pub items: Vec<Issue>,
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct Repository {
     pub full_name: String,
+}
+
+impl Repository {
+    const GITHUB_API_URL: &'static str = "https://api.github.com";
+
+    pub async fn get_issues<'a>(
+        &self,
+        client: &GithubClient,
+        query: &Query<'a>,
+    ) -> anyhow::Result<Vec<Issue>> {
+        let Query {
+            filters,
+            include_labels,
+            exclude_labels,
+            ..
+        } = query;
+
+        let use_issues = exclude_labels.is_empty() || filters.iter().any(|&(key, _)| key == "no");
+        // negating filters can only be handled by the search api
+        let url = if use_issues {
+            self.build_issues_url(filters, include_labels)
+        } else {
+            self.build_search_issues_url(filters, include_labels, exclude_labels)
+        };
+
+        let result = client.get(&url);
+        if use_issues {
+            client
+                .json(result)
+                .await
+                .with_context(|| format!("failed to list issues from {}", url))
+        } else {
+            let result = client
+                .json::<IssueSearchResult>(result)
+                .await
+                .with_context(|| format!("failed to list issues from {}", url))?;
+            Ok(result.items)
+        }
+    }
+
+    pub async fn get_issues_count<'a>(
+        &self,
+        client: &GithubClient,
+        query: &Query<'a>,
+    ) -> anyhow::Result<usize> {
+        Ok(self.get_issues(client, query).await?.len())
+    }
+
+    fn build_issues_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
+        let filters = filters
+            .iter()
+            .map(|(key, val)| format!("{}={}", key, val))
+            .chain(std::iter::once(format!(
+                "labels={}",
+                include_labels.join(",")
+            )))
+            .chain(std::iter::once("filter=all".to_owned()))
+            .chain(std::iter::once(format!("sort=created")))
+            .chain(std::iter::once(format!("direction=asc")))
+            .collect::<Vec<_>>()
+            .join("&");
+        format!(
+            "{}/repos/{}/issues?{}",
+            Repository::GITHUB_API_URL,
+            self.full_name,
+            filters
+        )
+    }
+
+    fn build_search_issues_url(
+        &self,
+        filters: &Vec<(&str, &str)>,
+        include_labels: &Vec<&str>,
+        exclude_labels: &Vec<&str>,
+    ) -> String {
+        let filters = filters
+            .iter()
+            .map(|(key, val)| format!("{}:{}", key, val))
+            .chain(
+                include_labels
+                    .iter()
+                    .map(|label| format!("label:{}", label)),
+            )
+            .chain(
+                exclude_labels
+                    .iter()
+                    .map(|label| format!("-label:{}", label)),
+            )
+            .chain(std::iter::once(format!("repo:{}", self.full_name)))
+            .collect::<Vec<_>>()
+            .join("+");
+        format!(
+            "{}/search/issues?q={}&sort=created&order=asc",
+            Repository::GITHUB_API_URL,
+            filters
+        )
+    }
+}
+
+pub struct Query<'a> {
+    pub kind: QueryKind,
+    // key/value filter
+    pub filters: Vec<(&'a str, &'a str)>,
+    pub include_labels: Vec<&'a str>,
+    pub exclude_labels: Vec<&'a str>,
+}
+
+pub enum QueryKind {
+    List,
+    Count,
 }
 
 #[derive(Debug)]

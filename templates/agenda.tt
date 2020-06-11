@@ -1,0 +1,118 @@
+---
+tags: prioritization, rustc
+---
+
+# T-compiler Meeting Agenda YYYY-MM-DD
+
+[Tracking Issue](https://github.com/rust-lang/rust/issues/54818)
+
+## Announcements
+
+- Major Changes Proposals:
+  - Seconded proposals (in FCP)
+    - {mcp.seconded}
+  - New proposals (not seconded)
+    - {mcp.new_not_seconded}
+  - Old proposals (not seconded)
+    - {mcp.old_not_seconded}
+
+## Beta-nominations
+
+[T-compiler beta noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated+label%3AT-compiler)
+
+- {beta_nominated.t_compiler} :back: / :hand:
+
+[libs-impl beta noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated+label%3Alibs-impl)
+
+- {beta_nominated.libs_impl} :back: / :hand:
+
+[T-rustdoc beta noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated+label%3AT-rustdoc)
+
+- {beta_nominated.t_rustdoc} :back: / :hand:
+
+## Stable-nominations
+
+[T-compiler stable noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Astable-nominated+label%3AT-compiler)
+
+- {stable_nominated.t_compiler} :back: / :hand:
+
+[libs-impl stable noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Astable-nominated+label%3Alibs-impl)
+
+- {stable_nominated.libs_impl} :back: / :hand:
+
+[T-rustdoc stable noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Astable-nominated+label%3AT-rustdoc)
+
+- {stable_nominated.t_rustdoc} :back: / :hand:
+
+## PR's S-waiting-on-team
+
+[T-compiler S-waiting-on-team](https://github.com/rust-lang/rust/pulls?utf8=%E2%9C%93&q=is%3Aopen+label%3AS-waiting-on-team+label%3AT-compiler)
+
+- {prs_waiting_on_team.t_compiler}
+
+[libs-impl S-waiting-on-team](https://github.com/rust-lang/rust/pulls?utf8=%E2%9C%93&q=is%3Aopen+label%3AS-waiting-on-team+label%3Alibs-impl)
+
+- {prs_waiting_on_team.libs_impl}
+
+## Issues of Note
+
+### Short Summary
+
+- [N P-critical issues](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3AT-compiler+label%3AP-critical+)
+  - [M of those are unassigned](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3AT-compiler+label%3AP-critical+no%3Aassignee)
+- [N P-high issues](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3AT-compiler+label%3AP-high+)
+  - [M of those are unassigned](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3AT-compiler+label%3AP-high+no%3Aassignee)
+- [N P-high, M P-medium, P P-low regression-from-stable-to-beta](https://github.com/rust-lang/rust/labels/regression-from-stable-to-beta)
+  - The only assigned are the P-high ones.
+- [N P-high, M P-medium, P P-low regression-from-stable-to-nightly](https://github.com/rust-lang/rust/labels/regression-from-stable-to-nightly)
+  - There are N P-medium assigned.
+- [N regression-from-stable-to-stable](https://github.com/rust-lang/rust/labels/regression-from-stable-to-stable)
+  - [M of those are not prioritized](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3Aregression-from-stable-to-stable+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low).
+
+There are N (more|less) `P-critical` issues and M (more|less) `P-high` issues in comparison with last week.
+
+### P-critical
+
+- {p_critical.t_compiler}
+  - This issue is assigned to @person
+
+- {p_critical.libs_impl}
+
+- {p_critical.t_rustdoc}
+
+### Unassigned P-high regressions
+
+- {beta_regressions.unassigned_p_high}
+- {nightly_regressions.unassigned_p_high}
+
+## Performance logs
+
+[Triage done by njn](https://github.com/rust-lang/rustc-perf/tree/master/triage#triage-logs)
+
+Regressions
+
+- Regression #1
+
+Improvements
+
+- Improvement #1
+
+## Nominated Issues
+
+[T-compiler I-nominated](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AI-nominated+label%3AT-compiler)
+
+- {i_nominated.t_compiler}
+
+[libs-impl I-nominated](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AI-nominated+label%3Alibs-impl)
+
+- {i_nominated.libs_impl}
+
+## WG checkins
+
+@**WG-X** checkin by @**person1**:
+
+> Checkin text
+
+@**WG-Y** checkin by @**person2**:
+
+> Checkin text
