@@ -30,6 +30,20 @@ impl Handler for NotifyZulipHandler {
             if let github::IssuesAction::Labeled | github::IssuesAction::Unlabeled = e.action {
                 let applied_label = &e.label.as_ref().expect("label").name;
                 if let Some(config) = config.and_then(|c| c.labels.get(applied_label)) {
+                    for label in &config.required_labels {
+                        let pattern =  match glob::Pattern::new(label) {
+                            Ok(pattern) => pattern,
+                            Err(err) => {
+                                log::error!("Invalid glob pattern: {}", err);
+                                continue;
+                            }
+                        };
+                        if !e.issue.labels().iter().any(|l| pattern.matches(&l.name)) {
+                            // Issue misses a required label, ignore this event
+                            return Ok(None);
+                        }
+                    }
+
                     if e.action == github::IssuesAction::Labeled && config.message_on_add.is_some() {
                         return Ok(Some(NotifyZulipInput {
                             notification_type: NotificationType::Labeled,

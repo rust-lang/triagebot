@@ -120,6 +120,8 @@ pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) topic: String,
     pub(crate) message_on_add: Option<String>,
     pub(crate) message_on_remove: Option<String>,
+    #[serde(default)]
+    pub(crate) required_labels: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
