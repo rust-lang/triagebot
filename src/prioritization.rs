@@ -369,7 +369,7 @@ pub fn agenda<'a>() -> Step<'a> {
     queries.push(QueryMap {
         name: "issues_of_note.p_critical",
         query: github::Query {
-            kind: github::QueryKind::List,
+            kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
             include_labels: vec!["T-compiler", "P-critical"],
             exclude_labels: vec![],
@@ -379,7 +379,7 @@ pub fn agenda<'a>() -> Step<'a> {
     queries.push(QueryMap {
         name: "issues_of_note.unassigned_p_critical",
         query: github::Query {
-            kind: github::QueryKind::List,
+            kind: github::QueryKind::Count,
             filters: vec![("state", "open"), ("no", "assignee")],
             include_labels: vec!["T-compiler", "P-critical"],
             exclude_labels: vec![],
@@ -389,7 +389,7 @@ pub fn agenda<'a>() -> Step<'a> {
     queries.push(QueryMap {
         name: "issues_of_note.p_high",
         query: github::Query {
-            kind: github::QueryKind::List,
+            kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
             include_labels: vec!["T-compiler", "P-high"],
             exclude_labels: vec![],
@@ -399,43 +399,129 @@ pub fn agenda<'a>() -> Step<'a> {
     queries.push(QueryMap {
         name: "issues_of_note.unassigned_p_high",
         query: github::Query {
-            kind: github::QueryKind::List,
+            kind: github::QueryKind::Count,
             filters: vec![("state", "open"), ("no", "assignee")],
             include_labels: vec!["T-compiler", "P-high"],
             exclude_labels: vec![],
         },
     });
 
-    // - [N regression-from-stable-to-stable](https://github.com/rust-lang/rust/labels/regression-from-stable-to-stable)
-    //   - [M of those are not prioritized](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3Aregression-from-stable-to-stable+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low).
-    //
-    // There are N (more|less) `P-critical` issues and M (more|less) `P-high` issues in comparison with last week.
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_beta",
+        name: "issues_of_note.regression_from_stable_to_beta.p-critical",
         query: github::Query {
-            kind: github::QueryKind::List,
+            kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
-            include_labels: vec!["regression-from-stable-to-beta"],
+            include_labels: vec!["regression-from-stable-to-beta", "P-critical"],
             exclude_labels: vec![],
         },
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_nightly",
+        name: "issues_of_note.regression_from_stable_to_beta.p-high",
         query: github::Query {
-            kind: github::QueryKind::List,
+            kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
-            include_labels: vec!["regression-from-stable-to-nightly"],
+            include_labels: vec!["regression-from-stable-to-beta", "P-high"],
             exclude_labels: vec![],
         },
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_stable",
+        name: "issues_of_note.regression_from_stable_to_beta.p-medium",
         query: github::Query {
-            kind: github::QueryKind::List,
+            kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
-            include_labels: vec!["regression-from-stable-to-stable"],
+            include_labels: vec!["regression-from-stable-to-beta", "P-medium"],
+            exclude_labels: vec![],
+        },
+    });
+
+    queries.push(QueryMap {
+        name: "issues_of_note.regression_from_stable_to_beta.p-low",
+        query: github::Query {
+            kind: github::QueryKind::Count,
+            filters: vec![("state", "open")],
+            include_labels: vec!["regression-from-stable-to-beta", "P-low"],
+            exclude_labels: vec![],
+        },
+    });
+
+    queries.push(QueryMap {
+        name: "issues_of_note.regression_from_stable_to_nightly.p-critical",
+        query: github::Query {
+            kind: github::QueryKind::Count,
+            filters: vec![("state", "open")],
+            include_labels: vec!["regression-from-stable-to-nightly", "P-critical"],
+            exclude_labels: vec![],
+        },
+    });
+
+    queries.push(QueryMap {
+        name: "issues_of_note.regression_from_stable_to_nightly.p-high",
+        query: github::Query {
+            kind: github::QueryKind::Count,
+            filters: vec![("state", "open")],
+            include_labels: vec!["regression-from-stable-to-nightly", "P-high"],
+            exclude_labels: vec![],
+        },
+    });
+
+    queries.push(QueryMap {
+        name: "issues_of_note.regression_from_stable_to_nightly.p-medium",
+        query: github::Query {
+            kind: github::QueryKind::Count,
+            filters: vec![("state", "open")],
+            include_labels: vec!["regression-from-stable-to-nightly", "P-medium"],
+            exclude_labels: vec![],
+        },
+    });
+
+    queries.push(QueryMap {
+        name: "issues_of_note.regression_from_stable_to_nightly.p-low",
+        query: github::Query {
+            kind: github::QueryKind::Count,
+            filters: vec![("state", "open")],
+            include_labels: vec!["regression-from-stable-to-nightly", "P-low"],
+            exclude_labels: vec![],
+        },
+    });
+
+    queries.push(QueryMap {
+        name: "issues_of_note.regression_from_stable_to_stable.p-critical",
+        query: github::Query {
+            kind: github::QueryKind::Count,
+            filters: vec![("state", "open")],
+            include_labels: vec!["regression-from-stable-to-stable", "P-critical"],
+            exclude_labels: vec![],
+        },
+    });
+
+    queries.push(QueryMap {
+        name: "issues_of_note.regression_from_stable_to_stable.p-high",
+        query: github::Query {
+            kind: github::QueryKind::Count,
+            filters: vec![("state", "open")],
+            include_labels: vec!["regression-from-stable-to-stable", "P-high"],
+            exclude_labels: vec![],
+        },
+    });
+
+    queries.push(QueryMap {
+        name: "issues_of_note.regression_from_stable_to_stable.p-medium",
+        query: github::Query {
+            kind: github::QueryKind::Count,
+            filters: vec![("state", "open")],
+            include_labels: vec!["regression-from-stable-to-stable", "P-medium"],
+            exclude_labels: vec![],
+        },
+    });
+
+    queries.push(QueryMap {
+        name: "issues_of_note.regression_from_stable_to_stable.p-low",
+        query: github::Query {
+            kind: github::QueryKind::Count,
+            filters: vec![("state", "open")],
+            include_labels: vec!["regression-from-stable-to-stable", "P-low"],
             exclude_labels: vec![],
         },
     });
