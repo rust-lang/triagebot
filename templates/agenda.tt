@@ -21,53 +21,43 @@ tags: prioritization, rustc
 ### WG checkins
 
 @**WG-X** checkin by @**person1**:
-
 > Checkin text
 
 @**WG-Y** checkin by @**person2**:
-
 > Checkin text
 
 ## Beta-nominations
 
-[T-compiler beta noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated+label%3AT-compiler)
-
+[T-compiler](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated+label%3AT-compiler)
 - {beta_nominated.t_compiler}
 
-[libs-impl beta noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated+label%3Alibs-impl)
-
+[libs-impl](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated+label%3Alibs-impl)
 - {beta_nominated.libs_impl}
 
-[T-rustdoc beta noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated+label%3AT-rustdoc)
-
+[T-rustdoc](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated+label%3AT-rustdoc)
 - {beta_nominated.t_rustdoc}
 
 :back: / :shrug: / :hand:
 
 ## Stable-nominations
 
-[T-compiler stable noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Astable-nominated+label%3AT-compiler)
-
+[T-compiler](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Astable-nominated+label%3AT-compiler)
 - {stable_nominated.t_compiler}
 
-[libs-impl stable noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Astable-nominated+label%3Alibs-impl)
-
+[libs-impl](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Astable-nominated+label%3Alibs-impl)
 - {stable_nominated.libs_impl}
 
-[T-rustdoc stable noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Astable-nominated+label%3AT-rustdoc)
-
+[T-rustdoc](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Astable-nominated+label%3AT-rustdoc)
 - {stable_nominated.t_rustdoc}
 
 :back: / :shrug: / :hand:
 
 ## PR's S-waiting-on-team
 
-[T-compiler S-waiting-on-team](https://github.com/rust-lang/rust/pulls?utf8=%E2%9C%93&q=is%3Aopen+label%3AS-waiting-on-team+label%3AT-compiler)
-
+[T-compiler](https://github.com/rust-lang/rust/pulls?utf8=%E2%9C%93&q=is%3Aopen+label%3AS-waiting-on-team+label%3AT-compiler)
 - {prs_waiting_on_team.t_compiler}
 
-[libs-impl S-waiting-on-team](https://github.com/rust-lang/rust/pulls?utf8=%E2%9C%93&q=is%3Aopen+label%3AS-waiting-on-team+label%3Alibs-impl)
-
+[libs-impl](https://github.com/rust-lang/rust/pulls?utf8=%E2%9C%93&q=is%3Aopen+label%3AS-waiting-on-team+label%3Alibs-impl)
 - {prs_waiting_on_team.libs_impl}
 
 ## Issues of Note
@@ -86,27 +76,32 @@ tags: prioritization, rustc
 
 ### P-critical
 
+[T-compiler](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3AP-critical+label%3AT-compiler)
 - {p_critical.t_compiler}
 
+[libs-impl](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3AP-critical+label%3Alibs-impl)
 - {p_critical.libs_impl}
 
+[T-rustdoc](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3AP-critical+label%3AT-rustdoc)
 - {p_critical.t_rustdoc}
 
 ### Unassigned P-high regressions
 
+[Beta regressions](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Aregression-from-stable-to-beta+P-high+no%3Aassignee)
 - {beta_regressions.unassigned_p_high}
+
+[Beta regressions](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Aregression-from-stable-to-beta+P-high+no%3Aassignee)
 - {nightly_regressions.unassigned_p_high}
 
 ## Performance logs
 
 [Triage done by njn](https://github.com/rust-lang/rustc-perf/tree/master/triage#triage-logs)
+<Performance logs text>
 
 ## Nominated Issues
 
-[T-compiler I-nominated](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AI-nominated+label%3AT-compiler)
-
+[T-compiler](https://github.com/rust-lang/rust/issues?q=label%3AI-nominated+label%3AT-compiler)
 - {i_nominated.t_compiler}
 
-[libs-impl I-nominated](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AI-nominated+label%3Alibs-impl)
-
+[libs-impl](https://github.com/rust-lang/rust/issues?q=label%3AI-nominated+label%3Alibs-impl)
 - {i_nominated.libs_impl}
