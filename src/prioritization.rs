@@ -71,8 +71,9 @@ pub fn regressions<'a>() -> Step<'a> {
                 "P-medium",
                 "P-low",
                 "T-infra",
-                "T-release",
                 "T-libs",
+                "T-release",
+                "T-rustdoc",
             ],
         },
     });
@@ -89,8 +90,9 @@ pub fn regressions<'a>() -> Step<'a> {
                 "P-medium",
                 "P-low",
                 "T-infra",
-                "T-release",
                 "T-libs",
+                "T-release",
+                "T-rustdoc",
             ],
         },
     });
@@ -107,8 +109,9 @@ pub fn regressions<'a>() -> Step<'a> {
                 "P-medium",
                 "P-low",
                 "T-infra",
-                "T-release",
                 "T-libs",
+                "T-release",
+                "T-rustdoc",
             ],
         },
     });
