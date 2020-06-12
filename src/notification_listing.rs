@@ -27,10 +27,23 @@ pub async fn render(db: &DbClient, user: &str) -> String {
             notification
                 .short_description
                 .as_ref()
-                .unwrap_or(&notification.origin_url),
+                .unwrap_or(&notification.origin_url)
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+                .replace('"', "&quot;")
+                .replace('\'', "&#39;"),
         ));
         if let Some(metadata) = &notification.metadata {
-            out.push_str(&format!("<ul><li>{}</li></ul>", metadata));
+            out.push_str(&format!(
+                "<ul><li>{}</li></ul>",
+                metadata
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;")
+                    .replace('"', "&quot;")
+                    .replace('\'', "&#39;"),
+            ));
         }
         out.push_str("</li>");
     }
