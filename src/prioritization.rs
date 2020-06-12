@@ -56,8 +56,6 @@ pub fn unpri_i_prioritize<'a>() -> Step<'a> {
     }
 }
 
-// FIXME: we should filter out `T-libs` ones given that we only want `libs-impl` but meanwhile
-// we are in a kind of transition state we have all of them.
 pub fn regressions<'a>() -> Step<'a> {
     let mut queries = Vec::new();
 
