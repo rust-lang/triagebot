@@ -325,21 +325,21 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "stable_nominated.t_rustdoc",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![],
-            include_labels: vec!["stable-nominated", "T-rustdoc"],
-            exclude_labels: vec!["stable-accepted"],
-        },
-    });
-
-    queries.push(QueryMap {
         name: "stable_nominated.libs_impl",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![],
             include_labels: vec!["stable-nominated", "libs-impl"],
+            exclude_labels: vec!["stable-accepted"],
+        },
+    });
+
+    queries.push(QueryMap {
+        name: "stable_nominated.t_rustdoc",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![],
+            include_labels: vec!["stable-nominated", "T-rustdoc"],
             exclude_labels: vec!["stable-accepted"],
         },
     });
