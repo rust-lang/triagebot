@@ -476,7 +476,7 @@ pub fn agenda<'a>() -> Step<'a> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open"), ("no", "assignee")],
             include_labels: vec!["regression-from-stable-to-beta", "P-high"],
-            exclude_labels: vec!["T-infra", "T-release"],
+            exclude_labels: vec!["T-infra", "T-libs", "T-release", "T-rustdoc"],
         },
     });
 
@@ -486,7 +486,7 @@ pub fn agenda<'a>() -> Step<'a> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open"), ("no", "assignee")],
             include_labels: vec!["regression-from-stable-to-nightly", "P-high"],
-            exclude_labels: vec!["T-infra", "T-release"],
+            exclude_labels: vec!["T-infra", "T-libs", "T-release", "T-rustdoc"],
         },
     });
 
