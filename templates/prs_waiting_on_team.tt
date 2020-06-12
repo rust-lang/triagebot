@@ -1,6 +1,6 @@
 ## PR's waiting for on team
 
-1. [All PR's waiting on team](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+is%3Apr+label%3AS-waiting-on-team)
+1. [All PR's waiting on team](https://github.com/rust-lang/rust/labels/S-waiting-on-team)
     - Add T-compiler or libs-impl tag when it corresponds.
     - Do a sanity check on them.
 
