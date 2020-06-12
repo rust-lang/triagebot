@@ -32,29 +32,33 @@ tags: prioritization, rustc
 
 [T-compiler beta noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated+label%3AT-compiler)
 
-- {beta_nominated.t_compiler} :back: / :hand:
+- {beta_nominated.t_compiler}
 
 [libs-impl beta noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated+label%3Alibs-impl)
 
-- {beta_nominated.libs_impl} :back: / :hand:
+- {beta_nominated.libs_impl}
 
 [T-rustdoc beta noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated+label%3AT-rustdoc)
 
-- {beta_nominated.t_rustdoc} :back: / :hand:
+- {beta_nominated.t_rustdoc}
+
+:back: / :shrug: / :hand:
 
 ## Stable-nominations
 
 [T-compiler stable noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Astable-nominated+label%3AT-compiler)
 
-- {stable_nominated.t_compiler} :back: / :hand:
+- {stable_nominated.t_compiler}
 
 [libs-impl stable noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Astable-nominated+label%3Alibs-impl)
 
-- {stable_nominated.libs_impl} :back: / :hand:
+- {stable_nominated.libs_impl}
 
 [T-rustdoc stable noms](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Astable-nominated+label%3AT-rustdoc)
 
-- {stable_nominated.t_rustdoc} :back: / :hand:
+- {stable_nominated.t_rustdoc}
+
+:back: / :shrug: / :hand:
 
 ## PR's S-waiting-on-team
 
