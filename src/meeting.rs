@@ -188,7 +188,7 @@ impl Template for IssuesTemplate {
                 ));
             }
         } else {
-            out = format!("Empty");
+            out = format!("There are no issues this time.");
         }
 
         out
