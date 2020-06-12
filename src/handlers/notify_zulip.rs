@@ -92,7 +92,7 @@ async fn handle_input<'a>(
             config.message_on_add.as_ref().unwrap().clone()
         }
         NotificationType::Unlabeled => {
-            config.message_on_add.as_ref().unwrap().clone()
+            config.message_on_remove.as_ref().unwrap().clone()
         }
     };
 
