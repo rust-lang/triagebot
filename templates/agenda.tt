@@ -104,14 +104,6 @@ There are N (more|less) `P-critical` issues and M (more|less) `P-high` issues in
 
 [Triage done by njn](https://github.com/rust-lang/rustc-perf/tree/master/triage#triage-logs)
 
-Regressions
-
-- Regression #1
-
-Improvements
-
-- Improvement #1
-
 ## Nominated Issues
 
 [T-compiler I-nominated](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AI-nominated+label%3AT-compiler)
