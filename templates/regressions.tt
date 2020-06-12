@@ -1,6 +1,6 @@
 ## Regressions
 
-1. [Beta regressions without P-label](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3Aregression-from-stable-to-beta+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low+-label%3AT-infra+-label%3AT-release)
+1. [Beta regressions without P-label](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3Aregression-from-stable-to-beta+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low+-label%3AT-infra+-label%3AT-libs+-label%3AT-release+-label%3AT-rustdoc)
     - Prioritize.
     - Ping appropriate people and/or [ICE-breakers](https://rustc-dev-guide.rust-lang.org/ice-breaker/about.html#tagging-an-issue-for-an-ice-breaker-group).
     - Assign if possible; if it remains unassigned, add it to agenda so we can assign during the meeting.
@@ -9,8 +9,8 @@
 
 - {regressions.stable_to_beta}
 
-2. [Nightly regressions without P-label](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3Aregression-from-stable-to-nightly+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low+-label%3AT-infra+-label%3AT-release)
-    - Prioritize.
+2. [Nightly regressions without P-label](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3Aregression-from-stable-to-nightly+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low+-label%3AT-infra+-label%3AT-libs+-label%3AT-release+-label%3AT-rustdoc)
+- Prioritize.
     - Ping appropriate people and/or [ICE-breakers](https://rustc-dev-guide.rust-lang.org/ice-breaker/about.html#tagging-an-issue-for-an-ice-breaker-group).
     - Assign if possible; if it remains unassigned, add it to agenda so we can assign during the meeting.
 
@@ -18,7 +18,7 @@
 
 - {regressions.stable_to_nightly}
 
-3. [Stable regressions without P-label](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3Aregression-from-stable-to-stable+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low+-label%3AT-infra+-label%3AT-release)
+3. [Stable regressions without P-label](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3Aregression-from-stable-to-stable+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low+-label%3AT-infra+-label%3AT-libs+-label%3AT-release+-label%3AT-rustdoc)
     - Prioritize (once we have this under control).
     - Ping appropriate people and/or [ICE-breakers](https://rustc-dev-guide.rust-lang.org/ice-breaker/about.html#tagging-an-issue-for-an-ice-breaker-group).
     - Assign if possible; if it remains unassigned, add it to agenda so we can assign during the meeting.
