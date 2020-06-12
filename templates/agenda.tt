@@ -74,18 +74,15 @@ tags: prioritization, rustc
 
 ### Short Summary
 
-- [N P-critical issues](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3AT-compiler+label%3AP-critical+)
-  - [M of those are unassigned](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3AT-compiler+label%3AP-critical+no%3Aassignee)
-- [N P-high issues](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3AT-compiler+label%3AP-high+)
-  - [M of those are unassigned](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3AT-compiler+label%3AP-high+no%3Aassignee)
-- [X P-critical, N P-high, M P-medium, P P-low regression-from-stable-to-beta](https://github.com/rust-lang/rust/labels/regression-from-stable-to-beta)
-  - X P-critical, N P-high, M P-medium, P P-low assigned
-- [X P-critical, N P-high, M P-medium, P P-low regression-from-stable-to-nightly](https://github.com/rust-lang/rust/labels/regression-from-stable-to-nightly)
-  - X P-critical, N P-high, M P-medium, P P-low assigned
-- [N regression-from-stable-to-stable](https://github.com/rust-lang/rust/labels/regression-from-stable-to-stable)
-  - [M of those are not prioritized](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3Aregression-from-stable-to-stable+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low).
-
-There are N (more|less) `P-critical` issues and M (more|less) `P-high` issues in comparison with last week.
+- [X T-compiler P-critical issues](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3AT-compiler+label%3AP-critical+)
+  - [X of those are unassigned](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3AT-compiler+label%3AP-critical+no%3Aassignee)
+- [X T-compiler P-high issues](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3AT-compiler+label%3AP-high+)
+  - [X of those are unassigned](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3AT-compiler+label%3AP-high+no%3Aassignee)
+- [X P-critical, X P-high, X P-medium, X P-low regression-from-stable-to-beta](https://github.com/rust-lang/rust/labels/regression-from-stable-to-beta)
+  - X P-critical, X P-high, X P-medium, X P-low assigned
+- [X P-critical, X P-high, X P-medium, X P-low regression-from-stable-to-nightly](https://github.com/rust-lang/rust/labels/regression-from-stable-to-nightly)
+  - X P-critical, X P-high, X P-medium, X P-low assigned
+- [X P-critical, X P-high, X P-medium, X P-low regression-from-stable-to-stable](https://github.com/rust-lang/rust/labels/regression-from-stable-to-stable)
 
 ### P-critical
 
