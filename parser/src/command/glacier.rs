@@ -1,15 +1,13 @@
 //! The glacier command parser.
 //!
-//! This adds the option to track ICEs. Do note that the gist must be from a playground link.
-//! The link must also be in quotes.
+//! This adds the option to track ICEs. The <code-source> must be in quotes.
 //!
 //! The grammar is as follows:
 //!
 //! ```text
 //! Command: `@bot glacier <code-source>`
 //!
-//! <code-source>:
-//!   - "https://gist.github.com/.*"
+//! <code-source>: any URL that resolves to plain-text Rust code
 //! ```
 
 use crate::error::Error;
