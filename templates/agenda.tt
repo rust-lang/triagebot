@@ -90,7 +90,6 @@ There are N (more|less) `P-critical` issues and M (more|less) `P-high` issues in
 ### P-critical
 
 - {p_critical.t_compiler}
-  - This issue is assigned to @person
 
 - {p_critical.libs_impl}
 
