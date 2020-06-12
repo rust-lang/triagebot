@@ -9,6 +9,8 @@ tags: prioritization, rustc
 ## Announcements
 
 - Major Changes Proposals:
+  - New accepted proposals
+    - {mcp.accepted}
   - Seconded proposals (in FCP)
     - {mcp.seconded}
   - New proposals (not seconded)

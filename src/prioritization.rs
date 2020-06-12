@@ -234,6 +234,16 @@ pub fn agenda<'a>() -> Step<'a> {
     let mut actions = Vec::new();
 
     queries.push(QueryMap {
+        name: "mcp.accepted",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "closed"), ("closed-days-ago", "7")],
+            include_labels: vec!["major-change-accepted"],
+            exclude_labels: vec![],
+        },
+    });
+
+    queries.push(QueryMap {
         name: "mcp.seconded",
         query: github::Query {
             kind: github::QueryKind::List,
