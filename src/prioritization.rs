@@ -230,9 +230,11 @@ pub fn prs_waiting_on_team<'a>() -> Step<'a> {
 }
 
 pub fn agenda<'a>() -> Step<'a> {
-    let mut queries = Vec::new();
     let mut actions = Vec::new();
 
+    let mut queries = Vec::new();
+
+    // MCP queries
     queries.push(QueryMap {
         name: "mcp.accepted",
         query: github::Query {
@@ -280,6 +282,7 @@ pub fn agenda<'a>() -> Step<'a> {
 
     let mut queries = Vec::new();
 
+    // beta nomination queries
     queries.push(QueryMap {
         name: "beta_nominated.t_compiler",
         query: github::Query {
@@ -310,6 +313,7 @@ pub fn agenda<'a>() -> Step<'a> {
         },
     });
 
+    // stable nomination queries
     queries.push(QueryMap {
         name: "stable_nominated.t_compiler",
         query: github::Query {
@@ -340,6 +344,7 @@ pub fn agenda<'a>() -> Step<'a> {
         },
     });
 
+    // prs waiting on team queries
     queries.push(QueryMap {
         name: "prs_waiting_on_team.t_compiler",
         query: github::Query {
@@ -360,6 +365,7 @@ pub fn agenda<'a>() -> Step<'a> {
         },
     });
 
+    // issues of note queries
     queries.push(QueryMap {
         name: "issues_of_note.p_critical",
         query: github::Query {
