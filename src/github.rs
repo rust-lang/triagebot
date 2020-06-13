@@ -689,6 +689,7 @@ impl Repository {
             .chain(std::iter::once("filter=all".to_owned()))
             .chain(std::iter::once(format!("sort=created")))
             .chain(std::iter::once(format!("direction=asc")))
+            .chain(std::iter::once(format!("per_page=100")))
             .collect::<Vec<_>>()
             .join("&");
         format!(
@@ -730,7 +731,7 @@ impl Repository {
             .collect::<Vec<_>>()
             .join("+");
         format!(
-            "{}/search/issues?q={}&sort=created&order=asc",
+            "{}/search/issues?q={}&sort=created&order=asc&per_page=100",
             Repository::GITHUB_API_URL,
             filters
         )
