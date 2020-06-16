@@ -161,9 +161,8 @@ async fn handle_input(
         There is a Zulip [stream] for that. Use this issue to leave \
         procedural comments, such as volunteering to review, indicating that you \
         second the proposal (or third, etc), or raising a concern that you would \
-        like to be addressed.
-
-        [stream]: {}",
+        like to be addressed. \
+        \n\n[stream]: {}",
         topic_url
     );
     issue
