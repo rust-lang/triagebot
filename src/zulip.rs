@@ -317,9 +317,8 @@ pub struct MessageApiRequest<'a> {
 }
 
 impl MessageApiRequest<'_> {
+    // FIXME: support private links too
     pub fn url(&self) -> String {
-        // FIXME: support private links too
-        assert_eq!(self.to, "stream");
         // See
         // https://github.com/zulip/zulip/blob/46247623fc279/zerver/lib/url_encoding.py#L9
         // ALWAYS_SAFE from
