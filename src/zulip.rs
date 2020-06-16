@@ -5,6 +5,7 @@ use crate::handlers::Context;
 use anyhow::Context as _;
 use std::convert::TryInto;
 use std::env;
+use std::io::Write as _;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Request {
@@ -316,6 +317,31 @@ pub struct MessageApiRequest<'a> {
 }
 
 impl MessageApiRequest<'_> {
+    pub fn url(&self) -> String {
+        // FIXME: support private links too
+        assert_eq!(self.to, "stream");
+        // See
+        // https://github.com/zulip/zulip/blob/46247623fc279/zerver/lib/url_encoding.py#L9
+        // ALWAYS_SAFE from
+        // https://github.com/python/cpython/blob/113e2b0a07c/Lib/urllib/parse.py#L772-L775
+        let always_safe = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-~";
+        let mut encoded_topic = Vec::new();
+        for ch in self.topic.expect("topic").bytes() {
+            if !(always_safe.contains(ch as char) || ch == b'.') {
+                write!(encoded_topic, "%{:02X}", ch).unwrap();
+            } else {
+                encoded_topic.push(ch);
+            }
+        }
+        let mut encoded_topic = String::from_utf8(encoded_topic).unwrap();
+        encoded_topic = encoded_topic.replace("%", ".");
+
+        format!(
+            "https://rust-lang.zulipchat.com/#narrow/stream/{}-xxx/topic/{}",
+            self.to, encoded_topic,
+        )
+    }
+
     pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
         if self.type_ == "stream" {
             assert!(self.topic.is_some());

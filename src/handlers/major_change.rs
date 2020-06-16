@@ -4,6 +4,7 @@ use crate::{
     handlers::{Context, Handler},
     interactions::ErrorComment,
 };
+use anyhow::Context as _;
 use futures::future::{BoxFuture, FutureExt};
 use parser::command::second::SecondCommand;
 use parser::command::{Command, Input};
@@ -153,6 +154,22 @@ async fn handle_input(
         topic: Some(&zulip_topic),
         content: &zulip_msg,
     };
+
+    let topic_url = zulip_req.url();
+    let comment = format!(
+        "This issue is not meant to be used for technical discussion. \
+        There is a Zulip [stream] for that. Use this issue to leave \
+        procedural comments, such as volunteering to review, indicating that you \
+        second the proposal (or third, etc), or raising a concern that you would \
+        like to be addressed.
+
+        [stream]: {}",
+        topic_url
+    );
+    issue
+        .post_comment(&ctx.github, &comment)
+        .await
+        .context("post major change comment")?;
 
     let zulip_req = zulip_req.send(&ctx.github.raw());
 
