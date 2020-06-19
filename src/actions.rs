@@ -31,7 +31,6 @@ pub struct IssueDecorator {
     pub number: u64,
     pub title: String,
     pub html_url: String,
-    pub pr: String,
     pub labels: String,
     pub assignees: String,
 }
@@ -72,34 +71,22 @@ impl<'a> Action for Step<'a> {
                             Ok(issues) => {
                                 let issues_decorator: Vec<_> = issues
                                     .iter()
-                                    .map(|issue| {
-                                        let pr = if issue.pull_request.is_some() {
-                                            // FIXME: link to PR.
-                                            // We need to tweak PullRequestDetails for this
-                                            "[has_pr] "
-                                        } else {
-                                            ""
-                                        }
-                                        .to_string();
-
-                                        IssueDecorator {
-                                            title: issue.title.clone(),
-                                            number: issue.number,
-                                            html_url: issue.html_url.clone(),
-                                            pr,
-                                            labels: issue
-                                                .labels
-                                                .iter()
-                                                .map(|l| l.name.as_ref())
-                                                .collect::<Vec<_>>()
-                                                .join(", "),
-                                            assignees: issue
-                                                .assignees
-                                                .iter()
-                                                .map(|u| u.login.as_ref())
-                                                .collect::<Vec<_>>()
-                                                .join(", "),
-                                        }
+                                    .map(|issue| IssueDecorator {
+                                        title: issue.title.clone(),
+                                        number: issue.number,
+                                        html_url: issue.html_url.clone(),
+                                        labels: issue
+                                            .labels
+                                            .iter()
+                                            .map(|l| l.name.as_ref())
+                                            .collect::<Vec<_>>()
+                                            .join(", "),
+                                        assignees: issue
+                                            .assignees
+                                            .iter()
+                                            .map(|u| u.login.as_ref())
+                                            .collect::<Vec<_>>()
+                                            .join(", "),
                                     })
                                     .collect();
 
