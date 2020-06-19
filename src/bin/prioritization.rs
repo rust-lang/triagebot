@@ -9,7 +9,7 @@ async fn main() {
     let prioritization_steps = prioritization::prepare_steps();
 
     for step in &prioritization_steps {
-        println!("{}", step.call().await);
+        print!("{}", step.call().await);
 
         press_key_to_continue();
     }
