@@ -1,3 +1,5 @@
+{% import "_issues.tt" as issues %}
+
 ## Unprioritized I-prioritize
 
 1. [All unprioritized I-prioritize](https://github.com/rust-lang/rust/issues?q=is%3Aopen+is%3Aissue+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low+label%3AI-prioritize)
@@ -6,7 +8,7 @@
 
 ### Issues
 
-- {unpri_i_prioritize.all}
+{{issues::render(issues=unpri_i_prioritize_all, empty="There are no unprioritized I-prioritize issues this time.")}}
 
 2. [T-compiler](https://github.com/rust-lang/rust/issues?q=is%3Aopen+is%3Aissue+label%3AT-compiler+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low+label%3AI-prioritize)
     - Prioritize issues and remove nomination of the ones not worth discussing.
@@ -15,7 +17,7 @@
 
 ### Issues
 
-- {unpri_i_prioritize.t_compiler}
+{{issues::render(issues=unpri_i_prioritize_t_compiler, empty="There are no unprioritized I-prioritize issues for T-compiler this time.")}}
 
 3. [libs-impl](https://github.com/rust-lang/rust/issues?q=is%3Aopen+is%3Aissue+label%3Alibs-impl+-label%3AP-critical+-label%3AP-high+-label%3AP-medium+-label%3AP-low+label%3AI-prioritize)
     - Prioritize issues and remove nomination of the ones not worth discussing.
@@ -24,4 +26,4 @@
 
 ### Issues
 
-- {unpri_i_prioritize.libs_impl}
+{{issues::render(issues=unpri_i_prioritize_libs_impl, empty="There are no unprioritized I-prioritize issues for libs-impl this time.")}}

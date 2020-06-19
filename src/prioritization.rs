@@ -18,7 +18,7 @@ pub fn unpri_i_prioritize<'a>() -> Step<'a> {
     let mut queries = Vec::new();
 
     queries.push(QueryMap {
-        name: "unpri_i_prioritize.all",
+        name: "unpri_i_prioritize_all",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -28,7 +28,7 @@ pub fn unpri_i_prioritize<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "unpri_i_prioritize.t_compiler",
+        name: "unpri_i_prioritize_t_compiler",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -38,7 +38,7 @@ pub fn unpri_i_prioritize<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "unpri_i_prioritize.libs_impl",
+        name: "unpri_i_prioritize_libs_impl",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -60,7 +60,7 @@ pub fn regressions<'a>() -> Step<'a> {
     let mut queries = Vec::new();
 
     queries.push(QueryMap {
-        name: "regressions.stable_to_beta",
+        name: "regressions_stable_to_beta",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -79,7 +79,7 @@ pub fn regressions<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "regressions.stable_to_nightly",
+        name: "regressions_stable_to_nightly",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -98,7 +98,7 @@ pub fn regressions<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "regressions.stable_to_stable",
+        name: "regressions_stable_to_stable",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -129,7 +129,7 @@ pub fn nominations<'a>() -> Step<'a> {
     let mut queries = Vec::new();
 
     queries.push(QueryMap {
-        name: "nominations.stable_nominated",
+        name: "nominations_stable_nominated",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![],
@@ -139,7 +139,7 @@ pub fn nominations<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "nominations.beta_nominated",
+        name: "nominations_beta_nominated",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![],
@@ -149,7 +149,7 @@ pub fn nominations<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "nominations.i_nominated",
+        name: "nominations_i_nominated",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -159,7 +159,7 @@ pub fn nominations<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "nominations.i_nominated_t_compiler",
+        name: "nominations_i_nominated_t_compiler",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -169,7 +169,7 @@ pub fn nominations<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "nominations.i_nominated_libs_impl",
+        name: "nominations_i_nominated_libs_impl",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -191,7 +191,7 @@ pub fn prs_waiting_on_team<'a>() -> Step<'a> {
     let mut queries = Vec::new();
 
     queries.push(QueryMap {
-        name: "prs_waiting_on_team.all",
+        name: "prs_waiting_on_team_all",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -201,7 +201,7 @@ pub fn prs_waiting_on_team<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "prs_waiting_on_team.t_compiler",
+        name: "prs_waiting_on_team_t_compiler",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -211,7 +211,7 @@ pub fn prs_waiting_on_team<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "prs_waiting_on_team.libs_impl",
+        name: "prs_waiting_on_team_libs_impl",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -236,7 +236,7 @@ pub fn agenda<'a>() -> Step<'a> {
 
     // MCP queries
     queries.push(QueryMap {
-        name: "mcp.accepted",
+        name: "mcp_accepted",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "closed"), ("closed-days-ago", "7")],
@@ -246,7 +246,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "mcp.seconded",
+        name: "mcp_seconded",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -256,7 +256,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "mcp.new_not_seconded",
+        name: "mcp_new_not_seconded",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -266,7 +266,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "mcp.old_not_seconded",
+        name: "mcp_old_not_seconded",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -284,7 +284,7 @@ pub fn agenda<'a>() -> Step<'a> {
 
     // beta nomination queries
     queries.push(QueryMap {
-        name: "beta_nominated.t_compiler",
+        name: "beta_nominated_t_compiler",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![],
@@ -294,7 +294,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "beta_nominated.libs_impl",
+        name: "beta_nominated_libs_impl",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![],
@@ -304,7 +304,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "beta_nominated.t_rustdoc",
+        name: "beta_nominated_t_rustdoc",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![],
@@ -315,7 +315,7 @@ pub fn agenda<'a>() -> Step<'a> {
 
     // stable nomination queries
     queries.push(QueryMap {
-        name: "stable_nominated.t_compiler",
+        name: "stable_nominated_t_compiler",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![],
@@ -325,7 +325,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "stable_nominated.libs_impl",
+        name: "stable_nominated_libs_impl",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![],
@@ -335,7 +335,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "stable_nominated.t_rustdoc",
+        name: "stable_nominated_t_rustdoc",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![],
@@ -346,7 +346,7 @@ pub fn agenda<'a>() -> Step<'a> {
 
     // prs waiting on team queries
     queries.push(QueryMap {
-        name: "prs_waiting_on_team.t_compiler",
+        name: "prs_waiting_on_team_t_compiler",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -356,7 +356,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "prs_waiting_on_team.libs_impl",
+        name: "prs_waiting_on_team_libs_impl",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -367,7 +367,7 @@ pub fn agenda<'a>() -> Step<'a> {
 
     // issues of note queries
     queries.push(QueryMap {
-        name: "issues_of_note.p_critical",
+        name: "issues_of_note_p_critical",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -377,7 +377,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.unassigned_p_critical",
+        name: "issues_of_note_unassigned_p_critical",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open"), ("no", "assignee")],
@@ -387,7 +387,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.p_high",
+        name: "issues_of_note_p_high",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -397,7 +397,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.unassigned_p_high",
+        name: "issues_of_note_unassigned_p_high",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open"), ("no", "assignee")],
@@ -407,7 +407,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_beta.p-critical",
+        name: "issues_of_note_regression_from_stable_to_beta_p_critical",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -417,7 +417,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_beta.p-high",
+        name: "issues_of_note_regression_from_stable_to_beta_p_high",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -427,7 +427,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_beta.p-medium",
+        name: "issues_of_note_regression_from_stable_to_beta_p_medium",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -437,7 +437,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_beta.p-low",
+        name: "issues_of_note_regression_from_stable_to_beta_p_low",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -447,7 +447,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_nightly.p-critical",
+        name: "issues_of_note_regression_from_stable_to_nightly_p_critical",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -457,7 +457,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_nightly.p-high",
+        name: "issues_of_note_regression_from_stable_to_nightly_p_high",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -467,7 +467,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_nightly.p-medium",
+        name: "issues_of_note_regression_from_stable_to_nightly_p_medium",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -477,7 +477,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_nightly.p-low",
+        name: "issues_of_note_regression_from_stable_to_nightly_p_low",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -487,7 +487,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_stable.p-critical",
+        name: "issues_of_note_regression_from_stable_to_stable_p_critical",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -497,7 +497,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_stable.p-high",
+        name: "issues_of_note_regression_from_stable_to_stable_p_high",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -507,7 +507,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_stable.p-medium",
+        name: "issues_of_note_regression_from_stable_to_stable_p_medium",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -517,7 +517,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "issues_of_note.regression_from_stable_to_stable.p-low",
+        name: "issues_of_note_regression_from_stable_to_stable_p_low",
         query: github::Query {
             kind: github::QueryKind::Count,
             filters: vec![("state", "open")],
@@ -527,7 +527,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "p_critical.t_compiler",
+        name: "p_critical_t_compiler",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -537,7 +537,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "p_critical.libs_impl",
+        name: "p_critical_libs_impl",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -547,7 +547,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "p_critical.t_rustdoc",
+        name: "p_critical_t_rustdoc",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -557,7 +557,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "beta_regressions.unassigned_p_high",
+        name: "beta_regressions_unassigned_p_high",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open"), ("no", "assignee")],
@@ -567,7 +567,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "nightly_regressions.unassigned_p_high",
+        name: "nightly_regressions_unassigned_p_high",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open"), ("no", "assignee")],
@@ -577,7 +577,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "i_nominated.t_compiler",
+        name: "i_nominated_t_compiler",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -587,7 +587,7 @@ pub fn agenda<'a>() -> Step<'a> {
     });
 
     queries.push(QueryMap {
-        name: "i_nominated.libs_impl",
+        name: "i_nominated_libs_impl",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],

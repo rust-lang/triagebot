@@ -1,3 +1,5 @@
+{% import "_issues.tt" as issues %}
+
 ## PR's waiting for on team
 
 1. [All PR's waiting on team](https://github.com/rust-lang/rust/labels/S-waiting-on-team)
@@ -6,18 +8,18 @@
 
 ### Issues
 
-- {prs_waiting_on_team.all}
+{{issues::render(issues=prs_waiting_on_team_all, empty="There are no PR's waiting on team this time.")}}
 
 2. [PR's waiting on T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+is%3Apr+label%3AS-waiting-on-team+label%3AT-compiler)
     - Explicitly nominate any that you think may be able to be resolved *quickly* in triage meeting.
 
 ### Issues
 
-- {prs_waiting_on_team.t_compiler}
+{{issues::render(issues=prs_waiting_on_team_t_compiler, empty="There are no PR's waiting on T-compiler this time.")}}
 
 3. [PR's waiting on libs-impl](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+is%3Apr+label%3AS-waiting-on-team+label%3Alibs-impl)
     - Explicitly nominate any that you think may be able to be resolved *quickly* in triage meeting.
 
 ### Issues
 
-- {prs_waiting_on_team.libs_impl}
+{{issues::render(issues=prs_waiting_on_team_libs_impl, empty="There are no PR's waiting on libs-impl this time.")}}

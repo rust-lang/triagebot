@@ -1,3 +1,5 @@
+{% import "_issues.tt" as issues %}
+
 ---
 tags: weekly, rustc
 ---
@@ -10,13 +12,13 @@ tags: weekly, rustc
 
 - Major Changes Proposals:
   - New accepted proposals
-    - {mcp.accepted}
+{{issues::render(issues=mcp_accepted, indent="    ", empty="No new accepted proposals this time.")}}
   - Seconded proposals (in FCP)
-    - {mcp.seconded}
+{{issues::render(issues=mcp_seconded, indent="    ", empty="No seconded proposals this time.")}}
   - New proposals (not seconded)
-    - {mcp.new_not_seconded}
+{{issues::render(issues=mcp_new_not_seconded, indent="    ", empty="No new proposals this time.")}}
   - Old proposals (not seconded)
-    - {mcp.old_not_seconded}
+{{issues::render(issues=mcp_old_not_seconded, indent="    ", empty="No old proposals this time.")}}
 
 ### WG checkins
 
@@ -29,67 +31,67 @@ tags: weekly, rustc
 ## Beta-nominations
 
 [T-compiler](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-compiler)
-- {beta_nominated.t_compiler}
+{{issues::render(issues=beta_nominated_t_compiler, empty="No beta nominations this time.")}}
 
 [libs-impl](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3Alibs-impl)
-- {beta_nominated.libs_impl}
+{{issues::render(issues=beta_nominated_libs_impl, empty="No beta nominations this time.")}}
 
 [T-rustdoc](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-rustdoc)
-- {beta_nominated.t_rustdoc}
+{{issues::render(issues=beta_nominated_t_rustdoc, empty="No beta nominations this time.")}}
 
 :back: / :shrug: / :hand:
 
 ## Stable-nominations
 
 [T-compiler](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-compiler)
-- {stable_nominated.t_compiler}
+{{issues::render(issues=stable_nominated_t_compiler, empty="No stable nominations this time.")}}
 
 [libs-impl](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3Alibs-impl)
-- {stable_nominated.libs_impl}
+{{issues::render(issues=stable_nominated_libs_impl, empty="No stable nominations this time.")}}
 
 [T-rustdoc](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-rustdoc)
-- {stable_nominated.t_rustdoc}
+{{issues::render(issues=stable_nominated_t_rustdoc, empty="No stable nominations this time.")}}
 
 :back: / :shrug: / :hand:
 
-## PR's S-waiting-on-team
+## PRs S-waiting-on-team
 
 [T-compiler](https://github.com/rust-lang/rust/pulls?utf8=%E2%9C%93&q=is%3Aopen+label%3AS-waiting-on-team+label%3AT-compiler)
-- {prs_waiting_on_team.t_compiler}
+{{issues::render(issues=prs_waiting_on_team_t_compiler, empty="No PRs waiting on T-compiler this time.")}}
 
 [libs-impl](https://github.com/rust-lang/rust/pulls?utf8=%E2%9C%93&q=is%3Aopen+label%3AS-waiting-on-team+label%3Alibs-impl)
-- {prs_waiting_on_team.libs_impl}
+{{issues::render(issues=prs_waiting_on_team_libs_impl, empty="No PRs wiating on libs-impl this time.")}}
 
 ## Issues of Note
 
 ### Short Summary
 
-- [{issues_of_note.p_critical} T-compiler P-critical issues](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AT-compiler+label%3AP-critical+)
-  - [{issues_of_note.unassigned_p_critical} of those are unassigned](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AT-compiler+label%3AP-critical+no%3Aassignee)
-- [{issues_of_note.p_high} T-compiler P-high issues](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AT-compiler+label%3AP-high+)
-  - [{issues_of_note.unassigned_p_high} of those are unassigned](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AT-compiler+label%3AP-high+no%3Aassignee)
-- [{issues_of_note.regression_from_stable_to_beta.p-critical} P-critical, {issues_of_note.regression_from_stable_to_beta.p-high} P-high, {issues_of_note.regression_from_stable_to_beta.p-medium} P-medium, {issues_of_note.regression_from_stable_to_beta.p-low} P-low regression-from-stable-to-beta](https://github.com/rust-lang/rust/labels/regression-from-stable-to-beta)
-- [{issues_of_note.regression_from_stable_to_nightly.p-critical} P-critical, {issues_of_note.regression_from_stable_to_nightly.p-high} P-high, {issues_of_note.regression_from_stable_to_nightly.p-medium} P-medium, {issues_of_note.regression_from_stable_to_nightly.p-low} P-low regression-from-stable-to-nightly](https://github.com/rust-lang/rust/labels/regression-from-stable-to-nightly)
-- [{issues_of_note.regression_from_stable_to_stable.p-critical} P-critical, {issues_of_note.regression_from_stable_to_stable.p-high} P-high, {issues_of_note.regression_from_stable_to_stable.p-medium} P-medium, {issues_of_note.regression_from_stable_to_stable.p-low} P-low regression-from-stable-to-stable](https://github.com/rust-lang/rust/labels/regression-from-stable-to-stable)
+- [{{issues_of_note_p_critical}} T-compiler P-critical issues](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AT-compiler+label%3AP-critical+)
+  - [{{issues_of_note_unassigned_p_critical}} of those are unassigned](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AT-compiler+label%3AP-critical+no%3Aassignee)
+- [{{issues_of_note_p_high}} T-compiler P-high issues](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AT-compiler+label%3AP-high+)
+  - [{{issues_of_note_unassigned_p_high}} of those are unassigned](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AT-compiler+label%3AP-high+no%3Aassignee)
+- [{{issues_of_note_regression_from_stable_to_beta_p_critical}} P-critical, {{issues_of_note_regression_from_stable_to_beta_p_high}} P-high, {{issues_of_note_regression_from_stable_to_beta_p_medium}} P-medium, {{issues_of_note_regression_from_stable_to_beta_p_low}} P-low regression-from-stable-to-beta](https://github.com/rust-lang/rust/labels/regression-from-stable-to-beta)
+- [{{issues_of_note_regression_from_stable_to_nightly_p_critical}} P-critical, {{issues_of_note_regression_from_stable_to_nightly_p_high}} P-high, {{issues_of_note_regression_from_stable_to_nightly_p_medium}} P-medium, {{issues_of_note_regression_from_stable_to_nightly_p_low}} P-low regression-from-stable-to-nightly](https://github.com/rust-lang/rust/labels/regression-from-stable-to-nightly)
+- [{{issues_of_note_regression_from_stable_to_stable_p_critical}} P-critical, {{issues_of_note_regression_from_stable_to_stable_p_high}} P-high, {{issues_of_note_regression_from_stable_to_stable_p_medium}} P-medium, {{issues_of_note_regression_from_stable_to_stable_p_low}} P-low regression-from-stable-to-stable](https://github.com/rust-lang/rust/labels/regression-from-stable-to-stable)
 
 ### P-critical
 
 [T-compiler](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AP-critical+label%3AT-compiler)
-- {p_critical.t_compiler}
+{{issues::render(issues=p_critical_t_compiler, empty="No P-critical issues for T-compiler this time.")}}
 
 [libs-impl](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AP-critical+label%3Alibs-impl)
-- {p_critical.libs_impl}
+{{issues::render(issues=p_critical_libs_impl, empty="No P-critical issues for libs-impl this time.")}}
 
 [T-rustdoc](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AP-critical+label%3AT-rustdoc)
-- {p_critical.t_rustdoc}
+{{issues::render(issues=p_critical_t_rustdoc, empty="No P-critical issues for T-rustdoc this time.")}}
 
 ### Unassigned P-high regressions
 
 [Beta regressions](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3Aregression-from-stable-to-beta+P-high+no%3Aassignee)
-- {beta_regressions.unassigned_p_high}
+{{issues::render(issues=beta_regressions_unassigned_p_high, empty="No unassigned P-high beta regressions this time.")}}
 
 [Nightly regressions](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3Aregression-from-stable-to-nightly+P-high+no%3Aassignee)
-- {nightly_regressions.unassigned_p_high}
+{{issues::render(issues=nightly_regressions_unassigned_p_high, empty="No unassigned P-high nightly regressions this time.")}}
 
 ## Performance logs
 
@@ -99,7 +101,7 @@ tags: weekly, rustc
 ## Nominated Issues
 
 [T-compiler](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AI-nominated+label%3AT-compiler)
-- {i_nominated.t_compiler}
+{{issues::render(issues=i_nominated_t_compiler, empty="No nominated issues for T-compiler this time.")}}
 
 [libs-impl](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AI-nominated+label%3Alibs-impl)
-- {i_nominated.libs_impl}
+{{issues::render(issues=i_nominated_libs_impl, empty="No nominated issues for libs-impl this time.")}}
