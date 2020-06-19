@@ -1,4 +1,4 @@
 {% macro render(issue) -%}
-"{{issue.title}}" [#{{issue.number}}]({{issue.html_url}}) {{issue.pr}}labels=[{{issue.labels}}}] assignees=[{{issue.assignees}}]
+"{{issue.title}}" [#{{issue.number}}]({{issue.html_url}})
 {%- endmacro %}
 

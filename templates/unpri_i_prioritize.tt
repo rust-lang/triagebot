@@ -1,4 +1,4 @@
-{% import "_issues.tt" as issues %}
+{% import "_issues_with_meta.tt" as issues %}
 
 ## Unprioritized I-prioritize
 

@@ -1,0 +1,5 @@
+{% import "_issue_with_meta.tt" as issue %}
+
+{% macro render(issues, indent="", empty="No issues this time.") -%}
+{% for issue in issues %}{{indent}}- {{issue::render(issue=issue)}}{% else %}{{indent}}- {{empty}}{% endfor %}
+{%- endmacro %}
