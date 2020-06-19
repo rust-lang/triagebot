@@ -1,14 +1,14 @@
 use std::io::{self, Write};
-use triagebot::{logger, meeting::Action, prioritization};
+use triagebot::{actions::Action, logger, prioritization};
 
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
     logger::init();
 
-    let meeting = prioritization::prepare_meeting();
+    let prioritization_steps = prioritization::prepare_steps();
 
-    for step in &meeting.steps {
+    for step in &prioritization_steps {
         println!("{}", step.call().await);
 
         press_key_to_continue();

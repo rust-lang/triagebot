@@ -6,10 +6,6 @@ use tera::{Context, Tera};
 
 use crate::github::{self, GithubClient, Repository};
 
-pub struct Meeting<A: Action> {
-    pub steps: Vec<A>,
-}
-
 #[async_trait]
 pub trait Action {
     async fn call(&self) -> String;

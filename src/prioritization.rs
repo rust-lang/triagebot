@@ -1,17 +1,15 @@
+use crate::actions::{Query, QueryMap, Step};
 use crate::github;
-use crate::meeting::{Meeting, Query, QueryMap, Step};
 
-pub fn prepare_meeting<'a>() -> Meeting<Step<'a>> {
-    Meeting {
-        steps: vec![
-            unpri_i_prioritize(),
-            regressions(),
-            nominations(),
-            prs_waiting_on_team(),
-            agenda(),
-            final_review(),
-        ],
-    }
+pub fn prepare_steps<'a>() -> Vec<Step<'a>> {
+    vec![
+        unpri_i_prioritize(),
+        regressions(),
+        nominations(),
+        prs_waiting_on_team(),
+        agenda(),
+        final_review(),
+    ]
 }
 
 pub fn unpri_i_prioritize<'a>() -> Step<'a> {
