@@ -1,5 +1,8 @@
 #![allow(clippy::new_without_default)]
 
+#[macro_use]
+extern crate lazy_static;
+
 use anyhow::Context;
 use handlers::HandlerError;
 use interactions::ErrorComment;

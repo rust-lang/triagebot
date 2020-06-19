@@ -40,17 +40,21 @@ pub struct IssueDecorator {
     pub assignees: String,
 }
 
-#[async_trait]
-impl<'a> Action for Step<'a> {
-    async fn call(&self) -> String {
-        let tera = match Tera::new("templates/*") {
+lazy_static! {
+    pub static ref TEMPLATES: Tera = {
+        match Tera::new("templates/*") {
             Ok(t) => t,
             Err(e) => {
                 println!("Parsing error(s): {}", e);
                 ::std::process::exit(1);
             }
-        };
+        }
+    };
+}
 
+#[async_trait]
+impl<'a> Action for Step<'a> {
+    async fn call(&self) -> String {
         let gh = GithubClient::new(
             Client::new(),
             env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"),
@@ -135,6 +139,8 @@ impl<'a> Action for Step<'a> {
             }
         }
 
-        tera.render(&format!("{}.tt", self.name), &context).unwrap()
+        TEMPLATES
+            .render(&format!("{}.tt", self.name), &context)
+            .unwrap()
     }
 }
