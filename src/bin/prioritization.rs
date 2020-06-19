@@ -1,5 +1,5 @@
 use std::io::{self, Write};
-use triagebot::{actions::Action, logger, prioritization};
+use triagebot::{logger, prioritization};
 
 #[tokio::main]
 async fn main() {

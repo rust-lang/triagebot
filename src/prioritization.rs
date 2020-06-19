@@ -1,7 +1,7 @@
-use crate::actions::{Query, QueryMap, Step};
+use crate::actions::{Action, Query, QueryMap, Step};
 use crate::github;
 
-pub fn prepare_steps<'a>() -> Vec<Step<'a>> {
+pub fn prepare_steps<'a>() -> Vec<Box<dyn Action>> {
     vec![
         unpri_i_prioritize(),
         regressions(),
@@ -12,7 +12,7 @@ pub fn prepare_steps<'a>() -> Vec<Step<'a>> {
     ]
 }
 
-pub fn unpri_i_prioritize<'a>() -> Step<'a> {
+pub fn unpri_i_prioritize<'a>() -> Box<Step<'a>> {
     let mut queries = Vec::new();
 
     queries.push(QueryMap {
@@ -45,16 +45,16 @@ pub fn unpri_i_prioritize<'a>() -> Step<'a> {
         },
     });
 
-    Step {
+    Box::new(Step {
         name: "unpri_i_prioritize",
         actions: vec![Query {
             repo: "rust-lang/rust",
             queries,
         }],
-    }
+    })
 }
 
-pub fn regressions<'a>() -> Step<'a> {
+pub fn regressions<'a>() -> Box<Step<'a>> {
     let mut queries = Vec::new();
 
     queries.push(QueryMap {
@@ -114,16 +114,16 @@ pub fn regressions<'a>() -> Step<'a> {
         },
     });
 
-    Step {
+    Box::new(Step {
         name: "regressions",
         actions: vec![Query {
             repo: "rust-lang/rust",
             queries,
         }],
-    }
+    })
 }
 
-pub fn nominations<'a>() -> Step<'a> {
+pub fn nominations<'a>() -> Box<Step<'a>> {
     let mut queries = Vec::new();
 
     queries.push(QueryMap {
@@ -176,16 +176,16 @@ pub fn nominations<'a>() -> Step<'a> {
         },
     });
 
-    Step {
+    Box::new(Step {
         name: "nominations",
         actions: vec![Query {
             repo: "rust-lang/rust",
             queries,
         }],
-    }
+    })
 }
 
-pub fn prs_waiting_on_team<'a>() -> Step<'a> {
+pub fn prs_waiting_on_team<'a>() -> Box<Step<'a>> {
     let mut queries = Vec::new();
 
     queries.push(QueryMap {
@@ -218,16 +218,16 @@ pub fn prs_waiting_on_team<'a>() -> Step<'a> {
         },
     });
 
-    Step {
+    Box::new(Step {
         name: "prs_waiting_on_team",
         actions: vec![Query {
             repo: "rust-lang/rust",
             queries,
         }],
-    }
+    })
 }
 
-pub fn agenda<'a>() -> Step<'a> {
+pub fn agenda<'a>() -> Box<Step<'a>> {
     let mut actions = Vec::new();
 
     let mut queries = Vec::new();
@@ -599,15 +599,15 @@ pub fn agenda<'a>() -> Step<'a> {
         queries,
     });
 
-    Step {
+    Box::new(Step {
         name: "agenda",
         actions,
-    }
+    })
 }
 
-pub fn final_review<'a>() -> Step<'a> {
-    Step {
+pub fn final_review<'a>() -> Box<Step<'a>> {
+    Box::new(Step {
         name: "final_review",
         actions: vec![],
-    }
+    })
 }
