@@ -62,7 +62,7 @@ impl Handler for AutolabelHandler {
             }
             if e.action == github::IssuesAction::Closed {
                 let labels = event.issue().unwrap().labels();
-                if let Some(x) = labels.clone().into_iter().position(|x| x.name == "I-prioritize") {
+                if let Some(x) = labels.iter().position(|x| x.name == "I-prioritize") {
                     let mut labels_excluded = labels.to_vec();
                     labels_excluded.remove(x);
                     return Ok(Some(AutolabelInput { labels: labels_excluded }));
