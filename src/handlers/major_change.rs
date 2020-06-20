@@ -128,7 +128,7 @@ async fn handle_input(
                 return Ok(());
             }
             (format!(
-                "A new proposal has been announced [#{}]({}). It will be brought up at the next meeting.",
+                "A new proposal has been announced: [#{}]({}). It will be brought up at the next meeting.",
                 issue.number,
                 event.html_url().unwrap()
             ), config.meeting_label.clone())
