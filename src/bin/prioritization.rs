@@ -18,7 +18,7 @@ async fn main() {
 fn press_key_to_continue() {
     let mut stdout = io::stdout();
     stdout
-        .write(b"Press a key to continue ...")
+        .write(b"[Press Enter to continue]")
         .expect("Unable to write to stdout");
     stdout.flush().expect("Unable to flush stdout");
 
