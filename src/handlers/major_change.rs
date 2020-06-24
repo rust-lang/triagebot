@@ -127,11 +127,18 @@ async fn handle_input(
                 cmnt.post(&ctx.github).await?;
                 return Ok(());
             }
-            (format!(
-                "A new proposal has been announced: [#{}]({}). It will be brought up at the next meeting.",
-                issue.number,
-                event.html_url().unwrap()
-            ), config.meeting_label.clone())
+            (
+                format!(
+                    "A new proposal has been announced: [#{}]({}). It will be
+                announced at the next meeting to try and draw attention to it,
+                but usually MCPs are not discussed during triage meetings. If
+                you think this would benefit from discussion amongst the
+                compiler team, consider proposing a design meeting.",
+                    issue.number,
+                    event.html_url().unwrap()
+                ),
+                config.meeting_label.clone(),
+            )
         }
     };
 
