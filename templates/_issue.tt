@@ -1,0 +1,1 @@
+{% macro render(issue) %}"{{issue.title}}" [#{{issue.number}}]({{issue.html_url}}){% endmacro %}

@@ -1,17 +1,20 @@
 #![allow(clippy::new_without_default)]
 
+#[macro_use]
+extern crate lazy_static;
+
 use anyhow::Context;
 use handlers::HandlerError;
 use interactions::ErrorComment;
 use std::fmt;
 
+pub mod actions;
 pub mod config;
 pub mod db;
 pub mod github;
 pub mod handlers;
 pub mod interactions;
 pub mod logger;
-pub mod meeting;
 pub mod notification_listing;
 pub mod payload;
 pub mod prioritization;

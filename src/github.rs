@@ -644,7 +644,10 @@ impl Repository {
             ..
         } = query;
 
-        let use_issues = exclude_labels.is_empty() || filters.iter().any(|&(key, _)| key == "no");
+        let use_issues = exclude_labels.is_empty()
+            && filters
+                .iter()
+                .all(|&(key, _)| key != "no" && key != "closed-days-ago");
         // negating filters can only be handled by the search api
         let url = if use_issues {
             self.build_issues_url(filters, include_labels)
@@ -686,6 +689,7 @@ impl Repository {
             .chain(std::iter::once("filter=all".to_owned()))
             .chain(std::iter::once(format!("sort=created")))
             .chain(std::iter::once(format!("direction=asc")))
+            .chain(std::iter::once(format!("per_page=100")))
             .collect::<Vec<_>>()
             .join("&");
         format!(
@@ -704,7 +708,15 @@ impl Repository {
     ) -> String {
         let filters = filters
             .iter()
-            .map(|(key, val)| format!("{}:{}", key, val))
+            .map(|(key, val)| {
+                if *key == "closed-days-ago" {
+                    let last_week =
+                        Utc::now() - chrono::Duration::days(val.parse::<i64>().unwrap());
+                    format!("closed:>={}", last_week.format("%Y-%m-%d"))
+                } else {
+                    format!("{}:{}", key, val)
+                }
+            })
             .chain(
                 include_labels
                     .iter()
@@ -719,7 +731,7 @@ impl Repository {
             .collect::<Vec<_>>()
             .join("+");
         format!(
-            "{}/search/issues?q={}&sort=created&order=asc",
+            "{}/search/issues?q={}&sort=created&order=asc&per_page=100",
             Repository::GITHUB_API_URL,
             filters
         )

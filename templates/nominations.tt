@@ -1,22 +1,24 @@
+{% import "_issues_with_meta.tt" as issues %}
+
 ## Stable nominations
 
-- [All stable nominations](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=+label%3Astable-nominated)
+- [All stable nominations](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted)
     - Add T-compiler, libs-impl or T-rustdoc tag when it corresponds.
     - Do a sanity check on them.
 
 ### Issues
 
-{nominations.stable_nominated}
+{{-issues::render(issues=nominations_stable_nominated, empty="There are no stable nominations this time.")}}
 
 ## Beta nominations
 
-- [All beta nominations](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=label%3Abeta-nominated)
+- [All beta nominations](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted)
     - Add T-compiler, libs-impl or T-rustdoc tag when it corresponds.
     - Do a sanity check on them.
 
 ### Issues
 
-- {nominations.beta_nominated}
+{{-issues::render(issues=nominations_beta_nominated, empty="There are no beta nominations this time.")}}
 
 ## I-nominated
 
@@ -26,7 +28,7 @@
 
 ### Issues
 
-- {nominations.i_nominated}
+{{-issues::render(issues=nominations_i_nominated, empty="There are no I-nominated issues this time.")}}
 
 2. [I-nominated T-compiler](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AI-nominated+label%3AT-compiler)
     - Remove leftovers from last meeting.
@@ -34,7 +36,7 @@
 
 ### Issues
 
-- {nominations.i_nominated_t_compiler}
+{{-issues::render(issues=nominations_i_nominated_t_compiler, empty="There are no I-nominated issues for T-compiler this time.")}}
 
 3. [I-nominated libs-impl](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AI-nominated+label%3Alibs-impl)
     - Remove leftovers from last meeting.
@@ -42,4 +44,4 @@
 
 ### Issues
 
-- {nominations.i_nominated_libs_impl}
+{{-issues::render(issues=nominations_i_nominated_libs_impl, empty="There are no I-nominated issues for libs-impl this time.")}}

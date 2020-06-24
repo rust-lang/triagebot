@@ -1,15 +1,15 @@
 use std::io::{self, Write};
-use triagebot::{logger, meeting::Action, prioritization};
+use triagebot::{logger, prioritization};
 
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
     logger::init();
 
-    let meeting = prioritization::prepare_meeting();
+    let prioritization_steps = prioritization::prepare_steps();
 
-    for step in &meeting.steps {
-        println!("{}", step.call().await);
+    for step in &prioritization_steps {
+        print!("{}", step.call().await);
 
         press_key_to_continue();
     }
@@ -18,11 +18,13 @@ async fn main() {
 fn press_key_to_continue() {
     let mut stdout = io::stdout();
     stdout
-        .write(b"Press a key to continue ...")
+        .write(b"\n\n[Press Enter to continue]\n")
         .expect("Unable to write to stdout");
     stdout.flush().expect("Unable to flush stdout");
 
     io::stdin()
         .read_line(&mut String::new())
         .expect("Unable to read user input");
+
+    stdout.write(b"\n").expect("Unable to write to stdout");
 }
