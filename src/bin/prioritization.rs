@@ -18,11 +18,13 @@ async fn main() {
 fn press_key_to_continue() {
     let mut stdout = io::stdout();
     stdout
-        .write(b"[Press Enter to continue]")
+        .write(b"\n\n[Press Enter to continue]\n")
         .expect("Unable to write to stdout");
     stdout.flush().expect("Unable to flush stdout");
 
     io::stdin()
         .read_line(&mut String::new())
         .expect("Unable to read user input");
+
+    stdout.write(b"\n").expect("Unable to write to stdout");
 }
