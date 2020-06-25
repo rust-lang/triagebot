@@ -12,6 +12,7 @@ use parser::command::{Command, Input};
 pub(super) enum Invocation {
     Second,
     NewProposal,
+    AcceptedProposal,
 }
 
 pub(super) struct MajorChangeHandler;
@@ -50,7 +51,15 @@ impl Handler for MajorChangeHandler {
 
         if let Event::Issue(e) = event {
             if e.issue.labels().iter().any(|l| l.name == "major-change") {
-                return Ok(Some(Invocation::NewProposal));
+                if e.issue
+                    .labels()
+                    .iter()
+                    .any(|l| l.name == "major-change-accepted")
+                {
+                    return Ok(Some(Invocation::AcceptedProposal));
+                } else {
+                    return Ok(Some(Invocation::NewProposal));
+                }
             }
         }
 
@@ -132,6 +141,24 @@ async fn handle_input(
                 issue.number,
                 event.html_url().unwrap()
             ), config.meeting_label.clone())
+        }
+        Invocation::AcceptedProposal => {
+            if !issue.labels().iter().any(|l| l.name == "major-change") {
+                let cmnt = ErrorComment::new(
+                    &issue,
+                    "This is not a major change (it lacks the `major-change` label).",
+                );
+                cmnt.post(&ctx.github).await?;
+                return Ok(());
+            }
+            (
+                format!(
+                    "This proposal has been accepted: [#{}]({}).",
+                    issue.number,
+                    event.html_url().unwrap()
+                ),
+                config.meeting_label.clone(),
+            )
         }
     };
 
