@@ -9,6 +9,7 @@ use futures::future::{BoxFuture, FutureExt};
 use parser::command::second::SecondCommand;
 use parser::command::{Command, Input};
 
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub(super) enum Invocation {
     Second,
     NewProposal,
@@ -38,27 +39,26 @@ impl Handler for MajorChangeHandler {
             Event::Issue(e) => {
                 if e.action != github::IssuesAction::Opened
                     && e.action != github::IssuesAction::Reopened
+                    && e.action != github::IssuesAction::Labeled
                 {
                     return Ok(None);
+                }
+
+                if e.issue.labels().iter().any(|l| l.name == "major-change") {
+                    if e.issue
+                        .labels()
+                        .iter()
+                        .any(|l| l.name == "major-change-accepted")
+                    {
+                        return Ok(Some(Invocation::AcceptedProposal));
+                    } else {
+                        return Ok(Some(Invocation::NewProposal));
+                    }
                 }
             }
             Event::IssueComment(e) => {
                 if e.action != github::IssueCommentAction::Created {
                     return Ok(None);
-                }
-            }
-        }
-
-        if let Event::Issue(e) = event {
-            if e.issue.labels().iter().any(|l| l.name == "major-change") {
-                if e.issue
-                    .labels()
-                    .iter()
-                    .any(|l| l.name == "major-change-accepted")
-                {
-                    return Ok(Some(Invocation::AcceptedProposal));
-                } else {
-                    return Ok(Some(Invocation::NewProposal));
                 }
             }
         }
@@ -182,20 +182,22 @@ async fn handle_input(
         content: &zulip_msg,
     };
 
-    let topic_url = zulip_req.url();
-    let comment = format!(
-        "This issue is not meant to be used for technical discussion. \
+    if cmd == Invocation::NewProposal {
+        let topic_url = zulip_req.url();
+        let comment = format!(
+            "This issue is not meant to be used for technical discussion. \
         There is a Zulip [stream] for that. Use this issue to leave \
         procedural comments, such as volunteering to review, indicating that you \
         second the proposal (or third, etc), or raising a concern that you would \
         like to be addressed. \
         \n\n[stream]: {}",
-        topic_url
-    );
-    issue
-        .post_comment(&ctx.github, &comment)
-        .await
-        .context("post major change comment")?;
+            topic_url
+        );
+        issue
+            .post_comment(&ctx.github, &comment)
+            .await
+            .context("post major change comment")?;
+    }
 
     let zulip_req = zulip_req.send(&ctx.github.raw());
 
