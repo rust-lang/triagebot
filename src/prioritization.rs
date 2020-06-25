@@ -232,27 +232,7 @@ pub fn agenda<'a>() -> Box<Step<'a>> {
 
     let mut queries = Vec::new();
 
-    // MCP queries
-    queries.push(QueryMap {
-        name: "mcp_accepted",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![("state", "all")],
-            include_labels: vec!["major-change-accepted", "to-announce"],
-            exclude_labels: vec![],
-        },
-    });
-
-    queries.push(QueryMap {
-        name: "mcp_seconded",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![("state", "open")],
-            include_labels: vec!["major-change", "final-comment-period"],
-            exclude_labels: vec![],
-        },
-    });
-
+    // MCP/FCP queries
     queries.push(QueryMap {
         name: "mcp_new_not_seconded",
         query: github::Query {
@@ -273,8 +253,89 @@ pub fn agenda<'a>() -> Box<Step<'a>> {
         },
     });
 
+    queries.push(QueryMap {
+        name: "in_pre_fcp_compiler_team",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open")],
+            include_labels: vec!["proposed-final-comment-period"],
+            exclude_labels: vec![],
+        },
+    });
+    queries.push(QueryMap {
+        name: "in_fcp_compiler_team",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open")],
+            include_labels: vec!["final-comment-period"],
+            exclude_labels: vec![],
+        },
+    });
+
+    queries.push(QueryMap {
+        name: "mcp_accepted",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "all")],
+            include_labels: vec!["major-change-accepted", "to-announce"],
+            exclude_labels: vec![],
+        },
+    });
+
     actions.push(Query {
         repo: "rust-lang/compiler-team",
+        queries,
+    });
+
+    let mut queries = Vec::new();
+
+    queries.push(QueryMap {
+        name: "in_pre_fcp_rust",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open")],
+            include_labels: vec!["proposed-final-comment-period", "T-compiler"],
+            exclude_labels: vec![],
+        },
+    });
+    queries.push(QueryMap {
+        name: "in_fcp_rust",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open")],
+            include_labels: vec!["final-comment-period", "T-compiler"],
+            exclude_labels: vec![],
+        },
+    });
+
+    actions.push(Query {
+        repo: "rust-lang/rust",
+        queries,
+    });
+
+    let mut queries = Vec::new();
+
+    queries.push(QueryMap {
+        name: "in_pre_fcp_forge",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open")],
+            include_labels: vec!["proposed-final-comment-period"],
+            exclude_labels: vec![],
+        },
+    });
+    queries.push(QueryMap {
+        name: "in_fcp_forge",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open")],
+            include_labels: vec!["final-comment-period"],
+            exclude_labels: vec![],
+        },
+    });
+
+    actions.push(Query {
+        repo: "rust-lang/rust-forge",
         queries,
     });
 

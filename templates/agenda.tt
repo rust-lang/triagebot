@@ -10,15 +10,20 @@ tags: weekly, rustc
 
 ## Announcements
 
-- Major Changes Proposals:
-  - New accepted proposals
-{{-issues::render(issues=mcp_accepted, indent="    ", empty="No new accepted proposals this time.")}}
-  - Seconded proposals (in FCP)
-{{-issues::render(issues=mcp_seconded, indent="    ", empty="No seconded proposals this time.")}}
-  - New proposals (not seconded)
+- New MCPs (take a look, see if you like them!)
 {{-issues::render(issues=mcp_new_not_seconded, indent="    ", empty="No new proposals this time.")}}
-  - Old proposals (not seconded)
+- Old MCPs (not seconded, take a look)
 {{-issues::render(issues=mcp_old_not_seconded, indent="    ", empty="No old proposals this time.")}}
+- Pending FCP requests (check your boxes!)
+{{-issues::render(issues=in_pre_fcp_compiler_team, indent="    ", empty="No pending FCP requests on rust repo this time.")}}
+{{-issues::render(issues=in_pre_fcp_rust, indent="    ", empty="No pending FCP requests on compiler-team repo this time.")}}
+{{-issues::render(issues=in_pre_fcp_forge, indent="    ", empty="No pending FCP requests on forge repo this time.")}}
+- Things in FCP (make sure you're good with it)
+{{-issues::render(issues=in_fcp_compiler_team, indent="    ", empty="No FCP requests on rust repo this time.")}}
+{{-issues::render(issues=in_fcp_rust, indent="    ", empty="No FCP requests on compiler-team repo this time.")}}
+{{-issues::render(issues=in_fcp_forge, indent="    ", empty="No FCP requests on forge repo this time.")}}
+- Accepted MCPs
+{{-issues::render(issues=mcp_accepted, indent="    ", empty="No new accepted proposals this time.")}}
 
 ### WG checkins
 
