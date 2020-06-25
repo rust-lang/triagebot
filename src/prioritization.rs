@@ -237,8 +237,8 @@ pub fn agenda<'a>() -> Box<Step<'a>> {
         name: "mcp_accepted",
         query: github::Query {
             kind: github::QueryKind::List,
-            filters: vec![("state", "closed"), ("closed-days-ago", "7")],
-            include_labels: vec!["major-change-accepted"],
+            filters: vec![("state", "all")],
+            include_labels: vec!["major-change-accepted", "to-announce"],
             exclude_labels: vec![],
         },
     });

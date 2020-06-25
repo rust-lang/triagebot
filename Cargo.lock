@@ -445,7 +445,7 @@ name = "globset"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "aho-corasick 0.7.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "aho-corasick 0.7.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "bstr 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
