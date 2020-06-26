@@ -122,7 +122,8 @@ async fn handle_input(
             }
 
             (format!(
-                "@*T-compiler*: Proposal [#{}]({}) has been seconded, and will be approved in 10 days if no objections are raised.",
+                "@*{}*: Proposal [#{}]({}) has been seconded, and will be approved in 10 days if no objections are raised.",
+                config.zulip_ping,
                 issue.number,
                 event.html_url().unwrap()
             ), config.second_label.clone())
@@ -136,11 +137,18 @@ async fn handle_input(
                 cmnt.post(&ctx.github).await?;
                 return Ok(());
             }
-            (format!(
-                "A new proposal has been announced: [#{}]({}). It will be brought up at the next meeting.",
-                issue.number,
-                event.html_url().unwrap()
-            ), config.meeting_label.clone())
+            (
+                format!(
+                    "A new proposal has been announced: [#{}]({}). It will be
+                announced at the next meeting to try and draw attention to it,
+                but usually MCPs are not discussed during triage meetings. If
+                you think this would benefit from discussion amongst the
+                team, consider proposing a design meeting.",
+                    issue.number,
+                    event.html_url().unwrap()
+                ),
+                config.meeting_label.clone(),
+            )
         }
         Invocation::AcceptedProposal => {
             if !issue.labels().iter().any(|l| l.name == "major-change") {
