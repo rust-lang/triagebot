@@ -126,6 +126,7 @@ pub(crate) struct NotifyZulipLabelConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct MajorChangeConfig {
+    pub(crate) zulip_ping: String,
     pub(crate) second_label: String,
     pub(crate) meeting_label: String,
     pub(crate) zulip_stream: u64,

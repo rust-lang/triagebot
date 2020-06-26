@@ -113,7 +113,8 @@ async fn handle_input(
             }
 
             (format!(
-                "@*T-compiler*: Proposal [#{}]({}) has been seconded, and will be approved in 10 days if no objections are raised.",
+                "@*{}*: Proposal [#{}]({}) has been seconded, and will be approved in 10 days if no objections are raised.",
+                config.zulip_ping,
                 issue.number,
                 event.html_url().unwrap()
             ), config.second_label.clone())
@@ -133,7 +134,7 @@ async fn handle_input(
                 announced at the next meeting to try and draw attention to it,
                 but usually MCPs are not discussed during triage meetings. If
                 you think this would benefit from discussion amongst the
-                compiler team, consider proposing a design meeting.",
+                team, consider proposing a design meeting.",
                     issue.number,
                     event.html_url().unwrap()
                 ),
