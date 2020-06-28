@@ -182,11 +182,11 @@ async fn handle_input(
         &issue.title[..std::cmp::min(issue.title.len(), 60 - zulip_topic.len())],
     );
 
-    let zulip_stream = config.zulip_stream.to_string();
     let zulip_req = crate::zulip::MessageApiRequest {
-        type_: "stream",
-        to: &zulip_stream,
-        topic: Some(&zulip_topic),
+        recipient: crate::zulip::Recipient::Stream {
+            id: config.zulip_stream,
+            topic: &zulip_topic,
+        },
         content: &zulip_msg,
     };
 
