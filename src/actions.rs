@@ -31,6 +31,7 @@ pub struct IssueDecorator {
     pub number: u64,
     pub title: String,
     pub html_url: String,
+    pub repo_name: String,
     pub labels: String,
     pub assignees: String,
 }
@@ -75,6 +76,13 @@ impl<'a> Action for Step<'a> {
                                         title: issue.title.clone(),
                                         number: issue.number,
                                         html_url: issue.html_url.clone(),
+                                        repo_name: repository
+                                            .full_name
+                                            .clone()
+                                            .split("/")
+                                            .last()
+                                            .expect("Failed to split repository name")
+                                            .to_string(),
                                         labels: issue
                                             .labels
                                             .iter()
