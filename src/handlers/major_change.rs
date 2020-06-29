@@ -52,7 +52,17 @@ impl Handler for MajorChangeHandler {
                     {
                         return Ok(Some(Invocation::AcceptedProposal));
                     } else {
-                        return Ok(Some(Invocation::NewProposal));
+                        // Opening an issue with a label assigned triggers both
+                        // "Opened" and "labeled" events.
+                        if e.action == github::IssuesAction::Opened
+                            || e.action == github::IssuesAction::Reopened
+                        {
+                            return Ok(Some(Invocation::NewProposal));
+                        } else {
+                            // Nothing to do, issue was labeled, but not marked
+                            // as accepted
+                            return Ok(None);
+                        }
                     }
                 }
             }
