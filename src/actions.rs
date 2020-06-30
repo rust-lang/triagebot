@@ -78,7 +78,6 @@ impl<'a> Action for Step<'a> {
                                         html_url: issue.html_url.clone(),
                                         repo_name: repository
                                             .full_name
-                                            .clone()
                                             .split("/")
                                             .last()
                                             .expect("Failed to split repository name")
