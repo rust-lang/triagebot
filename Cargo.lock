@@ -863,7 +863,7 @@ dependencies = [
  "once_cell 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.114 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.55 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.56 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_path_to_error 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "snafu 0.6.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 2.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1209,7 +1209,7 @@ dependencies = [
  "percent-encoding 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pin-project-lite 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.114 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.55 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.56 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_urlencoded 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-tls 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1328,7 +1328,7 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.55"
+version = "1.0.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "itoa 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1487,7 +1487,7 @@ dependencies = [
  "pest_derive 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.114 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.55 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.56 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1644,7 +1644,7 @@ dependencies = [
  "reqwest 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust_team_data 1.0.0 (git+https://github.com/rust-lang/team)",
  "serde 1.0.114 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.55 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.56 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_path_to_error 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tera 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1773,7 +1773,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.114 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.55 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.56 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasm-bindgen-macro 0.2.56 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2072,7 +2072,7 @@ dependencies = [
 "checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 "checksum serde 1.0.114 (registry+https://github.com/rust-lang/crates.io-index)" = "5317f7588f0a5078ee60ef675ef96735a1442132dc645eb1d12c018620ed8cd3"
 "checksum serde_derive 1.0.114 (registry+https://github.com/rust-lang/crates.io-index)" = "2a0be94b04690fbaed37cddffc5c134bf537c8e3329d53e982fe04c374978f8e"
-"checksum serde_json 1.0.55 (registry+https://github.com/rust-lang/crates.io-index)" = "ec2c5d7e739bc07a3e73381a39d61fdb5f671c60c1df26a130690665803d8226"
+"checksum serde_json 1.0.56 (registry+https://github.com/rust-lang/crates.io-index)" = "3433e879a558dde8b5e8feb2a04899cf34fdde1fafb894687e52105fc1162ac3"
 "checksum serde_path_to_error 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "913be57cc4ce01e57709c49d3f9a73e0019ae0ba26c4063d7bc15351d68f3593"
 "checksum serde_urlencoded 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "9ec5d77e2d4c73717816afac02670d5c4f534ea95ed430442cad02e7a6e32c97"
 "checksum sha-1 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f7d94d0bede923b3cea61f3f1ff57ff8cdfd77b400fb8f9998949e0cf04163df"
