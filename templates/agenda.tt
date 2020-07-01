@@ -65,7 +65,7 @@ tags: weekly, rustc
 {{-issues::render(issues=prs_waiting_on_team_t_compiler, empty="No PRs waiting on T-compiler this time.")}}
 
 [libs-impl](https://github.com/rust-lang/rust/pulls?utf8=%E2%9C%93&q=is%3Aopen+label%3AS-waiting-on-team+label%3Alibs-impl)
-{{-issues::render(issues=prs_waiting_on_team_libs_impl, empty="No PRs wiating on libs-impl this time.")}}
+{{-issues::render(issues=prs_waiting_on_team_libs_impl, empty="No PRs waiting on libs-impl this time.")}}
 
 ## Issues of Note
 
