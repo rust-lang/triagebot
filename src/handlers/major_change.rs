@@ -39,7 +39,9 @@ impl Handler for MajorChangeHandler {
             Event::Issue(e) => {
                 // If we were labeled with accepted, then issue that event
                 if e.action == IssuesAction::Labeled
-                    && e.label.map_or(false, |l| l.name == "major-change-accepted")
+                    && e.label
+                        .as_ref()
+                        .map_or(false, |l| l.name == "major-change-accepted")
                 {
                     return Ok(Some(Invocation::AcceptedProposal));
                 }
@@ -53,7 +55,7 @@ impl Handler for MajorChangeHandler {
                 if (e.action == IssuesAction::Reopened
                     && e.issue.labels().iter().any(|l| l.name == "major-change"))
                     || (e.action == IssuesAction::Labeled
-                        && e.label.map_or(false, |l| l.name == "major-change"))
+                        && e.label.as_ref().map_or(false, |l| l.name == "major-change"))
                 {
                     return Ok(Some(Invocation::NewProposal));
                 }
