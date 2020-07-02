@@ -1,6 +1,6 @@
 use crate::{
     config::MajorChangeConfig,
-    github::{self, Event},
+    github::{self, Event, IssuesAction},
     handlers::{Context, Handler},
     interactions::ErrorComment,
 };
@@ -37,34 +37,29 @@ impl Handler for MajorChangeHandler {
 
         match event {
             Event::Issue(e) => {
-                if e.action != github::IssuesAction::Opened
-                    && e.action != github::IssuesAction::Reopened
-                    && e.action != github::IssuesAction::Labeled
+                // If we were labeled with accepted, then issue that event
+                if e.action == IssuesAction::Labeled
+                    && e.label.map_or(false, |l| l.name == "major-change-accepted")
                 {
-                    return Ok(None);
+                    return Ok(Some(Invocation::AcceptedProposal));
                 }
 
-                if e.issue.labels().iter().any(|l| l.name == "major-change") {
-                    if e.issue
-                        .labels()
-                        .iter()
-                        .any(|l| l.name == "major-change-accepted")
-                    {
-                        return Ok(Some(Invocation::AcceptedProposal));
-                    } else {
-                        // Opening an issue with a label assigned triggers both
-                        // "Opened" and "labeled" events.
-                        if e.action == github::IssuesAction::Opened
-                            || e.action == github::IssuesAction::Reopened
-                        {
-                            return Ok(Some(Invocation::NewProposal));
-                        } else {
-                            // Nothing to do, issue was labeled, but not marked
-                            // as accepted
-                            return Ok(None);
-                        }
-                    }
+                // Opening an issue with a label assigned triggers both
+                // "Opened" and "Labeled" events.
+                //
+                // We want to treat reopened issues as new proposals but if the
+                // issues is freshly opened, we only want to trigger once;
+                // currently we do so on the label event.
+                if (e.action == IssuesAction::Reopened
+                    && e.issue.labels().iter().any(|l| l.name == "major-change"))
+                    || (e.action == IssuesAction::Labeled
+                        && e.label.map_or(false, |l| l.name == "major-change"))
+                {
+                    return Ok(Some(Invocation::NewProposal));
                 }
+
+                // All other issue events are ignored
+                return Ok(None);
             }
             Event::IssueComment(e) => {
                 if e.action != github::IssueCommentAction::Created {
