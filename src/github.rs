@@ -644,7 +644,7 @@ impl Repository {
             ..
         } = query;
 
-        let use_issues = exclude_labels.is_empty() || filters.iter().any(|&(key, _)| key == "no");
+        let use_issues = exclude_labels.is_empty() && filters.iter().all(|&(key, _)| key != "no");
         // negating filters can only be handled by the search api
         let url = if use_issues {
             self.build_issues_url(filters, include_labels)
