@@ -15,12 +15,12 @@ tags: weekly, rustc
 - Old MCPs (not seconded, take a look)
 {{-issues::render(issues=mcp_old_not_seconded, indent="    ", empty="No old proposals this time.")}}
 - Pending FCP requests (check your boxes!)
-{{-issues::render(issues=in_pre_fcp_compiler_team, indent="    ", empty="No pending FCP requests on rust repo this time.")}}
-{{-issues::render(issues=in_pre_fcp_rust, indent="    ", empty="No pending FCP requests on compiler-team repo this time.")}}
+{{-issues::render(issues=in_pre_fcp_compiler_team, indent="    ", empty="No pending FCP requests on compiler-team repo this time.")}}
+{{-issues::render(issues=in_pre_fcp_rust, indent="    ", empty="No pending FCP requests on rust repo this time.")}}
 {{-issues::render(issues=in_pre_fcp_forge, indent="    ", empty="No pending FCP requests on forge repo this time.")}}
 - Things in FCP (make sure you're good with it)
-{{-issues::render(issues=in_fcp_compiler_team, indent="    ", empty="No FCP requests on rust repo this time.")}}
-{{-issues::render(issues=in_fcp_rust, indent="    ", empty="No FCP requests on compiler-team repo this time.")}}
+{{-issues::render(issues=in_fcp_compiler_team, indent="    ", empty="No FCP requests on compiler-team repo this time.")}}
+{{-issues::render(issues=in_fcp_rust, indent="    ", empty="No FCP requests on rust repo this time.")}}
 {{-issues::render(issues=in_fcp_forge, indent="    ", empty="No FCP requests on forge repo this time.")}}
 - Accepted MCPs
 {{-issues::render(issues=mcp_accepted, indent="    ", empty="No new accepted proposals this time.")}}
@@ -65,7 +65,7 @@ tags: weekly, rustc
 {{-issues::render(issues=prs_waiting_on_team_t_compiler, empty="No PRs waiting on T-compiler this time.")}}
 
 [libs-impl](https://github.com/rust-lang/rust/pulls?utf8=%E2%9C%93&q=is%3Aopen+label%3AS-waiting-on-team+label%3Alibs-impl)
-{{-issues::render(issues=prs_waiting_on_team_libs_impl, empty="No PRs wiating on libs-impl this time.")}}
+{{-issues::render(issues=prs_waiting_on_team_libs_impl, empty="No PRs waiting on libs-impl this time.")}}
 
 ## Issues of Note
 
