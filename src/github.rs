@@ -541,6 +541,16 @@ impl Issue {
     }
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct ChangeInner {
+    pub from: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct Changes {
+    pub body: ChangeInner,
+}
+
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PullRequestReviewAction {
@@ -554,12 +564,14 @@ pub struct PullRequestReviewEvent {
     pub action: PullRequestReviewAction,
     pub pull_request: Issue,
     pub review: Comment,
+    pub changes: Option<Changes>,
     pub repository: Repository,
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct PullRequestReviewComment {
     pub action: IssueCommentAction,
+    pub changes: Option<Changes>,
     #[serde(rename = "pull_request")]
     pub issue: Issue,
     pub comment: Comment,
@@ -577,6 +589,7 @@ pub enum IssueCommentAction {
 #[derive(Debug, serde::Deserialize)]
 pub struct IssueCommentEvent {
     pub action: IssueCommentAction,
+    pub changes: Option<Changes>,
     pub issue: Issue,
     pub comment: Comment,
     pub repository: Repository,
@@ -612,6 +625,7 @@ pub struct IssuesEvent {
     pub action: IssuesAction,
     #[serde(alias = "pull_request")]
     pub issue: Issue,
+    pub changes: Option<Changes>,
     pub repository: Repository,
     /// Some if action is IssuesAction::Labeled, for example
     pub label: Option<Label>,
@@ -766,6 +780,14 @@ impl Event {
         match self {
             Event::Issue(e) => Some(&e.issue.body),
             Event::IssueComment(e) => Some(&e.comment.body),
+        }
+    }
+
+    /// This will both extract from IssueComment events but also Issue events
+    pub fn comment_from(&self) -> Option<&str> {
+        match self {
+            Event::Issue(e) => Some(&e.changes.as_ref()?.body.from),
+            Event::IssueComment(e) => Some(&e.changes.as_ref()?.body.from),
         }
     }
 
