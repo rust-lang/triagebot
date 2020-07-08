@@ -63,15 +63,21 @@ impl Handler for MajorChangeHandler {
                 // All other issue events are ignored
                 return Ok(None);
             }
-            Event::IssueComment(e) => {
-                if e.action != github::IssueCommentAction::Created {
-                    return Ok(None);
-                }
-            }
+            Event::IssueComment(e) => {}
         }
 
         let mut input = Input::new(&body, &ctx.username);
-        match input.parse_command() {
+        let command = input.parse_command();
+        
+        if let Some(previous) = event.comment_from() {
+            let mut prev_input = Input::new(&previous, &ctx.username);
+            let prev_command = prev_input.parse_command();
+            if command == prev_command {
+                return Ok(None);
+            }
+        }
+        
+        match command {
             Command::Second(Ok(SecondCommand)) => Ok(Some(Invocation::Second)),
             _ => Ok(None),
         }
@@ -107,14 +113,6 @@ async fn handle_input(
                 return Ok(());
             }
 
-            if !issue.labels().iter().any(|l| l.name == "major-change") {
-                let cmnt = ErrorComment::new(
-                    &issue,
-                    "This is not a major change (it lacks the `major-change` label).",
-                );
-                cmnt.post(&ctx.github).await?;
-                return Ok(());
-            }
             let is_team_member =
                 if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await {
                     false

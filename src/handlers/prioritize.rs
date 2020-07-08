@@ -25,9 +25,27 @@ impl Handler for PrioritizeHandler {
             // not interested in other events
             return Ok(None);
         };
+        
+        if let Event::Issue(e) = event {
+            if !matches!(e.action, github::IssuesAction::Opened | github::IssuesAction::Edited) {
+                // skip events other than opening or editing the issue to avoid retriggering commands in the
+                // issue body
+                return Ok(None);
+            }
+        }
 
         let mut input = Input::new(&body, &ctx.username);
-        match input.parse_command() {
+        let command = input.parse_command();
+        
+        if let Some(previous) = event.comment_from() {
+            let mut prev_input = Input::new(&previous, &ctx.username);
+            let prev_command = prev_input.parse_command();
+            if command == prev_command {
+                return Ok(None);
+            }
+        }
+        
+        match command {
             Command::Prioritize(Ok(PrioritizeCommand)) => Ok(Some(PrioritizeCommand)),
             _ => Ok(None),
         }

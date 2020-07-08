@@ -38,15 +38,25 @@ impl Handler for RelabelHandler {
         };
 
         if let Event::Issue(e) = event {
-            if e.action != github::IssuesAction::Opened {
-                // skip events other than opening the issue to avoid retriggering commands in the
+            if !matches!(e.action, github::IssuesAction::Opened | github::IssuesAction::Edited) {
+                // skip events other than opening or editing the issue to avoid retriggering commands in the
                 // issue body
                 return Ok(None);
             }
         }
 
         let mut input = Input::new(&body, &ctx.username);
-        match input.parse_command() {
+        let command = input.parse_command();
+        
+        if let Some(previous) = event.comment_from() {
+            let mut prev_input = Input::new(&previous, &ctx.username);
+            let prev_command = prev_input.parse_command();
+            if command == prev_command {
+                return Ok(None);
+            }
+        }
+        
+        match command {
             Command::Relabel(Ok(command)) => Ok(Some(command)),
             Command::Relabel(Err(err)) => {
                 return Err(format!(
