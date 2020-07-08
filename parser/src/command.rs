@@ -14,7 +14,7 @@ pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
     input.find(&format!("@{}", bot))
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Command<'a> {
     Relabel(Result<relabel::RelabelCommand, Error<'a>>),
     Assign(Result<assign::AssignCommand, Error<'a>>),
@@ -195,6 +195,24 @@ fn code_2() {
     ```";
     let mut input = Input::new(input, "bot");
     assert!(input.parse_command().is_none());
+}
+
+#[test]
+fn edit_1() {
+    let input_old = "@bot modify labels: +bug.";
+    let mut input_old = Input::new(input_old, "bot");
+    let input_new = "Adding labels: @bot modify labels: +bug. some other text";
+    let mut input_new = Input::new(input_new, "bot");
+    assert_eq!(input_old.parse_command(), input_new.parse_command());
+}
+
+#[test]
+fn edit_2() {
+    let input_old = "@bot modify label: +bug.";
+    let mut input_old = Input::new(input_old, "bot");
+    let input_new = "@bot modify labels: +bug.";
+    let mut input_new = Input::new(input_new, "bot");
+    assert_ne!(input_old.parse_command(), input_new.parse_command());
 }
 
 #[test]

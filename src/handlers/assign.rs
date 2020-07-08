@@ -47,16 +47,29 @@ impl Handler for AssignmentHandler {
         };
 
         if let Event::Issue(e) = event {
-            if e.action != github::IssuesAction::Opened {
+            if !matches!(e.action, github::IssuesAction::Opened | github::IssuesAction::Edited) {
                 log::debug!("skipping event, issue was {:?}", e.action);
-                // skip events other than opening the issue to avoid retriggering commands in the
+                // skip events other than opening or editing the issue to avoid retriggering commands in the
                 // issue body
                 return Ok(None);
             }
         }
 
         let mut input = Input::new(&body, &ctx.username);
-        match input.parse_command() {
+        let command = input.parse_command();
+        
+        if let Some(previous) = event.comment_from() {
+            let mut prev_input = Input::new(&previous, &ctx.username);
+            let prev_command = prev_input.parse_command();
+            if command == prev_command {
+                log::info!("skipping unmodified command: {:?} -> {:?}", prev_command, command);
+                return Ok(None);
+            } else {
+                log::debug!("executing modified command: {:?} -> {:?}", prev_command, command);
+            }
+        }
+        
+        match command {
             Command::Assign(Ok(command)) => Ok(Some(command)),
             Command::Assign(Err(err)) => {
                 return Err(format!(

@@ -109,6 +109,7 @@ pub async fn webhook(
                         github::IssueCommentAction::Deleted
                     }
                 },
+                changes: payload.changes,
                 issue: payload.pull_request,
                 comment: payload.review,
                 repository: payload.repository,
@@ -125,6 +126,7 @@ pub async fn webhook(
             // review comments.
             github::Event::IssueComment(github::IssueCommentEvent {
                 action: payload.action,
+                changes: payload.changes,
                 issue: payload.issue,
                 comment: payload.comment,
                 repository: payload.repository,
