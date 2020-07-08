@@ -29,7 +29,7 @@ use crate::token::{Token, Tokenizer};
 use std::error::Error as _;
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct RelabelCommand(pub Vec<LabelDelta>);
 
 #[derive(Debug, PartialEq, Eq)]
