@@ -239,7 +239,7 @@ pub fn agenda<'a>() -> Box<Step<'a>> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
             include_labels: vec!["major-change", "to-announce"],
-            exclude_labels: vec!["final-comment-period"],
+            exclude_labels: vec!["final-comment-period", "major-change-accepted"],
         },
     });
 
