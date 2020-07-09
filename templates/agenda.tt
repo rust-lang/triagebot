@@ -24,6 +24,8 @@ tags: weekly, rustc
 {{-issues::render(issues=in_fcp_forge, indent="    ", empty="No FCP requests on forge repo this time.")}}
 - Accepted MCPs
 {{-issues::render(issues=mcp_accepted, indent="    ", empty="No new accepted proposals this time.")}}
+- Finalized FCPs
+{{-issues::render(issues=fcp_finished, indent="    ", empty="No new finished FCP this time.")}}
 
 ### WG checkins
 

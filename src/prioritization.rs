@@ -308,6 +308,16 @@ pub fn agenda<'a>() -> Box<Step<'a>> {
         },
     });
 
+    queries.push(QueryMap {
+        name: "fcp_finished",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open")],
+            include_labels: vec!["finished-final-comment-period", "disposition-merge"],
+            exclude_labels: vec![],
+        },
+    });
+
     actions.push(Query {
         repo: "rust-lang/rust",
         queries,
