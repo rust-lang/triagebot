@@ -21,9 +21,14 @@ pub struct Request {
 
 #[derive(Debug, serde::Deserialize)]
 struct Message {
-    sender_id: usize,
+    sender_id: u64,
+    recipient_id: u64,
     sender_short_name: String,
     sender_full_name: String,
+    stream_id: Option<u64>,
+    topic: Option<String>,
+    #[serde(rename = "type")]
+    type_: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -63,7 +68,7 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
     }
 
     log::trace!("zulip hook: {:?}", req);
-    let gh_id = match to_github_id(&ctx.github, req.message.sender_id).await {
+    let gh_id = match to_github_id(&ctx.github, req.message.sender_id as usize).await {
         Ok(Some(gh_id)) => Ok(gh_id),
         Ok(None) => Err(serde_json::to_string(&Response {
             content: &format!(
@@ -231,7 +236,7 @@ async fn execute_for_other_user(
 
     // Map GitHub `user_id` to `zulip_user_id`.
     let zulip_user_id = match to_zulip_id(&ctx.github, user_id).await {
-        Ok(Some(id)) => id as i64,
+        Ok(Some(id)) => id as u64,
         Ok(None) => {
             return Ok(serde_json::to_string(&Response {
                 content: &format!("Could not find Zulip ID for GitHub ID: {}", user_id),
@@ -246,8 +251,8 @@ async fn execute_for_other_user(
         }
     };
 
-    let user_email = match members.iter().find(|m| m.user_id == zulip_user_id) {
-        Some(m) => &m.email,
+    let user = match members.iter().find(|m| m.user_id == zulip_user_id) {
+        Some(m) => m,
         None => {
             return Ok(serde_json::to_string(&Response {
                 content: &format!("Could not find Zulip user email."),
@@ -271,13 +276,15 @@ async fn execute_for_other_user(
     );
 
     let res = MessageApiRequest {
-        type_: "private",
-        to: &user_email,
-        topic: None,
-        content: &message,
+        recipient: Recipient::Private {
+            id: user.user_id,
+            email: &user.email,
+        },
+        content: &message
     }
     .send(ctx.github.raw())
     .await;
+
     match res {
         Ok(resp) => {
             if !resp.status().is_success() {
@@ -303,48 +310,74 @@ struct MembersApiResponse {
 #[derive(serde::Deserialize)]
 struct Member {
     email: String,
-    user_id: i64,
+    user_id: u64,
+}
+
+#[derive(serde::Serialize)]
+#[serde(tag = "type")]
+#[serde(rename_all = "snake_case")]
+pub enum Recipient<'a> {
+    Stream {
+        #[serde(rename = "to")]
+        id: u64,
+        topic: &'a str,
+    },
+    Private {
+        #[serde(skip)]
+        id: u64,
+        #[serde(rename = "to")]
+        email: &'a str,
+    },
+}
+
+impl Recipient<'_> {
+    pub fn narrow(&self) -> String {
+        match self {
+            Recipient::Stream { id, topic } => {
+                // See
+                // https://github.com/zulip/zulip/blob/46247623fc279/zerver/lib/url_encoding.py#L9
+                // ALWAYS_SAFE without `.` from
+                // https://github.com/python/cpython/blob/113e2b0a07c/Lib/urllib/parse.py#L772-L775
+                //
+                // ALWAYS_SAFE doesn't contain `.` because Zulip actually encodes them to be able
+                // to use `.` instead of `%` in the encoded strings
+                const ALWAYS_SAFE: &str =
+                    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-~";
+
+                let mut encoded_topic = Vec::new();
+                for ch in topic.bytes() {
+                    if !(ALWAYS_SAFE.contains(ch as char)) {
+                        write!(encoded_topic, "%{:02X}", ch).unwrap();
+                    } else {
+                        encoded_topic.push(ch);
+                    }
+                }
+
+                let mut encoded_topic = String::from_utf8(encoded_topic).unwrap();
+                encoded_topic = encoded_topic.replace("%", ".");
+
+                format!("stream/{}-xxx/topic/{}", id, encoded_topic)
+            }
+            Recipient::Private { id, .. } => format!("pm-with/{}-xxx", id),
+        }
+    }
 }
 
 #[derive(serde::Serialize)]
 pub struct MessageApiRequest<'a> {
-    #[serde(rename = "type")]
-    pub type_: &'a str,
-    pub to: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub topic: Option<&'a str>,
+    pub recipient: Recipient<'a>,
     pub content: &'a str,
 }
 
-impl MessageApiRequest<'_> {
-    // FIXME: support private links too
+impl<'a> MessageApiRequest<'a> {
     pub fn url(&self) -> String {
-        // See
-        // https://github.com/zulip/zulip/blob/46247623fc279/zerver/lib/url_encoding.py#L9
-        // ALWAYS_SAFE from
-        // https://github.com/python/cpython/blob/113e2b0a07c/Lib/urllib/parse.py#L772-L775
-        let always_safe = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-~";
-        let mut encoded_topic = Vec::new();
-        for ch in self.topic.expect("topic").bytes() {
-            if !(always_safe.contains(ch as char) || ch == b'.') {
-                write!(encoded_topic, "%{:02X}", ch).unwrap();
-            } else {
-                encoded_topic.push(ch);
-            }
-        }
-        let mut encoded_topic = String::from_utf8(encoded_topic).unwrap();
-        encoded_topic = encoded_topic.replace("%", ".");
-
         format!(
-            "https://rust-lang.zulipchat.com/#narrow/stream/{}-xxx/topic/{}",
-            self.to, encoded_topic,
+            "https://rust-lang.zulipchat.com/#narrow/{}",
+            self.recipient.narrow()
         )
     }
 
     pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
-        if self.type_ == "stream" {
-            assert!(self.topic.is_some());
-        }
         let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
 
         Ok(client

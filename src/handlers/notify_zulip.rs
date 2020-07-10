@@ -31,7 +31,7 @@ impl Handler for NotifyZulipHandler {
                 let applied_label = &e.label.as_ref().expect("label").name;
                 if let Some(config) = config.and_then(|c| c.labels.get(applied_label)) {
                     for label in &config.required_labels {
-                        let pattern =  match glob::Pattern::new(label) {
+                        let pattern = match glob::Pattern::new(label) {
                             Ok(pattern) => pattern,
                             Err(err) => {
                                 log::error!("Invalid glob pattern: {}", err);
@@ -44,7 +44,8 @@ impl Handler for NotifyZulipHandler {
                         }
                     }
 
-                    if e.action == github::IssuesAction::Labeled && config.message_on_add.is_some() {
+                    if e.action == github::IssuesAction::Labeled && config.message_on_add.is_some()
+                    {
                         return Ok(Some(NotifyZulipInput {
                             notification_type: NotificationType::Labeled,
                         }));
@@ -78,9 +79,12 @@ async fn handle_input<'a>(
 ) -> anyhow::Result<()> {
     let event = match event {
         Event::Issue(e) => e,
-        _ => unreachable!()
+        _ => unreachable!(),
     };
-    let config = config.labels.get(&event.label.as_ref().unwrap().name).unwrap();
+    let config = config
+        .labels
+        .get(&event.label.as_ref().unwrap().name)
+        .unwrap();
 
     let mut topic = config.topic.clone();
     topic = topic.replace("{number}", &event.issue.number.to_string());
@@ -88,23 +92,20 @@ async fn handle_input<'a>(
     topic.truncate(60); // Zulip limitation
 
     let mut msg = match input.notification_type {
-        NotificationType::Labeled => {
-            config.message_on_add.as_ref().unwrap().clone()
-        }
-        NotificationType::Unlabeled => {
-            config.message_on_remove.as_ref().unwrap().clone()
-        }
+        NotificationType::Labeled => config.message_on_add.as_ref().unwrap().clone(),
+        NotificationType::Unlabeled => config.message_on_remove.as_ref().unwrap().clone(),
     };
 
     msg = msg.replace("{number}", &event.issue.number.to_string());
     msg = msg.replace("{title}", &event.issue.title);
 
     let zulip_req = crate::zulip::MessageApiRequest {
-            type_: "stream",
-            to: &config.zulip_stream.to_string(),
-            topic: Some(&topic),
-            content: &msg,
-        };
+        recipient: crate::zulip::Recipient::Stream {
+            id: config.zulip_stream,
+            topic: &topic,
+        },
+        content: &msg,
+    };
     zulip_req.send(&ctx.github.raw()).await?;
 
     Ok(())
