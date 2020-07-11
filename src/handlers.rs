@@ -1,8 +1,9 @@
-use crate::config::{self, ConfigurationError};
-use crate::github::{Event, GithubClient};
-use futures::future::BoxFuture;
+use crate::config::{self, Config, ConfigurationError};
+use crate::github::{Event, GithubClient, IssuesAction, IssuesEvent};
 use octocrab::Octocrab;
+use parser::command::{Command, Input};
 use std::fmt;
+use std::sync::Arc;
 use tokio_postgres::Client as DbClient;
 
 #[derive(Debug)]
@@ -22,68 +23,152 @@ impl fmt::Display for HandlerError {
     }
 }
 
+mod assign;
+mod autolabel;
+mod glacier;
+mod major_change;
+mod nominate;
 mod notification;
+mod notify_zulip;
+mod ping;
+mod prioritize;
+mod relabel;
 mod rustc_commits;
 
-macro_rules! handlers {
-    ($($name:ident = $handler:expr,)*) => {
-        $(mod $name;)*
+// TODO: Return multiple handler errors ?
+pub async fn handle(ctx: &Context, event: &Event) -> Result<(), HandlerError> {
+    let config = match config::get(&ctx.github, event.repo_name()).await {
+        Ok(config) => config,
+        Err(e @ ConfigurationError::Missing) => {
+            return Err(HandlerError::Message(e.to_string()));
+        }
+        Err(e @ ConfigurationError::Toml(_)) => {
+            return Err(HandlerError::Message(e.to_string()));
+        }
+        Err(e @ ConfigurationError::Http(_)) => {
+            return Err(HandlerError::Other(e.into()));
+        }
+    };
 
-        pub async fn handle(ctx: &Context, event: &Event) -> Result<(), HandlerError> {
-            let config = config::get(&ctx.github, event.repo_name()).await;
+    if let Event::Issue(event) = event {
+        handle_issue(ctx, event, &config).await?;
+    }
 
+    if let Some(body) = event.comment_body() {
+        handle_command(ctx, event, &config, body).await?;
+    }
+
+    if let Err(e) = notification::handle(ctx, event).await {
+        log::error!(
+            "failed to process event {:?} with notification handler: {:?}",
+            event,
+            e
+        );
+    }
+
+    if let Err(e) = rustc_commits::handle(ctx, event).await {
+        log::error!(
+            "failed to process event {:?} with rustc_commits handler: {:?}",
+            event,
+            e
+        );
+    }
+
+    Ok(())
+}
+
+macro_rules! issue_handlers {
+    ($($name:ident,)*) => {
+        async fn handle_issue(ctx: &Context, event: &IssuesEvent, config: &Arc<Config>) -> Result<(), HandlerError> {
             $(
-            if let Some(input) = Handler::parse_input(
-                &$handler, ctx, event, config.as_ref().ok().and_then(|c| c.$name.as_ref()),
+            if let Some(input) = $name::parse_input(
+                ctx, event, config.$name.as_ref(),
             ).map_err(HandlerError::Message)? {
-                let config = match &config {
-                    Ok(config) => config,
-                    Err(e @ ConfigurationError::Missing) => {
-                        return Err(HandlerError::Message(e.to_string()));
-                    }
-                    Err(e @ ConfigurationError::Toml(_)) => {
-                        return Err(HandlerError::Message(e.to_string()));
-                    }
-                    Err(e @ ConfigurationError::Http(_)) => {
-                        return Err(HandlerError::Other(e.clone().into()));
-                    }
-                };
                 if let Some(config) = &config.$name {
-                    Handler::handle_input(&$handler, ctx, config, event, input).await.map_err(HandlerError::Other)?;
+                    $name::handle_input(ctx, config, event, input).await.map_err(HandlerError::Other)?;
                 } else {
                     return Err(HandlerError::Message(format!(
                         "The feature `{}` is not enabled in this repository.\n\
-                         To enable it add its section in the `triagebot.toml` \
-                         in the root of the repository.",
+                        To enable it add its section in the `triagebot.toml` \
+                        in the root of the repository.",
                         stringify!($name)
                     )));
                 }
             })*
-
-            if let Err(e) = notification::handle(ctx, event).await {
-                log::error!("failed to process event {:?} with notification handler: {:?}", event, e);
-            }
-
-            if let Err(e) = rustc_commits::handle(ctx, event).await {
-                log::error!("failed to process event {:?} with rustc_commits handler: {:?}", event, e);
-            }
-
             Ok(())
         }
     }
 }
 
-handlers! {
-    assign = assign::AssignmentHandler,
-    relabel = relabel::RelabelHandler,
-    ping = ping::PingHandler,
-    nominate = nominate::NominateHandler,
-    prioritize = prioritize::PrioritizeHandler,
-    major_change = major_change::MajorChangeHandler,
-    //tracking_issue = tracking_issue::TrackingIssueHandler,
-    glacier = glacier::GlacierHandler,
-    autolabel = autolabel::AutolabelHandler,
-    notify_zulip = notify_zulip::NotifyZulipHandler,
+issue_handlers! {
+    autolabel,
+    major_change,
+    notify_zulip,
+}
+
+macro_rules! command_handlers {
+    ($($name:ident: $enum:ident,)*) => {
+        async fn handle_command(ctx: &Context, event: &Event, config: &Arc<Config>, body: &str) -> Result<(), HandlerError> {
+            if let Event::Issue(e) = event {
+                if !matches!(e.action, IssuesAction::Opened | IssuesAction::Edited) {
+                    // no change in issue's body for these events, so skip
+                    log::debug!("skipping event, issue was {:?}", e.action);
+                    return Ok(());
+                }
+            }
+
+            // TODO: parse multiple commands and diff them
+            let mut input = Input::new(&body, &ctx.username);
+            let command = input.parse_command();
+
+            if let Some(previous) = event.comment_from() {
+                let mut prev_input = Input::new(&previous, &ctx.username);
+                let prev_command = prev_input.parse_command();
+                if command == prev_command {
+                    log::info!("skipping unmodified command: {:?} -> {:?}", prev_command, command);
+                    return Ok(());
+                } else {
+                    log::debug!("executing modified command: {:?} -> {:?}", prev_command, command);
+                }
+            }
+
+            match command {
+                $(
+                Command::$enum(Ok(command)) => {
+                    if let Some(config) = &config.$name {
+                        $name::handle_command(ctx, config, event, command).await.map_err(HandlerError::Other)?;
+                    } else {
+                        return Err(HandlerError::Message(format!(
+                            "The feature `{}` is not enabled in this repository.\n\
+                            To enable it add its section in the `triagebot.toml` \
+                            in the root of the repository.",
+                            stringify!($name)
+                        )));
+                    }
+                }
+                Command::$enum(Err(err)) => {
+                    return Err(HandlerError::Message(format!(
+                        "Parsing {} command in [comment]({}) failed: {}",
+                        stringify!($name),
+                        event.html_url().expect("has html url"),
+                        err
+                    )));
+                })*
+                Command::None => {}
+            }
+            Ok(())
+        }
+    }
+}
+
+command_handlers! {
+    assign: Assign,
+    glacier: Glacier,
+    nominate: Nominate,
+    ping: Ping,
+    prioritize: Prioritize,
+    relabel: Relabel,
+    major_change: Second,
 }
 
 pub struct Context {
@@ -91,24 +176,4 @@ pub struct Context {
     pub db: DbClient,
     pub username: String,
     pub octocrab: Octocrab,
-}
-
-pub trait Handler: Sync + Send {
-    type Input;
-    type Config;
-
-    fn parse_input(
-        &self,
-        ctx: &Context,
-        event: &Event,
-        config: Option<&Self::Config>,
-    ) -> Result<Option<Self::Input>, String>;
-
-    fn handle_input<'a>(
-        &self,
-        ctx: &'a Context,
-        config: &'a Self::Config,
-        event: &'a Event,
-        input: Self::Input,
-    ) -> BoxFuture<'a, anyhow::Result<()>>;
 }

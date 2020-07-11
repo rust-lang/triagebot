@@ -7,80 +7,16 @@
 use crate::{
     config::PingConfig,
     github::{self, Event},
-    handlers::{Context, Handler},
+    handlers::Context,
     interactions::ErrorComment,
 };
-use futures::future::{BoxFuture, FutureExt};
 use parser::command::ping::PingCommand;
-use parser::command::{Command, Input};
 
-pub(super) struct PingHandler;
-
-impl Handler for PingHandler {
-    type Input = PingCommand;
-    type Config = PingConfig;
-
-    fn parse_input(
-        &self,
-        ctx: &Context,
-        event: &Event,
-        _: Option<&Self::Config>,
-    ) -> Result<Option<Self::Input>, String> {
-        let body = if let Some(b) = event.comment_body() {
-            b
-        } else {
-            // not interested in other events
-            return Ok(None);
-        };
-
-        if let Event::Issue(e) = event {
-            if !matches!(e.action, github::IssuesAction::Opened | github::IssuesAction::Edited) {
-                // skip events other than opening or editing the issue to avoid retriggering commands in the
-                // issue body
-                return Ok(None);
-            }
-        }
-
-        let mut input = Input::new(&body, &ctx.username);
-        let command = input.parse_command();
-        
-        if let Some(previous) = event.comment_from() {
-            let mut prev_input = Input::new(&previous, &ctx.username);
-            let prev_command = prev_input.parse_command();
-            if command == prev_command {
-                return Ok(None);
-            }
-        }
-        
-        match command {
-            Command::Ping(Ok(command)) => Ok(Some(command)),
-            Command::Ping(Err(err)) => {
-                return Err(format!(
-                    "Parsing ping command in [comment]({}) failed: {}",
-                    event.html_url().expect("has html url"),
-                    err
-                ));
-            }
-            _ => Ok(None),
-        }
-    }
-
-    fn handle_input<'a>(
-        &self,
-        ctx: &'a Context,
-        config: &'a PingConfig,
-        event: &'a Event,
-        input: PingCommand,
-    ) -> BoxFuture<'a, anyhow::Result<()>> {
-        handle_input(ctx, config, event, input.team).boxed()
-    }
-}
-
-async fn handle_input(
+pub(super) async fn handle_command(
     ctx: &Context,
     config: &PingConfig,
     event: &Event,
-    team_name: String,
+    team_name: PingCommand,
 ) -> anyhow::Result<()> {
     let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
     {
@@ -98,7 +34,7 @@ async fn handle_input(
         return Ok(());
     }
 
-    let (gh_team, config) = match config.get_by_name(&team_name) {
+    let (gh_team, config) = match config.get_by_name(&team_name.team) {
         Some(v) => v,
         None => {
             let cmnt = ErrorComment::new(
@@ -106,7 +42,7 @@ async fn handle_input(
                 format!(
                     "This team (`{}`) cannot be pinged via this command;\
                  it may need to be added to `triagebot.toml` on the master branch.",
-                    team_name,
+                    team_name.team,
                 ),
             );
             cmnt.post(&ctx.github).await?;
@@ -121,7 +57,7 @@ async fn handle_input(
                 &event.issue().unwrap(),
                 format!(
                     "This team (`{}`) does not exist in the team repository.",
-                    team_name,
+                    team_name.team,
                 ),
             );
             cmnt.post(&ctx.github).await?;
