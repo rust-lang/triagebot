@@ -63,12 +63,12 @@ impl Handler for MajorChangeHandler {
                 // All other issue events are ignored
                 return Ok(None);
             }
-            Event::IssueComment(e) => {}
+            Event::IssueComment(_) => {}
         }
 
         let mut input = Input::new(&body, &ctx.username);
         let command = input.parse_command();
-        
+
         if let Some(previous) = event.comment_from() {
             let mut prev_input = Input::new(&previous, &ctx.username);
             let prev_command = prev_input.parse_command();
@@ -76,7 +76,7 @@ impl Handler for MajorChangeHandler {
                 return Ok(None);
             }
         }
-        
+
         match command {
             Command::Second(Ok(SecondCommand)) => Ok(Some(Invocation::Second)),
             _ => Ok(None),
@@ -215,7 +215,7 @@ async fn handle_input(
     let zulip_req = zulip_req.send(&ctx.github.raw());
 
     let (gh_res, zulip_res) = futures::join!(github_req, zulip_req);
-    gh_res?;
-    zulip_res?;
+    zulip_res.context("zulip post failed")?;
+    gh_res.context("label setting failed")?;
     Ok(())
 }
