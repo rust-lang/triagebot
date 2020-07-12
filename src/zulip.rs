@@ -280,7 +280,7 @@ async fn execute_for_other_user(
             id: user.user_id,
             email: &user.email,
         },
-        content: &message
+        content: &message,
     }
     .send(ctx.github.raw())
     .await;
@@ -380,10 +380,34 @@ impl<'a> MessageApiRequest<'a> {
     pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
         let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
 
+        #[derive(serde::Serialize)]
+        struct SerializedApi<'a> {
+            #[serde(rename = "type")]
+            type_: &'static str,
+            to: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            topic: Option<&'a str>,
+            content: &'a str,
+        }
+
         Ok(client
             .post("https://rust-lang.zulipchat.com/api/v1/messages")
             .basic_auth(BOT_EMAIL, Some(&bot_api_token))
-            .form(&self)
+            .form(&SerializedApi {
+                type_: match self.recipient {
+                    Recipient::Stream { .. } => "stream",
+                    Recipient::Private { .. } => "private",
+                },
+                to: match self.recipient {
+                    Recipient::Stream { id, .. } => id.to_string(),
+                    Recipient::Private { email, .. } => email.to_string(),
+                },
+                topic: match self.recipient {
+                    Recipient::Stream { topic, .. } => Some(topic),
+                    Recipient::Private { .. } => None,
+                },
+                content: self.content,
+            })
             .send()
             .await?)
     }
