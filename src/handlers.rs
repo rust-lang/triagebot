@@ -100,6 +100,10 @@ macro_rules! issue_handlers {
     }
 }
 
+// Handle events that happend on issues
+//
+// This is for events that happends only on issues (e.g. label changes).
+// Each module in the list must contain the functions `parse_input` and `handle_input`.
 issue_handlers! {
     autolabel,
     major_change,
@@ -161,6 +165,11 @@ macro_rules! command_handlers {
     }
 }
 
+// Handle commands in comments/issues body
+//
+// This is for handlers for commands parsed by the `parser` crate.
+// Each variant of `parser::command::Command` must be in this list,
+// preceded by the module containing the coresponding `handle_command` function
 command_handlers! {
     assign: Assign,
     glacier: Glacier,
