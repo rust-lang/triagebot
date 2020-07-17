@@ -38,36 +38,35 @@ impl Handler for MajorChangeHandler {
 
         match event {
             Event::Issue(e) => {
-                match e.action {
-                    IssuesAction::Edited => return Ok(Some(Invocation::Rename)),
-                    _ => {
-                        // If we were labeled with accepted, then issue that event
-                        if e.action == IssuesAction::Labeled
-                            && e.label
-                                .as_ref()
-                                .map_or(false, |l| l.name == "major-change-accepted")
-                        {
-                            return Ok(Some(Invocation::AcceptedProposal));
-                        }
-
-                        // Opening an issue with a label assigned triggers both
-                        // "Opened" and "Labeled" events.
-                        //
-                        // We want to treat reopened issues as new proposals but if the
-                        // issue is freshly opened, we only want to trigger once;
-                        // currently we do so on the label event.
-                        if (e.action == IssuesAction::Reopened
-                            && e.issue.labels().iter().any(|l| l.name == "major-change"))
-                            || (e.action == IssuesAction::Labeled
-                                && e.label.as_ref().map_or(false, |l| l.name == "major-change"))
-                        {
-                            return Ok(Some(Invocation::NewProposal));
-                        }
-
-                        // All other issue events are ignored
-                        return Ok(None);
-                    }
+                if e.action == IssuesAction::Edited {
+                    return Ok(Some(Invocation::Rename));
                 }
+
+                // If we were labeled with accepted, then issue that event
+                if e.action == IssuesAction::Labeled
+                    && e.label
+                        .as_ref()
+                        .map_or(false, |l| l.name == "major-change-accepted")
+                {
+                    return Ok(Some(Invocation::AcceptedProposal));
+                }
+
+                // Opening an issue with a label assigned triggers both
+                // "Opened" and "Labeled" events.
+                //
+                // We want to treat reopened issues as new proposals but if the
+                // issue is freshly opened, we only want to trigger once;
+                // currently we do so on the label event.
+                if (e.action == IssuesAction::Reopened
+                    && e.issue.labels().iter().any(|l| l.name == "major-change"))
+                    || (e.action == IssuesAction::Labeled
+                        && e.label.as_ref().map_or(false, |l| l.name == "major-change"))
+                {
+                    return Ok(Some(Invocation::NewProposal));
+                }
+
+                // All other issue events are ignored
+                return Ok(None);
             }
             Event::IssueComment(_) => {}
         }
