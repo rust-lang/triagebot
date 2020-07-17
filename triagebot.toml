@@ -1,5 +1,5 @@
 [relabel]
-allow-unauthenticated = ["bug", "invalid", "question"]
+allow-unauthenticated = ["bug", "invalid", "question", "enhancement"]
 
 [assign]
 
