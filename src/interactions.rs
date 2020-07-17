@@ -32,10 +32,7 @@ impl<'a> ErrorComment<'a> {
         T: Into<String>,
     {
         ErrorComment {
-            comment: Comment {
-                issue,
-                message: message.into(),
-            },
+            comment: Comment::new(issue, message),
         }
     }
 
