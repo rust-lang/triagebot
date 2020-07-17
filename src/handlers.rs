@@ -122,33 +122,17 @@ macro_rules! command_handlers {
                 }
             }
 
-            // TODO: parse multiple commands and diff them
-            let mut input = Input::new(&body, &ctx.username);
-            let command = input.next();
-
-            if let Some(previous) = event.comment_from() {
-                let mut prev_input = Input::new(&previous, &ctx.username);
-                let prev_command = prev_input.next();
-                if command == prev_command {
-                    log::info!(
-                        "skipping unmodified command: {:?} -> {:?}",
-                        prev_command,
-                        command
-                    );
-                    return;
-                } else {
-                    log::debug!(
-                        "executing modified command: {:?} -> {:?}",
-                        prev_command,
-                        command
-                    );
-                }
-            }
-
-            let command = match command {
-                Some(command) => command,
-                None => return,
+            let input = Input::new(&body, &ctx.username);
+            let commands = if let Some(previous) = event.comment_from() {
+                let prev_commands = Input::new(&previous, &ctx.username).collect::<Vec<_>>();
+                input.filter(|cmd| !prev_commands.contains(cmd)).collect::<Vec<_>>()
+            } else {
+                input.collect()
             };
+
+            if commands.is_empty() {
+                return;
+            }
 
             let config = match config {
                 Ok(config) => config,
@@ -163,30 +147,32 @@ macro_rules! command_handlers {
                 }
             };
 
-            match command {
-                $(
-                Command::$enum(Ok(command)) => {
-                    if let Some(config) = &config.$name {
-                        $name::handle_command(ctx, config, event, command)
-                            .await
-                            .unwrap_or_else(|err| errors.push(HandlerError::Other(err)));
-                    } else {
-                        errors.push(HandlerError::Message(format!(
-                            "The feature `{}` is not enabled in this repository.\n\
-                            To enable it add its section in the `triagebot.toml` \
-                            in the root of the repository.",
-                            stringify!($name)
-                        )));
+            for command in commands {
+                match command {
+                    $(
+                    Command::$enum(Ok(command)) => {
+                        if let Some(config) = &config.$name {
+                            $name::handle_command(ctx, config, event, command)
+                                .await
+                                .unwrap_or_else(|err| errors.push(HandlerError::Other(err)));
+                        } else {
+                            errors.push(HandlerError::Message(format!(
+                                "The feature `{}` is not enabled in this repository.\n\
+                                To enable it add its section in the `triagebot.toml` \
+                                in the root of the repository.",
+                                stringify!($name)
+                            )));
+                        }
                     }
+                    Command::$enum(Err(err)) => {
+                        errors.push(HandlerError::Message(format!(
+                            "Parsing {} command in [comment]({}) failed: {}",
+                            stringify!($name),
+                            event.html_url().expect("has html url"),
+                            err
+                        )));
+                    })*
                 }
-                Command::$enum(Err(err)) => {
-                    errors.push(HandlerError::Message(format!(
-                        "Parsing {} command in [comment]({}) failed: {}",
-                        stringify!($name),
-                        event.html_url().expect("has html url"),
-                        err
-                    )));
-                })*
             }
         }
     }
