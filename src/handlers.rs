@@ -124,11 +124,11 @@ macro_rules! command_handlers {
 
             // TODO: parse multiple commands and diff them
             let mut input = Input::new(&body, &ctx.username);
-            let command = input.parse_command();
+            let command = input.next();
 
             if let Some(previous) = event.comment_from() {
                 let mut prev_input = Input::new(&previous, &ctx.username);
-                let prev_command = prev_input.parse_command();
+                let prev_command = prev_input.next();
                 if command == prev_command {
                     log::info!(
                         "skipping unmodified command: {:?} -> {:?}",
@@ -145,9 +145,10 @@ macro_rules! command_handlers {
                 }
             }
 
-            if command == Command::None {
-                return;
-            }
+            let command = match command {
+                Some(command) => command,
+                None => return,
+            };
 
             let config = match config {
                 Ok(config) => config,
@@ -186,7 +187,6 @@ macro_rules! command_handlers {
                         err
                     )));
                 })*
-                Command::None => unreachable!(),
             }
         }
     }
