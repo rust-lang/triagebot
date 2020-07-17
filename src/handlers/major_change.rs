@@ -2,7 +2,7 @@ use crate::{
     config::MajorChangeConfig,
     github::{self, Event, IssuesAction},
     handlers::{Context, Handler},
-    interactions::ErrorComment,
+    interactions::{Comment, ErrorComment},
 };
 use anyhow::Context as _;
 use futures::future::{BoxFuture, FutureExt};
@@ -14,6 +14,7 @@ pub(super) enum Invocation {
     Second,
     NewProposal,
     AcceptedProposal,
+    Rename,
 }
 
 pub(super) struct MajorChangeHandler;
@@ -37,31 +38,36 @@ impl Handler for MajorChangeHandler {
 
         match event {
             Event::Issue(e) => {
-                // If we were labeled with accepted, then issue that event
-                if e.action == IssuesAction::Labeled
-                    && e.label
-                        .as_ref()
-                        .map_or(false, |l| l.name == "major-change-accepted")
-                {
-                    return Ok(Some(Invocation::AcceptedProposal));
-                }
+                match e.action {
+                    IssuesAction::Edited => return Ok(Some(Invocation::Rename)),
+                    _ => {
+                        // If we were labeled with accepted, then issue that event
+                        if e.action == IssuesAction::Labeled
+                            && e.label
+                                .as_ref()
+                                .map_or(false, |l| l.name == "major-change-accepted")
+                        {
+                            return Ok(Some(Invocation::AcceptedProposal));
+                        }
 
-                // Opening an issue with a label assigned triggers both
-                // "Opened" and "Labeled" events.
-                //
-                // We want to treat reopened issues as new proposals but if the
-                // issues is freshly opened, we only want to trigger once;
-                // currently we do so on the label event.
-                if (e.action == IssuesAction::Reopened
-                    && e.issue.labels().iter().any(|l| l.name == "major-change"))
-                    || (e.action == IssuesAction::Labeled
-                        && e.label.as_ref().map_or(false, |l| l.name == "major-change"))
-                {
-                    return Ok(Some(Invocation::NewProposal));
-                }
+                        // Opening an issue with a label assigned triggers both
+                        // "Opened" and "Labeled" events.
+                        //
+                        // We want to treat reopened issues as new proposals but if the
+                        // issue is freshly opened, we only want to trigger once;
+                        // currently we do so on the label event.
+                        if (e.action == IssuesAction::Reopened
+                            && e.issue.labels().iter().any(|l| l.name == "major-change"))
+                            || (e.action == IssuesAction::Labeled
+                                && e.label.as_ref().map_or(false, |l| l.name == "major-change"))
+                        {
+                            return Ok(Some(Invocation::NewProposal));
+                        }
 
-                // All other issue events are ignored
-                return Ok(None);
+                        // All other issue events are ignored
+                        return Ok(None);
+                    }
+                }
             }
             Event::IssueComment(_) => {}
         }
@@ -172,6 +178,20 @@ async fn handle_input(
                 ),
                 config.meeting_label.clone(),
             )
+        }
+        Invocation::Rename => {
+            // TODO: update the topic automatically if/when zulip/zulip#15846 is implemented
+            let cmnt = Comment::new(
+                &issue,
+                format!(
+                    "This issue was renamed to \"{}\". Will you rename the
+                    Zulip topic and then update the Zulip topic link in my
+                    earlier comment? Rustbot appreciates your help!",
+                    issue.title
+                ),
+            );
+            cmnt.post(&ctx.github).await?;
+            return Ok(());
         }
     };
 
