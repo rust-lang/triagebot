@@ -14,23 +14,86 @@
 use crate::{
     config::AssignConfig,
     github::{self, Event, Selection},
-    handlers::Context,
+    handlers::{Context, Handler},
     interactions::EditIssueBody,
 };
 use anyhow::Context as _;
+use futures::future::{BoxFuture, FutureExt};
 use parser::command::assign::AssignCommand;
+use parser::command::{Command, Input};
+
+pub(super) struct AssignmentHandler;
 
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct AssignData {
     user: Option<String>,
 }
 
-pub(super) async fn handle_command(
-    ctx: &Context,
-    _config: &AssignConfig,
-    event: &Event,
-    cmd: AssignCommand,
-) -> anyhow::Result<()> {
+impl Handler for AssignmentHandler {
+    type Input = AssignCommand;
+    type Config = AssignConfig;
+
+    fn parse_input(
+        &self,
+        ctx: &Context,
+        event: &Event,
+        _: Option<&AssignConfig>,
+    ) -> Result<Option<Self::Input>, String> {
+        let body = if let Some(b) = event.comment_body() {
+            b
+        } else {
+            // not interested in other events
+            return Ok(None);
+        };
+
+        if let Event::Issue(e) = event {
+            if !matches!(e.action, github::IssuesAction::Opened | github::IssuesAction::Edited) {
+                log::debug!("skipping event, issue was {:?}", e.action);
+                // skip events other than opening or editing the issue to avoid retriggering commands in the
+                // issue body
+                return Ok(None);
+            }
+        }
+
+        let mut input = Input::new(&body, &ctx.username);
+        let command = input.parse_command();
+        
+        if let Some(previous) = event.comment_from() {
+            let mut prev_input = Input::new(&previous, &ctx.username);
+            let prev_command = prev_input.parse_command();
+            if command == prev_command {
+                log::info!("skipping unmodified command: {:?} -> {:?}", prev_command, command);
+                return Ok(None);
+            } else {
+                log::debug!("executing modified command: {:?} -> {:?}", prev_command, command);
+            }
+        }
+        
+        match command {
+            Command::Assign(Ok(command)) => Ok(Some(command)),
+            Command::Assign(Err(err)) => {
+                return Err(format!(
+                    "Parsing assign command in [comment]({}) failed: {}",
+                    event.html_url().expect("has html url"),
+                    err
+                ));
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn handle_input<'a>(
+        &self,
+        ctx: &'a Context,
+        _config: &'a AssignConfig,
+        event: &'a Event,
+        cmd: AssignCommand,
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
+        handle_input(ctx, event, cmd).boxed()
+    }
+}
+
+async fn handle_input(ctx: &Context, event: &Event, cmd: AssignCommand) -> anyhow::Result<()> {
     let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
     {
         false
@@ -60,7 +123,10 @@ pub(super) async fn handle_command(
             );
             return Ok(());
         }
-        if let Err(err) = issue.set_assignee(&ctx.github, &username).await {
+        if let Err(err) = issue
+            .set_assignee(&ctx.github, &username)
+            .await
+        {
             log::warn!(
                 "failed to set assignee of PR {} to {}: {:?}",
                 issue.global_id(),
@@ -87,7 +153,9 @@ pub(super) async fn handle_command(
             }) = e.current_data()
             {
                 if current == event.user().login || is_team_member {
-                    issue.remove_assignees(&ctx.github, Selection::All).await?;
+                    issue
+                        .remove_assignees(&ctx.github, Selection::All)
+                        .await?;
                     e.apply(&ctx.github, String::new(), AssignData { user: None })
                         .await?;
                     return Ok(());
@@ -124,7 +192,10 @@ pub(super) async fn handle_command(
 
     e.apply(&ctx.github, String::new(), &data).await?;
 
-    match issue.set_assignee(&ctx.github, &to_assign).await {
+    match issue
+        .set_assignee(&ctx.github, &to_assign)
+        .await
+    {
         Ok(()) => return Ok(()), // we are done
         Err(github::AssignmentError::InvalidAssignee) => {
             issue

@@ -85,7 +85,7 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    pub fn error<T: 'static + std::error::Error + Send>(&mut self, source: T) -> Error<'a> {
+    pub fn error<T: 'static + std::error::Error>(&mut self, source: T) -> Error<'a> {
         Error {
             input: self.input,
             position: self.cur_pos(),
