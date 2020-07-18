@@ -3,76 +3,12 @@
 use crate::{
     config::NominateConfig,
     github::{self, Event},
-    handlers::{Context, Handler},
+    handlers::Context,
     interactions::ErrorComment,
 };
-use futures::future::{BoxFuture, FutureExt};
 use parser::command::nominate::{NominateCommand, Style};
-use parser::command::{Command, Input};
 
-pub(super) struct NominateHandler;
-
-impl Handler for NominateHandler {
-    type Input = NominateCommand;
-    type Config = NominateConfig;
-
-    fn parse_input(
-        &self,
-        ctx: &Context,
-        event: &Event,
-        _: Option<&Self::Config>,
-    ) -> Result<Option<Self::Input>, String> {
-        let body = if let Some(b) = event.comment_body() {
-            b
-        } else {
-            // not interested in other events
-            return Ok(None);
-        };
-
-        if let Event::Issue(e) = event {
-            if !matches!(e.action, github::IssuesAction::Opened | github::IssuesAction::Edited) {
-                // skip events other than opening or editing the issue to avoid retriggering commands in the
-                // issue body
-                return Ok(None);
-            }
-        }
-
-        let mut input = Input::new(&body, &ctx.username);
-        let command = input.parse_command();
-        
-        if let Some(previous) = event.comment_from() {
-            let mut prev_input = Input::new(&previous, &ctx.username);
-            let prev_command = prev_input.parse_command();
-            if command == prev_command {
-                return Ok(None);
-            }
-        }
-        
-        match command {
-            Command::Nominate(Ok(command)) => Ok(Some(command)),
-            Command::Nominate(Err(err)) => {
-                return Err(format!(
-                    "Parsing nominate command in [comment]({}) failed: {}",
-                    event.html_url().expect("has html url"),
-                    err
-                ));
-            }
-            _ => Ok(None),
-        }
-    }
-
-    fn handle_input<'a>(
-        &self,
-        ctx: &'a Context,
-        config: &'a Self::Config,
-        event: &'a Event,
-        input: Self::Input,
-    ) -> BoxFuture<'a, anyhow::Result<()>> {
-        handle_input(ctx, config, event, input).boxed()
-    }
-}
-
-async fn handle_input(
+pub(super) async fn handle_command(
     ctx: &Context,
     config: &NominateConfig,
     event: &Event,
