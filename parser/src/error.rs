@@ -5,7 +5,7 @@ use std::fmt;
 pub struct Error<'a> {
     pub input: &'a str,
     pub position: usize,
-    pub source: Box<dyn error::Error + Send>,
+    pub source: Box<dyn error::Error>,
 }
 
 impl<'a> PartialEq for Error<'a> {
