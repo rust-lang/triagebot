@@ -37,21 +37,10 @@ mod rustc_commits;
 
 // TODO: Return multiple handler errors ?
 pub async fn handle(ctx: &Context, event: &Event) -> Result<(), HandlerError> {
-    let config = match config::get(&ctx.github, event.repo_name()).await {
-        Ok(config) => config,
-        Err(e @ ConfigurationError::Missing) => {
-            return Err(HandlerError::Message(e.to_string()));
-        }
-        Err(e @ ConfigurationError::Toml(_)) => {
-            return Err(HandlerError::Message(e.to_string()));
-        }
-        Err(e @ ConfigurationError::Http(_)) => {
-            return Err(HandlerError::Other(e.into()));
-        }
-    };
+    let config = config::get(&ctx.github, event.repo_name()).await;
 
-    if let Event::Issue(event) = event {
-        handle_issue(ctx, event, &config).await?;
+    if let (Ok(config), Event::Issue(event)) = (config.as_ref(), event) {
+        handle_issue(ctx, event, config).await?;
     }
 
     if let Some(body) = event.comment_body() {
@@ -112,7 +101,7 @@ issue_handlers! {
 
 macro_rules! command_handlers {
     ($($name:ident: $enum:ident,)*) => {
-        async fn handle_command(ctx: &Context, event: &Event, config: &Arc<Config>, body: &str) -> Result<(), HandlerError> {
+        async fn handle_command(ctx: &Context, event: &Event, config: &Result<Arc<Config>, ConfigurationError>, body: &str) -> Result<(), HandlerError> {
             if let Event::Issue(e) = event {
                 if !matches!(e.action, IssuesAction::Opened | IssuesAction::Edited) {
                     // no change in issue's body for these events, so skip
@@ -136,6 +125,23 @@ macro_rules! command_handlers {
                 }
             }
 
+            if command == Command::None {
+                return Ok(());
+            }
+
+            let config = match config {
+                Ok(config) => config,
+                Err(e @ ConfigurationError::Missing) => {
+                    return Err(HandlerError::Message(e.to_string()));
+                }
+                Err(e @ ConfigurationError::Toml(_)) => {
+                    return Err(HandlerError::Message(e.to_string()));
+                }
+                Err(e @ ConfigurationError::Http(_)) => {
+                    return Err(HandlerError::Other(e.clone().into()));
+                }
+            };
+
             match command {
                 $(
                 Command::$enum(Ok(command)) => {
@@ -158,7 +164,7 @@ macro_rules! command_handlers {
                         err
                     )));
                 })*
-                Command::None => {}
+                Command::None => unreachable!(),
             }
             Ok(())
         }
