@@ -613,6 +613,7 @@ pub struct ChangeInner {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Changes {
+    pub title: ChangeInner,
     pub body: ChangeInner,
 }
 

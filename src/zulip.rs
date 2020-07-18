@@ -469,6 +469,50 @@ impl<'a> MessageApiRequest<'a> {
     }
 }
 
+#[derive(serde::Deserialize)]
+pub struct MessageApiResponse {
+    #[serde(rename = "id")]
+    pub message_id: u64,
+}
+
+#[derive(Default)]
+pub struct UpdateMessageApiRequest<'a> {
+    pub message_id: u64,
+    pub topic: Option<&'a str>,
+    pub propagate_mode: Option<&'a str>,
+    pub content: Option<&'a str>,
+}
+
+impl<'a> UpdateMessageApiRequest<'a> {
+    pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
+        let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
+
+        #[derive(serde::Serialize)]
+        struct SerializedApi<'a> {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            pub topic: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            pub propagate_mode: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            pub content: Option<&'a str>,
+        }
+
+        Ok(client
+            .patch(&format!(
+                "https://rust-lang.zulipchat.com/api/v1/messages/{}",
+                self.message_id
+            ))
+            .basic_auth(BOT_EMAIL, Some(&bot_api_token))
+            .form(&SerializedApi {
+                topic: self.topic,
+                propagate_mode: self.propagate_mode,
+                content: self.content,
+            })
+            .send()
+            .await?)
+    }
+}
+
 async fn acknowledge(gh_id: i64, mut words: impl Iterator<Item = &str>) -> anyhow::Result<String> {
     let filter = match words.next() {
         Some(filter) => {
