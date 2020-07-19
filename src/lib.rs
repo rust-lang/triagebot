@@ -155,21 +155,34 @@ pub async fn webhook(
             return Ok(false);
         }
     };
-    if let Err(err) = handlers::handle(&ctx, &event).await {
+    let errors = handlers::handle(&ctx, &event).await;
+    let mut other_error = false;
+    let mut message = String::new();
+    for err in errors {
         match err {
-            HandlerError::Message(message) => {
-                if let Some(issue) = event.issue() {
-                    let cmnt = ErrorComment::new(issue, message);
-                    cmnt.post(&ctx.github).await?;
+            HandlerError::Message(msg) => {
+                if !message.is_empty() {
+                    message.push_str("\n\n");
                 }
+                message.push_str(&msg);
             }
             HandlerError::Other(err) => {
                 log::error!("handling event failed: {:?}", err);
-                return Err(WebhookError(anyhow::anyhow!(
-                    "handling failed, error logged",
-                )));
+                other_error = true;
             }
         }
     }
-    Ok(true)
+    if !message.is_empty() {
+        if let Some(issue) = event.issue() {
+            let cmnt = ErrorComment::new(issue, message);
+            cmnt.post(&ctx.github).await?;
+        }
+    }
+    if other_error {
+        Err(WebhookError(anyhow::anyhow!(
+            "handling failed, error logged",
+        )))
+    } else {
+        Ok(true)
+    }
 }

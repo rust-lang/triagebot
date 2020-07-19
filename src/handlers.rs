@@ -35,16 +35,16 @@ mod prioritize;
 mod relabel;
 mod rustc_commits;
 
-// TODO: Return multiple handler errors ?
-pub async fn handle(ctx: &Context, event: &Event) -> Result<(), HandlerError> {
+pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo_name()).await;
+    let mut errors = Vec::new();
 
     if let (Ok(config), Event::Issue(event)) = (config.as_ref(), event) {
-        handle_issue(ctx, event, config).await?;
+        handle_issue(ctx, event, config, &mut errors).await;
     }
 
     if let Some(body) = event.comment_body() {
-        handle_command(ctx, event, &config, body).await?;
+        handle_command(ctx, event, &config, body, &mut errors).await;
     }
 
     if let Err(e) = notification::handle(ctx, event).await {
@@ -63,28 +63,34 @@ pub async fn handle(ctx: &Context, event: &Event) -> Result<(), HandlerError> {
         );
     }
 
-    Ok(())
+    errors
 }
 
 macro_rules! issue_handlers {
     ($($name:ident,)*) => {
-        async fn handle_issue(ctx: &Context, event: &IssuesEvent, config: &Arc<Config>) -> Result<(), HandlerError> {
+        async fn handle_issue(
+            ctx: &Context,
+            event: &IssuesEvent,
+            config: &Arc<Config>,
+            errors: &mut Vec<HandlerError>,
+        ) {
             $(
-            if let Some(input) = $name::parse_input(
-                ctx, event, config.$name.as_ref(),
-            ).map_err(HandlerError::Message)? {
-                if let Some(config) = &config.$name {
-                    $name::handle_input(ctx, config, event, input).await.map_err(HandlerError::Other)?;
-                } else {
-                    return Err(HandlerError::Message(format!(
-                        "The feature `{}` is not enabled in this repository.\n\
-                        To enable it add its section in the `triagebot.toml` \
-                        in the root of the repository.",
-                        stringify!($name)
-                    )));
+            match $name::parse_input(ctx, event, config.$name.as_ref()) {
+                Err(err) => errors.push(HandlerError::Message(err)),
+                Ok(Some(input)) => {
+                    if let Some(config) = &config.$name {
+                        $name::handle_input(ctx, config, event, input).await.unwrap_or_else(|err| errors.push(HandlerError::Other(err)));
+                    } else {
+                        errors.push(HandlerError::Message(format!(
+                            "The feature `{}` is not enabled in this repository.\n\
+                            To enable it add its section in the `triagebot.toml` \
+                            in the root of the repository.",
+                            stringify!($name)
+                        )));
+                    }
                 }
+                Ok(None) => {}
             })*
-            Ok(())
         }
     }
 }
@@ -101,72 +107,73 @@ issue_handlers! {
 
 macro_rules! command_handlers {
     ($($name:ident: $enum:ident,)*) => {
-        async fn handle_command(ctx: &Context, event: &Event, config: &Result<Arc<Config>, ConfigurationError>, body: &str) -> Result<(), HandlerError> {
+        async fn handle_command(
+            ctx: &Context,
+            event: &Event,
+            config: &Result<Arc<Config>, ConfigurationError>,
+            body: &str,
+            errors: &mut Vec<HandlerError>,
+        ) {
             if let Event::Issue(e) = event {
                 if !matches!(e.action, IssuesAction::Opened | IssuesAction::Edited) {
                     // no change in issue's body for these events, so skip
                     log::debug!("skipping event, issue was {:?}", e.action);
-                    return Ok(());
+                    return;
                 }
             }
 
-            // TODO: parse multiple commands and diff them
-            let mut input = Input::new(&body, &ctx.username);
-            let command = input.parse_command();
+            let input = Input::new(&body, &ctx.username);
+            let commands = if let Some(previous) = event.comment_from() {
+                let prev_commands = Input::new(&previous, &ctx.username).collect::<Vec<_>>();
+                input.filter(|cmd| !prev_commands.contains(cmd)).collect::<Vec<_>>()
+            } else {
+                input.collect()
+            };
 
-            if let Some(previous) = event.comment_from() {
-                let mut prev_input = Input::new(&previous, &ctx.username);
-                let prev_command = prev_input.parse_command();
-                if command == prev_command {
-                    log::info!("skipping unmodified command: {:?} -> {:?}", prev_command, command);
-                    return Ok(());
-                } else {
-                    log::debug!("executing modified command: {:?} -> {:?}", prev_command, command);
-                }
-            }
-
-            if command == Command::None {
-                return Ok(());
+            if commands.is_empty() {
+                return;
             }
 
             let config = match config {
                 Ok(config) => config,
                 Err(e @ ConfigurationError::Missing) => {
-                    return Err(HandlerError::Message(e.to_string()));
+                    return errors.push(HandlerError::Message(e.to_string()));
                 }
                 Err(e @ ConfigurationError::Toml(_)) => {
-                    return Err(HandlerError::Message(e.to_string()));
+                    return errors.push(HandlerError::Message(e.to_string()));
                 }
                 Err(e @ ConfigurationError::Http(_)) => {
-                    return Err(HandlerError::Other(e.clone().into()));
+                    return errors.push(HandlerError::Other(e.clone().into()));
                 }
             };
 
-            match command {
-                $(
-                Command::$enum(Ok(command)) => {
-                    if let Some(config) = &config.$name {
-                        $name::handle_command(ctx, config, event, command).await.map_err(HandlerError::Other)?;
-                    } else {
-                        return Err(HandlerError::Message(format!(
-                            "The feature `{}` is not enabled in this repository.\n\
-                            To enable it add its section in the `triagebot.toml` \
-                            in the root of the repository.",
-                            stringify!($name)
-                        )));
+            for command in commands {
+                match command {
+                    $(
+                    Command::$enum(Ok(command)) => {
+                        if let Some(config) = &config.$name {
+                            $name::handle_command(ctx, config, event, command)
+                                .await
+                                .unwrap_or_else(|err| errors.push(HandlerError::Other(err)));
+                        } else {
+                            errors.push(HandlerError::Message(format!(
+                                "The feature `{}` is not enabled in this repository.\n\
+                                To enable it add its section in the `triagebot.toml` \
+                                in the root of the repository.",
+                                stringify!($name)
+                            )));
+                        }
                     }
+                    Command::$enum(Err(err)) => {
+                        errors.push(HandlerError::Message(format!(
+                            "Parsing {} command in [comment]({}) failed: {}",
+                            stringify!($name),
+                            event.html_url().expect("has html url"),
+                            err
+                        )));
+                    })*
                 }
-                Command::$enum(Err(err)) => {
-                    return Err(HandlerError::Message(format!(
-                        "Parsing {} command in [comment]({}) failed: {}",
-                        stringify!($name),
-                        event.html_url().expect("has html url"),
-                        err
-                    )));
-                })*
-                Command::None => unreachable!(),
             }
-            Ok(())
         }
     }
 }

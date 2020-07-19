@@ -23,7 +23,6 @@ pub enum Command<'a> {
     Prioritize(Result<prioritize::PrioritizeCommand, Error<'a>>),
     Second(Result<second::SecondCommand, Error<'a>>),
     Glacier(Result<glacier::GlacierCommand, Error<'a>>),
-    None,
 }
 
 #[derive(Debug)]
@@ -64,12 +63,7 @@ impl<'a> Input<'a> {
         }
     }
 
-    pub fn parse_command(&mut self) -> Command<'a> {
-        let start = match find_commmand_start(&self.all[self.parsed..], self.bot) {
-            Some(pos) => pos,
-            None => return Command::None,
-        };
-        self.parsed += start;
+    fn parse_command(&mut self) -> Option<Command<'a>> {
         let mut tok = Tokenizer::new(&self.all[self.parsed..]);
         assert_eq!(
             tok.next_token().unwrap(),
@@ -131,18 +125,31 @@ impl<'a> Input<'a> {
             .is_some()
         {
             log::info!("command overlaps code; code: {:?}", self.code);
-            return Command::None;
+            return None;
         }
 
-        match success.pop() {
-            Some((mut tok, c)) => {
-                // if we errored out while parsing the command do not move the input forwards
-                if c.is_ok() {
-                    self.parsed += tok.position();
-                }
-                c
+        let (mut tok, c) = success.pop()?;
+        // if we errored out while parsing the command do not move the input forwards
+        self.parsed += if c.is_ok() {
+            tok.position()
+        } else {
+            self.bot.len() + 1
+        };
+        Some(c)
+    }
+}
+
+impl<'a> Iterator for Input<'a> {
+    type Item = Command<'a>;
+
+    fn next(&mut self) -> Option<Command<'a>> {
+        loop {
+            let start = find_commmand_start(&self.all[self.parsed..], self.bot)?;
+            self.parsed += start;
+            if let Some(command) = self.parse_command() {
+                return Some(command);
             }
-            None => Command::None,
+            self.parsed += self.bot.len() + 1;
         }
     }
 }
@@ -157,19 +164,11 @@ impl<'a> Command<'a> {
             Command::Prioritize(r) => r.is_ok(),
             Command::Second(r) => r.is_ok(),
             Command::Glacier(r) => r.is_ok(),
-            Command::None => true,
         }
     }
 
     pub fn is_err(&self) -> bool {
         !self.is_ok()
-    }
-
-    pub fn is_none(&self) -> bool {
-        match self {
-            Command::None => true,
-            _ => false,
-        }
     }
 }
 
@@ -178,14 +177,14 @@ fn errors_outside_command_are_fine() {
     let input =
         "haha\" unterminated quotes @bot modify labels: +bug. Terminating after the command";
     let mut input = Input::new(input, "bot");
-    assert!(input.parse_command().is_ok());
+    assert!(input.next().unwrap().is_ok());
 }
 
 #[test]
 fn code_1() {
     let input = "`@bot modify labels: +bug.`";
     let mut input = Input::new(input, "bot");
-    assert!(input.parse_command().is_none());
+    assert!(input.next().is_none());
 }
 
 #[test]
@@ -194,7 +193,7 @@ fn code_2() {
     @bot modify labels: +bug.
     ```";
     let mut input = Input::new(input, "bot");
-    assert!(input.parse_command().is_none());
+    assert!(input.next().is_none());
 }
 
 #[test]
@@ -203,7 +202,7 @@ fn edit_1() {
     let mut input_old = Input::new(input_old, "bot");
     let input_new = "Adding labels: @bot modify labels: +bug. some other text";
     let mut input_new = Input::new(input_new, "bot");
-    assert_eq!(input_old.parse_command(), input_new.parse_command());
+    assert_eq!(input_old.next(), input_new.next());
 }
 
 #[test]
@@ -212,15 +211,14 @@ fn edit_2() {
     let mut input_old = Input::new(input_old, "bot");
     let input_new = "@bot modify labels: +bug.";
     let mut input_new = Input::new(input_new, "bot");
-    assert_ne!(input_old.parse_command(), input_new.parse_command());
+    assert_ne!(input_old.next(), input_new.next());
 }
 
 #[test]
 fn move_input_along() {
     let input = "@bot modify labels: +bug. Afterwards, delete the world.";
     let mut input = Input::new(input, "bot");
-    let parsed = input.parse_command();
-    assert!(parsed.is_ok());
+    assert!(input.next().unwrap().is_ok());
     assert_eq!(&input.all[input.parsed..], " Afterwards, delete the world.");
 }
 
@@ -228,7 +226,7 @@ fn move_input_along() {
 fn move_input_along_1() {
     let input = "@bot modify labels\": +bug. Afterwards, delete the world.";
     let mut input = Input::new(input, "bot");
-    assert!(input.parse_command().is_err());
+    assert!(input.next().unwrap().is_err());
     // don't move input along if parsing the command fails
-    assert_eq!(input.parsed, 0);
+    assert_eq!(&input.all[..input.parsed], "@bot");
 }
