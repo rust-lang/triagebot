@@ -5,7 +5,7 @@ use crate::handlers::Context;
 use anyhow::Context as _;
 use std::convert::TryInto;
 use std::env;
-use std::io::Write as _;
+use std::fmt::Write as _;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Request {
@@ -344,23 +344,46 @@ impl Recipient<'_> {
                 const ALWAYS_SAFE: &str =
                     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-~";
 
-                let mut encoded_topic = Vec::new();
+                let mut encoded_topic = String::new();
                 for ch in topic.bytes() {
                     if !(ALWAYS_SAFE.contains(ch as char)) {
-                        write!(encoded_topic, "%{:02X}", ch).unwrap();
+                        write!(encoded_topic, ".{:02X}", ch).unwrap();
                     } else {
-                        encoded_topic.push(ch);
+                        encoded_topic.push(ch as char);
                     }
                 }
-
-                let mut encoded_topic = String::from_utf8(encoded_topic).unwrap();
-                encoded_topic = encoded_topic.replace("%", ".");
-
                 format!("stream/{}-xxx/topic/{}", id, encoded_topic)
             }
             Recipient::Private { id, .. } => format!("pm-with/{}-xxx", id),
         }
     }
+}
+
+#[cfg(test)]
+fn check_encode(topic: &str, expected: &str) {
+    const PREFIX: &str = "stream/0-xxx/topic/";
+    let computed = Recipient::Stream { id: 0, topic }.narrow();
+    assert_eq!(&computed[..PREFIX.len()], PREFIX);
+    assert_eq!(&computed[PREFIX.len()..], expected);
+}
+
+#[test]
+fn test_encode() {
+    check_encode("some text with spaces", "some.20text.20with.20spaces");
+    check_encode(
+        " !\"#$%&'()*+,-./",
+        ".20.21.22.23.24.25.26.27.28.29.2A.2B.2C-.2E.2F",
+    );
+    check_encode("0123456789:;<=>?", "0123456789.3A.3B.3C.3D.3E.3F");
+    check_encode(
+        "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_",
+        ".40ABCDEFGHIJKLMNOPQRSTUVWXYZ.5B.5C.5D.5E_",
+    );
+    check_encode(
+        "`abcdefghijklmnopqrstuvwxyz{|}~",
+        ".60abcdefghijklmnopqrstuvwxyz.7B.7C.7D~.7F",
+    );
+    check_encode("áé…", ".C3.A1.C3.A9.E2.80.A6");
 }
 
 #[derive(serde::Serialize)]
