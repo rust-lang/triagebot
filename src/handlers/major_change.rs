@@ -157,13 +157,21 @@ async fn handle(
     labels.push(Label { name: label_to_add });
     let github_req = issue.set_labels(&ctx.github, labels);
 
-    let mut zulip_topic = format!(" {}", issue.zulip_topic_reference());
-    // We prepend the issue title, truncating such that the overall length does
-    // not exceed 60 characters (a Zulip limitation).
-    zulip_topic.insert_str(
-        0,
-        &issue.title[..std::cmp::min(issue.title.len(), 60 - zulip_topic.len())],
-    );
+    // Concatenate the issue title and the topic reference, truncating such that
+    // the overall length does not exceed 60 characters (a Zulip limitation).
+    let topic_ref = issue.zulip_topic_reference();
+    // Skip chars until the last characters that can be written:
+    // Maximum 60, minus the reference, minus the elipsis and the space
+    let mut chars = issue
+        .title
+        .char_indices()
+        .skip(60 - topic_ref.chars().count() - 2);
+    let zulip_topic = match chars.next() {
+        Some((len, _)) if chars.next().is_some() => {
+            format!("{}… {}", &issue.title[..len], topic_ref)
+        }
+        _ => format!("{} {}", issue.title, topic_ref),
+    };
 
     let zulip_req = crate::zulip::MessageApiRequest {
         recipient: crate::zulip::Recipient::Stream {

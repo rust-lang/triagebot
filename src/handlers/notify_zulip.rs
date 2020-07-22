@@ -68,7 +68,12 @@ pub(super) async fn handle_input<'a>(
     let mut topic = config.topic.clone();
     topic = topic.replace("{number}", &event.issue.number.to_string());
     topic = topic.replace("{title}", &event.issue.title);
-    topic.truncate(60); // Zulip limitation
+    // Truncate to 60 chars (a Zulip limitation)
+    let mut chars = topic.char_indices().skip(59);
+    if let (Some((len, _)), Some(_)) = (chars.next(), chars.next()) {
+        topic.truncate(len);
+        topic.push('…');
+    }
 
     let mut msg = match input.notification_type {
         NotificationType::Labeled => config.message_on_add.as_ref().unwrap().clone(),
