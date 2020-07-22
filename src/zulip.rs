@@ -5,7 +5,7 @@ use crate::handlers::Context;
 use anyhow::Context as _;
 use std::convert::TryInto;
 use std::env;
-use std::io::Write as _;
+use std::fmt::Write as _;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Request {
@@ -344,19 +344,15 @@ impl Recipient<'_> {
                 const ALWAYS_SAFE: &str =
                     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-~";
 
-                let mut encoded_topic = Vec::new();
+                let mut encoded_topic = String::new();
                 for ch in topic.bytes() {
                     if !(ALWAYS_SAFE.contains(ch as char)) {
                         write!(encoded_topic, ".{:02X}", ch).unwrap();
                     } else {
-                        encoded_topic.push(ch);
+                        encoded_topic.push(ch as char);
                     }
                 }
-                format!(
-                    "stream/{}-xxx/topic/{}",
-                    id,
-                    String::from_utf8(encoded_topic).unwrap()
-                )
+                format!("stream/{}-xxx/topic/{}", id, encoded_topic)
             }
             Recipient::Private { id, .. } => format!("pm-with/{}-xxx", id),
         }
