@@ -104,6 +104,7 @@ pub(super) async fn handle_input(
 
             let prev_topic = zulip_topic_from_issue(&prev_issue);
             let partial_issue: PartialIssue = issue.into();
+            let new_topic = zulip_topic_from_issue(&partial_issue);
 
             let zulip_send_req = crate::zulip::MessageApiRequest {
                 recipient: crate::zulip::Recipient::Stream {
@@ -121,7 +122,7 @@ pub(super) async fn handle_input(
 
             let zulip_update_req = crate::zulip::UpdateMessageApiRequest {
                 message_id: zulip_send_res.message_id,
-                topic: Some(&partial_issue.title),
+                topic: Some(&new_topic),
                 ..Default::default()
             };
             zulip_update_req
