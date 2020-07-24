@@ -1,17 +1,17 @@
 use crate::{
     config::MajorChangeConfig,
-    github::{Event, Issue, IssuesAction, IssuesEvent, Label},
+    github::{Event, Issue, IssuesAction, IssuesEvent, Label, PartialIssue},
     handlers::Context,
     interactions::ErrorComment,
 };
 use anyhow::Context as _;
 use parser::command::second::SecondCommand;
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Invocation {
     NewProposal,
     AcceptedProposal,
-    Rename,
+    Rename { prev_issue: PartialIssue },
 }
 
 pub(super) fn parse_input(
@@ -20,7 +20,16 @@ pub(super) fn parse_input(
     _config: Option<&MajorChangeConfig>,
 ) -> Result<Option<Invocation>, String> {
     if event.action == IssuesAction::Edited {
-        return Ok(Some(Invocation::Rename));
+        if let Some(changes) = &event.changes {
+            let prev_issue = PartialIssue {
+                number: event.issue.number,
+                title: changes.title.from.clone(),
+                repository: event.issue.repository().clone(),
+            };
+            return Ok(Some(Invocation::Rename { prev_issue }));
+        } else {
+            return Err(format!("no changes property in edited event"));
+        }
     }
 
     // If we were labeled with accepted, then issue that event
@@ -90,29 +99,16 @@ pub(super) async fn handle_input(
             "This proposal has been accepted: [#{}]({}).",
             event.issue.number, event.issue.html_url,
         ),
-        Invocation::Rename => {
+        Invocation::Rename { prev_issue } => {
             let issue = &event.issue;
-            
-            // Concatenate the issue title and the topic reference, truncating such that
-            // the overall length does not exceed 60 characters (a Zulip limitation).
-            let topic_ref = issue.zulip_topic_reference();
-            // Skip chars until the last characters that can be written:
-            // Maximum 60, minus the reference, minus the elipsis and the space
-            let mut chars = issue
-                .title
-                .char_indices()
-                .skip(60 - topic_ref.chars().count() - 2);
-            let zulip_topic = match chars.next() {
-                Some((len, _)) if chars.next().is_some() => {
-                    format!("{}… {}", &issue.title[..len], topic_ref)
-                }
-                _ => format!("{} {}", issue.title, topic_ref),
-            };
+
+            let prev_topic = zulip_topic_from_issue(&prev_issue);
+            let partial_issue: PartialIssue = issue.into();
 
             let zulip_send_req = crate::zulip::MessageApiRequest {
                 recipient: crate::zulip::Recipient::Stream {
                     id: config.zulip_stream,
-                    topic: &zulip_topic,
+                    topic: &prev_topic,
                 },
                 content: "The associated GitHub issue has been renamed. Renaming this Zulip topic.",
             };
@@ -125,7 +121,7 @@ pub(super) async fn handle_input(
 
             let zulip_update_req = crate::zulip::UpdateMessageApiRequest {
                 message_id: zulip_send_res.message_id,
-                topic: Some("TODO"),
+                topic: Some(&partial_issue.title),
                 ..Default::default()
             };
             zulip_update_req
@@ -207,21 +203,8 @@ async fn handle(
     labels.push(Label { name: label_to_add });
     let github_req = issue.set_labels(&ctx.github, labels);
 
-    // Concatenate the issue title and the topic reference, truncating such that
-    // the overall length does not exceed 60 characters (a Zulip limitation).
-    let topic_ref = issue.zulip_topic_reference();
-    // Skip chars until the last characters that can be written:
-    // Maximum 60, minus the reference, minus the elipsis and the space
-    let mut chars = issue
-        .title
-        .char_indices()
-        .skip(60 - topic_ref.chars().count() - 2);
-    let zulip_topic = match chars.next() {
-        Some((len, _)) if chars.next().is_some() => {
-            format!("{}… {}", &issue.title[..len], topic_ref)
-        }
-        _ => format!("{} {}", issue.title, topic_ref),
-    };
+    let partial_issue: PartialIssue = issue.into();
+    let zulip_topic = zulip_topic_from_issue(&partial_issue);
 
     let zulip_req = crate::zulip::MessageApiRequest {
         recipient: crate::zulip::Recipient::Stream {
@@ -256,4 +239,22 @@ async fn handle(
     zulip_res.context("zulip post failed")?;
     gh_res.context("label setting failed")?;
     Ok(())
+}
+
+fn zulip_topic_from_issue(issue: &PartialIssue) -> String {
+    // Concatenate the issue title and the topic reference, truncating such that
+    // the overall length does not exceed 60 characters (a Zulip limitation).
+    let topic_ref = issue.zulip_topic_reference();
+    // Skip chars until the last characters that can be written:
+    // Maximum 60, minus the reference, minus the elipsis and the space
+    let mut chars = issue
+        .title
+        .char_indices()
+        .skip(60 - topic_ref.chars().count() - 2);
+    match chars.next() {
+        Some((len, _)) if chars.next().is_some() => {
+            format!("{}… {}", &issue.title[..len], topic_ref)
+        }
+        _ => format!("{} {}", issue.title, topic_ref),
+    }
 }

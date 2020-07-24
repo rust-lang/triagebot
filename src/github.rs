@@ -260,6 +260,38 @@ pub struct Issue {
     repository: OnceCell<IssueRepository>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PartialIssue {
+    pub number: u64,
+    pub title: String,
+    pub repository: IssueRepository,
+}
+
+impl PartialIssue {
+    pub fn zulip_topic_reference(&self) -> String {
+        let repo = &self.repository;
+        if repo.organization == "rust-lang" {
+            if repo.repository == "rust" {
+                format!("#{}", self.number)
+            } else {
+                format!("{}#{}", repo.repository, self.number)
+            }
+        } else {
+            format!("{}/{}#{}", repo.organization, repo.repository, self.number)
+        }
+    }
+}
+
+impl From<&Issue> for PartialIssue {
+    fn from(other: &Issue) -> PartialIssue {
+        PartialIssue {
+            number: other.number,
+            title: other.title.clone(),
+            repository: other.repository.get().unwrap().clone(),
+        }
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct Comment {
     #[serde(deserialize_with = "opt_string")]
@@ -305,7 +337,7 @@ impl fmt::Display for AssignmentError {
 
 impl std::error::Error for AssignmentError {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssueRepository {
     pub organization: String,
     pub repository: String,
@@ -327,19 +359,6 @@ impl IssueRepository {
 }
 
 impl Issue {
-    pub fn zulip_topic_reference(&self) -> String {
-        let repo = self.repository();
-        if repo.organization == "rust-lang" {
-            if repo.repository == "rust" {
-                format!("#{}", self.number)
-            } else {
-                format!("{}#{}", repo.repository, self.number)
-            }
-        } else {
-            format!("{}/{}#{}", repo.organization, repo.repository, self.number)
-        }
-    }
-
     pub fn repository(&self) -> &IssueRepository {
         self.repository.get_or_init(|| {
             // https://api.github.com/repos/rust-lang/rust/issues/69257/comments
