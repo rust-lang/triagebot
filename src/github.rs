@@ -180,6 +180,7 @@ impl User {
     }
 
     pub async fn is_team_member<'a>(&'a self, client: &'a GithubClient) -> anyhow::Result<bool> {
+        log::trace!("Getting team membership for {:?}", self.login);
         let permission = crate::team_data::teams(client).await?;
         let map = permission.teams;
         let is_triager = map
@@ -188,11 +189,15 @@ impl User {
         let is_pri_member = map
             .get("wg-prioritization")
             .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
-        Ok(
-            map["all"].members.iter().any(|g| g.github == self.login)
-                || is_triager
-                || is_pri_member,
-        )
+        let in_all = map["all"].members.iter().any(|g| g.github == self.login);
+        log::trace!(
+            "{:?} is all?={:?}, triager?={:?}, prioritizer?={:?}",
+            self.login,
+            in_all,
+            is_triager,
+            is_pri_member
+        );
+        Ok(in_all || is_triager || is_pri_member)
     }
 
     // Returns the ID of the given user, if the user is in the `all` team.
