@@ -260,6 +260,8 @@ pub struct Issue {
     repository: OnceCell<IssueRepository>,
 }
 
+/// Contains only the parts of `Issue` that are needed for turning the issue title into a Zulip
+/// topic.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PartialIssue {
     pub number: u64,
