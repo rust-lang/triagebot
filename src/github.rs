@@ -20,11 +20,16 @@ pub struct User {
 impl GithubClient {
     async fn _send_req(&self, req: RequestBuilder) -> anyhow::Result<(Response, String)> {
         const MAX_ATTEMPTS: usize = 2;
-        log::debug!("_send_req with {:?}", req);
         let req_dbg = format!("{:?}", req);
-        let req = req
+        let mut req = req
             .build()
             .with_context(|| format!("building reqwest {}", req_dbg))?;
+
+        let auth = req.headers_mut().remove(AUTHORIZATION);
+        log::debug!("_send_req with {:?}", auth);
+        if let Some(auth) = auth {
+            req.headers_mut().insert(AUTHORIZATION, auth);
+        }
 
         let mut resp = self.client.execute(req.try_clone().unwrap()).await?;
         if let Some(sleep) = Self::needs_retry(&resp).await {
