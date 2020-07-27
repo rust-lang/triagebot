@@ -51,7 +51,7 @@ pub(super) async fn handle_command(
     .await?;
     fork.create_file(
         format!("ices/{}.rs", number),
-        format!("Add ICE reproduction for issue #{}.", number),
+        format!("Add ICE reproduction for issue rust-lang/rust#{}.", number),
         body,
     )
     .branch(format!("triagebot-ice-{}", number))
@@ -61,12 +61,12 @@ pub(super) async fn handle_command(
     octocrab
         .pulls("rust-lang", "glacier")
         .create(
-            format!("ICE - {}", number),
+            format!("ICE - rust-lang/rust#{}", number),
             format!("rustbot:triagebot-ice-{}", number),
             "master",
         )
         .body(format!(
-            "Automatically created by @{} in issue #{}",
+            "Automatically created by @{} in issue rust-lang/rust#{}",
             user.login, number
         ))
         .send()
