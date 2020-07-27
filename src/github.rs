@@ -3,6 +3,7 @@ use anyhow::Context;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{future::BoxFuture, FutureExt};
+use hyper::header::HeaderValue;
 use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
@@ -20,16 +21,11 @@ pub struct User {
 impl GithubClient {
     async fn _send_req(&self, req: RequestBuilder) -> anyhow::Result<(Response, String)> {
         const MAX_ATTEMPTS: usize = 2;
+        log::debug!("_send_req with {:?}", req);
         let req_dbg = format!("{:?}", req);
-        let mut req = req
+        let req = req
             .build()
             .with_context(|| format!("building reqwest {}", req_dbg))?;
-
-        let auth = req.headers_mut().remove(AUTHORIZATION);
-        log::debug!("_send_req with {:?}", auth);
-        if let Some(auth) = auth {
-            req.headers_mut().insert(AUTHORIZATION, auth);
-        }
 
         let mut resp = self.client.execute(req.try_clone().unwrap()).await?;
         if let Some(sleep) = Self::needs_retry(&resp).await {
@@ -833,8 +829,10 @@ trait RequestSend: Sized {
 
 impl RequestSend for RequestBuilder {
     fn configure(self, g: &GithubClient) -> RequestBuilder {
+        let mut auth = HeaderValue::from_maybe_shared(format!("token {}", g.token)).unwrap();
+        auth.set_sensitive(true);
         self.header(USER_AGENT, "rust-lang-triagebot")
-            .header(AUTHORIZATION, format!("token {}", g.token))
+            .header(AUTHORIZATION, &auth)
     }
 }
 
