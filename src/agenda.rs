@@ -449,3 +449,81 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         actions,
     })
 }
+
+pub fn lang<'a>() -> Box<dyn Action> {
+    let mut actions = Vec::new();
+
+    let mut queries = Vec::new();
+
+    // https://github.com/rust-lang/rfcs/pulls?q=is%3Aopen+is%3Apr+label%3AT-lang
+    queries.push(QueryMap {
+        name: "newly_created_rfcs",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open"), ("is", "pr")],
+            include_labels: vec!["T-lang"],
+            exclude_labels: vec![],
+        },
+    });
+
+    //https://github.com/rust-lang/rfcs/pulls?q=is%3Aopen+is%3Apr+label%3AI-nominated+label%3AT-lang
+    queries.push(QueryMap {
+        name: "nominated_rfcs",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open"), ("is", "pr")],
+            include_labels: vec!["T-lang", "I-nominated"],
+            exclude_labels: vec![],
+        },
+    });
+
+    actions.push(Query {
+        repo: "rust-lang/rfcs",
+        queries,
+    });
+
+    let mut queries = Vec::new();
+
+    // https://github.com/rust-lang/rust/issues?q=is%3Aissue+is%3Aopen+label%3AP-high+label%3AT-lang
+    queries.push(QueryMap {
+        name: "p_high_issues",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open")],
+            include_labels: vec!["T-lang", "P-high"],
+            exclude_labels: vec![],
+        },
+    });
+
+    // https://github.com/rust-lang/rust/pulls?q=is%3Aopen+is%3Apr+label%3AI-nominated+label%3AT-lang
+    queries.push(QueryMap {
+        name: "nominated_prs",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open"), ("is", "pr")],
+            include_labels: vec!["T-lang", "I-nominated"],
+            exclude_labels: vec![],
+        },
+    });
+
+    // https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3AI-nominated+label%3AT-lang+
+    queries.push(QueryMap {
+        name: "nominated_issues",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open")],
+            include_labels: vec!["T-lang", "I-nominated"],
+            exclude_labels: vec![],
+        },
+    });
+
+    actions.push(Query {
+        repo: "rust-lang/rust",
+        queries,
+    });
+
+    Box::new(Step {
+        name: "lang_agenda",
+        actions,
+    })
+}
