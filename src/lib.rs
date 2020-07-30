@@ -9,6 +9,7 @@ use interactions::ErrorComment;
 use std::fmt;
 
 pub mod actions;
+pub mod agenda;
 pub mod config;
 pub mod db;
 pub mod github;
@@ -17,7 +18,6 @@ pub mod interactions;
 pub mod logger;
 pub mod notification_listing;
 pub mod payload;
-pub mod prioritization;
 pub mod team;
 mod team_data;
 pub mod zulip;
