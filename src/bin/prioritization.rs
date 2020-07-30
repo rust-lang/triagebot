@@ -1,11 +1,11 @@
-use triagebot::{logger, prioritization};
+use triagebot::{agenda, logger};
 
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
     logger::init();
 
-    let agenda = prioritization::prepare_agenda();
+    let agenda = agenda::prepare_agenda();
 
     print!("{}", agenda.call().await);
 }
