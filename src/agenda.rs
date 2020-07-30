@@ -1,7 +1,7 @@
 use crate::actions::{Action, Query, QueryMap, Step};
 use crate::github;
 
-pub fn prepare_agenda<'a>() -> Box<dyn Action> {
+pub fn prioritization<'a>() -> Box<dyn Action> {
     let mut actions = Vec::new();
 
     let mut queries = Vec::new();
@@ -445,7 +445,7 @@ pub fn prepare_agenda<'a>() -> Box<dyn Action> {
     });
 
     Box::new(Step {
-        name: "agenda",
+        name: "prioritization_agenda",
         actions,
     })
 }
