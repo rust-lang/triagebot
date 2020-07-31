@@ -179,12 +179,9 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .context("database migrations")?;
 
     let client = Client::new();
-    let gh = github::GithubClient::new(
-        client.clone(),
-        env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"),
-    );
+    let gh = github::GithubClient::new_with_default_token(client.clone());
     let oc = octocrab::OctocrabBuilder::new()
-        .personal_token(env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"))
+        .personal_token(github::default_token_from_env())
         .build()
         .expect("Failed to build octograb.");
     let ctx = Arc::new(Context {

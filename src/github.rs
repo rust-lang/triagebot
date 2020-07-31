@@ -669,9 +669,14 @@ impl Repository {
         } = query;
 
         let use_issues = exclude_labels.is_empty() && filters.iter().all(|&(key, _)| key != "no");
+        let is_pr = filters
+            .iter()
+            .any(|&(key, value)| key == "is" && value == "pr");
         // negating filters can only be handled by the search api
         let url = if use_issues {
             self.build_issues_url(filters, include_labels)
+        } else if is_pr {
+            self.build_pulls_url(filters, include_labels)
         } else {
             self.build_search_issues_url(filters, include_labels, exclude_labels)
         };
@@ -715,6 +720,28 @@ impl Repository {
             .join("&");
         format!(
             "{}/repos/{}/issues?{}",
+            Repository::GITHUB_API_URL,
+            self.full_name,
+            filters
+        )
+    }
+
+    fn build_pulls_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
+        let filters = filters
+            .iter()
+            .map(|(key, val)| format!("{}={}", key, val))
+            .chain(std::iter::once(format!(
+                "labels={}",
+                include_labels.join(",")
+            )))
+            .chain(std::iter::once("filter=all".to_owned()))
+            .chain(std::iter::once(format!("sort=created")))
+            .chain(std::iter::once(format!("direction=asc")))
+            .chain(std::iter::once(format!("per_page=100")))
+            .collect::<Vec<_>>()
+            .join("&");
+        format!(
+            "{}/repos/{}/pulls?{}",
             Repository::GITHUB_API_URL,
             self.full_name,
             filters
@@ -836,6 +863,35 @@ impl RequestSend for RequestBuilder {
     }
 }
 
+/// Finds the token in the user's environment, panicking if no suitable token
+/// can be found.
+pub fn default_token_from_env() -> String {
+    match std::env::var("GITHUB_API_TOKEN") {
+        Ok(v) => return v,
+        Err(_) => (),
+    }
+
+    match get_token_from_git_config() {
+        Ok(v) => return v,
+        Err(_) => (),
+    }
+
+    panic!("could not find token in GITHUB_API_TOKEN or .gitconfig/github.oath-token")
+}
+
+fn get_token_from_git_config() -> anyhow::Result<String> {
+    let output = std::process::Command::new("git")
+        .arg("config")
+        .arg("--get")
+        .arg("github.oauth-token")
+        .output()?;
+    if !output.status.success() {
+        anyhow::bail!("error received executing `git`: {:?}", output.status);
+    }
+    let git_token = String::from_utf8(output.stdout)?.trim().to_string();
+    Ok(git_token)
+}
+
 #[derive(Clone)]
 pub struct GithubClient {
     token: String,
@@ -845,6 +901,10 @@ pub struct GithubClient {
 impl GithubClient {
     pub fn new(client: Client, token: String) -> Self {
         GithubClient { client, token }
+    }
+
+    pub fn new_with_default_token(client: Client) -> Self {
+        Self::new(client, default_token_from_env())
     }
 
     pub fn raw(&self) -> &Client {

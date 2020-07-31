@@ -5,7 +5,7 @@ async fn main() {
     dotenv::dotenv().ok();
     logger::init();
 
-    let agenda = agenda::prepare_agenda();
+    let agenda = agenda::lang();
 
     print!("{}", agenda.call().await);
 }
