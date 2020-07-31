@@ -863,6 +863,12 @@ impl RequestSend for RequestBuilder {
     }
 }
 
+/// Finds the token in the user's environment, panicking if no suitable token
+/// can be found.
+pub fn default_token_from_env() -> String {
+    std::env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN")
+}
+
 #[derive(Clone)]
 pub struct GithubClient {
     token: String,
@@ -872,6 +878,10 @@ pub struct GithubClient {
 impl GithubClient {
     pub fn new(client: Client, token: String) -> Self {
         GithubClient { client, token }
+    }
+
+    pub fn new_with_default_token(client: Client) -> Self {
+        Self::new(client, default_token_from_env())
     }
 
     pub fn raw(&self) -> &Client {

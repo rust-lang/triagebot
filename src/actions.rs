@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 
 use reqwest::Client;
-use std::env;
 use tera::{Context, Tera};
 
 use crate::github::{self, GithubClient, Repository};
@@ -51,10 +50,7 @@ lazy_static! {
 #[async_trait]
 impl<'a> Action for Step<'a> {
     async fn call(&self) -> String {
-        let gh = GithubClient::new(
-            Client::new(),
-            env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN"),
-        );
+        let gh = GithubClient::new_with_default_token(Client::new());
 
         let mut context = Context::new();
 
