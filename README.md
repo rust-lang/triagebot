@@ -11,6 +11,9 @@ if you find something helpful!
 
 The `GITHUB_WEBHOOK_SECRET` and `GITHUB_API_TOKEN` environment variables need to be set.
 
+If `GITHUB_API_TOKEN` is not set, the token can also be stored in `~/.gitconfig` in the
+`github.oauth-token` setting.
+
 ## License
 
 Triagebot is distributed under the terms of both the MIT license and the

@@ -866,7 +866,30 @@ impl RequestSend for RequestBuilder {
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
 pub fn default_token_from_env() -> String {
-    std::env::var("GITHUB_API_TOKEN").expect("Missing GITHUB_API_TOKEN")
+    match std::env::var("GITHUB_API_TOKEN") {
+        Ok(v) => return v,
+        Err(_) => (),
+    }
+
+    match get_token_from_git_config() {
+        Ok(v) => return v,
+        Err(_) => (),
+    }
+
+    panic!("could not find token in GITHUB_API_TOKEN or .gitconfig/github.oath-token")
+}
+
+fn get_token_from_git_config() -> anyhow::Result<String> {
+    let output = std::process::Command::new("git")
+        .arg("config")
+        .arg("--get")
+        .arg("github.oauth-token")
+        .output()?;
+    if !output.status.success() {
+        anyhow::bail!("error received executing `git`: {:?}", output.status);
+    }
+    let git_token = String::from_utf8(output.stdout)?.trim().to_string();
+    Ok(git_token)
 }
 
 #[derive(Clone)]
