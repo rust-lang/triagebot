@@ -137,4 +137,5 @@ CREATE TABLE rustc_commits (
     time TIMESTAMP WITH TIME ZONE
 );
 ",
+    "ALTER TABLE rustc_commits ADD COLUMN pr INTEGER;",
 ];
