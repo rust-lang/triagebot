@@ -23,7 +23,7 @@ pub struct Request {
 struct Message {
     sender_id: u64,
     recipient_id: u64,
-    sender_short_name: String,
+    sender_short_name: Option<String>,
     sender_full_name: String,
     stream_id: Option<u64>,
     topic: Option<String>,
@@ -268,11 +268,15 @@ async fn execute_for_other_user(
 
     // At this point, the command has been run (FIXME: though it may have
     // errored, it's hard to determine that currently, so we'll just give the
-    // output fromt he command as well as the command itself).
+    // output from the command as well as the command itself).
 
+    let sender = match &message_data.sender_short_name {
+        Some(short_name) => format!("{} ({})", message_data.sender_full_name, short_name),
+        None => message_data.sender_full_name.clone(),
+    };
     let message = format!(
-        "{} ({}) ran `{}` with output `{}` as you.",
-        message_data.sender_full_name, message_data.sender_short_name, command, output_msg
+        "{} ran `{}` with output `{}` as you.",
+        sender, command, output_msg
     );
 
     let res = MessageApiRequest {
