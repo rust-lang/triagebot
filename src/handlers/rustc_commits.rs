@@ -3,6 +3,7 @@ use crate::{
     github::{self, Event},
     handlers::Context,
 };
+use std::convert::TryInto;
 
 const BORS_GH_ID: i64 = 3372342;
 
@@ -87,6 +88,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             sha: gc.sha,
             parent_sha: gc.parents.remove(0).sha,
             time: gc.commit.author.date,
+            pr: Some(event.issue.number.try_into().unwrap()),
         },
     )
     .await;
