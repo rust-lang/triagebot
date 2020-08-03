@@ -455,6 +455,23 @@ pub fn lang<'a>() -> Box<dyn Action> {
 
     let mut queries = Vec::new();
 
+    queries.push(QueryMap {
+        name: "pending_proposals",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open"), ("is", "issue")],
+            include_labels: vec!["major-change"],
+            exclude_labels: vec!["charter-needed"],
+        },
+    });
+
+    actions.push(Query {
+        repo: "rust-lang/lang-team",
+        queries,
+    });
+
+    let mut queries = Vec::new();
+
     // https://github.com/rust-lang/rfcs/pulls?q=is%3Aopen+is%3Apr+label%3AT-lang
     queries.push(QueryMap {
         name: "newly_created_rfcs",
