@@ -284,9 +284,10 @@ pub enum AssignmentError {
 }
 
 #[derive(Debug)]
-pub enum Selection<'a, T> {
+pub enum Selection<'a, T: ?Sized> {
     All,
     One(&'a T),
+    Except(&'a T),
 }
 
 impl fmt::Display for AssignmentError {
@@ -462,7 +463,7 @@ impl Issue {
     pub async fn remove_assignees(
         &self,
         client: &GithubClient,
-        selection: Selection<'_, String>,
+        selection: Selection<'_, str>,
     ) -> Result<(), AssignmentError> {
         log::info!("remove {:?} assignees for {}", selection, self.global_id());
         let url = format!(
@@ -477,7 +478,13 @@ impl Issue {
                 .iter()
                 .map(|u| u.login.as_str())
                 .collect::<Vec<_>>(),
-            Selection::One(user) => vec![user.as_str()],
+            Selection::One(user) => vec![user],
+            Selection::Except(user) => self
+                .assignees
+                .iter()
+                .map(|u| u.login.as_str())
+                .filter(|&u| u != user)
+                .collect::<Vec<_>>(),
         };
 
         #[derive(serde::Serialize)]
@@ -493,60 +500,47 @@ impl Issue {
         Ok(())
     }
 
-    pub async fn set_assignee(
+    pub async fn add_assignee(
         &self,
         client: &GithubClient,
         user: &str,
     ) -> Result<(), AssignmentError> {
-        log::info!("set_assignee for {} to {}", self.global_id(), user);
+        log::info!("add_assignee {} for {}", user, self.global_id());
         let url = format!(
             "{repo_url}/issues/{number}/assignees",
             repo_url = self.repository().url(),
             number = self.number
         );
 
-        let check_url = format!(
-            "{repo_url}/assignees/{name}",
-            repo_url = self.repository().url(),
-            name = user,
-        );
-
-        match client._send_req(client.get(&check_url)).await {
-            Ok((resp, _)) => {
-                if resp.status() == reqwest::StatusCode::NO_CONTENT {
-                    // all okay
-                    log::debug!("set_assignee: assignee is valid");
-                } else {
-                    log::error!(
-                        "unknown status for assignee check, assuming all okay: {:?}",
-                        resp
-                    );
-                }
-            }
-            Err(e) => {
-                if let Some(e) = e.downcast_ref::<reqwest::Error>() {
-                    if e.status() == Some(reqwest::StatusCode::NOT_FOUND) {
-                        log::debug!("set_assignee: assignee is invalid, returning");
-                        return Err(AssignmentError::InvalidAssignee);
-                    }
-                }
-                log::debug!("set_assignee: get {} failed, {:?}", check_url, e);
-                return Err(AssignmentError::Http(e));
-            }
-        }
-
-        self.remove_assignees(client, Selection::All).await?;
-
         #[derive(serde::Serialize)]
         struct AssigneeReq<'a> {
             assignees: &'a [&'a str],
         }
 
-        client
-            ._send_req(client.post(&url).json(&AssigneeReq { assignees: &[user] }))
+        let result: Issue = client
+            .json(client.post(&url).json(&AssigneeReq { assignees: &[user] }))
             .await
             .map_err(AssignmentError::Http)?;
+        // Invalid assignees are silently ignored. We can just check if the user is now
+        // contained in the assignees list.
+        let success = result.assignees.iter().any(|u| u.login.as_str() == user);
 
+        if success {
+            Ok(())
+        } else {
+            Err(AssignmentError::InvalidAssignee)
+        }
+    }
+
+    pub async fn set_assignee(
+        &self,
+        client: &GithubClient,
+        user: &str,
+    ) -> Result<(), AssignmentError> {
+        log::info!("set_assignee for {} to {}", self.global_id(), user);
+        self.add_assignee(client, user).await?;
+        self.remove_assignees(client, Selection::Except(user))
+            .await?;
         Ok(())
     }
 }
