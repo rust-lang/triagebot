@@ -2,6 +2,14 @@
 
 # T-lang meeting agenda
 
+## Pending proposals
+
+{{-issues::render(issues=pending_proposals, indent="  ", empty="No pending proposals this time.")}}
+
+## Project board review
+
+Review the [Lang team project board](https://github.com/rust-lang/lang-team/projects/2) and get updates
+
 ## Newly created RFCs
 
 {{-issues::render(issues=newly_created_rfcs, indent="  ", empty="No new RFCs this time.")}}
