@@ -56,6 +56,20 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         },
     });
 
+    queries.push(QueryMap {
+        name: "fcp_finished_compiler_team",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "all")],
+            include_labels: vec![
+                "finished-final-comment-period",
+                "disposition-merge",
+                "to-announce",
+            ],
+            exclude_labels: vec![],
+        },
+    });
+
     actions.push(Query {
         repo: "rust-lang/compiler-team",
         queries,
@@ -83,10 +97,10 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     queries.push(QueryMap {
-        name: "fcp_finished",
+        name: "fcp_finished_rust",
         query: github::Query {
             kind: github::QueryKind::List,
-            filters: vec![("state", "open")],
+            filters: vec![("state", "all")],
             include_labels: vec![
                 "finished-final-comment-period",
                 "disposition-merge",
@@ -118,6 +132,20 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
             include_labels: vec!["final-comment-period"],
+            exclude_labels: vec![],
+        },
+    });
+
+    queries.push(QueryMap {
+        name: "fcp_finished_forge",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "all")],
+            include_labels: vec![
+                "finished-final-comment-period",
+                "disposition-merge",
+                "to-announce",
+            ],
             exclude_labels: vec![],
         },
     });
