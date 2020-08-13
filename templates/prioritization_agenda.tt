@@ -27,6 +27,7 @@ tags: weekly, rustc
 - Finalized FCPs (disposition merge)
 {{-issues::render(issues=fcp_finished_compiler_team, indent="  ", empty="No new finished FCP (disposition merge) this time.")}}
 {{-issues::render(issues=fcp_finished_rust, indent="  ", empty="No new finished FCP (disposition merge) this time.")}}
+{{-issues::render(issues=fcp_finished_forge, indent="  ", empty="No new finished FCP (disposition merge) this time.")}}
 
 ### WG checkins
 
