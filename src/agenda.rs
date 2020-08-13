@@ -60,7 +60,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         name: "fcp_finished_compiler_team",
         query: github::Query {
             kind: github::QueryKind::List,
-            filters: vec![("state", "open")],
+            filters: vec![("state", "all")],
             include_labels: vec![
                 "finished-final-comment-period",
                 "disposition-merge",
@@ -100,7 +100,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         name: "fcp_finished_rust",
         query: github::Query {
             kind: github::QueryKind::List,
-            filters: vec![("state", "open")],
+            filters: vec![("state", "all")],
             include_labels: vec![
                 "finished-final-comment-period",
                 "disposition-merge",
@@ -140,7 +140,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         name: "fcp_finished_forge",
         query: github::Query {
             kind: github::QueryKind::List,
-            filters: vec![("state", "open")],
+            filters: vec![("state", "all")],
             include_labels: vec![
                 "finished-final-comment-period",
                 "disposition-merge",
