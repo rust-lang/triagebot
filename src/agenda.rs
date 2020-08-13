@@ -87,7 +87,11 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
-            include_labels: vec!["finished-final-comment-period", "disposition-merge"],
+            include_labels: vec![
+                "finished-final-comment-period",
+                "disposition-merge",
+                "to-announce",
+            ],
             exclude_labels: vec![],
         },
     });
