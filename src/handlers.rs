@@ -1,5 +1,5 @@
 use crate::config::{self, Config, ConfigurationError};
-use crate::github::{Event, GithubClient, IssuesAction, IssuesEvent};
+use crate::github::{Event, GithubClient, IssueCommentAction, IssuesAction, IssuesEvent};
 use octocrab::Octocrab;
 use parser::command::{Command, Input};
 use std::fmt;
@@ -114,10 +114,15 @@ macro_rules! command_handlers {
             body: &str,
             errors: &mut Vec<HandlerError>,
         ) {
-            if let Event::Issue(e) = event {
-                if !matches!(e.action, IssuesAction::Opened | IssuesAction::Edited) {
+            match event {
+                Event::Issue(e) => if !matches!(e.action, IssuesAction::Opened | IssuesAction::Edited) {
                     // no change in issue's body for these events, so skip
                     log::debug!("skipping event, issue was {:?}", e.action);
+                    return;
+                }
+                Event::IssueComment(e) => if e.action == IssueCommentAction::Deleted {
+                    // don't execute commands again when comment is deleted
+                    log::debug!("skipping event, comment was {:?}", e.action);
                     return;
                 }
             }
