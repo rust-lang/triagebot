@@ -97,7 +97,7 @@ fn handle_command<'a>(
     Box::pin(async move {
         log::trace!("handling zulip command {:?}", words);
         let mut words = words.split_whitespace();
-        let next = words.next();
+        let mut next = words.next();
 
         if let Some("as") = next {
             return match execute_for_other_user(&ctx, words, message_data).await {
@@ -158,7 +158,7 @@ fn handle_command<'a>(
                 .unwrap(),
             },
             _ => {
-                while let Some(word) = words.next() {
+                while let Some(word) = next {
                     if word == "@**triagebot**" {
                         let next = words.next();
                         match next {
@@ -172,6 +172,7 @@ fn handle_command<'a>(
                             _ => {}
                         }
                     }
+                    next = words.next();
                 }
 
                 serde_json::to_string(&Response {
