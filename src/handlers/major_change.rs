@@ -74,12 +74,12 @@ pub(super) async fn handle_input(
     }
     let zulip_msg = match cmd {
         Invocation::NewProposal => format!(
-            "A new proposal has been announced: [#{}]({}). It will be \
+            "A new proposal has been announced: [{} #{}]({}). It will be \
             announced at the next meeting to try and draw attention to it, \
             but usually MCPs are not discussed during triage meetings. If \
             you think this would benefit from discussion amongst the \
             team, consider proposing a design meeting.",
-            event.issue.number, event.issue.html_url,
+            event.issue.title, event.issue.number, event.issue.html_url,
         ),
         Invocation::AcceptedProposal => format!(
             "This proposal has been accepted: [#{}]({}).",
