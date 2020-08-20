@@ -95,6 +95,7 @@ fn handle_command<'a>(
     message_data: &'a Message,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = String> + Send + 'a>> {
     Box::pin(async move {
+        log::trace!("handling zulip command {:?}", words);
         let mut words = words.split_whitespace();
         let next = words.next();
 
