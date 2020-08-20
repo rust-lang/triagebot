@@ -663,7 +663,7 @@ async fn post_waiter(ctx: &Context, message: &Message) -> anyhow::Result<String>
             id: message.stream_id.ok_or_else(|| {
                 anyhow::format_err!("private waiting not supported, missing stream id")
             })?,
-            topic: message.topic.ok_or_else(|| {
+            topic: message.topic.as_deref().ok_or_else(|| {
                 anyhow::format_err!("private waiting not supported, missing topic")
             })?,
         },
