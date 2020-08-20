@@ -156,20 +156,28 @@ fn handle_command<'a>(
                 })
                 .unwrap(),
             },
-            Some("await") => match post_waiter(&ctx, message_data).await {
-                Ok(r) => r,
-                Err(e) => serde_json::to_string(&Response {
-                    content: &format!(
-                        "Failed to await at this time: {:?}",
-                        e
-                    ),
+            _ => {
+                while let Some(word) = words.next() {
+                    if word == "@**triagebot**" {
+                        let next = words.next();
+                        match next {
+                            Some("await") => return match post_waiter(&ctx, message_data).await {
+                                Ok(r) => r,
+                                Err(e) => serde_json::to_string(&Response {
+                                    content: &format!("Failed to await at this time: {:?}", e),
+                                })
+                                .unwrap(),
+                            },
+                            _ => {}
+                        }
+                    }
+                }
+
+                serde_json::to_string(&Response {
+                    content: "Unknown command.",
                 })
-                .unwrap(),
+                .unwrap()
             },
-            _ => serde_json::to_string(&Response {
-                content: "Unknown command.",
-            })
-            .unwrap(),
         }
     })
 }
