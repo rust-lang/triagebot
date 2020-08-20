@@ -450,13 +450,7 @@ impl<'a> MessageApiRequest<'a> {
                     Recipient::Private { email, .. } => email.to_string(),
                 },
                 topic: match self.recipient {
-                    Recipient::Stream { topic, .. } => {
-                        if topic.is_empty() {
-                            None
-                        } else {
-                            Some(topic)
-                        }
-                    }
+                    Recipient::Stream { topic, .. } => Some(topic),
                     Recipient::Private { .. } => None,
                 },
                 content: self.content,
@@ -666,10 +660,12 @@ impl<'a> AddReaction<'a> {
 async fn post_waiter(ctx: &Context, message: &Message) -> anyhow::Result<String> {
     let posted = MessageApiRequest {
         recipient: Recipient::Stream {
-            id: message
-                .stream_id
-                .ok_or_else(|| anyhow::format_err!("private waiting not supported"))?,
-            topic: "",
+            id: message.stream_id.ok_or_else(|| {
+                anyhow::format_err!("private waiting not supported, missing stream id")
+            })?,
+            topic: message.topic.ok_or_else(|| {
+                anyhow::format_err!("private waiting not supported, missing topic")
+            })?,
         },
         content: "Does anyone has something to add on this topic, or should we move on?\n\
                   React with :working_on_it: if you have something to say.\n\
