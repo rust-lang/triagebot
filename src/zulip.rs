@@ -156,6 +156,16 @@ fn handle_command<'a>(
                 })
                 .unwrap(),
             },
+            Some("await") => match post_waiter(&ctx, message_data).await {
+                Ok(r) => r,
+                Err(e) => serde_json::to_string(&Response {
+                    content: &format!(
+                        "Failed to await at this time: {:?}",
+                        e
+                    ),
+                })
+                .unwrap(),
+            },
             _ => serde_json::to_string(&Response {
                 content: "Unknown command.",
             })
@@ -430,7 +440,13 @@ impl<'a> MessageApiRequest<'a> {
                     Recipient::Private { email, .. } => email.to_string(),
                 },
                 topic: match self.recipient {
-                    Recipient::Stream { topic, .. } => Some(topic),
+                    Recipient::Stream { topic, .. } => {
+                        if topic.is_empty() {
+                            None
+                        } else {
+                            Some(topic)
+                        }
+                    }
                     Recipient::Private { .. } => None,
                 },
                 content: self.content,
@@ -603,4 +619,73 @@ async fn move_notification(
         })
         .unwrap()),
     }
+}
+
+#[derive(serde::Serialize, Debug)]
+struct ResponseNotRequired {
+    response_not_required: bool,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct SentMessage {
+    id: u64,
+}
+
+#[derive(serde::Serialize, Debug, Copy, Clone)]
+struct AddReaction<'a> {
+    message_id: u64,
+    emoji_name: &'a str,
+}
+
+impl<'a> AddReaction<'a> {
+    pub async fn send(self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
+        let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
+
+        Ok(client
+            .post(&format!(
+                "https://rust-lang.zulipchat.com/api/v1/messages/{}/reactions",
+                self.message_id
+            ))
+            .basic_auth(BOT_EMAIL, Some(&bot_api_token))
+            .form(&self)
+            .send()
+            .await?)
+    }
+}
+
+async fn post_waiter(ctx: &Context, message: &Message) -> anyhow::Result<String> {
+    let posted = MessageApiRequest {
+        recipient: Recipient::Stream {
+            id: message
+                .stream_id
+                .ok_or_else(|| anyhow::format_err!("private waiting not supported"))?,
+            topic: "",
+        },
+        content: "Does anyone has something to add on this topic, or should we move on?\n\
+                  React with :working_on_it: if you have something to say.\n\
+                  React with :all_good: if we should move on.",
+    }
+    .send(ctx.github.raw())
+    .await?;
+    let body = posted.text().await?;
+    let message_id = serde_json::from_str::<SentMessage>(&body)
+        .with_context(|| format!("{:?} did not deserialize as SentMessage", body))?
+        .id;
+
+    let reaction_a = AddReaction {
+        message_id,
+        emoji_name: "working_on_it",
+    }
+    .send(&ctx.github.raw());
+    let reaction_b = AddReaction {
+        message_id,
+        emoji_name: "all_good",
+    }
+    .send(&ctx.github.raw());
+    futures::try_join!(reaction_a, reaction_b,)?;
+
+    Ok(serde_json::to_string(&ResponseNotRequired {
+        response_not_required: true,
+    })
+    .unwrap())
 }
