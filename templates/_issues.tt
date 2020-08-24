@@ -2,6 +2,5 @@
 
 {% macro render(issues, indent="", empty="No issues this time.") %}
 {%- for issue in issues %}
-{{indent}}- {{issue::render(issue=issue)}}{% else %}
-{{indent}}- {{empty}}{% endfor -%}
+{{indent}}- {{issue::render(issue=issue)}}{% else %}{{empty}}{% endfor -%}
 {% endmacro %}
