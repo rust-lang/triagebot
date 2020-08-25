@@ -1,6 +1,7 @@
 {% import "_issue.tt" as issue %}
 
-{% macro render(issues, indent="", empty="No issues this time.") %}
+{% macro render(issues, indent="", newline_and_indent=true, empty="No issues this time.") %}
 {%- for issue in issues %}
-{{indent}}- {{issue::render(issue=issue)}}{% else %}{{empty}}{% endfor -%}
+{{indent}}- {{issue::render(issue=issue)}}{% else %}{% if newline_and_indent %}
+{{indent}}- {% endif %}{{empty}}{% endfor -%}
 {% endmacro %}
