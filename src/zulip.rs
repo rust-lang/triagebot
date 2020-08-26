@@ -668,7 +668,7 @@ async fn post_waiter(ctx: &Context, message: &Message) -> anyhow::Result<String>
                 anyhow::format_err!("private waiting not supported, missing topic")
             })?,
         },
-        content: "Does anyone has something to add on this topic, or should we move on?\n\
+        content: "Does anyone have something to add on this topic, or should we move on?\n\
                   React with :working_on_it: if you have something to say.\n\
                   React with :all_good: if we should move on.",
     }
