@@ -25,7 +25,7 @@ tags: weekly, rustc
 - Accepted MCPs
 {{-issues::render(issues=mcp_accepted, indent="  ", empty="No new accepted proposals this time.")}}
 - Finalized FCPs (disposition merge)
-{{-issues::render(issues=fcp_finished_compiler_team, indent="", newline-and_indent=false, empty="")}}
+{{-issues::render(issues=fcp_finished_compiler_team, indent="", newline_and_indent=false, empty="")}}
 {{-issues::render(issues=fcp_finished_rust, indent="", newline_and_indent=false, empty="")}}
 {{-issues::render(issues=fcp_finished_forge, indent="  ", empty="No new finished FCP (disposition merge) this time.")}}
 
