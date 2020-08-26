@@ -26,7 +26,8 @@ struct Message {
     sender_short_name: Option<String>,
     sender_full_name: String,
     stream_id: Option<u64>,
-    topic: Option<String>,
+    // The topic of the incoming message. Not the stream name.
+    subject: Option<String>,
     #[serde(rename = "type")]
     type_: String,
 }
@@ -663,7 +664,7 @@ async fn post_waiter(ctx: &Context, message: &Message) -> anyhow::Result<String>
             id: message.stream_id.ok_or_else(|| {
                 anyhow::format_err!("private waiting not supported, missing stream id")
             })?,
-            topic: message.topic.as_deref().ok_or_else(|| {
+            topic: message.subject.as_deref().ok_or_else(|| {
                 anyhow::format_err!("private waiting not supported, missing topic")
             })?,
         },
