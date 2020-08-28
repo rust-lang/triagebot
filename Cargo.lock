@@ -1593,9 +1593,9 @@ dependencies = [
 
 [[package]]
 name = "tera"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9598067511caa7edb41886c4a29efe6d0564926837bde7dffa4a130ea6cc975"
+checksum = "1381c83828bedd5ce4e59473110afa5381ffe523406d9ade4b77c9f7be70ff9a"
 dependencies = [
  "globwalk",
  "lazy_static",
