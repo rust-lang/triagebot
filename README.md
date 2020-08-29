@@ -9,6 +9,10 @@ if you find something helpful!
 
 ## Installation
 
+To compile the Triagebot you need OpenSSL development library to be installed (e.g. for Ubuntu-like Linux distributions `sudo apt install libssl-dev`).
+
+Run `cargo build` to compile the triagebot.
+
 The `GITHUB_WEBHOOK_SECRET` and `GITHUB_API_TOKEN` environment variables need to be set.
 
 If `GITHUB_API_TOKEN` is not set, the token can also be stored in `~/.gitconfig` in the
