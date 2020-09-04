@@ -66,7 +66,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
 
     if let Err(e) = milestone_prs::handle(ctx, event).await {
         log::error!(
-            "failed to process event {:?} with rustc_commits handler: {:?}",
+            "failed to process event {:?} with milestone_prs handler: {:?}",
             event,
             e
         );

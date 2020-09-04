@@ -652,7 +652,7 @@ pub struct IssueCommentEvent {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum IssuesAction {
     Opened,
     Edited,
@@ -674,6 +674,7 @@ pub enum IssuesAction {
     ReviewRequestRemoved,
     ReadyForReview,
     Synchronize,
+    ConvertedToDraft,
 }
 
 #[derive(Debug, serde::Deserialize)]
