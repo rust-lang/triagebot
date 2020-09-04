@@ -549,14 +549,23 @@ impl Issue {
     }
 
     pub async fn set_milestone(&self, client: &GithubClient, title: &str) -> anyhow::Result<()> {
+        log::trace!(
+            "Setting milestone for rust-lang/rust#{} to {}",
+            self.number,
+            title
+        );
+
         let create_url = format!("{}/milestones", self.repository().url());
-        client
+        let resp = client
             .send_req(
                 client
                     .post(&create_url)
                     .body(serde_json::to_vec(&MilestoneCreateBody { title }).unwrap()),
             )
-            .await?;
+            .await;
+        // Explicitly do *not* try to return Err(...) if this fails -- that's
+        // fine, it just means the milestone was already created.
+        log::trace!("Created milestone: {:?}", resp);
 
         let list_url = format!("{}/milestones", self.repository().url());
         let milestone_list: Vec<Milestone> = client.json(client.get(&list_url)).await?;
