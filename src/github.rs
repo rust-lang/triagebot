@@ -244,12 +244,16 @@ pub struct Issue {
     pub number: u64,
     pub body: String,
     created_at: chrono::DateTime<Utc>,
+    #[serde(default)]
+    pub merge_commit_sha: Option<String>,
     pub title: String,
     pub html_url: String,
     pub user: User,
     pub labels: Vec<Label>,
     pub assignees: Vec<User>,
     pub pull_request: Option<PullRequestDetails>,
+    #[serde(default)]
+    pub merged: bool,
     // API URL
     comments_url: String,
     #[serde(skip)]
@@ -543,6 +547,54 @@ impl Issue {
             .await?;
         Ok(())
     }
+
+    pub async fn set_milestone(&self, client: &GithubClient, title: &str) -> anyhow::Result<()> {
+        let create_url = format!("{}/milestones", self.repository().url());
+        client
+            .send_req(
+                client
+                    .post(&create_url)
+                    .body(serde_json::to_vec(&MilestoneCreateBody { title }).unwrap()),
+            )
+            .await?;
+
+        let list_url = format!("{}/milestones", self.repository().url());
+        let milestone_list: Vec<Milestone> = client.json(client.get(&list_url)).await?;
+        let milestone_no = if let Some(milestone) = milestone_list.iter().find(|v| v.title == title)
+        {
+            milestone.number
+        } else {
+            anyhow::bail!(
+                "Despite just creating milestone {} on {}, it does not exist?",
+                title,
+                self.repository()
+            )
+        };
+
+        #[derive(serde::Serialize)]
+        struct SetMilestone {
+            milestone: u64,
+        }
+        let url = format!("{}/issues/{}", self.repository().url(), self.number);
+        client
+            ._send_req(client.patch(&url).json(&SetMilestone {
+                milestone: milestone_no,
+            }))
+            .await
+            .context("failed to set milestone")?;
+        Ok(())
+    }
+}
+
+#[derive(serde::Serialize)]
+struct MilestoneCreateBody<'a> {
+    title: &'a str,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct Milestone {
+    number: u64,
+    title: String,
 }
 
 #[derive(Debug, serde::Deserialize)]

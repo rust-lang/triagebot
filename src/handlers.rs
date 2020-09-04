@@ -27,6 +27,7 @@ mod assign;
 mod autolabel;
 mod glacier;
 mod major_change;
+mod milestone_prs;
 mod nominate;
 mod notification;
 mod notify_zulip;
@@ -56,6 +57,14 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
     }
 
     if let Err(e) = rustc_commits::handle(ctx, event).await {
+        log::error!(
+            "failed to process event {:?} with rustc_commits handler: {:?}",
+            event,
+            e
+        );
+    }
+
+    if let Err(e) = milestone_prs::handle(ctx, event).await {
         log::error!(
             "failed to process event {:?} with rustc_commits handler: {:?}",
             event,
