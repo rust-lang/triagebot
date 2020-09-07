@@ -111,7 +111,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                     user_id: user.id.unwrap(),
                     origin_url: event.html_url().unwrap().to_owned(),
                     origin_html: body.to_owned(),
-                    time: event.time(),
+                    time: event.time().unwrap(),
                     short_description: Some(short_description.clone()),
                     team_name: team_name.clone(),
                 },

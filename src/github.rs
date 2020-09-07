@@ -932,12 +932,12 @@ impl Event {
         }
     }
 
-    pub fn time(&self) -> chrono::DateTime<FixedOffset> {
+    pub fn time(&self) -> Option<chrono::DateTime<FixedOffset>> {
         match self {
-            Event::Create(_) => todo!(),
-            Event::Issue(e) => e.issue.created_at.into(),
-            Event::IssueComment(e) => e.comment.updated_at.into(),
-            Event::Push(_) => todo!(),
+            Event::Create(_) => None,
+            Event::Issue(e) => Some(e.issue.created_at.into()),
+            Event::IssueComment(e) => Some(e.comment.updated_at.into()),
+            Event::Push(_) => None,
         }
     }
 }
