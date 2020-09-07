@@ -847,61 +847,99 @@ pub enum QueryKind {
     Count,
 }
 
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CreateKind {
+    Branch,
+    Tag,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct CreateEvent {
+    pub ref_type: CreateKind,
+    repository: Repository,
+    sender: User,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct PushEvent {
+    #[serde(rename = "ref")]
+    pub git_ref: String,
+    repository: Repository,
+    sender: User,
+}
+
 #[derive(Debug)]
 pub enum Event {
+    Create(CreateEvent),
     IssueComment(IssueCommentEvent),
     Issue(IssuesEvent),
+    Push(PushEvent),
 }
 
 impl Event {
     pub fn repo_name(&self) -> &str {
         match self {
+            Event::Create(event) => &event.repository.full_name,
             Event::IssueComment(event) => &event.repository.full_name,
             Event::Issue(event) => &event.repository.full_name,
+            Event::Push(event) => &event.repository.full_name,
         }
     }
 
     pub fn issue(&self) -> Option<&Issue> {
         match self {
+            Event::Create(_) => None,
             Event::IssueComment(event) => Some(&event.issue),
             Event::Issue(event) => Some(&event.issue),
+            Event::Push(_) => None,
         }
     }
 
     /// This will both extract from IssueComment events but also Issue events
     pub fn comment_body(&self) -> Option<&str> {
         match self {
+            Event::Create(_) => None,
             Event::Issue(e) => Some(&e.issue.body),
             Event::IssueComment(e) => Some(&e.comment.body),
+            Event::Push(_) => None,
         }
     }
 
     /// This will both extract from IssueComment events but also Issue events
     pub fn comment_from(&self) -> Option<&str> {
         match self {
+            Event::Create(_) => None,
             Event::Issue(e) => Some(&e.changes.as_ref()?.body.from),
             Event::IssueComment(e) => Some(&e.changes.as_ref()?.body.from),
+            Event::Push(_) => None,
         }
     }
 
     pub fn html_url(&self) -> Option<&str> {
         match self {
+            Event::Create(_) => None,
             Event::Issue(e) => Some(&e.issue.html_url),
             Event::IssueComment(e) => Some(&e.comment.html_url),
+            Event::Push(_) => None,
         }
     }
 
     pub fn user(&self) -> &User {
         match self {
+            Event::Create(e) => &e.sender,
             Event::Issue(e) => &e.issue.user,
             Event::IssueComment(e) => &e.comment.user,
+            Event::Push(e) => &e.sender,
         }
     }
 
-    pub fn time(&self) -> chrono::DateTime<FixedOffset> {
+    pub fn time(&self) -> Option<chrono::DateTime<FixedOffset>> {
         match self {
-            Event::Issue(e) => e.issue.created_at.into(),
-            Event::IssueComment(e) => e.comment.updated_at.into(),
+            Event::Create(_) => None,
+            Event::Issue(e) => Some(e.issue.created_at.into()),
+            Event::IssueComment(e) => Some(e.comment.updated_at.into()),
+            Event::Push(_) => None,
         }
     }
 }
