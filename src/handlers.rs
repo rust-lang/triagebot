@@ -134,6 +134,10 @@ macro_rules! command_handlers {
                     log::debug!("skipping event, comment was {:?}", e.action);
                     return;
                 }
+                Event::Push(_) | Event::Create(_) => {
+                    log::debug!("skipping unsupported event");
+                    return;
+                }
             }
 
             let input = Input::new(&body, &ctx.username);
