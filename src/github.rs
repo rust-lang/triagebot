@@ -863,6 +863,8 @@ pub struct CreateEvent {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct PushEvent {
+    #[serde(rename = "ref")]
+    pub git_ref: String,
     repository: Repository,
     sender: User,
 }

@@ -1,3 +1,4 @@
+use crate::changelogs::ChangelogFormat;
 use crate::github::GithubClient;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -25,6 +26,7 @@ pub(crate) struct Config {
     pub(crate) glacier: Option<GlacierConfig>,
     pub(crate) autolabel: Option<AutolabelConfig>,
     pub(crate) notify_zulip: Option<NotifyZulipConfig>,
+    pub(crate) github_releases: Option<GitHubReleasesConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -150,6 +152,15 @@ pub(crate) async fn get(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, Co
     }
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct GitHubReleasesConfig {
+    pub(crate) format: ChangelogFormat,
+    pub(crate) project_name: String,
+    pub(crate) changelog_path: String,
+    pub(crate) changelog_branch: String,
+}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -272,6 +283,7 @@ mod tests {
                 glacier: None,
                 autolabel: None,
                 notify_zulip: None,
+                github_releases: None,
             }
         );
     }
