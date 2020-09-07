@@ -10,6 +10,7 @@ use std::fmt;
 
 pub mod actions;
 pub mod agenda;
+mod changelogs;
 pub mod config;
 pub mod db;
 pub mod github;
