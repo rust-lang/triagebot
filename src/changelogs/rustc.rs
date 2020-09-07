@@ -57,9 +57,7 @@ impl<'a> RustcFormat<'a> {
             document.append(child);
         }
 
-        let mut content = Vec::new();
-        comrak::format_commonmark(document, &ComrakOptions::default(), &mut content)?;
-        let content = String::from_utf8(content)?;
+        let content = super::render_for_github_releases(document)?;
 
         if let Some(version) = h1.split(' ').nth(1) {
             self.result.versions.insert(version.to_string(), content);
@@ -81,6 +79,8 @@ Version 1.45.2 (2020-08-03)
 
 * [Fix bindings in tuple struct patterns][74954]
 * [Link in another section][69033]
+* Very very very very very very very very very very very long line that has some
+  linebreaks here and there
 
 [74954]: https://github.com/rust-lang/rust/issues/74954
 
@@ -131,6 +131,7 @@ related tools.
     const EXPECTED_1_45_2: &str = "\
 - [Fix bindings in tuple struct patterns](https://github.com/rust-lang/rust/issues/74954)
 - [Link in another section](https://github.com/rust-lang/rust/pull/69033/)
+- Very very very very very very very very very very very long line that has some linebreaks here and there
 ";
 
     #[test]
