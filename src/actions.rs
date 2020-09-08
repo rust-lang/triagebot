@@ -48,6 +48,10 @@ lazy_static! {
 }
 
 // Group all the pending FCP for these teams
+pub const IN_PRE_FCP: &str = "in_pre_fcp";
+pub const IN_FCP: &str = "in_fcp";
+pub const FCP_FINISHED: &str = "fcp_finished";
+
 pub const IN_PRE_FCP_COMPILER_TEAM: &str = "in_pre_fcp_compiler_team";
 pub const IN_PRE_FCP_RUST: &str = "in_pre_fcp_rust";
 pub const IN_PRE_FCP_FORGE: &str = "in_pre_fcp_forge";
@@ -121,11 +125,11 @@ impl<'a> Action for Step<'a> {
 
                                 // group query results for multiline FCP and add them later
                                 if PENDINGFCP.contains(name) {
-                                    all_pending_fcp.push(("in_pre_fcp", issues_decorator));
+                                    all_pending_fcp.push((IN_PRE_FCP, issues_decorator));
                                 } else if THINGSINFCP.contains(name) {
-                                    all_things_in_fcp.push(("in_fcp", issues_decorator));
+                                    all_things_in_fcp.push((IN_FCP, issues_decorator));
                                 } else if FINALIZEDFCP.contains(name) {
-                                    all_finalized_fcp.push(("fcp_finished", issues_decorator));
+                                    all_finalized_fcp.push((FCP_FINISHED, issues_decorator));
                                 } else {
                                     context.insert(*name, &issues_decorator);
                                 }
