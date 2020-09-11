@@ -163,7 +163,14 @@ fn handle_command<'a>(
                     if word == "@**triagebot**" {
                         let next = words.next();
                         match next {
-                            Some("await") => return match post_waiter(&ctx, message_data).await {
+                            Some("end-topic") | Some("await") => return match post_waiter(&ctx, message_data, WaitingMessage::end_topic()).await {
+                                Ok(r) => r,
+                                Err(e) => serde_json::to_string(&Response {
+                                    content: &format!("Failed to await at this time: {:?}", e),
+                                })
+                                .unwrap(),
+                            },
+                            Some("end-meeting") => return match post_waiter(&ctx, message_data, WaitingMessage::end_meeting()).await {
                                 Ok(r) => r,
                                 Err(e) => serde_json::to_string(&Response {
                                     content: &format!("Failed to await at this time: {:?}", e),
@@ -658,7 +665,36 @@ impl<'a> AddReaction<'a> {
     }
 }
 
-async fn post_waiter(ctx: &Context, message: &Message) -> anyhow::Result<String> {
+struct WaitingMessage<'a> {
+    primary: &'a str,
+    emoji: &'a [&'a str],
+}
+
+impl WaitingMessage<'static> {
+    fn end_topic() -> Self {
+        WaitingMessage {
+            primary: "Does anyone have something to add on the current topic?\n\
+                  React with :working_on_it: if you have something to say.\n\
+                  React with :all_good: if not.",
+            emoji: &[":working_on_it:", ":all_good:"],
+        }
+    }
+
+    fn end_meeting() -> Self {
+        WaitingMessage {
+            primary: "Does anyone have something to bring up?\n\
+                  React with :working_on_it: if you have something to say.\n\
+                  React with :all_good: if you're ready to end the meeting.",
+            emoji: &[":working_on_it:", ":all_good:"],
+        }
+    }
+}
+
+async fn post_waiter(
+    ctx: &Context,
+    message: &Message,
+    waiting: WaitingMessage<'_>,
+) -> anyhow::Result<String> {
     let posted = MessageApiRequest {
         recipient: Recipient::Stream {
             id: message.stream_id.ok_or_else(|| {
@@ -668,9 +704,7 @@ async fn post_waiter(ctx: &Context, message: &Message) -> anyhow::Result<String>
                 anyhow::format_err!("private waiting not supported, missing topic")
             })?,
         },
-        content: "Does anyone have something to add on this topic, or should we move on?\n\
-                  React with :working_on_it: if you have something to say.\n\
-                  React with :all_good: if we should move on.",
+        content: waiting.primary,
     }
     .send(ctx.github.raw())
     .await?;
@@ -679,17 +713,14 @@ async fn post_waiter(ctx: &Context, message: &Message) -> anyhow::Result<String>
         .with_context(|| format!("{:?} did not deserialize as SentMessage", body))?
         .id;
 
-    let reaction_a = AddReaction {
-        message_id,
-        emoji_name: "working_on_it",
+    for reaction in waiting.emoji {
+        AddReaction {
+            message_id,
+            emoji_name: reaction,
+        }
+        .send(&ctx.github.raw())
+        .await?;
     }
-    .send(&ctx.github.raw());
-    let reaction_b = AddReaction {
-        message_id,
-        emoji_name: "all_good",
-    }
-    .send(&ctx.github.raw());
-    futures::try_join!(reaction_a, reaction_b,)?;
 
     Ok(serde_json::to_string(&ResponseNotRequired {
         response_not_required: true,
