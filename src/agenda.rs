@@ -437,7 +437,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open"), ("no", "assignee")],
             include_labels: vec!["regression-from-stable-to-beta", "P-high"],
-            exclude_labels: vec!["T-infra", "T-libs", "T-release", "T-rustdoc"],
+            exclude_labels: vec!["T-infra", "T-libs", "T-release", "T-rustdoc", "T-core"],
         },
     });
 
@@ -447,7 +447,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open"), ("no", "assignee")],
             include_labels: vec!["regression-from-stable-to-nightly", "P-high"],
-            exclude_labels: vec!["T-infra", "T-libs", "T-release", "T-rustdoc"],
+            exclude_labels: vec!["T-infra", "T-libs", "T-release", "T-rustdoc", "T-core"],
         },
     });
 
