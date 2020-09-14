@@ -244,12 +244,16 @@ pub struct Issue {
     pub number: u64,
     pub body: String,
     created_at: chrono::DateTime<Utc>,
+    #[serde(default)]
+    pub merge_commit_sha: Option<String>,
     pub title: String,
     pub html_url: String,
     pub user: User,
     pub labels: Vec<Label>,
     pub assignees: Vec<User>,
     pub pull_request: Option<PullRequestDetails>,
+    #[serde(default)]
+    pub merged: bool,
     // API URL
     comments_url: String,
     #[serde(skip)]
@@ -543,6 +547,63 @@ impl Issue {
             .await?;
         Ok(())
     }
+
+    pub async fn set_milestone(&self, client: &GithubClient, title: &str) -> anyhow::Result<()> {
+        log::trace!(
+            "Setting milestone for rust-lang/rust#{} to {}",
+            self.number,
+            title
+        );
+
+        let create_url = format!("{}/milestones", self.repository().url());
+        let resp = client
+            .send_req(
+                client
+                    .post(&create_url)
+                    .body(serde_json::to_vec(&MilestoneCreateBody { title }).unwrap()),
+            )
+            .await;
+        // Explicitly do *not* try to return Err(...) if this fails -- that's
+        // fine, it just means the milestone was already created.
+        log::trace!("Created milestone: {:?}", resp);
+
+        let list_url = format!("{}/milestones", self.repository().url());
+        let milestone_list: Vec<Milestone> = client.json(client.get(&list_url)).await?;
+        let milestone_no = if let Some(milestone) = milestone_list.iter().find(|v| v.title == title)
+        {
+            milestone.number
+        } else {
+            anyhow::bail!(
+                "Despite just creating milestone {} on {}, it does not exist?",
+                title,
+                self.repository()
+            )
+        };
+
+        #[derive(serde::Serialize)]
+        struct SetMilestone {
+            milestone: u64,
+        }
+        let url = format!("{}/issues/{}", self.repository().url(), self.number);
+        client
+            ._send_req(client.patch(&url).json(&SetMilestone {
+                milestone: milestone_no,
+            }))
+            .await
+            .context("failed to set milestone")?;
+        Ok(())
+    }
+}
+
+#[derive(serde::Serialize)]
+struct MilestoneCreateBody<'a> {
+    title: &'a str,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct Milestone {
+    number: u64,
+    title: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -600,7 +661,7 @@ pub struct IssueCommentEvent {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum IssuesAction {
     Opened,
     Edited,
@@ -622,6 +683,7 @@ pub enum IssuesAction {
     ReviewRequestRemoved,
     ReadyForReview,
     Synchronize,
+    ConvertedToDraft,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -785,61 +847,99 @@ pub enum QueryKind {
     Count,
 }
 
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CreateKind {
+    Branch,
+    Tag,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct CreateEvent {
+    pub ref_type: CreateKind,
+    repository: Repository,
+    sender: User,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct PushEvent {
+    #[serde(rename = "ref")]
+    pub git_ref: String,
+    repository: Repository,
+    sender: User,
+}
+
 #[derive(Debug)]
 pub enum Event {
+    Create(CreateEvent),
     IssueComment(IssueCommentEvent),
     Issue(IssuesEvent),
+    Push(PushEvent),
 }
 
 impl Event {
     pub fn repo_name(&self) -> &str {
         match self {
+            Event::Create(event) => &event.repository.full_name,
             Event::IssueComment(event) => &event.repository.full_name,
             Event::Issue(event) => &event.repository.full_name,
+            Event::Push(event) => &event.repository.full_name,
         }
     }
 
     pub fn issue(&self) -> Option<&Issue> {
         match self {
+            Event::Create(_) => None,
             Event::IssueComment(event) => Some(&event.issue),
             Event::Issue(event) => Some(&event.issue),
+            Event::Push(_) => None,
         }
     }
 
     /// This will both extract from IssueComment events but also Issue events
     pub fn comment_body(&self) -> Option<&str> {
         match self {
+            Event::Create(_) => None,
             Event::Issue(e) => Some(&e.issue.body),
             Event::IssueComment(e) => Some(&e.comment.body),
+            Event::Push(_) => None,
         }
     }
 
     /// This will both extract from IssueComment events but also Issue events
     pub fn comment_from(&self) -> Option<&str> {
         match self {
+            Event::Create(_) => None,
             Event::Issue(e) => Some(&e.changes.as_ref()?.body.from),
             Event::IssueComment(e) => Some(&e.changes.as_ref()?.body.from),
+            Event::Push(_) => None,
         }
     }
 
     pub fn html_url(&self) -> Option<&str> {
         match self {
+            Event::Create(_) => None,
             Event::Issue(e) => Some(&e.issue.html_url),
             Event::IssueComment(e) => Some(&e.comment.html_url),
+            Event::Push(_) => None,
         }
     }
 
     pub fn user(&self) -> &User {
         match self {
+            Event::Create(e) => &e.sender,
             Event::Issue(e) => &e.issue.user,
             Event::IssueComment(e) => &e.comment.user,
+            Event::Push(e) => &e.sender,
         }
     }
 
-    pub fn time(&self) -> chrono::DateTime<FixedOffset> {
+    pub fn time(&self) -> Option<chrono::DateTime<FixedOffset>> {
         match self {
-            Event::Issue(e) => e.issue.created_at.into(),
-            Event::IssueComment(e) => e.comment.updated_at.into(),
+            Event::Create(_) => None,
+            Event::Issue(e) => Some(e.issue.created_at.into()),
+            Event::IssueComment(e) => Some(e.comment.updated_at.into()),
+            Event::Push(_) => None,
         }
     }
 }

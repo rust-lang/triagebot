@@ -25,8 +25,10 @@ impl fmt::Display for HandlerError {
 
 mod assign;
 mod autolabel;
+mod github_releases;
 mod glacier;
 mod major_change;
+mod milestone_prs;
 mod nominate;
 mod notification;
 mod notify_zulip;
@@ -61,6 +63,28 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
             event,
             e
         );
+    }
+
+    if let Err(e) = milestone_prs::handle(ctx, event).await {
+        log::error!(
+            "failed to process event {:?} with milestone_prs handler: {:?}",
+            event,
+            e
+        );
+    }
+
+    if let Some(ghr_config) = config
+        .as_ref()
+        .ok()
+        .and_then(|c| c.github_releases.as_ref())
+    {
+        if let Err(e) = github_releases::handle(ctx, event, ghr_config).await {
+            log::error!(
+                "failed to process event {:?} with github_releases handler: {:?}",
+                event,
+                e
+            );
+        }
     }
 
     errors
@@ -123,6 +147,10 @@ macro_rules! command_handlers {
                 Event::IssueComment(e) => if e.action == IssueCommentAction::Deleted {
                     // don't execute commands again when comment is deleted
                     log::debug!("skipping event, comment was {:?}", e.action);
+                    return;
+                }
+                Event::Push(_) | Event::Create(_) => {
+                    log::debug!("skipping unsupported event");
                     return;
                 }
             }

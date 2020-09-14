@@ -10,6 +10,7 @@ use std::fmt;
 
 pub mod actions;
 pub mod agenda;
+mod changelogs;
 pub mod config;
 pub mod db;
 pub mod github;
@@ -29,6 +30,8 @@ pub enum EventName {
     PullRequestReviewComment,
     IssueComment,
     Issue,
+    Push,
+    Create,
     Other,
 }
 
@@ -41,6 +44,8 @@ impl std::str::FromStr for EventName {
             "issue_comment" => EventName::IssueComment,
             "pull_request" => EventName::PullRequest,
             "issues" => EventName::Issue,
+            "push" => EventName::Push,
+            "create" => EventName::Create,
             _ => EventName::Other,
         })
     }
@@ -57,6 +62,8 @@ impl fmt::Display for EventName {
                 EventName::IssueComment => "issue_comment",
                 EventName::Issue => "issues",
                 EventName::PullRequest => "pull_request",
+                EventName::Push => "push",
+                EventName::Create => "create",
                 EventName::Other => "other",
             }
         )
@@ -149,6 +156,24 @@ pub async fn webhook(
             log::info!("handling issue event {:?}", payload);
 
             github::Event::Issue(payload)
+        }
+        EventName::Push => {
+            let payload = deserialize_payload::<github::PushEvent>(&payload)
+                .with_context(|| format!("{:?} failed to deserialize", event))
+                .map_err(anyhow::Error::from)?;
+
+            log::info!("handling push event {:?}", payload);
+
+            github::Event::Push(payload)
+        }
+        EventName::Create => {
+            let payload = deserialize_payload::<github::CreateEvent>(&payload)
+                .with_context(|| format!("{:?} failed to deserialize", event))
+                .map_err(anyhow::Error::from)?;
+
+            log::info!("handling create event {:?}", payload);
+
+            github::Event::Create(payload)
         }
         // Other events need not be handled
         EventName::Other => {

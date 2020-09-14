@@ -33,6 +33,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let short_description = match event {
         Event::Issue(e) => e.issue.title.clone(),
         Event::IssueComment(e) => format!("Comment on {}", e.issue.title),
+        Event::Push(_) | Event::Create(_) => return Ok(()),
     };
 
     let mut caps = parser::get_mentions(body)
@@ -110,7 +111,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                     user_id: user.id.unwrap(),
                     origin_url: event.html_url().unwrap().to_owned(),
                     origin_html: body.to_owned(),
-                    time: event.time(),
+                    time: event.time().unwrap(),
                     short_description: Some(short_description.clone()),
                     team_name: team_name.clone(),
                 },
