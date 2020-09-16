@@ -676,7 +676,7 @@ impl WaitingMessage<'static> {
             primary: "Does anyone have something to add on the current topic?\n\
                   React with :working_on_it: if you have something to say.\n\
                   React with :all_good: if not.",
-            emoji: &[":working_on_it:", ":all_good:"],
+            emoji: &["working_on_it", "all_good"],
         }
     }
 
@@ -685,7 +685,7 @@ impl WaitingMessage<'static> {
             primary: "Does anyone have something to bring up?\n\
                   React with :working_on_it: if you have something to say.\n\
                   React with :all_good: if you're ready to end the meeting.",
-            emoji: &[":working_on_it:", ":all_good:"],
+            emoji: &["working_on_it", "all_good"],
         }
     }
 }
@@ -719,7 +719,8 @@ async fn post_waiter(
             emoji_name: reaction,
         }
         .send(&ctx.github.raw())
-        .await?;
+        .await
+        .context("emoji reaction failed")?;
     }
 
     Ok(serde_json::to_string(&ResponseNotRequired {
