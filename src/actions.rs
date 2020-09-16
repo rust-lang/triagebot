@@ -47,12 +47,42 @@ lazy_static! {
     };
 }
 
+// Group all the pending FCP for these teams
+pub const IN_PRE_FCP: &str = "in_pre_fcp";
+pub const IN_FCP: &str = "in_fcp";
+pub const FCP_FINISHED: &str = "fcp_finished";
+
+pub const IN_PRE_FCP_COMPILER_TEAM: &str = "in_pre_fcp_compiler_team";
+pub const IN_PRE_FCP_RUST: &str = "in_pre_fcp_rust";
+pub const IN_PRE_FCP_FORGE: &str = "in_pre_fcp_forge";
+const PENDINGFCP: [&str; 3] = [IN_PRE_FCP_COMPILER_TEAM, IN_PRE_FCP_RUST, IN_PRE_FCP_FORGE];
+
+// Group all the FCP for these teams
+pub const IN_FCP_COMPILER_TEAM: &str = "in_fcp_compiler_team";
+pub const IN_FCP_RUST: &str = "in_fcp_rust";
+pub const IN_FCP_FORGE: &str = "in_fcp_forge";
+const THINGSINFCP: [&str; 3] = [IN_FCP_COMPILER_TEAM, IN_FCP_RUST, IN_FCP_FORGE];
+
+// Group all the Finalized FCP for these teams
+pub const FCP_FINISHED_COMPILER_TEAM: &str = "fcp_finished_compiler_team";
+pub const FCP_FINISHED_RUST: &str = "fcp_finished_rust";
+pub const FCP_FINISHED_FORGE: &str = "fcp_finished_forge";
+const FINALIZEDFCP: [&str; 3] = [
+    FCP_FINISHED_COMPILER_TEAM,
+    FCP_FINISHED_RUST,
+    FCP_FINISHED_FORGE,
+];
+
 #[async_trait]
 impl<'a> Action for Step<'a> {
     async fn call(&self) -> String {
         let gh = GithubClient::new_with_default_token(Client::new());
 
         let mut context = Context::new();
+
+        let mut all_pending_fcp: Vec<(&str, Vec<IssueDecorator>)> = vec![];
+        let mut all_things_in_fcp: Vec<(&str, Vec<IssueDecorator>)> = vec![];
+        let mut all_finalized_fcp: Vec<(&str, Vec<IssueDecorator>)> = vec![];
 
         for Query { repo, queries } in &self.actions {
             let repository = Repository {
@@ -93,7 +123,16 @@ impl<'a> Action for Step<'a> {
                                     })
                                     .collect();
 
-                                context.insert(*name, &issues_decorator);
+                                // group query results for multiline FCP and add them later
+                                if PENDINGFCP.contains(name) {
+                                    all_pending_fcp.push((IN_PRE_FCP, issues_decorator));
+                                } else if THINGSINFCP.contains(name) {
+                                    all_things_in_fcp.push((IN_FCP, issues_decorator));
+                                } else if FINALIZEDFCP.contains(name) {
+                                    all_finalized_fcp.push((FCP_FINISHED, issues_decorator));
+                                } else {
+                                    context.insert(*name, &issues_decorator);
+                                }
                             }
                             Err(err) => {
                                 eprintln!("ERROR: {}", err);
@@ -123,6 +162,17 @@ impl<'a> Action for Step<'a> {
                     }
                 };
             }
+        }
+
+        // Add to a single template the aggregate of each group
+        for (name, issue_decorator) in all_pending_fcp {
+            context.insert(name, &issue_decorator);
+        }
+        for (name, issue_decorator) in all_things_in_fcp {
+            context.insert(name, &issue_decorator);
+        }
+        for (name, issue_decorator) in all_finalized_fcp {
+            context.insert(name, &issue_decorator);
         }
 
         TEMPLATES
