@@ -1,4 +1,4 @@
-use crate::actions::{self, Action, Query, QueryMap, Step};
+use crate::actions::{Action, Query, QueryMap, Step};
 use crate::github;
 
 pub fn prioritization<'a>() -> Box<dyn Action> {
@@ -28,7 +28,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     queries.push(QueryMap {
-        name: actions::IN_PRE_FCP_COMPILER_TEAM,
+        name: "in_pre_fcp",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -37,7 +37,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         },
     });
     queries.push(QueryMap {
-        name: actions::IN_FCP_COMPILER_TEAM,
+        name: "in_fcp",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -57,7 +57,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     queries.push(QueryMap {
-        name: actions::FCP_FINISHED_COMPILER_TEAM,
+        name: "fcp_finished",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "all")],
@@ -78,7 +78,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     let mut queries = Vec::new();
 
     queries.push(QueryMap {
-        name: actions::IN_PRE_FCP_RUST,
+        name: "in_pre_fcp",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -87,7 +87,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         },
     });
     queries.push(QueryMap {
-        name: actions::IN_FCP_RUST,
+        name: "in_fcp",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -97,7 +97,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     queries.push(QueryMap {
-        name: actions::FCP_FINISHED_RUST,
+        name: "fcp_finished",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "all")],
@@ -118,7 +118,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     let mut queries = Vec::new();
 
     queries.push(QueryMap {
-        name: actions::IN_PRE_FCP_FORGE,
+        name: "in_pre_fcp",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -127,7 +127,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         },
     });
     queries.push(QueryMap {
-        name: actions::IN_FCP_FORGE,
+        name: "in_fcp",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
@@ -137,7 +137,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     queries.push(QueryMap {
-        name: actions::FCP_FINISHED_FORGE,
+        name: "fcp_finished",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "all")],
