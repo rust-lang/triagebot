@@ -13,7 +13,11 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
             include_labels: vec!["major-change", "to-announce"],
-            exclude_labels: vec!["final-comment-period", "major-change-accepted"],
+            exclude_labels: vec![
+                "proposed-final-comment-period",
+                "final-comment-period",
+                "major-change-accepted",
+            ],
         },
     });
 
@@ -23,7 +27,11 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
             include_labels: vec!["major-change"],
-            exclude_labels: vec!["to-announce", "final-comment-period"],
+            exclude_labels: vec![
+                "to-announce",
+                "proposed-final-comment-period",
+                "final-comment-period",
+            ],
         },
     });
 
