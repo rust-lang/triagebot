@@ -2,6 +2,18 @@
 
 # T-lang meeting agenda
 
+* Meeting date 
+
+## Attendance
+
+* Team members:
+* Others:
+
+## Before meeting checklist
+
+* [ ] Update the project board with new proposals
+* [ ] Update the project board with new RFCs
+
 ## Pending proposals
 
 {{-issues::render(issues=pending_proposals, indent="  ", empty="No pending proposals this time.")}}
@@ -10,22 +22,14 @@
 
 Review the [Lang team project board](https://github.com/rust-lang/lang-team/projects/2) and get updates
 
-## Newly created RFCs
-
-{{-issues::render(issues=newly_created_rfcs, indent="  ", empty="No new RFCs this time.")}}
-
 ## Nominated RFCs
 
 {{-issues::render(issues=nominated_rfcs, indent="  ", empty="No nominated RFCs this time.")}}
 
-## P-high issues
+## P-high issues on rust-lang/rust
 
 {{-issues::render(issues=p_high_issues, indent="  ", empty="No P-high issues this time.")}}
 
-## Nominated PRs
+## Nominated PRs and issues on rust-lang/rust
 
-{{-issues::render(issues=nominated_prs, indent="  ", empty="No nominated PRs this time.")}}
-
-## Nominated issues
-
-{{-issues::render(issues=nominated_issues, indent="  ", empty="No nominated issues this time.")}}
+{{-issues::render(issues=nominated_prs_issues, indent="  ", empty="No nominated PRs this time.")}}
