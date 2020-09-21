@@ -552,20 +552,9 @@ pub fn lang<'a>() -> Box<dyn Action> {
         },
     });
 
-    // https://github.com/rust-lang/rust/pulls?q=is%3Aopen+is%3Apr+label%3AI-nominated+label%3AT-lang
-    queries.push(QueryMap {
-        name: "nominated_prs",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![("state", "open"), ("is", "pr")],
-            include_labels: vec!["T-lang", "I-nominated"],
-            exclude_labels: vec![],
-        },
-    });
-
     // https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3AI-nominated+label%3AT-lang+
     queries.push(QueryMap {
-        name: "nominated_issues",
+        name: "nominated_prs_issues",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
