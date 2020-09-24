@@ -440,10 +440,10 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     queries.push(QueryMap {
-        name: "beta_regressions_unassigned_p_high",
+        name: "beta_regressions_p_high",
         query: github::Query {
             kind: github::QueryKind::List,
-            filters: vec![("state", "open"), ("no", "assignee")],
+            filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-beta", "P-high"],
             exclude_labels: vec!["T-infra", "T-libs", "T-release", "T-rustdoc", "T-core"],
         },

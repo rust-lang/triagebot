@@ -88,12 +88,12 @@ tags: weekly, rustc
 [T-rustdoc](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3AP-critical+label%3AT-rustdoc)
 {{-issues::render(issues=p_critical_t_rustdoc, empty="No `P-critical` issues for `T-rustdoc` this time.")}}
 
-### Unassigned P-high regressions
+### P-high regressions
 
-[Beta regressions](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3Aregression-from-stable-to-beta+P-high+no%3Aassignee)
-{{-issues::render(issues=beta_regressions_unassigned_p_high, empty="No unassigned `P-high` beta regressions this time.")}}
+[P-high beta regressions](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3Aregression-from-stable-to-beta+label%3AP-high)
+{{-issues::render(issues=beta_regressions_p_high, empty="No `P-high` beta regressions this time.")}}
 
-[Nightly regressions](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3Aregression-from-stable-to-nightly+P-high+no%3Aassignee)
+[Unassigned P-high nightly regressions](https://github.com/rust-lang/rust/issues?utf8=%E2%9C%93&q=is%3Aopen+label%3Aregression-from-stable-to-nightly+label%3AP-high+no%3Aassignee)
 {{-issues::render(issues=nightly_regressions_unassigned_p_high, empty="No unassigned `P-high` nightly regressions this time.")}}
 
 ## Performance logs
