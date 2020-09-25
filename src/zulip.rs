@@ -73,7 +73,8 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
         Ok(Some(gh_id)) => Ok(gh_id),
         Ok(None) => Err(serde_json::to_string(&Response {
             content: &format!(
-                "Unknown Zulip user. Please add `zulip-id = {}` to your file in rust-lang/team.",
+                "Unknown Zulip user. Please add `zulip-id = {}` to your file in \
+                [rust-lang/team](https://github.com/rust-lang/team).",
                 req.message.sender_id
             ),
         })
