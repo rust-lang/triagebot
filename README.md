@@ -13,10 +13,15 @@ To compile the Triagebot you need OpenSSL development library to be installed (e
 
 Run `cargo build` to compile the triagebot.
 
-The `GITHUB_WEBHOOK_SECRET` and `GITHUB_API_TOKEN` environment variables need to be set.
+The `GITHUB_WEBHOOK_SECRET`, `GITHUB_API_TOKEN` and `DATABASE_URL` environment
+variables need to be set.
 
 If `GITHUB_API_TOKEN` is not set, the token can also be stored in `~/.gitconfig` in the
 `github.oauth-token` setting.
+
+To configure the GitHub webhook, point it to the `/github-hook` path of your
+webserver (by default `http://localhost:8000`), configure the secret you chose
+in `.env`, set the content type to `application/json` and select all events.
 
 ## License
 
