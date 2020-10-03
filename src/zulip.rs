@@ -484,6 +484,8 @@ async fn acknowledge(gh_id: i64, mut words: impl Iterator<Item = &str>) -> anyho
             std::num::NonZeroUsize::new(number)
                 .ok_or_else(|| anyhow::anyhow!("index must be at least 1"))?,
         )
+    } else if url == "all" || url == "*" {
+        Identifier::All
     } else {
         Identifier::Url(url)
     };

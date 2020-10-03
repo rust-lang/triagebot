@@ -40,6 +40,8 @@ pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::
 pub enum Identifier<'a> {
     Url(&'a str),
     Index(std::num::NonZeroUsize),
+    /// Glob identifier (`all` or `*`).
+    All,
 }
 
 pub async fn delete_ping(
@@ -139,6 +141,36 @@ pub async fn delete_ping(
                 return Ok(vec![deleted_notification]);
             }
         },
+        Identifier::All => {
+            let rows = db
+                .query(
+                    "DELETE FROM notifications WHERE user_id = $1
+                        RETURNING origin_url, origin_html, time, short_description, metadata",
+                    &[&user_id],
+                )
+                .await
+                .context("delete all notifications query")?;
+            if rows.is_empty() {
+                anyhow::bail!("Did not delete any notifications");
+            }
+            Ok(rows
+                .into_iter()
+                .map(|row| {
+                    let origin_url: String = row.get(0);
+                    let origin_text: String = row.get(1);
+                    let time: DateTime<FixedOffset> = row.get(2);
+                    let short_description: Option<String> = row.get(3);
+                    let metadata: Option<String> = row.get(4);
+                    NotificationData {
+                        origin_url,
+                        origin_text,
+                        time,
+                        short_description,
+                        metadata,
+                    }
+                })
+                .collect())
+        }
     }
 }
 
