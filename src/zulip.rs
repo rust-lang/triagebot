@@ -470,29 +470,32 @@ impl<'a> MessageApiRequest<'a> {
 }
 
 async fn acknowledge(gh_id: i64, mut words: impl Iterator<Item = &str>) -> anyhow::Result<String> {
-    let url = match words.next() {
-        Some(url) => {
+    let filter = match words.next() {
+        Some(filter) => {
             if words.next().is_some() {
                 anyhow::bail!("too many words");
             }
-            url
+            filter
         }
         None => anyhow::bail!("not enough words"),
     };
-    let ident = if let Ok(number) = url.parse::<usize>() {
+    let ident = if let Ok(number) = filter.parse::<usize>() {
         Identifier::Index(
             std::num::NonZeroUsize::new(number)
                 .ok_or_else(|| anyhow::anyhow!("index must be at least 1"))?,
         )
-    } else if url == "all" || url == "*" {
+    } else if filter == "all" || filter == "*" {
         Identifier::All
     } else {
-        Identifier::Url(url)
+        Identifier::Url(filter)
     };
     match delete_ping(&mut crate::db::make_client().await?, gh_id, ident).await {
         Ok(deleted) => {
             let resp = if deleted.is_empty() {
-                String::from("You have no pending notifications, so none were deleted.")
+                format!(
+                    "No notifications matched `{}`, so none were deleted.",
+                    filter
+                )
             } else {
                 let mut resp = String::from("Acknowledged:\n");
                 for deleted in deleted {
@@ -514,7 +517,7 @@ async fn acknowledge(gh_id: i64, mut words: impl Iterator<Item = &str>) -> anyho
             Ok(serde_json::to_string(&Response { content: &resp }).unwrap())
         }
         Err(e) => Ok(serde_json::to_string(&Response {
-            content: &format!("Failed to acknowledge {}: {:?}.", url, e),
+            content: &format!("Failed to acknowledge {}: {:?}.", filter, e),
         })
         .unwrap()),
     }
