@@ -491,20 +491,26 @@ async fn acknowledge(gh_id: i64, mut words: impl Iterator<Item = &str>) -> anyho
     };
     match delete_ping(&mut crate::db::make_client().await?, gh_id, ident).await {
         Ok(deleted) => {
-            let mut resp = format!("Acknowledged:\n");
-            for deleted in deleted {
-                resp.push_str(&format!(
-                    " * [{}]({}){}\n",
-                    deleted
-                        .short_description
-                        .as_deref()
-                        .unwrap_or(&deleted.origin_url),
-                    deleted.origin_url,
-                    deleted
-                        .metadata
-                        .map_or(String::new(), |m| format!(" ({})", m)),
-                ));
-            }
+            let resp = if deleted.is_empty() {
+                String::from("You have no pending notifications, so none were deleted.")
+            } else {
+                let mut resp = String::from("Acknowledged:\n");
+                for deleted in deleted {
+                    resp.push_str(&format!(
+                        " * [{}]({}){}\n",
+                        deleted
+                            .short_description
+                            .as_deref()
+                            .unwrap_or(&deleted.origin_url),
+                        deleted.origin_url,
+                        deleted
+                            .metadata
+                            .map_or(String::new(), |m| format!(" ({})", m)),
+                    ));
+                }
+                resp
+            };
+
             Ok(serde_json::to_string(&Response { content: &resp }).unwrap())
         }
         Err(e) => Ok(serde_json::to_string(&Response {

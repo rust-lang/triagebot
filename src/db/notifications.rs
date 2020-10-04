@@ -59,9 +59,6 @@ pub async fn delete_ping(
                 )
                 .await
                 .context("delete notification query")?;
-            if rows.is_empty() {
-                anyhow::bail!("Did not delete any notifications");
-            }
             Ok(rows
                 .into_iter()
                 .map(|row| {
@@ -150,9 +147,6 @@ pub async fn delete_ping(
                 )
                 .await
                 .context("delete all notifications query")?;
-            if rows.is_empty() {
-                anyhow::bail!("Did not delete any notifications");
-            }
             Ok(rows
                 .into_iter()
                 .map(|row| {
