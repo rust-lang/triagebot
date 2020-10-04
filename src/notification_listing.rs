@@ -56,7 +56,7 @@ pub async fn render(db: &DbClient, user: &str) -> String {
         out.push_str(
             "<p><em>You can acknowledge a notification by sending </em><code>ack &lt;idx&gt;</code><em> \
             to </em><strong><code>@triagebot</code></strong><em> on Zulip, or you can acknowledge \
-            <em>all</em> notifications by sending <em>ack all</em>. Read about the other notification commands \
+            all notifications by sending </em><code>ack all</code><em>. Read about the other notification commands \
             <a href=\"https://forge.rust-lang.org/platforms/zulip/triagebot.html#issue-notifications\">here</a>.</em></p>"
         );
     }
