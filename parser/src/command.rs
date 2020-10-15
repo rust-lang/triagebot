@@ -197,6 +197,13 @@ fn code_2() {
 }
 
 #[test]
+fn code_3() {
+    let input = "@bot label +bug.";
+    let mut input = Input::new(input, "bot");
+    assert!(input.next().is_none());
+}
+
+#[test]
 fn edit_1() {
     let input_old = "@bot modify labels: +bug.";
     let mut input_old = Input::new(input_old, "bot");
