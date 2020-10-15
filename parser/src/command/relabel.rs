@@ -5,7 +5,7 @@
 //! The grammar is as follows:
 //!
 //! ```text
-//! Command: `@bot modify labels:? to? <label-list>.`
+//! Command: `@bot modify labels:? to? <label-list>.` or `@bot label <label-list>`
 //!
 //! <label-list>:
 //!  - <label-delta>
@@ -127,32 +127,35 @@ fn delta_empty() {
 impl RelabelCommand {
     pub fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
         let mut toks = input.clone();
-        if let Some(Token::Word("modify")) = toks.next_token()? {
-            // continue
-        } else {
-            return Ok(None);
-        }
-        if let Some(Token::Word("labels")) = toks.next_token()? {
-            // continue
-        } else {
-            return Ok(None);
-        }
-        if let Some(Token::Colon) = toks.peek_token()? {
-            toks.next_token()?;
-        } else if let Some(Token::Word("to")) = toks.peek_token()? {
-            toks.next_token()?;
-            // optionally eat the colon after to, e.g.:
-            // @rustbot modify labels to: -S-waiting-on-author, +S-waiting-on-review
-            if let Ok(Some(Token::Colon)) = toks.peek_token() {
-                toks.next_token()?;
+        match toks.next_token()? {
+            Some(Token::Word("modify")) => {
+                if let Some(Token::Word("labels")) = toks.next_token()? {
+                    if let Some(Token::Colon) = toks.peek_token()? {
+                        toks.next_token()?;
+                    } else if let Some(Token::Word("to")) = toks.peek_token()? {
+                        toks.next_token()?;
+                        // optionally eat the colon after to, e.g.:
+                        // @rustbot modify labels to: -S-waiting-on-author, +S-waiting-on-review
+                        if let Ok(Some(Token::Colon)) = toks.peek_token() {
+                            toks.next_token()?;
+                        }
+                    } else {
+                        // It's okay if there's no to or colon, we can just eat labels
+                        // afterwards.
+                    }
+                    if let Some(Token::Word("to")) = toks.peek_token()? {
+                        return Err(toks.error(ParseError::MisleadingTo));
+                    }
+                } else {
+                    return Ok(None);
+                }
             }
-        } else {
-            // It's okay if there's no to or colon, we can just eat labels
-            // afterwards.
+            Some(Token::Word("label")) => {
+                // continue
+            }
+            _ => return Ok(None),
         }
-        if let Some(Token::Word("to")) = toks.peek_token()? {
-            return Err(toks.error(ParseError::MisleadingTo));
-        }
+
         // start parsing deltas
         let mut deltas = Vec::new();
         loop {
