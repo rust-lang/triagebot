@@ -1,3 +1,0 @@
-{% import "_issue.tt" as issue %}
-
-{% macro render(issue) %}{{issue::render(issue=issue)}} labels=[{{issue.labels}}}] assignees=[{{issue.assignees}}]{% endmacro %}
