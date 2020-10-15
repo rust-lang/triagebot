@@ -479,6 +479,17 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         },
     });
 
+    //https://github.com/rust-lang/rfcs/pulls?q=is%3Aopen+is%3Apr+label%3AI-nominated+label%3AT-compiler
+    queries.push(QueryMap {
+        name: "nominated_rfcs_t_compiler",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open"), ("is", "pr")],
+            include_labels: vec!["T-compiler", "I-nominated"],
+            exclude_labels: vec![],
+        },
+    });
+
     actions.push(Query {
         repo: "rust-lang/rust",
         queries,
@@ -530,17 +541,6 @@ pub fn lang<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open"), ("is", "pr")],
             include_labels: vec!["T-lang", "I-nominated"],
-            exclude_labels: vec![],
-        },
-    });
-
-    //https://github.com/rust-lang/rfcs/pulls?q=is%3Aopen+is%3Apr+label%3AI-nominated+label%3AT-compiler
-    queries.push(QueryMap {
-        name: "nominated_rfcs_t_compiler",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![("state", "open"), ("is", "pr")],
-            include_labels: vec!["T-compiler", "I-nominated"],
             exclude_labels: vec![],
         },
     });
