@@ -24,7 +24,7 @@ Review the [Lang team project board](https://github.com/rust-lang/lang-team/proj
 
 ## Nominated RFCs
 
-{{-issues::render(issues=nominated_rfcs_t_lang, indent="  ", empty="No nominated RFCs this time.")}}
+{{-issues::render(issues=nominated_rfcs, indent="  ", empty="No nominated RFCs this time.")}}
 
 ## P-high issues on rust-lang/rust
 

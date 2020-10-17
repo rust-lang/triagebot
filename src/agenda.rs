@@ -536,7 +536,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
 
     //https://github.com/rust-lang/rfcs/pulls?q=is%3Aopen+is%3Apr+label%3AI-nominated+label%3AT-lang
     queries.push(QueryMap {
-        name: "nominated_rfcs_t_lang",
+        name: "nominated_rfcs",
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open"), ("is", "pr")],
