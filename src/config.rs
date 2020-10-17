@@ -132,6 +132,7 @@ pub(crate) struct MajorChangeConfig {
     pub(crate) second_label: String,
     pub(crate) meeting_label: String,
     pub(crate) zulip_stream: u64,
+    pub(crate) open_extra_text: Option<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
