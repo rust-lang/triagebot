@@ -104,7 +104,10 @@ tags: weekly, rustc
 ## Nominated Issues
 
 [T-compiler](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AI-nominated+label%3AT-compiler)
-{{-issues::render(issues=i_nominated_t_compiler, empty="No nominated issues for `T-compiler` this time.")}}
+{{-issues::render(issues=nominated_t_compiler, empty="No nominated issues for `T-compiler` this time.")}}
 
 [libs-impl](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AI-nominated+label%3Alibs-impl)
-{{-issues::render(issues=i_nominated_libs_impl, empty="No nominated issues for `libs-impl` this time.")}}
+{{-issues::render(issues=nominated_libs_impl, empty="No nominated issues for `libs-impl` this time.")}}
+
+[RFC](https://github.com/rust-lang/rfcs/issues?q=is%3Aopen+label%3AI-nominated+label%3AT-compiler)
+{{-issues::render(issues=nominated_rfcs_t_compiler, empty="No nominated RFCs for `T-compiler` this time.")}}
