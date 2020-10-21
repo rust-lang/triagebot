@@ -957,20 +957,28 @@ impl RequestSend for RequestBuilder {
     }
 }
 
+fn validate_token(t: &str) -> bool {
+    t.chars().all(|char| char.is_digit(16))
+}
+
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
 pub fn default_token_from_env() -> String {
-    match std::env::var("GITHUB_API_TOKEN") {
-        Ok(v) => return v,
-        Err(_) => (),
+    let token = match std::env::var("GITHUB_API_TOKEN") {
+        Ok(v) => v,
+        Err(_) => match get_token_from_git_config() {
+            Ok(v) => v,
+            Err(_) => {
+                panic!("Could not find token in GITHUB_API_TOKEN or .gitconfig/github.oath-token")
+            }
+        },
+    };
+
+    if !validate_token(&token) {
+        panic!("Invalid Github token found")
     }
 
-    match get_token_from_git_config() {
-        Ok(v) => return v,
-        Err(_) => (),
-    }
-
-    panic!("could not find token in GITHUB_API_TOKEN or .gitconfig/github.oath-token")
+    token
 }
 
 fn get_token_from_git_config() -> anyhow::Result<String> {
