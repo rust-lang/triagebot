@@ -10,7 +10,7 @@ pub mod prioritize;
 pub mod relabel;
 pub mod second;
 
-pub fn find_commmand_start(input: &str, bot: &str) -> Option<usize> {
+pub fn find_command_start(input: &str, bot: &str) -> Option<usize> {
     input.find(&format!("@{}", bot))
 }
 
@@ -144,7 +144,7 @@ impl<'a> Iterator for Input<'a> {
 
     fn next(&mut self) -> Option<Command<'a>> {
         loop {
-            let start = find_commmand_start(&self.all[self.parsed..], self.bot)?;
+            let start = find_command_start(&self.all[self.parsed..], self.bot)?;
             self.parsed += start;
             if let Some(command) = self.parse_command() {
                 return Some(command);
