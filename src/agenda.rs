@@ -479,6 +479,15 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         },
     });
 
+    actions.push(Query {
+        repo: "rust-lang/rust",
+        queries,
+    });
+
+    // retrieve some RFCs for the T-compiler agenda
+
+    let mut queries = Vec::new();
+
     //https://github.com/rust-lang/rfcs/pulls?q=is%3Aopen+is%3Apr+label%3AI-nominated+label%3AT-compiler
     queries.push(QueryMap {
         name: "nominated_rfcs_t_compiler",
@@ -491,7 +500,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repo: "rust-lang/rust",
+        repo: "rust-lang/rfcs",
         queries,
     });
 
