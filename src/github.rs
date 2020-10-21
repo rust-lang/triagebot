@@ -969,7 +969,7 @@ pub fn default_token_from_env() -> String {
         Err(_) => match get_token_from_git_config() {
             Ok(v) => v,
             Err(_) => {
-                panic!("Could not find token in GITHUB_API_TOKEN or .gitconfig/github.oath-token")
+                panic!("Could not find token in GITHUB_API_TOKEN or .gitconfig/github.oauth-token")
             }
         },
     };
