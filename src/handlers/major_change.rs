@@ -189,7 +189,9 @@ async fn handle(
         procedural comments, such as volunteering to review, indicating that you \
         second the proposal (or third, etc), or raising a concern that you would \
         like to be addressed. \
+        \n\n{} \
         \n\n[stream]: {}",
+            config.open_extra_text.as_deref().unwrap_or_default(),
             topic_url
         );
         issue
