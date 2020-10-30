@@ -22,7 +22,9 @@ pub(super) async fn handle_command(
         return Ok(());
     };
 
-    let response = ctx.github.raw().get(&cmd.source).send().await?;
+    let html_url = cmd.source;
+    let url = html_url.replace("github.com", "githubusercontent.com") + "/raw/playground.rs";
+    let response = ctx.github.raw().get(&url).send().await?;
     let body = response.text().await?;
 
     let number = event.issue().unwrap().number;
