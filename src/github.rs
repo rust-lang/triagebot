@@ -1039,6 +1039,11 @@ impl GithubClient {
         }
     }
 
+    /// Get the raw gist content from the URL of the HTML version of the gist:
+    ///
+    /// `html_url` looks like `https://gist.github.com/rust-play/7e80ca3b1ec7abe08f60c41aff91f060`.
+    ///
+    /// `filename` is the name of the file you want the content of.
     pub async fn raw_gist_from_url(
         &self,
         html_url: &str,
