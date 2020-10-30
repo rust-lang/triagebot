@@ -209,6 +209,16 @@ impl<'a> Tokenizer<'a> {
         }
         Ok(Some(Token::Word(&self.str_from(start))))
     }
+
+    pub fn eat_token(&mut self, token: Token<'a>) -> Result<bool, Error<'a>> {
+        match self.peek_token()? {
+            Some(next_tok) if next_tok == token => {
+                self.next_token()?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
+    }
 }
 
 #[cfg(test)]

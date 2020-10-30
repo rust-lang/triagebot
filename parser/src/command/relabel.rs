@@ -5,7 +5,7 @@
 //! The grammar is as follows:
 //!
 //! ```text
-//! Command: `@bot modify labels:? to? <label-list>.`
+//! Command: `@bot modify labels:? to? <label-list>.` or `@bot label:? <label-list>.`
 //!
 //! <label-list>:
 //!  - <label-delta>
@@ -127,29 +127,33 @@ fn delta_empty() {
 impl RelabelCommand {
     pub fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
         let mut toks = input.clone();
-        if let Some(Token::Word("modify")) = toks.next_token()? {
-            // continue
-        } else {
-            return Ok(None);
-        }
-        if let Some(Token::Word("labels")) = toks.next_token()? {
-            // continue
-        } else {
-            return Ok(None);
-        }
-        if let Some(Token::Colon) = toks.peek_token()? {
-            toks.next_token()?;
-        } else if let Some(Token::Word("to")) = toks.peek_token()? {
-            toks.next_token()?;
-            // optionally eat the colon after to, e.g.:
-            // @rustbot modify labels to: -S-waiting-on-author, +S-waiting-on-review
-            if let Ok(Some(Token::Colon)) = toks.peek_token() {
-                toks.next_token()?;
+
+        if toks.eat_token(Token::Word("modify"))? {
+            if toks.eat_token(Token::Word("labels"))? {
+                if toks.eat_token(Token::Colon)? {
+                    // ate the colon
+                } else if toks.eat_token(Token::Word("to"))? {
+                    // optionally eat the colon after to, e.g.:
+                    // @rustbot modify labels to: -S-waiting-on-author, +S-waiting-on-review
+                    toks.eat_token(Token::Colon)?;
+                } else {
+                    // It's okay if there's no to or colon, we can just eat labels
+                    // afterwards.
+                }
+                // continue
+                {} // FIXME(rustfmt#4506): this is needed to get rustfmt to indent the comment correctly
+            } else {
+                return Ok(None);
             }
+        } else if toks.eat_token(Token::Word("label"))? {
+            // optionally eat a colon
+            toks.eat_token(Token::Colon)?;
+            // continue
+            {} // FIXME(rustfmt#4506): this is needed to get rustfmt to indent the comment correctly
         } else {
-            // It's okay if there's no to or colon, we can just eat labels
-            // afterwards.
+            return Ok(None);
         }
+
         if let Some(Token::Word("to")) = toks.peek_token()? {
             return Err(toks.error(ParseError::MisleadingTo));
         }
@@ -236,5 +240,53 @@ fn parse_to_colon() {
             LabelDelta::Remove(Label("T-lang".into())),
             LabelDelta::Add(Label("bug".into())),
         ]))
+    );
+}
+
+#[test]
+fn parse_shorter_command() {
+    assert_eq!(
+        parse("label +T-compiler -T-lang bug"),
+        Ok(Some(vec![
+            LabelDelta::Add(Label("T-compiler".into())),
+            LabelDelta::Remove(Label("T-lang".into())),
+            LabelDelta::Add(Label("bug".into())),
+        ]))
+    );
+}
+
+#[test]
+fn parse_shorter_command_with_colon() {
+    assert_eq!(
+        parse("label: +T-compiler -T-lang bug"),
+        Ok(Some(vec![
+            LabelDelta::Add(Label("T-compiler".into())),
+            LabelDelta::Remove(Label("T-lang".into())),
+            LabelDelta::Add(Label("bug".into())),
+        ]))
+    );
+}
+
+#[test]
+fn parse_shorter_command_with_to() {
+    assert_eq!(
+        parse("label to +T-compiler -T-lang bug")
+            .unwrap_err()
+            .source()
+            .unwrap()
+            .downcast_ref(),
+        Some(&ParseError::MisleadingTo)
+    );
+}
+
+#[test]
+fn parse_shorter_command_with_to_colon() {
+    assert_eq!(
+        parse("label to: +T-compiler -T-lang bug")
+            .unwrap_err()
+            .source()
+            .unwrap()
+            .downcast_ref(),
+        Some(&ParseError::MisleadingTo)
     );
 }
