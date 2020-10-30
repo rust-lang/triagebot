@@ -1039,6 +1039,16 @@ impl GithubClient {
         }
     }
 
+    pub async fn raw_gist_from_url(
+        &self,
+        html_url: &str,
+        filename: &str,
+    ) -> anyhow::Result<String> {
+        let url = html_url.replace("github.com", "githubusercontent.com") + "/raw/" + filename;
+        let response = self.raw().get(&url).send().await?;
+        response.text().await.context("raw gist from url")
+    }
+
     fn get(&self, url: &str) -> RequestBuilder {
         log::trace!("get {:?}", url);
         self.client.get(url).configure(self)

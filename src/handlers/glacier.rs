@@ -22,10 +22,10 @@ pub(super) async fn handle_command(
         return Ok(());
     };
 
-    let html_url = cmd.source;
-    let url = html_url.replace("github.com", "githubusercontent.com") + "/raw/playground.rs";
-    let response = ctx.github.raw().get(&url).send().await?;
-    let body = response.text().await?;
+    let body = ctx
+        .github
+        .raw_gist_from_url(&cmd.source, "playground.rs")
+        .await?;
 
     let number = event.issue().unwrap().number;
     let user = event.user();
