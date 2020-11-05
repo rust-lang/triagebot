@@ -25,6 +25,7 @@ impl fmt::Display for HandlerError {
 
 mod assign;
 mod autolabel;
+mod close;
 mod github_releases;
 mod glacier;
 mod major_change;
@@ -224,6 +225,7 @@ command_handlers! {
     prioritize: Prioritize,
     relabel: Relabel,
     major_change: Second,
+    close: Close,
 }
 
 pub struct Context {
