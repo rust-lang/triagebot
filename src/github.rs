@@ -593,6 +593,23 @@ impl Issue {
             .context("failed to set milestone")?;
         Ok(())
     }
+
+    pub async fn close(&self, client: &GithubClient) -> anyhow::Result<()> {
+        let edit_url = format!("{}/issues/{}", self.repository().url(), self.number);
+        #[derive(serde::Serialize)]
+        struct CloseIssue<'a> {
+            state: &'a str,
+        }
+        client
+            ._send_req(
+                client
+                    .patch(&edit_url)
+                    .json(&CloseIssue { state: "closed" }),
+            )
+            .await
+            .context("failed to close issue")?;
+        Ok(())
+    }
 }
 
 #[derive(serde::Serialize)]
