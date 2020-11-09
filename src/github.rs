@@ -263,13 +263,13 @@ pub struct Issue {
 /// Contains only the parts of `Issue` that are needed for turning the issue title into a Zulip
 /// topic.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PartialIssue {
+pub struct ZulipGitHubReference {
     pub number: u64,
     pub title: String,
     pub repository: IssueRepository,
 }
 
-impl PartialIssue {
+impl ZulipGitHubReference {
     pub fn zulip_topic_reference(&self) -> String {
         let repo = &self.repository;
         if repo.organization == "rust-lang" {
@@ -284,9 +284,9 @@ impl PartialIssue {
     }
 }
 
-impl From<&Issue> for PartialIssue {
-    fn from(other: &Issue) -> PartialIssue {
-        PartialIssue {
+impl From<&Issue> for ZulipGitHubReference {
+    fn from(other: &Issue) -> ZulipGitHubReference {
+        ZulipGitHubReference {
             number: other.number,
             title: other.title.clone(),
             repository: other.repository.get().unwrap().clone(),

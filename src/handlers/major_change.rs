@@ -1,6 +1,6 @@
 use crate::{
     config::MajorChangeConfig,
-    github::{Event, Issue, IssuesAction, IssuesEvent, Label, PartialIssue},
+    github::{Event, Issue, IssuesAction, IssuesEvent, Label, ZulipGitHubReference},
     handlers::Context,
     interactions::ErrorComment,
 };
@@ -11,7 +11,7 @@ use parser::command::second::SecondCommand;
 pub enum Invocation {
     NewProposal,
     AcceptedProposal,
-    Rename { prev_issue: PartialIssue },
+    Rename { prev_issue: ZulipGitHubReference },
 }
 
 pub(super) fn parse_input(
@@ -21,7 +21,7 @@ pub(super) fn parse_input(
 ) -> Result<Option<Invocation>, String> {
     if event.action == IssuesAction::Edited {
         if let Some(changes) = &event.changes {
-            let prev_issue = PartialIssue {
+            let prev_issue = ZulipGitHubReference {
                 number: event.issue.number,
                 title: changes.title.from.clone(),
                 repository: event.issue.repository().clone(),
@@ -103,7 +103,7 @@ pub(super) async fn handle_input(
             let issue = &event.issue;
 
             let prev_topic = zulip_topic_from_issue(&prev_issue);
-            let partial_issue: PartialIssue = issue.into();
+            let partial_issue: ZulipGitHubReference = issue.into();
             let new_topic = zulip_topic_from_issue(&partial_issue);
 
             let zulip_send_req = crate::zulip::MessageApiRequest {
@@ -204,7 +204,7 @@ async fn handle(
     labels.push(Label { name: label_to_add });
     let github_req = issue.set_labels(&ctx.github, labels);
 
-    let partial_issue: PartialIssue = issue.into();
+    let partial_issue: ZulipGitHubReference = issue.into();
     let zulip_topic = zulip_topic_from_issue(&partial_issue);
 
     let zulip_req = crate::zulip::MessageApiRequest {
@@ -242,7 +242,7 @@ async fn handle(
     Ok(())
 }
 
-fn zulip_topic_from_issue(issue: &PartialIssue) -> String {
+fn zulip_topic_from_issue(issue: &ZulipGitHubReference) -> String {
     // Concatenate the issue title and the topic reference, truncating such that
     // the overall length does not exceed 60 characters (a Zulip limitation).
     let topic_ref = issue.zulip_topic_reference();
