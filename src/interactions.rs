@@ -1,29 +1,9 @@
 use crate::github::{GithubClient, Issue};
 use std::fmt::Write;
 
-pub struct Comment<'a> {
+pub struct ErrorComment<'a> {
     issue: &'a Issue,
     message: String,
-}
-
-impl<'a> Comment<'a> {
-    pub fn new<T>(issue: &'a Issue, message: T) -> Comment<'a>
-    where
-        T: Into<String>,
-    {
-        Comment {
-            issue,
-            message: message.into(),
-        }
-    }
-
-    pub async fn post(&self, client: &GithubClient) -> anyhow::Result<()> {
-        self.issue.post_comment(client, &self.message).await
-    }
-}
-
-pub struct ErrorComment<'a> {
-    comment: Comment<'a>,
 }
 
 impl<'a> ErrorComment<'a> {
@@ -32,19 +12,20 @@ impl<'a> ErrorComment<'a> {
         T: Into<String>,
     {
         ErrorComment {
-            comment: Comment::new(issue, message),
+            issue,
+            message: message.into(),
         }
     }
 
     pub async fn post(&self, client: &GithubClient) -> anyhow::Result<()> {
         let mut body = String::new();
-        writeln!(body, "**Error**: {}", self.comment.message)?;
+        writeln!(body, "**Error**: {}", self.message)?;
         writeln!(body)?;
         writeln!(
             body,
             "Please let **`@rust-lang/release`** know if you're having trouble with this bot."
         )?;
-        self.comment.issue.post_comment(client, &body).await
+        self.issue.post_comment(client, &body).await
     }
 }
 
