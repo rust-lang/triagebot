@@ -475,7 +475,7 @@ pub struct MessageApiResponse {
     pub message_id: u64,
 }
 
-#[derive(Default)]
+#[derive(Debug)]
 pub struct UpdateMessageApiRequest<'a> {
     pub message_id: u64,
     pub topic: Option<&'a str>,

@@ -123,7 +123,8 @@ pub(super) async fn handle_input(
             let zulip_update_req = crate::zulip::UpdateMessageApiRequest {
                 message_id: zulip_send_res.message_id,
                 topic: Some(&new_topic),
-                ..Default::default()
+                propagate_mode: None,
+                content: None,
             };
             zulip_update_req
                 .send(&ctx.github.raw())
