@@ -43,8 +43,6 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     // Fetch the version from the upstream repository.
     let version = if let Some(version) = get_version_standalone(ctx, merge_sha).await? {
         version
-    } else if let Some(version) = get_version_channelrs(ctx, merge_sha).await? {
-        version
     } else {
         log::error!("could not find the version of {:?}", merge_sha);
         return Ok(());
@@ -96,43 +94,4 @@ async fn get_version_standalone(ctx: &Context, merge_sha: &str) -> anyhow::Resul
             .trim()
             .to_string(),
     ))
-}
-
-async fn get_version_channelrs(ctx: &Context, merge_sha: &str) -> anyhow::Result<Option<String>> {
-    let resp = ctx
-        .github
-        .raw()
-        .get(&format!(
-            "https://raw.githubusercontent.com/rust-lang/rust/{}/src/bootstrap/channel.rs",
-            merge_sha
-        ))
-        .send()
-        .await
-        .with_context(|| format!("retrieving channel.rs for {}", merge_sha))?;
-
-    let resp = resp
-        .text()
-        .await
-        .with_context(|| format!("deserializing text channel.rs for {}", merge_sha))?;
-
-    let prefix = r#"const CFG_RELEASE_NUM: &str = ""#;
-    let start = if let Some(idx) = resp.find(prefix) {
-        idx + prefix.len()
-    } else {
-        log::error!(
-            "No {:?} in contents of channel.rs at {:?}",
-            prefix,
-            merge_sha
-        );
-        return Ok(None);
-    };
-    let after = &resp[start..];
-    let end = if let Some(idx) = after.find('"') {
-        idx
-    } else {
-        log::error!("No suffix in contents of channel.rs at {:?}", merge_sha);
-        return Ok(None);
-    };
-
-    Ok(Some(after[..end].to_string()))
 }
