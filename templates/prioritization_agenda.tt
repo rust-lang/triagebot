@@ -98,8 +98,7 @@ tags: weekly, rustc
 
 ## Performance logs
 
-[Triage done by njn](https://github.com/rust-lang/rustc-perf/tree/master/triage#triage-logs)
-<Performance logs text>
+> [triage logs](https://github.com/rust-lang/rustc-perf/tree/master/triage#triage-logs)
 
 ## Nominated Issues
 
