@@ -156,9 +156,9 @@ macro_rules! command_handlers {
                 }
             }
 
-            let input = Input::new(&body, &ctx.username);
+            let input = Input::new(&body, vec![&ctx.username, "triagebot"]);
             let commands = if let Some(previous) = event.comment_from() {
-                let prev_commands = Input::new(&previous, &ctx.username).collect::<Vec<_>>();
+                let prev_commands = Input::new(&previous, vec![&ctx.username, "triagebot"]).collect::<Vec<_>>();
                 input.filter(|cmd| !prev_commands.contains(cmd)).collect::<Vec<_>>()
             } else {
                 input.collect()
