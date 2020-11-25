@@ -284,16 +284,6 @@ impl ZulipGitHubReference {
     }
 }
 
-impl From<&Issue> for ZulipGitHubReference {
-    fn from(other: &Issue) -> ZulipGitHubReference {
-        ZulipGitHubReference {
-            number: other.number,
-            title: other.title.clone(),
-            repository: other.repository.get().unwrap().clone(),
-        }
-    }
-}
-
 #[derive(Debug, serde::Deserialize)]
 pub struct Comment {
     #[serde(deserialize_with = "opt_string")]
@@ -361,6 +351,14 @@ impl IssueRepository {
 }
 
 impl Issue {
+    pub fn to_zulip_github_reference(&self) -> ZulipGitHubReference {
+        ZulipGitHubReference {
+            number: self.number,
+            title: self.title.clone(),
+            repository: self.repository.get().unwrap().clone(),
+        }
+    }
+
     pub fn repository(&self) -> &IssueRepository {
         self.repository.get_or_init(|| {
             // https://api.github.com/repos/rust-lang/rust/issues/69257/comments

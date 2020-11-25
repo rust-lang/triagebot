@@ -103,7 +103,7 @@ pub(super) async fn handle_input(
             let issue = &event.issue;
 
             let prev_topic = zulip_topic_from_issue(&prev_issue);
-            let partial_issue: ZulipGitHubReference = issue.into();
+            let partial_issue = issue.to_zulip_github_reference();
             let new_topic = zulip_topic_from_issue(&partial_issue);
 
             let zulip_send_req = crate::zulip::MessageApiRequest {
@@ -205,7 +205,7 @@ async fn handle(
     labels.push(Label { name: label_to_add });
     let github_req = issue.set_labels(&ctx.github, labels);
 
-    let partial_issue: ZulipGitHubReference = issue.into();
+    let partial_issue = issue.to_zulip_github_reference();
     let zulip_topic = zulip_topic_from_issue(&partial_issue);
 
     let zulip_req = crate::zulip::MessageApiRequest {
