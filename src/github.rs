@@ -260,6 +260,30 @@ pub struct Issue {
     repository: OnceCell<IssueRepository>,
 }
 
+/// Contains only the parts of `Issue` that are needed for turning the issue title into a Zulip
+/// topic.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ZulipGitHubReference {
+    pub number: u64,
+    pub title: String,
+    pub repository: IssueRepository,
+}
+
+impl ZulipGitHubReference {
+    pub fn zulip_topic_reference(&self) -> String {
+        let repo = &self.repository;
+        if repo.organization == "rust-lang" {
+            if repo.repository == "rust" {
+                format!("#{}", self.number)
+            } else {
+                format!("{}#{}", repo.repository, self.number)
+            }
+        } else {
+            format!("{}/{}#{}", repo.organization, repo.repository, self.number)
+        }
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct Comment {
     #[serde(deserialize_with = "opt_string")]
@@ -305,7 +329,7 @@ impl fmt::Display for AssignmentError {
 
 impl std::error::Error for AssignmentError {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssueRepository {
     pub organization: String,
     pub repository: String,
@@ -327,16 +351,11 @@ impl IssueRepository {
 }
 
 impl Issue {
-    pub fn zulip_topic_reference(&self) -> String {
-        let repo = self.repository();
-        if repo.organization == "rust-lang" {
-            if repo.repository == "rust" {
-                format!("#{}", self.number)
-            } else {
-                format!("{}#{}", repo.repository, self.number)
-            }
-        } else {
-            format!("{}/{}#{}", repo.organization, repo.repository, self.number)
+    pub fn to_zulip_github_reference(&self) -> ZulipGitHubReference {
+        ZulipGitHubReference {
+            number: self.number,
+            title: self.title.clone(),
+            repository: self.repository.get().unwrap().clone(),
         }
     }
 
@@ -630,6 +649,7 @@ pub struct ChangeInner {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Changes {
+    pub title: ChangeInner,
     pub body: ChangeInner,
 }
 
