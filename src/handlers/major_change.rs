@@ -21,12 +21,14 @@ pub(super) fn parse_input(
 ) -> Result<Option<Invocation>, String> {
     if event.action == IssuesAction::Edited {
         if let Some(changes) = &event.changes {
-            let prev_issue = ZulipGitHubReference {
-                number: event.issue.number,
-                title: changes.title.from.clone(),
-                repository: event.issue.repository().clone(),
-            };
-            return Ok(Some(Invocation::Rename { prev_issue }));
+            if let Some(previous_title) = &changes.title {
+                let prev_issue = ZulipGitHubReference {
+                    number: event.issue.number,
+                    title: previous_title.from.clone(),
+                    repository: event.issue.repository().clone(),
+                };
+                return Ok(Some(Invocation::Rename { prev_issue }));
+            }
         } else {
             return Err(format!("no changes property in edited event"));
         }

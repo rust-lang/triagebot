@@ -649,8 +649,8 @@ pub struct ChangeInner {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Changes {
-    pub title: ChangeInner,
-    pub body: ChangeInner,
+    pub title: Option<ChangeInner>,
+    pub body: Option<ChangeInner>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -947,8 +947,8 @@ impl Event {
     pub fn comment_from(&self) -> Option<&str> {
         match self {
             Event::Create(_) => None,
-            Event::Issue(e) => Some(&e.changes.as_ref()?.body.from),
-            Event::IssueComment(e) => Some(&e.changes.as_ref()?.body.from),
+            Event::Issue(e) => Some(&e.changes.as_ref()?.body.as_ref()?.from),
+            Event::IssueComment(e) => Some(&e.changes.as_ref()?.body.as_ref()?.from),
             Event::Push(_) => None,
         }
     }
