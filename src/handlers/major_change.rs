@@ -27,10 +27,23 @@ pub(super) fn parse_input(
                     title: previous_title.from.clone(),
                     repository: event.issue.repository().clone(),
                 };
-                return Ok(Some(Invocation::Rename { prev_issue }));
+                if event
+                    .issue
+                    .labels()
+                    .iter()
+                    .any(|l| l.name == "major-change")
+                {
+                    return Ok(Some(Invocation::Rename { prev_issue }));
+                } else {
+                    // Ignore renamed issues without major-change label
+                    // to avoid warning about the major-change feature not being
+                    // enabled.
+                    return Ok(None);
+                }
             }
         } else {
-            return Err(format!("no changes property in edited event"));
+            log::warn!("Did not note changes in edited issue?");
+            return Ok(None);
         }
     }
 
