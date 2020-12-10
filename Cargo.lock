@@ -1919,6 +1919,7 @@ dependencies = [
  "openssl",
  "parser",
  "postgres-native-tls",
+ "rand",
  "regex",
  "reqwest",
  "rust_team_data",
