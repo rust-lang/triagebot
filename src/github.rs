@@ -355,7 +355,7 @@ impl Issue {
         ZulipGitHubReference {
             number: self.number,
             title: self.title.clone(),
-            repository: self.repository.get().unwrap().clone(),
+            repository: self.repository().clone(),
         }
     }
 
