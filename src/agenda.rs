@@ -15,6 +15,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             include_labels: vec!["major-change", "to-announce"],
             exclude_labels: vec![
                 "proposed-final-comment-period",
+                "finished-final-comment-period",
                 "final-comment-period",
                 "major-change-accepted",
             ],
@@ -30,6 +31,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             exclude_labels: vec![
                 "to-announce",
                 "proposed-final-comment-period",
+                "finished-final-comment-period",
                 "final-comment-period",
             ],
         },
