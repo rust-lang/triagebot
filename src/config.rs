@@ -123,6 +123,8 @@ pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) topic: String,
     pub(crate) message_on_add: Option<String>,
     pub(crate) message_on_remove: Option<String>,
+    pub(crate) message_on_close: Option<String>,
+    pub(crate) message_on_reopen: Option<String>,
     #[serde(default)]
     pub(crate) required_labels: Vec<String>,
 }

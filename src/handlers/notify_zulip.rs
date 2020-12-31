@@ -11,6 +11,8 @@ pub(super) struct NotifyZulipInput {
 pub(super) enum NotificationType {
     Labeled,
     Unlabeled,
+    Closed,
+    Reopened,
 }
 
 pub(super) fn parse_input(
@@ -18,40 +20,54 @@ pub(super) fn parse_input(
     event: &IssuesEvent,
     config: Option<&NotifyZulipConfig>,
 ) -> Result<Option<NotifyZulipInput>, String> {
-    if let IssuesAction::Labeled | IssuesAction::Unlabeled = event.action {
-        let applied_label = &event.label.as_ref().expect("label").name;
-        if let Some(config) = config.and_then(|c| c.labels.get(applied_label)) {
-            for label in &config.required_labels {
-                let pattern = match glob::Pattern::new(label) {
-                    Ok(pattern) => pattern,
-                    Err(err) => {
-                        log::error!("Invalid glob pattern: {}", err);
-                        continue;
-                    }
-                };
-                if !event
-                    .issue
-                    .labels()
-                    .iter()
-                    .any(|l| pattern.matches(&l.name))
-                {
-                    // Issue misses a required label, ignore this event
-                    return Ok(None);
-                }
-            }
+    let applied_label = &event.label.as_ref().expect("label").name;
 
-            if event.action == IssuesAction::Labeled && config.message_on_add.is_some() {
-                return Ok(Some(NotifyZulipInput {
-                    notification_type: NotificationType::Labeled,
-                }));
-            } else if config.message_on_remove.is_some() {
-                return Ok(Some(NotifyZulipInput {
-                    notification_type: NotificationType::Unlabeled,
-                }));
+    if let Some(config) = config.and_then(|c| c.labels.get(applied_label)) {
+        for label in &config.required_labels {
+            let pattern = match glob::Pattern::new(label) {
+                Ok(pattern) => pattern,
+                Err(err) => {
+                    log::error!("Invalid glob pattern: {}", err);
+                    continue;
+                }
+            };
+            if !event
+                .issue
+                .labels()
+                .iter()
+                .any(|l| pattern.matches(&l.name))
+            {
+                // Issue misses a required label, ignore this event
+                return Ok(None);
             }
         }
+
+        match event.action {
+            IssuesAction::Labeled if config.message_on_add.is_some() => {
+                Ok(Some(NotifyZulipInput {
+                    notification_type: NotificationType::Labeled,
+                }))
+            }
+            IssuesAction::Unlabeled if config.message_on_remove.is_some() => {
+                Ok(Some(NotifyZulipInput {
+                    notification_type: NotificationType::Unlabeled,
+                }))
+            }
+            IssuesAction::Closed if config.message_on_close.is_some() => {
+                Ok(Some(NotifyZulipInput {
+                    notification_type: NotificationType::Closed,
+                }))
+            }
+            IssuesAction::Reopened if config.message_on_reopen.is_some() => {
+                Ok(Some(NotifyZulipInput {
+                    notification_type: NotificationType::Reopened,
+                }))
+            }
+            _ => Ok(None),
+        }
+    } else {
+        Ok(None)
     }
-    Ok(None)
 }
 
 pub(super) async fn handle_input<'a>(
@@ -78,6 +94,8 @@ pub(super) async fn handle_input<'a>(
     let mut msg = match input.notification_type {
         NotificationType::Labeled => config.message_on_add.as_ref().unwrap().clone(),
         NotificationType::Unlabeled => config.message_on_remove.as_ref().unwrap().clone(),
+        NotificationType::Closed => config.message_on_close.as_ref().unwrap().clone(),
+        NotificationType::Reopened => config.message_on_reopen.as_ref().unwrap().clone(),
     };
 
     msg = msg.replace("{number}", &event.issue.number.to_string());
