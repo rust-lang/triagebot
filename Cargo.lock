@@ -450,9 +450,9 @@ checksum = "3868967e4e5ab86614e2176c99949eeef6cbcacaee737765f6ae693988273997"
 
 [[package]]
 name = "futures-macro"
-version = "0.3.10"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3520e0eb4e704e88d771b92d51273ee212997f0d8282f17f5d8ff1cb39104e42"
+checksum = "95778720c3ee3c179cd0d8fd5a0f9b40aa7d745c080f86a8f8bed33c4fd89758"
 dependencies = [
  "proc-macro-hack",
  "proc-macro2",
@@ -477,9 +477,9 @@ dependencies = [
 
 [[package]]
 name = "futures-util"
-version = "0.3.10"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3dd206efbe2ca683b2ce138ccdf61e1b0a63f5816dcedc9d8654c500ba0cea6"
+checksum = "cad5e82786df758d407932aded1235e24d8e2eb438b6adafd37930c2462fb5d1"
 dependencies = [
  "futures-channel",
  "futures-core",
