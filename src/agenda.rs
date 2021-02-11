@@ -183,7 +183,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![],
-            include_labels: vec!["beta-nominated", "libs-impl"],
+            include_labels: vec!["beta-nominated", "T-libs-impl"],
             exclude_labels: vec!["beta-accepted"],
         },
     });
@@ -214,7 +214,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![],
-            include_labels: vec!["stable-nominated", "libs-impl"],
+            include_labels: vec!["stable-nominated", "T-libs-impl"],
             exclude_labels: vec!["stable-accepted"],
         },
     });
@@ -245,7 +245,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
-            include_labels: vec!["S-waiting-on-team", "libs-impl"],
+            include_labels: vec!["S-waiting-on-team", "T-libs-impl"],
             exclude_labels: vec![],
         },
     });
@@ -426,7 +426,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
-            include_labels: vec!["libs-impl", "P-critical"],
+            include_labels: vec!["T-libs-impl", "P-critical"],
             exclude_labels: vec![],
         },
     });
@@ -476,7 +476,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         query: github::Query {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
-            include_labels: vec!["I-nominated", "libs-impl"],
+            include_labels: vec!["I-nominated", "T-libs-impl"],
             exclude_labels: vec![],
         },
     });
