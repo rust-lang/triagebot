@@ -1,35 +1,39 @@
-{% import "_issues.tt" as issues %}
+{% import "_issues_heading.tt" as issues_heading %}
+---
+title: Triage meeting DATE
+tags: triage-meeting
+---
 
 # T-lang meeting agenda
 
-* Meeting date
+* Meeting date: DATE
 
 ## Attendance
 
 * Team members:
 * Others:
 
-## Before meeting checklist
+## Meeting roles
 
-* [ ] Update the project board with new proposals
-* [ ] Update the project board with new RFCs
+* Action item scribe:
+* Note-taker:
+
+## Action item review
+
+* [Action items list](https://hackmd.io/gstfhtXYTHa3Jv-P_2RK7A)
 
 ## Pending proposals
 
-{{-issues::render(issues=pending_proposals, indent="", empty="No pending proposals this time.")}}
-
-## Project board review
-
-Review the [Lang team project board](https://github.com/rust-lang/lang-team/projects/2) and get updates
+{{-issues_heading::render(issues=pending_proposals, empty="No pending proposals this time.")}}
 
 ## Nominated RFCs
 
-{{-issues::render(issues=nominated_rfcs, indent="", empty="No nominated RFCs this time.")}}
+{{-issues_heading::render(issues=nominated_rfcs, empty="No nominated RFCs this time.")}}
 
 ## P-high issues on rust-lang/rust
 
-{{-issues::render(issues=p_high_issues, indent="", empty="No P-high issues this time.")}}
+{{-issues_heading::render(issues=p_high_issues, empty="No P-high issues this time.")}}
 
 ## Nominated PRs and issues on rust-lang/rust
 
-{{-issues::render(issues=nominated_prs_issues, indent="", empty="No nominated PRs this time.")}}
+{{-issues_heading::render(issues=nominated_prs_issues, empty="No nominated PRs this time.")}}
