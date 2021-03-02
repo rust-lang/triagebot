@@ -21,6 +21,7 @@ pub mod notification_listing;
 pub mod payload;
 pub mod team;
 mod team_data;
+pub mod triage;
 pub mod zulip;
 
 #[derive(Debug)]
