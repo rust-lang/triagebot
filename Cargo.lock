@@ -1200,9 +1200,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-lite"
-version = "0.1.11"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c917123afa01924fc84bb20c4c03f004d9c38e5127e3c039bbf7f4b9c76a2f6b"
+checksum = "257b64915a082f7811703966789728173279bdebb956b143dbcd23f6f970a777"
 
 [[package]]
 name = "pin-project-lite"
@@ -1807,7 +1807,7 @@ dependencies = [
  "mio",
  "mio-uds",
  "num_cpus",
- "pin-project-lite 0.1.11",
+ "pin-project-lite 0.1.12",
  "slab",
  "tokio-macros",
 ]
@@ -1838,7 +1838,7 @@ dependencies = [
  "parking_lot",
  "percent-encoding",
  "phf",
- "pin-project-lite 0.1.11",
+ "pin-project-lite 0.1.12",
  "postgres-protocol",
  "postgres-types",
  "tokio",
@@ -1865,7 +1865,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "log",
- "pin-project-lite 0.1.11",
+ "pin-project-lite 0.1.12",
  "tokio",
 ]
 
