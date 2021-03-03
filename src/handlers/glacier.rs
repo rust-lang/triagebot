@@ -5,6 +5,7 @@ use crate::{config::GlacierConfig, github::Event, handlers::Context};
 use octocrab::models::Object;
 use octocrab::params::repos::Reference;
 use parser::command::glacier::GlacierCommand;
+use rand::Rng as _;
 
 pub(super) async fn handle_command(
     ctx: &Context,
@@ -46,17 +47,22 @@ pub(super) async fn handle_command(
         unreachable!()
     };
 
-    fork.create_ref(
-        &Reference::Branch(format!("triagebot-ice-{}", number)),
-        master,
-    )
-    .await?;
+    let pr_branch_name = format!(
+        "triagebot-ice-{}-{}",
+        number,
+        rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(8)
+            .collect::<String>()
+    );
+    fork.create_ref(&Reference::Branch(pr_branch_name.clone()), master)
+        .await?;
     fork.create_file(
         format!("ices/{}.rs", number),
         format!("Add ICE reproduction for issue rust-lang/rust#{}.", number),
         body,
     )
-    .branch(format!("triagebot-ice-{}", number))
+    .branch(pr_branch_name.clone())
     .send()
     .await?;
 
@@ -64,7 +70,7 @@ pub(super) async fn handle_command(
         .pulls("rust-lang", "glacier")
         .create(
             format!("ICE - rust-lang/rust#{}", number),
-            format!("rustbot:triagebot-ice-{}", number),
+            format!("rustbot:{}", pr_branch_name),
             "master",
         )
         .body(format!(
