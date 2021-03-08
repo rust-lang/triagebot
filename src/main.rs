@@ -4,13 +4,28 @@ use anyhow::Context as _;
 use futures::{future::FutureExt, stream::StreamExt};
 use hyper::{header, Body, Request, Response, Server, StatusCode};
 use reqwest::Client;
+use route_recognizer::Router;
 use std::{env, net::SocketAddr, sync::Arc};
 use triagebot::{db, github, handlers::Context, logger, notification_listing, payload, EventName};
 use uuid::Uuid;
 
 async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Body>, hyper::Error> {
     log::info!("request = {:?}", req);
+    let mut router = Router::new();
+    router.add("/triage", "index".to_string());
+    router.add("/triage/:owner/:repo", "pulls".to_string());
     let (req, body_stream) = req.into_parts();
+
+    if let Ok(matcher) = router.recognize(req.uri.path()) {
+        if matcher.handler().as_str() == "pulls" {
+            let params = matcher.params();
+            let owner = params.find("owner");
+            let repo = params.find("repo");
+            return triagebot::triage::pulls(ctx, owner.unwrap(), repo.unwrap()).await;
+        } else {
+            return triagebot::triage::index();
+        }
+    }
     if req.uri.path() == "/" {
         return Ok(Response::builder()
             .status(StatusCode::OK)
