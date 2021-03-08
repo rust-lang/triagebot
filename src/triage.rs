@@ -77,7 +77,7 @@ pub async fn pulls(
                     .iter()
                     .map(|label| label.name.clone())
                     .collect::<Vec<_>>()
-                    .join(",")
+                    .join(", ")
             } else {
                 "".to_string()
             }
