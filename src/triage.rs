@@ -71,19 +71,13 @@ pub async fn pulls(
             (Utc::now() - base_pull.created_at).num_days()
         };
 
-        let labels: String = if let Some(labels) = base_pull.labels {
-            if !labels.is_empty() {
-                labels
-                    .iter()
-                    .map(|label| label.name.clone())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            } else {
-                "".to_string()
-            }
-        } else {
-            "".to_string()
-        };
+        let labels = base_pull.labels.map_or("".to_string(), |labels| {
+            labels
+                .iter()
+                .map(|label| label.name.clone())
+                .collect::<Vec<_>>()
+                .join(", ")
+        });
         let wait_for_author = labels.contains("S-waiting-on-author");
         let wait_for_review = labels.contains("S-waiting-on-review");
         let html_url = base_pull.html_url;
