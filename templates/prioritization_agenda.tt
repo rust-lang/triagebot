@@ -31,29 +31,19 @@ tags: weekly, rustc
 @*WG-Y* checkin by @**person2**:
 > Checkin text
 
-## Beta-nominations
+## Backport nominations
 
-[T-compiler](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-compiler)
-{{-issues::render(issues=beta_nominated_t_compiler, empty="No beta nominations for `T-compiler` this time.")}}
+[T-compiler stable](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-compiler) / [T-compiler beta](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-compiler)
+{{-issues::render(issues=beta_nominated_t_compiler, branch=":beta:", empty="No beta nominations for `T-compiler` this time.")}}
+{{-issues::render(issues=stable_nominated_t_compiler, branch=":stable:", empty="No stable nominations for `T-compiler` this time.")}}
 
-[T-libs-impl](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-libs-impl)
-{{-issues::render(issues=beta_nominated_libs_impl, empty="No beta nominations for `T-libs-impl` this time.")}}
+[T-libs-impl stable](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-libs-impl) / [T-libs-impl beta](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-libs-impl)
+{{-issues::render(issues=beta_nominated_libs_impl, branch=":beta:", empty="No beta nominations for `T-libs-impl` this time.")}}
+{{-issues::render(issues=stable_nominated_libs_impl, branch=":stable:", empty="No stable nominations for `T-libs-impl` this time.")}}
 
-[T-rustdoc](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-rustdoc)
-{{-issues::render(issues=beta_nominated_t_rustdoc, empty="No beta nominations for `T-rustdoc` this time.")}}
-
-:back: / :shrug: / :hand:
-
-## Stable-nominations
-
-[T-compiler](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-compiler)
-{{-issues::render(issues=stable_nominated_t_compiler, empty="No stable nominations for `T-compiler` this time.")}}
-
-[T-libs-impl](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-libs-impl)
-{{-issues::render(issues=stable_nominated_libs_impl, empty="No stable nominations for `T-libs-impl` this time.")}}
-
-[T-rustdoc](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-rustdoc)
-{{-issues::render(issues=stable_nominated_t_rustdoc, empty="No stable nominations for `T-rustdoc` this time.")}}
+[T-rustdoc stable](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-rustdoc) / [T-rustdoc beta](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-rustdoc)
+{{-issues::render(issues=beta_nominated_t_rustdoc, branch=":beta:", empty="No beta nominations for `T-rustdoc` this time.")}}
+{{-issues::render(issues=stable_nominated_t_rustdoc, branch=":stable:", empty="No stable nominations for `T-rustdoc` this time.")}}
 
 :back: / :shrug: / :hand:
 
