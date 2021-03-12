@@ -20,6 +20,10 @@ FROM ubuntu:bionic AS binary
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ca-certificates
 
+RUN mkdir -p /opt/triagebot
+
 COPY --from=build /target/release/triagebot /usr/local/bin/
+COPY templates /opt/triagebot/templates
+WORKDIR /opt/triagebot
 ENV PORT=80
 CMD triagebot
