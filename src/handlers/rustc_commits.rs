@@ -34,7 +34,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     }
 
     let repo = event.issue.repository();
-    if repo.organization != "rust-lang" && repo.repository != "rust" {
+    if !(repo.organization == "rust-lang" && repo.repository == "rust") {
         return Ok(());
     }
 
