@@ -135,7 +135,7 @@ pub(super) async fn handle_input<'a>(
     inputs: Vec<NotifyZulipInput>,
 ) -> anyhow::Result<()> {
     for input in inputs {
-        let config = config.labels.get(&input.label.name).unwrap();
+        let config = &config.labels[&input.label.name];
 
         let mut topic = config.topic.clone();
         topic = topic.replace("{number}", &event.issue.number.to_string());
