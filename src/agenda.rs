@@ -527,6 +527,16 @@ pub fn lang<'a>() -> Box<dyn Action> {
         },
     });
 
+    queries.push(QueryMap {
+        name: "scheduled_meetings",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open"), ("is", "issue")],
+            include_labels: vec!["meeting-proposal", "meeting-scheduled"],
+            exclude_labels: vec![],
+        },
+    });
+
     actions.push(Query {
         repo: "rust-lang/lang-team",
         queries,
@@ -589,6 +599,25 @@ pub fn lang<'a>() -> Box<dyn Action> {
         repo: "rust-lang/rust",
         queries,
     });
+
+    let mut queries = Vec::new();
+
+    // https://github.com/rust-lang/reference/labels/I-nominated
+    queries.push(QueryMap {
+        name: "nominated_reference_issues",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open")],
+            include_labels: vec!["I-nominated"],
+            exclude_labels: vec![],
+        },
+    });
+
+    actions.push(Query {
+        repo: "rust-lang/reference",
+        queries,
+    });
+
 
     Box::new(Step {
         name: "lang_agenda",

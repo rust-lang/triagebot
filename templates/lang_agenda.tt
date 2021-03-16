@@ -1,4 +1,5 @@
 {% import "_issues_heading.tt" as issues_heading %}
+{% import "_issues.tt" as issues %}
 ---
 title: Triage meeting DATE
 tags: triage-meeting
@@ -18,6 +19,10 @@ tags: triage-meeting
 * Action item scribe:
 * Note-taker:
 
+## Scheduled meetings
+
+{{-issues::render(issues=scheduled_meetings, indent="", empty="No pending proposals this time.")}}
+
 ## Action item review
 
 * [Action items list](https://hackmd.io/gstfhtXYTHa3Jv-P_2RK7A)
@@ -34,6 +39,10 @@ tags: triage-meeting
 
 {{-issues_heading::render(issues=p_high_issues, empty="No P-high issues this time.")}}
 
+## Nominated PRs and issues on rust-lang/reference
+
+{{-issues_heading::render(issues=nominated_reference_issues, empty="No nominated items this time.")}}
+
 ## Nominated PRs and issues on rust-lang/rust
 
-{{-issues_heading::render(issues=nominated_prs_issues, empty="No nominated PRs this time.")}}
+{{-issues_heading::render(issues=nominated_prs_issues, empty="No nominated items this time.")}}
