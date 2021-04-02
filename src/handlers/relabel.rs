@@ -40,9 +40,16 @@ pub(super) async fn handle_command(
             Err(err) => Some(err),
         };
         if let Some(msg) = err {
-            let cmnt = ErrorComment::new(&event.issue().unwrap(), msg);
-            cmnt.post(&ctx.github).await?;
-            return Ok(());
+            // If the label doesn't exist, posting an error about permissions is unhelpful.
+            // Post an error about the missing label in `set_labels` instead.
+            let label = github::Label {
+                name: name.to_string(),
+            };
+            if label.exists(&event.repo().url(), &ctx.github).await {
+                let cmnt = ErrorComment::new(&event.issue().unwrap(), msg);
+                cmnt.post(&ctx.github).await?;
+                return Ok(());
+            }
         }
         match delta {
             LabelDelta::Add(label) => {

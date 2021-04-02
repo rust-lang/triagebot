@@ -223,7 +223,7 @@ pub struct Label {
 }
 
 impl Label {
-    async fn exists<'a>(&'a self, repo_api_prefix: &'a str, client: &'a GithubClient) -> bool {
+    pub(crate) async fn exists(&self, repo_api_prefix: &str, client: &GithubClient) -> bool {
         #[allow(clippy::redundant_pattern_matching)]
         let url = format!("{}/labels/{}", repo_api_prefix, self.name);
         match client.send_req(client.get(&url)).await {
@@ -452,13 +452,32 @@ impl Issue {
             number = self.number
         );
 
-        let mut stream = labels
-            .into_iter()
-            .map(|label| async { (label.exists(&self.repository().url(), &client).await, label) })
-            .collect::<FuturesUnordered<_>>();
-        let mut labels = Vec::new();
-        while let Some((true, label)) = stream.next().await {
-            labels.push(label);
+        let mut saw_missing = false;
+        // drop missing_labels so we can move `labels` later
+        {
+            let missing_labels = labels
+                .iter()
+                .map(|label| async move {
+                    (label.exists(&self.repository().url(), &client).await, label)
+                })
+                .collect::<FuturesUnordered<_>>()
+                .filter_map(|(exists, label)| async move {
+                    if !exists {
+                        Some(label)
+                    } else {
+                        None
+                    }
+                });
+            futures::pin_mut!(missing_labels);
+            while let Some(label) = missing_labels.next().await {
+                use crate::ErrorComment;
+                let cmnt = ErrorComment::new(self, &format!("Label {} does not exist", label.name));
+                cmnt.post(client).await?;
+                saw_missing = true;
+            }
+        }
+        if saw_missing {
+            return Ok(());
         }
 
         #[derive(serde::Serialize)]
@@ -467,7 +486,7 @@ impl Issue {
         }
         client
             ._send_req(client.put(&url).json(&LabelsReq {
-                labels: labels.iter().map(|l| l.name.clone()).collect(),
+                labels: labels.into_iter().map(|l| l.name).collect(),
             }))
             .await
             .context("failed to set labels")?;
@@ -749,6 +768,10 @@ pub struct Repository {
 impl Repository {
     const GITHUB_API_URL: &'static str = "https://api.github.com";
 
+    pub(crate) fn url(&self) -> String {
+        format!("https://api.github.com/repos/{}", self.full_name)
+    }
+
     pub async fn get_issues<'a>(
         &self,
         client: &GithubClient,
@@ -916,11 +939,15 @@ pub enum Event {
 
 impl Event {
     pub fn repo_name(&self) -> &str {
+        &self.repo().full_name
+    }
+
+    pub(crate) fn repo(&self) -> &Repository {
         match self {
-            Event::Create(event) => &event.repository.full_name,
-            Event::IssueComment(event) => &event.repository.full_name,
-            Event::Issue(event) => &event.repository.full_name,
-            Event::Push(event) => &event.repository.full_name,
+            Event::Create(event) => &event.repository,
+            Event::IssueComment(event) => &event.repository,
+            Event::Issue(event) => &event.repository,
+            Event::Push(event) => &event.repository,
         }
     }
 
