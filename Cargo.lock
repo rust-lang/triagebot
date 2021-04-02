@@ -1483,7 +1483,7 @@ checksum = "824172f0afccf3773c3905f5550ac94572144efe0deaf49a1f22bbca188d193e"
 [[package]]
 name = "rust_team_data"
 version = "1.0.0"
-source = "git+https://github.com/rust-lang/team#7a10be6fb3aaf99d36d2e9059303ebe4dad3ab73"
+source = "git+https://github.com/rust-lang/team#e3f2439677c71c8cd600abdfa649ae439bce47cc"
 dependencies = [
  "indexmap",
  "serde",
