@@ -1,0 +1,37 @@
+version: 2
+updates:
+- package-ecosystem: cargo
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+  assignees:
+  - Mark-Simulacrum
+  versioning-strategy: lockfile-only
+  allow:
+  - dependency-type: direct
+  - dependency-type: indirect
+  ignore:
+  - dependency-name: futures-sink
+    versions:
+    - 0.3.13
+    - 0.3.14
+  - dependency-name: futures-core
+    versions:
+    - 0.3.14
+  - dependency-name: proc-macro2
+    versions:
+    - 1.0.26
+  - dependency-name: wasm-bindgen
+    versions:
+    - 0.2.71
+    - 0.2.72
+  - dependency-name: security-framework-sys
+    versions:
+    - 2.1.1
+  - dependency-name: futures-task
+    versions:
+    - 0.3.13
+  - dependency-name: libc
+    versions:
+    - 0.2.83
