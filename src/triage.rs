@@ -56,7 +56,7 @@ pub async fn pulls(
         let assignee = base_pull.assignee.map_or("".to_string(), |v| v.login);
         let updated_at = base_pull
             .updated_at
-            .map_or("".to_string(), |v| v.to_rfc2822());
+            .map_or("".to_string(), |v| v.format("%Y-%m-%d").to_string());
 
         let yellow_line = Utc::now() - Duration::days(YELLOW_DAYS);
         let red_line = Utc::now() - Duration::days(RED_DAYS);
