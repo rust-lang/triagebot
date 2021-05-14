@@ -57,14 +57,6 @@ impl<'a> Action for Step<'a> {
         let mut context = Context::new();
         let mut results = HashMap::new();
 
-        /*
-         let mut actions = Vec::new();
-        actions.push(Query {
-            repos,
-            queries
-        });
-        */
-
         for Query { repos, queries} in &self.actions {
 
             for repo in repos.iter() {
@@ -107,7 +99,7 @@ impl<'a> Action for Step<'a> {
                                         .collect();
 
                                     results
-                                        .entry(*name)
+                                        .entry(format!("{}.{}", repo, name))
                                         .or_insert(Vec::new())
                                         .extend(issues_decorator);
                                 }
@@ -143,7 +135,7 @@ impl<'a> Action for Step<'a> {
         }
 
         for (name, issues) in &results {
-            context.insert(*name, issues);
+            context.insert(format!("{}.{}", repo, name), issues);
         }
 
         TEMPLATES
