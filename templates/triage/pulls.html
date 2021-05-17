@@ -42,6 +42,10 @@
 
     <body>
         <h1>Triage dashboard - <a href="https://github.com/{{ owner }}/{{ repo }}">{{ owner }}/{{ repo }}</a></h1>
+        <form action="/triage/{{ owner }}/{{ repo }}" method="get">
+            <input type="search" name="q" value="{{ filter }}" style="width: 400px;">
+            <input type="submit" value="filter">
+        </form>
         <table>
             <thead>
                 <tr>

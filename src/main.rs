@@ -21,7 +21,14 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
             let params = matcher.params();
             let owner = params.find("owner");
             let repo = params.find("repo");
-            return triagebot::triage::pulls(ctx, owner.unwrap(), repo.unwrap()).await;
+            let filter = if let Some(q) = req.uri.query() {
+                let pair = url::form_urlencoded::parse(q.as_bytes()).find(|(k, _)| k == "q");
+                pair.map(|(_, filter)| filter.to_string())
+            } else {
+                None
+            };
+
+            return triagebot::triage::pulls(ctx, owner.unwrap(), repo.unwrap(), filter).await;
         } else {
             return triagebot::triage::index();
         }
