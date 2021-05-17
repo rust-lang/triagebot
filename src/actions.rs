@@ -99,7 +99,7 @@ impl<'a> Action for Step<'a> {
                                         .collect();
 
                                     results
-                                        .entry(format!("{}.{}", repo, name))
+                                        .entry(name)
                                         .or_insert(Vec::new())
                                         .extend(issues_decorator);
                                 }
@@ -118,7 +118,7 @@ impl<'a> Action for Step<'a> {
 
                             match count {
                                 Ok(count) => {
-                                    context.insert(*name, &count);
+                                    *context.entry(*name).or_insert(0) += count;
                                 }
                                 Err(err) => {
                                     eprintln!("ERROR: {}", err);
