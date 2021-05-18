@@ -38,15 +38,56 @@
                 border-radius:2;
             }
         </style>
+        <script>
+            function filter() {
+                var input, filter, table, tr, i, txtValue;
+                input = document.getElementById("filter-input");
+                filter = input.value;
+                table = document.getElementById("pr-table");
+                tr = table.getElementsByTagName("tr");
+
+                filters = filter.split(' ').map(function(x) {
+                    return x.split(':');
+                });
+
+
+                for (i = 0; i < tr.length; i++) {
+                    filters.forEach(function(flt) {
+                        if (flt.length == 2) {
+                            var td;
+                            switch (flt[0]) {
+                                case 'label':
+                                    td = tr[i].getElementsByTagName("td")[6];
+                                    break;
+                                case 'assignee':
+                                    td = tr[i].getElementsByTagName("td")[5];
+                                    break;
+                                case 'author':
+                                    td = tr[i].getElementsByTagName("td")[4];
+                                    break;
+                            }
+                            if (td) {
+                                txtValue = td.textContent || td.innerText;
+                                if (txtValue.indexOf(flt[1]) > -1) {
+                                    tr[i].style.display = "";
+                                } else {
+                                    tr[i].style.display = "none";
+                                }
+                            }
+                        } else {
+                            tr[i].style.display = "";
+                        }
+                    });
+                }
+            }
+        </script>
     </head>
 
     <body>
         <h1>Triage dashboard - <a href="https://github.com/{{ owner }}/{{ repo }}">{{ owner }}/{{ repo }}</a></h1>
-        <form action="/triage/{{ owner }}/{{ repo }}" method="get">
-            <input type="search" name="q" value="{{ filter }}" style="width: 400px;">
-            <input type="submit" value="filter">
-        </form>
-        <table>
+        <input id="filter-input" type="search" style="width: 400px;">
+        <input type="submit" value="filter" onclick="filter()">
+        <table id="pr-table">
             <thead>
                 <tr>
                     <th>#</th>

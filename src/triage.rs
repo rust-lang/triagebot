@@ -21,7 +21,6 @@ pub async fn pulls(
     ctx: Arc<Context>,
     owner: &str,
     repo: &str,
-    filter: Option<String>,
 ) -> Result<Response<Body>, hyper::Error> {
     let octocrab = &ctx.octocrab;
     let res = octocrab
@@ -52,24 +51,6 @@ pub async fn pulls(
         next_page = page.next;
     }
 
-    let mut label_filter = Vec::new();
-    let mut author_filter = Vec::new();
-    let mut assignee_filter = Vec::new();
-    if let Some(filter) = filter.clone() {
-        let kvs: Vec<&str> = filter.split_whitespace().collect();
-        for kv in kvs {
-            match kv.split_once(':') {
-                Some((k, v)) if !v.is_empty() => match k {
-                    "label" => label_filter.push(v.to_string()),
-                    "author" => author_filter.push(v.to_string()),
-                    "assignee" => assignee_filter.push(v.to_string()),
-                    _ => {}
-                },
-                _ => {}
-            }
-        }
-    }
-
     let mut pulls: Vec<Value> = Vec::new();
     for base_pull in base_pulls.into_iter() {
         let assignee = base_pull.assignee.map_or("".to_string(), |v| v.login);
@@ -90,38 +71,19 @@ pub async fn pulls(
             (Utc::now() - base_pull.created_at).num_days()
         };
 
-        let labels = base_pull.labels.map_or(Vec::new(), |labels| {
+        let labels = base_pull.labels.map_or("".to_string(), |labels| {
             labels
                 .iter()
                 .map(|label| label.name.clone())
                 .collect::<Vec<_>>()
+                .join(", ")
         });
-        if !label_filter.is_empty() {
-            let mut flg = false;
-            for filter in label_filter.iter() {
-                if !labels.iter().any(|label| *label == *filter) {
-                    flg = true;
-                }
-            }
-            if flg {
-                continue;
-            }
-        }
-
-        let labels = labels.join(", ");
         let wait_for_author = labels.contains("S-waiting-on-author");
         let wait_for_review = labels.contains("S-waiting-on-review");
         let html_url = base_pull.html_url;
         let number = base_pull.number;
         let title = base_pull.title;
         let author = base_pull.user.login;
-
-        if !author_filter.is_empty() && !author_filter.iter().all(|s| *s == author) {
-            continue;
-        }
-        if !assignee_filter.is_empty() && !assignee_filter.iter().all(|s| *s == assignee) {
-            continue;
-        }
 
         let pull = PullRequest {
             html_url,
@@ -143,11 +105,6 @@ pub async fn pulls(
     context.insert("pulls", &pulls);
     context.insert("owner", &owner);
     context.insert("repo", &repo);
-    if let Some(filter) = filter {
-        context.insert("filter", &filter);
-    } else {
-        context.insert("filter", "");
-    }
 
     let tera = tera::Tera::new("templates/triage/**/*").unwrap();
     let body = Body::from(tera.render("pulls.html", &context).unwrap());
