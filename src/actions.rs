@@ -99,7 +99,7 @@ impl<'a> Action for Step<'a> {
                                         .collect();
 
                                     results
-                                        .entry(name)
+                                        .entry(*name)
                                         .or_insert(Vec::new())
                                         .extend(issues_decorator);
                                 }
@@ -135,7 +135,7 @@ impl<'a> Action for Step<'a> {
         }
 
         for (name, issues) in &results {
-            context.insert(format!("{}.{}", repo, name), issues);
+            context.insert(*name, issues);
         }
 
         TEMPLATES
