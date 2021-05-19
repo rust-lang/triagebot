@@ -81,7 +81,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repo: "rust-lang/compiler-team",
+        repos: vec!["rust-lang/compiler-team"],
         queries,
     });
 
@@ -121,7 +121,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repo: "rust-lang/rust",
+        repos: vec!["rust-lang/rust"],
         queries,
     });
 
@@ -161,7 +161,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repo: "rust-lang/rust-forge",
+        repos: vec!["rust-lang/rust-forge"],
         queries,
     });
 
@@ -482,7 +482,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repo: "rust-lang/rust",
+        repos: vec!["rust-lang/rust"],
         queries,
     });
 
@@ -502,7 +502,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repo: "rust-lang/rfcs",
+        repos: vec!["rust-lang/rfcs"],
         queries,
     });
 
@@ -538,7 +538,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repo: "rust-lang/lang-team",
+        repos: vec!["rust-lang/lang-team"],
         queries,
     });
 
@@ -567,7 +567,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repo: "rust-lang/rfcs",
+        repos: vec!["rust-lang/rfcs"],
         queries,
     });
 
@@ -596,7 +596,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repo: "rust-lang/rust",
+        repos: vec!["rust-lang/rust"],
         queries,
     });
 
@@ -614,7 +614,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repo: "rust-lang/reference",
+        repos: vec!["rust-lang/reference"],
         queries,
     });
 
