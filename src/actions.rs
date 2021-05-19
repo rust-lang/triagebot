@@ -59,7 +59,7 @@ impl<'a> Action for Step<'a> {
 
         for Query { repos, queries} in &self.actions {
 
-            for repo in repos.iter() {
+            for repo in &repos {
                 let repository = Repository {
                     full_name: repo.to_string(),
                 };
