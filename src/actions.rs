@@ -59,7 +59,7 @@ impl<'a> Action for Step<'a> {
 
         for Query { repos, queries} in &self.actions {
 
-            for repo in &repos {
+            for repo in repos {
                 let repository = Repository {
                     full_name: repo.to_string(),
                 };
@@ -118,7 +118,14 @@ impl<'a> Action for Step<'a> {
 
                             match count {
                                 Ok(count) => {
-                                    *context.entry(*name).or_insert(0) += count;
+
+                                    let result = if let Some(value) = context.get(*name) {
+                                        value.as_u64().unwrap() + count as u64
+                                    } else {
+                                        count as u64
+                                    };
+
+                                    context.insert(*name, &result);
                                 }
                                 Err(err) => {
                                     eprintln!("ERROR: {}", err);
