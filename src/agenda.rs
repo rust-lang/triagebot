@@ -596,7 +596,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repos: vec!["rust-lang/rust"],
+        repos: vec!["rust-lang/rust", "rust-lang/reference"],
         queries,
     });
 
