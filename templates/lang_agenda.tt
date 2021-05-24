@@ -39,10 +39,6 @@ tags: triage-meeting
 
 {{-issues_heading::render(issues=p_high_issues, empty="No P-high issues this time.")}}
 
-## Nominated PRs and issues on rust-lang/reference
-
-{{-issues_heading::render(issues=nominated_reference_issues, empty="No nominated items this time.")}}
-
-## Nominated PRs and issues on rust-lang/rust
+## Nominated PRs and issues
 
 {{-issues_heading::render(issues=nominated_prs_issues, empty="No nominated items this time.")}}
