@@ -27,18 +27,32 @@ tags: triage-meeting
 
 * [Action items list](https://hackmd.io/gstfhtXYTHa3Jv-P_2RK7A)
 
-## Pending proposals
+## Pending lang team project proposals
 
-{{-issues_heading::render(issues=pending_proposals, empty="No pending proposals this time.")}}
+{{-issues_heading::render(issues=pending_project_proposals)}}
 
-## Nominated RFCs
+## PRs on the lang-team repo
 
-{{-issues_heading::render(issues=nominated_rfcs, empty="No nominated RFCs this time.")}}
+{{-issues_heading::render(issues=pending_lang_team_prs)}}
 
-## P-high issues on rust-lang/rust
+## Proposed FCPs
 
-{{-issues_heading::render(issues=p_high_issues, empty="No P-high issues this time.")}}
+**Check your boxes!**
 
-## Nominated PRs and issues
+{{-issues_heading::render(issues=proposed_fcp)}}
 
-{{-issues_heading::render(issues=nominated_prs_issues, empty="No nominated items this time.")}}
+## Active FCPs
+
+{{-issues_heading::render(issues=in_fcp)}}
+
+## Finished FCPs
+
+{{-issues_heading::render(issues=finished_fcp)}}
+
+## P-critical issues
+
+{{-issues_heading::render(issues=p_critical)}}
+
+## Nominated RFCs, PRs and issues
+
+{{-issues_heading::render(issues=nominated)}}

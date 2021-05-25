@@ -513,90 +513,96 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
 }
 
 pub fn lang<'a>() -> Box<dyn Action> {
-    let mut actions = Vec::new();
-
-    let mut queries = Vec::new();
-
-    queries.push(QueryMap {
-        name: "pending_proposals",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![("state", "open"), ("is", "issue")],
-            include_labels: vec!["major-change"],
-            exclude_labels: vec!["charter-needed"],
-        },
-    });
-
-    queries.push(QueryMap {
-        name: "scheduled_meetings",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![("state", "open"), ("is", "issue")],
-            include_labels: vec!["meeting-proposal", "meeting-scheduled"],
-            exclude_labels: vec![],
-        },
-    });
-
-    actions.push(Query {
-        repos: vec!["rust-lang/lang-team"],
-        queries,
-    });
-
-    let mut queries = Vec::new();
-
-    // https://github.com/rust-lang/rfcs/pulls?q=is%3Aopen+is%3Apr+label%3AT-lang
-    queries.push(QueryMap {
-        name: "newly_created_rfcs",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![("state", "open"), ("is", "pr")],
-            include_labels: vec!["T-lang"],
-            exclude_labels: vec![],
-        },
-    });
-
-    //https://github.com/rust-lang/rfcs/pulls?q=is%3Aopen+is%3Apr+label%3AI-nominated+label%3AT-lang
-    queries.push(QueryMap {
-        name: "nominated_rfcs",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![("state", "open"), ("is", "pr")],
-            include_labels: vec!["T-lang", "I-nominated"],
-            exclude_labels: vec![],
-        },
-    });
-
-    actions.push(Query {
-        repos: vec!["rust-lang/rfcs"],
-        queries,
-    });
-
-    actions.push(Query {
-        repos: vec!["rust-lang/rust", "rust-lang/reference"],
-        queries: vec![
-            QueryMap {
-                name: "p_high_issues",
-                query: github::Query {
-                    kind: github::QueryKind::List,
-                    filters: vec![("state", "open")],
-                    include_labels: vec!["T-lang", "P-high"],
-                    exclude_labels: vec![],
-                },
-            },
-            QueryMap {
-                name: "nominated_prs_issues",
-                query: github::Query {
-                    kind: github::QueryKind::List,
-                    filters: vec![("state", "open")],
-                    include_labels: vec!["T-lang", "I-nominated"],
-                    exclude_labels: vec![],
-                },
-            },
-        ],
-    });
-
     Box::new(Step {
         name: "lang_agenda",
-        actions,
+        actions: vec![
+            Query {
+                repos: vec!["rust-lang/lang-team"],
+                queries: vec![
+                    QueryMap {
+                        name: "pending_project_proposals",
+                        query: github::Query {
+                            kind: github::QueryKind::List,
+                            filters: vec![("state", "open"), ("is", "issue")],
+                            include_labels: vec!["major-change"],
+                            exclude_labels: vec!["charter-needed"],
+                        },
+                    },
+                    QueryMap {
+                        name: "pending_lang_team_prs",
+                        query: github::Query {
+                            kind: github::QueryKind::List,
+                            filters: vec![("state", "open"), ("is", "pr")],
+                            include_labels: vec![],
+                            exclude_labels: vec![],
+                        },
+                    },
+                    QueryMap {
+                        name: "scheduled_meetings",
+                        query: github::Query {
+                            kind: github::QueryKind::List,
+                            filters: vec![("state", "open"), ("is", "issue")],
+                            include_labels: vec!["meeting-proposal", "meeting-scheduled"],
+                            exclude_labels: vec![],
+                        },
+                    },
+                ],
+            },
+            Query {
+                repos: vec![
+                    "rust-lang/rfcs",
+                    "rust-lang/rust",
+                    "rust-lang/reference",
+                    "rust-lang/lang-team",
+                ],
+                queries: vec![
+                    QueryMap {
+                        name: "p_critical",
+                        query: github::Query {
+                            kind: github::QueryKind::List,
+                            filters: vec![("state", "open")],
+                            include_labels: vec!["T-lang", "P-critical"],
+                            exclude_labels: vec![],
+                        },
+                    },
+                    QueryMap {
+                        name: "nominated",
+                        query: github::Query {
+                            kind: github::QueryKind::List,
+                            filters: vec![("state", "open")],
+                            include_labels: vec!["T-lang", "I-nominated"],
+                            exclude_labels: vec![],
+                        },
+                    },
+                    QueryMap {
+                        name: "proposed_fcp",
+                        query: github::Query {
+                            kind: github::QueryKind::List,
+                            filters: vec![("state", "open")],
+                            include_labels: vec!["T-lang", "proposed-final-comment-period"],
+                            exclude_labels: vec![],
+                        },
+                    },
+                    QueryMap {
+                        name: "in_fcp",
+                        query: github::Query {
+                            kind: github::QueryKind::List,
+                            filters: vec![("state", "open")],
+                            include_labels: vec!["T-lang", "final-comment-period"],
+                            exclude_labels: vec![],
+                        },
+                    },
+                    QueryMap {
+                        name: "finished_fcp",
+                        query: github::Query {
+                            kind: github::QueryKind::List,
+                            filters: vec![("state", "open")],
+                            include_labels: vec!["T-lang", "finished-final-comment-period"],
+                            exclude_labels: vec![],
+                        },
+                    },
+                ],
+            },
+        ],
     })
 }
