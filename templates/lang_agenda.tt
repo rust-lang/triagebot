@@ -45,10 +45,6 @@ tags: triage-meeting
 
 {{-issues_heading::render(issues=in_fcp)}}
 
-## Finished FCPs
-
-{{-issues_heading::render(issues=finished_fcp)}}
-
 ## P-critical issues
 
 {{-issues_heading::render(issues=p_critical)}}
