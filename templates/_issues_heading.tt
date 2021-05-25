@@ -6,6 +6,8 @@
 
 **Link:** {{issue.html_url}}
 {%else%}
-{{empty}}
+
+None.
+
 {%endfor%}
 {% endmacro %}
