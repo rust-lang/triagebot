@@ -766,10 +766,10 @@ impl Repository {
             .iter()
             .any(|&(key, value)| key == "is" && value == "pr");
         // negating filters can only be handled by the search api
-        let url = if use_issues {
-            self.build_issues_url(filters, include_labels)
-        } else if is_pr {
+        let url = if is_pr {
             self.build_pulls_url(filters, include_labels)
+        } else if use_issues {
+            self.build_issues_url(filters, include_labels)
         } else {
             self.build_search_issues_url(filters, include_labels, exclude_labels)
         };
