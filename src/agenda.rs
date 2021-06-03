@@ -528,6 +528,16 @@ pub fn lang<'a>() -> Box<dyn Action> {
     });
 
     queries.push(QueryMap {
+        name: "open_prs",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open"), ("is", "pr")],
+            include_labels: vec!["T-lang", "major-change"],
+            exclude_labels: vec!["charter-needed"],
+        },
+    });
+
+    queries.push(QueryMap {
         name: "scheduled_meetings",
         query: github::Query {
             kind: github::QueryKind::List,

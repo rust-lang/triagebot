@@ -31,6 +31,10 @@ tags: triage-meeting
 
 {{-issues_heading::render(issues=pending_proposals, empty="No pending proposals this time.")}}
 
+## Open Pull requests
+
+{{-issues_heading::render(issues=open_prs, empty="No open pull requests at this time.")}}
+
 ## Nominated RFCs
 
 {{-issues_heading::render(issues=nominated_rfcs, empty="No nominated RFCs this time.")}}
