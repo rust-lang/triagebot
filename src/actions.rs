@@ -18,7 +18,7 @@ pub struct Step<'a> {
 }
 
 pub struct Query<'a> {
-    pub repo: &'a str,
+    pub repos: Vec<&'a str>,
     pub queries: Vec<QueryMap<'a>>,
 }
 
@@ -57,77 +57,87 @@ impl<'a> Action for Step<'a> {
         let mut context = Context::new();
         let mut results = HashMap::new();
 
-        for Query { repo, queries } in &self.actions {
-            let repository = Repository {
-                full_name: repo.to_string(),
-            };
+        for Query { repos, queries} in &self.actions {
 
-            for QueryMap { name, query } in queries {
-                match query.kind {
-                    github::QueryKind::List => {
-                        let issues_search_result = repository.get_issues(&gh, &query).await;
-
-                        match issues_search_result {
-                            Ok(issues) => {
-                                let issues_decorator: Vec<_> = issues
-                                    .iter()
-                                    .map(|issue| IssueDecorator {
-                                        title: issue.title.clone(),
-                                        number: issue.number,
-                                        html_url: issue.html_url.clone(),
-                                        repo_name: repository
-                                            .full_name
-                                            .split("/")
-                                            .last()
-                                            .expect("Failed to split repository name")
-                                            .to_string(),
-                                        labels: issue
-                                            .labels
-                                            .iter()
-                                            .map(|l| l.name.as_ref())
-                                            .collect::<Vec<_>>()
-                                            .join(", "),
-                                        assignees: issue
-                                            .assignees
-                                            .iter()
-                                            .map(|u| u.login.as_ref())
-                                            .collect::<Vec<_>>()
-                                            .join(", "),
-                                    })
-                                    .collect();
-
-                                results
-                                    .entry(*name)
-                                    .or_insert(Vec::new())
-                                    .extend(issues_decorator);
-                            }
-                            Err(err) => {
-                                eprintln!("ERROR: {}", err);
-                                err.chain()
-                                    .skip(1)
-                                    .for_each(|cause| eprintln!("because: {}", cause));
-                                std::process::exit(1);
-                            }
-                        }
-                    }
-
-                    github::QueryKind::Count => {
-                        let count = repository.get_issues_count(&gh, &query).await;
-
-                        match count {
-                            Ok(count) => {
-                                context.insert(*name, &count);
-                            }
-                            Err(err) => {
-                                eprintln!("ERROR: {}", err);
-                                err.chain()
-                                    .skip(1)
-                                    .for_each(|cause| eprintln!("because: {}", cause));
-                                std::process::exit(1);
-                            }
-                        }
-                    }
+            for repo in repos {
+                let repository = Repository {
+                    full_name: repo.to_string(),
                 };
+
+                for QueryMap { name, query } in queries {
+                    match query.kind {
+                        github::QueryKind::List => {
+                            let issues_search_result = repository.get_issues(&gh, &query).await;
+
+                            match issues_search_result {
+                                Ok(issues) => {
+                                    let issues_decorator: Vec<_> = issues
+                                        .iter()
+                                        .map(|issue| IssueDecorator {
+                                            title: issue.title.clone(),
+                                            number: issue.number,
+                                            html_url: issue.html_url.clone(),
+                                            repo_name: repository
+                                                .full_name
+                                                .split("/")
+                                                .last()
+                                                .expect("Failed to split repository name")
+                                                .to_string(),
+                                            labels: issue
+                                                .labels
+                                                .iter()
+                                                .map(|l| l.name.as_ref())
+                                                .collect::<Vec<_>>()
+                                                .join(", "),
+                                            assignees: issue
+                                                .assignees
+                                                .iter()
+                                                .map(|u| u.login.as_ref())
+                                                .collect::<Vec<_>>()
+                                                .join(", "),
+                                        })
+                                        .collect();
+
+                                    results
+                                        .entry(*name)
+                                        .or_insert(Vec::new())
+                                        .extend(issues_decorator);
+                                }
+                                Err(err) => {
+                                    eprintln!("ERROR: {}", err);
+                                    err.chain()
+                                        .skip(1)
+                                        .for_each(|cause| eprintln!("because: {}", cause));
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+
+                        github::QueryKind::Count => {
+                            let count = repository.get_issues_count(&gh, &query).await;
+
+                            match count {
+                                Ok(count) => {
+
+                                    let result = if let Some(value) = context.get(*name) {
+                                        value.as_u64().unwrap() + count as u64
+                                    } else {
+                                        count as u64
+                                    };
+
+                                    context.insert(*name, &result);
+                                }
+                                Err(err) => {
+                                    eprintln!("ERROR: {}", err);
+                                    err.chain()
+                                        .skip(1)
+                                        .for_each(|cause| eprintln!("because: {}", cause));
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                    };
+                }
             }
         }
 
