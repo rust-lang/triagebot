@@ -86,7 +86,7 @@ pub(crate) struct RelabelConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct ShortcutConfig {
     #[serde(default)]
-    pub(crate) allow: Vec<String>,
+    _empty: (),
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -264,9 +264,6 @@ mod tests {
             infra = "T-infra"
 
             [shortcut]
-            allow = [
-                "ready"
-            ]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -302,7 +299,7 @@ mod tests {
                 nominate: Some(NominateConfig {
                     teams: nominate_teams
                 }),
-                shortcut: Some(ShortcutConfig {allow: vec!["ready".into()]}),
+                shortcut: Some(ShortcutConfig { _empty: () }),
                 prioritize: None,
                 major_change: None,
                 glacier: None,
