@@ -1,4 +1,4 @@
-use crate::github::{Issue, IssueCommentAction, IssueCommentEvent, Label};
+use crate::github::{Issue, IssueCommentAction, IssueCommentEvent, Label, PullRequestReviewState};
 use crate::{config::ReviewSubmittedConfig, github::Event, handlers::Context};
 
 pub(crate) async fn handle(
@@ -19,6 +19,10 @@ pub(crate) async fn handle(
         },
     ) = event
     {
+        if event.comment.pr_review_state != PullRequestReviewState::ChangesRequested {
+            return Ok(());
+        }
+
         if event.issue.assignees.contains(&event.comment.user) {
             let labels = event
                 .issue
