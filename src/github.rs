@@ -762,6 +762,20 @@ pub struct Repository {
 impl Repository {
     const GITHUB_API_URL: &'static str = "https://api.github.com";
 
+    pub async fn get_issue(&self, client: &GithubClient, id: u64) -> anyhow::Result<Issue> {
+        let url = format!(
+            "{}/repos/{}/issues/{}",
+            Repository::GITHUB_API_URL,
+            self.full_name,
+            id
+        );
+        let result = client.get(&url);
+        client
+            .json(result)
+            .await
+            .with_context(|| format!("failed to get issue from {}", url))
+    }
+
     pub async fn get_issues<'a>(
         &self,
         client: &GithubClient,

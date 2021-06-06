@@ -25,6 +25,7 @@ impl fmt::Display for HandlerError {
 
 mod assign;
 mod autolabel;
+mod beta_backport;
 mod close;
 mod github_releases;
 mod glacier;
