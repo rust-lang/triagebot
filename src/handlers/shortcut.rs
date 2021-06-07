@@ -6,7 +6,7 @@ use crate::{
     config::ShortcutConfig,
     github::{Event, Label},
     handlers::Context,
-    interactions::ErrorComment,
+    interactions::{ErrorComment, PingComment},
 };
 use parser::command::shortcut::ShortcutCommand;
 
@@ -37,6 +37,14 @@ pub(super) async fn handle_command(
                 return Ok(());
             }
             issue.set_labels(&ctx.github, issue_labels).await?;
+
+            let to_ping: Vec<_> = issue
+                .assignees
+                .iter()
+                .map(|user| user.login.as_str())
+                .collect();
+            let cmnt = PingComment::new(&issue, &to_ping);
+            cmnt.post(&ctx.github).await?;
         }
         ShortcutCommand::Author => {
             if assign_and_remove_label(&mut issue_labels, waiting_on_author, waiting_on_review)
@@ -45,6 +53,10 @@ pub(super) async fn handle_command(
                 return Ok(());
             }
             issue.set_labels(&ctx.github, issue_labels).await?;
+
+            let to_ping = vec![issue.user.login.as_str()];
+            let cmnt = PingComment::new(&issue, &to_ping);
+            cmnt.post(&ctx.github).await?;
         }
     }
 
