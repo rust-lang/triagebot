@@ -10,9 +10,10 @@
 
 use crate::error::Error;
 use crate::token::{Token, Tokenizer};
+use std::collections::HashMap;
 use std::fmt;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum ShortcutCommand {
     Ready,
     Author,
@@ -35,28 +36,26 @@ impl fmt::Display for ParseError {
 
 impl ShortcutCommand {
     pub fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
+        let mut shortcuts = HashMap::new();
+        shortcuts.insert("ready", ShortcutCommand::Ready);
+        shortcuts.insert("author", ShortcutCommand::Author);
+
         let mut toks = input.clone();
-        if let Some(Token::Word("ready")) = toks.peek_token()? {
+        if let Some(Token::Word(word)) = toks.peek_token()? {
             toks.next_token()?;
             if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
+                if !shortcuts.contains_key(word) {
+                    return Ok(None);
+                }
                 toks.next_token()?;
                 *input = toks;
-                return Ok(Some(ShortcutCommand::Ready));
+                let command = shortcuts.get(word).unwrap();
+                return Ok(Some(*command));
             } else {
                 return Err(toks.error(ParseError::ExpectedEnd));
             }
-        } else if let Some(Token::Word("author")) = toks.peek_token()? {
-            toks.next_token()?;
-            if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
-                toks.next_token()?;
-                *input = toks;
-                return Ok(Some(ShortcutCommand::Author));
-            } else {
-                return Err(toks.error(ParseError::ExpectedEnd));
-            }
-        } else {
-            return Ok(None);
         }
+        Ok(None)
     }
 }
 
