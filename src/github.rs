@@ -767,9 +767,9 @@ impl Repository {
             .any(|&(key, value)| key == "is" && value == "pr");
         // negating filters can only be handled by the search api
         let url = if is_pr {
-            self.build_pulls_url(filters, include_labels)
+            self.build_issues_pulls_url(filters, include_labels)
         } else if use_issues {
-            self.build_issues_url(filters, include_labels)
+            self.build_issues_pulls_url(filters, include_labels)
         } else {
             self.build_search_issues_url(filters, include_labels, exclude_labels)
         };
@@ -797,7 +797,7 @@ impl Repository {
         Ok(self.get_issues(client, query).await?.len())
     }
 
-    fn build_issues_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
+    fn build_issues_pulls_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
         let filters = filters
             .iter()
             .map(|(key, val)| format!("{}={}", key, val))
@@ -813,28 +813,6 @@ impl Repository {
             .join("&");
         format!(
             "{}/repos/{}/issues?{}",
-            Repository::GITHUB_API_URL,
-            self.full_name,
-            filters
-        )
-    }
-
-    fn build_pulls_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
-        let filters = filters
-            .iter()
-            .map(|(key, val)| format!("{}={}", key, val))
-            .chain(std::iter::once(format!(
-                "labels={}",
-                include_labels.join(",")
-            )))
-            .chain(std::iter::once("filter=all".to_owned()))
-            .chain(std::iter::once(format!("sort=created")))
-            .chain(std::iter::once(format!("direction=asc")))
-            .chain(std::iter::once(format!("per_page=100")))
-            .collect::<Vec<_>>()
-            .join("&");
-        format!(
-            "{}/repos/{}/pulls?{}",
             Repository::GITHUB_API_URL,
             self.full_name,
             filters
