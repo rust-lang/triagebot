@@ -36,6 +36,7 @@ mod notify_zulip;
 mod ping;
 mod prioritize;
 mod relabel;
+mod review_submitted;
 mod rustc_commits;
 
 pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
@@ -72,6 +73,20 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
             event,
             e
         );
+    }
+
+    if let Some(config) = config
+        .as_ref()
+        .ok()
+        .and_then(|c| c.review_submitted.as_ref())
+    {
+        if let Err(e) = review_submitted::handle(ctx, event, config).await {
+            log::error!(
+                "failed to process event {:?} with review_submitted handler: {:?}",
+                event,
+                e
+            )
+        }
     }
 
     if let Some(ghr_config) = config
@@ -120,9 +135,9 @@ macro_rules! issue_handlers {
     }
 }
 
-// Handle events that happend on issues
+// Handle events that happened on issues
 //
-// This is for events that happends only on issues (e.g. label changes).
+// This is for events that happen only on issues (e.g. label changes).
 // Each module in the list must contain the functions `parse_input` and `handle_input`.
 issue_handlers! {
     autolabel,
