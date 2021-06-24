@@ -19,7 +19,7 @@ pub(crate) async fn handle(
         },
     ) = event
     {
-        if event.comment.pr_review_state != PullRequestReviewState::ChangesRequested {
+        if event.comment.pr_review_state != Some(PullRequestReviewState::ChangesRequested) {
             return Ok(());
         }
 

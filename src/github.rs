@@ -292,8 +292,8 @@ pub struct Comment {
     pub user: User,
     #[serde(alias = "submitted_at")] // for pull request reviews
     pub updated_at: chrono::DateTime<Utc>,
-    #[serde(rename = "state")]
-    pub pr_review_state: PullRequestReviewState,
+    #[serde(default, rename = "state")]
+    pub pr_review_state: Option<PullRequestReviewState>,
 }
 
 #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
