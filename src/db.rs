@@ -36,7 +36,7 @@ pub async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
                 anyhow::bail!("failed to connect to DB: {}", e);
             }
         };
-        tokio::spawn(async move {
+        tokio::task::spawn(async move {
             if let Err(e) = connection.await {
                 eprintln!("database connection error: {}", e);
             }

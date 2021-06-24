@@ -231,7 +231,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     dotenv::dotenv().ok();
     logger::init();
