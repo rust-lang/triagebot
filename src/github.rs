@@ -292,6 +292,18 @@ pub struct Comment {
     pub user: User,
     #[serde(alias = "submitted_at")] // for pull request reviews
     pub updated_at: chrono::DateTime<Utc>,
+    #[serde(rename = "state")]
+    pub pr_review_state: PullRequestReviewState,
+}
+
+#[derive(Debug, serde::Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PullRequestReviewState {
+    Approved,
+    ChangesRequested,
+    Commented,
+    Dismissed,
+    Pending,
 }
 
 fn opt_string<'de, D>(deserializer: D) -> Result<String, D::Error>
