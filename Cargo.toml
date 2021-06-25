@@ -21,7 +21,7 @@ parser = { path = "parser" }
 rust_team_data = { git = "https://github.com/rust-lang/team" }
 glob = "0.3.0"
 toml = "0.5.1"
-hyper = "0.13"
+hyper = { version = "0.14.4", features = ["server", "stream"]}
 tokio = { version = "1.7.1", features = ["macros", "time", "rt"] }
 futures = { version = "0.3", default-features = false, features = ["std"] }
 async-trait = "0.1.31"
@@ -33,7 +33,7 @@ tokio-postgres = { version = "0.7.2", features = ["with-chrono-0_4"] }
 postgres-native-tls = "0.5.0"
 native-tls = "0.2"
 serde_path_to_error = "0.1.2"
-octocrab = "0.5"
+octocrab = "0.9.1"
 comrak = "0.8.2"
 route-recognizer = "0.3.0"
 

@@ -2,7 +2,8 @@
 
 use crate::{config::GlacierConfig, github::Event, handlers::Context};
 
-use octocrab::models::Object;
+use models::repos::Object;
+use octocrab::models;
 use octocrab::params::repos::Reference;
 use parser::command::glacier::GlacierCommand;
 

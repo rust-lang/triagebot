@@ -1,7 +1,8 @@
 #![allow(clippy::new_without_default)]
 
 use anyhow::Context as _;
-use futures::{future::FutureExt, stream::StreamExt};
+use futures::future::FutureExt;
+use futures::StreamExt;
 use hyper::{header, Body, Request, Response, Server, StatusCode};
 use reqwest::Client;
 use route_recognizer::Router;
