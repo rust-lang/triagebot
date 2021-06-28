@@ -776,7 +776,7 @@ impl Repository {
         let use_issues = exclude_labels.is_empty() && filters.iter().all(|&(key, _)| key != "no");
         let is_pr = filters
             .iter()
-            .any(|&(key, value)| key == "is" && value == "pr");
+            .any(|&(key, value)| key == "is" && value == "pull-request");
         // negating filters can only be handled by the search api
         let url = if is_pr {
             self.build_pulls_url(filters, include_labels)

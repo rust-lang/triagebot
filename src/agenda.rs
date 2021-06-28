@@ -495,7 +495,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         name: "nominated_rfcs_t_compiler",
         query: github::Query {
             kind: github::QueryKind::List,
-            filters: vec![("state", "open"), ("is", "pr")],
+            filters: vec![("state", "open"), ("is", "pull-request")],
             include_labels: vec!["T-compiler", "I-nominated"],
             exclude_labels: vec![],
         },
@@ -532,7 +532,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                         name: "pending_lang_team_prs",
                         query: github::Query {
                             kind: github::QueryKind::List,
-                            filters: vec![("state", "open"), ("is", "pr")],
+                            filters: vec![("state", "open"), ("is", "pull-request")],
                             include_labels: vec![],
                             exclude_labels: vec![],
                         },
