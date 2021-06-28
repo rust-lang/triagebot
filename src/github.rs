@@ -810,28 +810,19 @@ impl Repository {
     }
 
     fn build_issues_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
-        let filters = filters
-            .iter()
-            .map(|(key, val)| format!("{}={}", key, val))
-            .chain(std::iter::once(format!(
-                "labels={}",
-                include_labels.join(",")
-            )))
-            .chain(std::iter::once("filter=all".to_owned()))
-            .chain(std::iter::once(format!("sort=created")))
-            .chain(std::iter::once(format!("direction=asc")))
-            .chain(std::iter::once(format!("per_page=100")))
-            .collect::<Vec<_>>()
-            .join("&");
-        format!(
-            "{}/repos/{}/issues?{}",
-            Repository::GITHUB_API_URL,
-            self.full_name,
-            filters
-        )
+        self.build_endpoint_url("issues", filters, include_labels)
     }
 
     fn build_pulls_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
+        self.build_endpoint_url("pulls", filters, include_labels)
+    }
+
+    fn build_endpoint_url(
+        &self,
+        endpoint: &str,
+        filters: &Vec<(&str, &str)>,
+        include_labels: &Vec<&str>,
+    ) -> String {
         let filters = filters
             .iter()
             .map(|(key, val)| format!("{}={}", key, val))
@@ -846,9 +837,10 @@ impl Repository {
             .collect::<Vec<_>>()
             .join("&");
         format!(
-            "{}/repos/{}/pulls?{}",
+            "{}/repos/{}/{}?{}",
             Repository::GITHUB_API_URL,
             self.full_name,
+            endpoint,
             filters
         )
     }
