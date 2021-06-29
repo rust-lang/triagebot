@@ -773,31 +773,42 @@ impl Repository {
             ..
         } = query;
 
-        let use_issues = exclude_labels.is_empty() && filters.iter().all(|&(key, _)| key != "no");
+        // `is: pull-request` indicates the query to retrieve PRs only
         let is_pr = filters
             .iter()
-            .any(|&(key, value)| key == "is" && value == "pr");
-        // negating filters can only be handled by the search api
-        let url = if is_pr {
-            self.build_pulls_url(filters, include_labels)
-        } else if use_issues {
-            self.build_issues_url(filters, include_labels)
-        } else {
+            .any(|&(key, value)| key == "is" && value == "pull-request");
+
+        // There are some cases that can only be handled by the search API:
+        // 1. When using negating label filters (exclude_labels)
+        // 2. When there's a key parameter key=no
+        // 3. When the query is to retrieve PRs only and there are label filters
+        //
+        // Check https://docs.github.com/en/rest/reference/search#search-issues-and-pull-requests
+        // for more information
+        let use_search_api = !exclude_labels.is_empty()
+            || filters.iter().any(|&(key, _)| key == "no")
+            || is_pr && !include_labels.is_empty();
+
+        let url = if use_search_api {
             self.build_search_issues_url(filters, include_labels, exclude_labels)
+        } else if is_pr {
+            self.build_pulls_url(filters, include_labels)
+        } else {
+            self.build_issues_url(filters, include_labels)
         };
 
         let result = client.get(&url);
-        if use_issues {
-            client
-                .json(result)
-                .await
-                .with_context(|| format!("failed to list issues from {}", url))
-        } else {
+        if use_search_api {
             let result = client
                 .json::<IssueSearchResult>(result)
                 .await
                 .with_context(|| format!("failed to list issues from {}", url))?;
             Ok(result.items)
+        } else {
+            client
+                .json(result)
+                .await
+                .with_context(|| format!("failed to list issues from {}", url))
         }
     }
 
@@ -810,28 +821,19 @@ impl Repository {
     }
 
     fn build_issues_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
-        let filters = filters
-            .iter()
-            .map(|(key, val)| format!("{}={}", key, val))
-            .chain(std::iter::once(format!(
-                "labels={}",
-                include_labels.join(",")
-            )))
-            .chain(std::iter::once("filter=all".to_owned()))
-            .chain(std::iter::once(format!("sort=created")))
-            .chain(std::iter::once(format!("direction=asc")))
-            .chain(std::iter::once(format!("per_page=100")))
-            .collect::<Vec<_>>()
-            .join("&");
-        format!(
-            "{}/repos/{}/issues?{}",
-            Repository::GITHUB_API_URL,
-            self.full_name,
-            filters
-        )
+        self.build_endpoint_url("issues", filters, include_labels)
     }
 
     fn build_pulls_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
+        self.build_endpoint_url("pulls", filters, include_labels)
+    }
+
+    fn build_endpoint_url(
+        &self,
+        endpoint: &str,
+        filters: &Vec<(&str, &str)>,
+        include_labels: &Vec<&str>,
+    ) -> String {
         let filters = filters
             .iter()
             .map(|(key, val)| format!("{}={}", key, val))
@@ -846,9 +848,10 @@ impl Repository {
             .collect::<Vec<_>>()
             .join("&");
         format!(
-            "{}/repos/{}/pulls?{}",
+            "{}/repos/{}/{}?{}",
             Repository::GITHUB_API_URL,
             self.full_name,
+            endpoint,
             filters
         )
     }
