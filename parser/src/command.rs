@@ -11,8 +11,13 @@ pub mod prioritize;
 pub mod relabel;
 pub mod second;
 
-pub fn find_command_start(input: &str, bot: &str) -> Option<usize> {
-    input.to_ascii_lowercase().find(&format!("@{}", bot))
+pub fn find_command_start(input: &str, bots: &[&str]) -> Option<usize> {
+    let input = input.to_ascii_lowercase();
+    bots.iter()
+        .map(|name| format!("@{}", name))
+        .chain(std::iter::once("r?".to_owned()))
+        .filter_map(|s| input.find(&s))
+        .min()
 }
 
 #[derive(Debug, PartialEq)]
@@ -69,61 +74,98 @@ impl<'a> Input<'a> {
 
     fn parse_command(&mut self) -> Option<Command<'a>> {
         let mut tok = Tokenizer::new(&self.all[self.parsed..]);
-        let name_length = if let Ok(Some(Token::Word(bot_name))) = tok.next_token() {
-            assert!(self
-                .bot
-                .iter()
-                .any(|name| bot_name.eq_ignore_ascii_case(&format!("@{}", name))));
-            bot_name.len()
-        } else {
-            panic!("no bot name?")
+        let review = match tok.next_token() {
+            Ok(Some(Token::Word(r))) if r == "r" || r == "R" => true,
+            Ok(Some(Token::Word(bot_name))) => {
+                assert!(
+                    self.bot
+                        .iter()
+                        .any(|name| bot_name.eq_ignore_ascii_case(&format!("@{}", name))),
+                    "not this bot name? ({:?})",
+                    bot_name
+                );
+                false
+            }
+            other => panic!("neiter review nor bot name? ({:?})", other),
         };
-        log::info!("identified potential command");
 
         let mut success = vec![];
 
-        let original_tokenizer = tok.clone();
+        if review {
+            match tok.next_token() {
+                Ok(Some(Token::Question)) => {}
+                other => {
+                    log::trace!("received odd review start token: {:?}", other);
+                    return None;
+                }
+            }
+            log::info!("identified potential review request");
+            match tok.next_token() {
+                Ok(Some(Token::Word(w))) => {
+                    let mentions = crate::mentions::get_mentions(w);
+                    if let [a] = &mentions[..] {
+                        success.push((
+                            tok,
+                            Command::Assign(Ok(assign::AssignCommand::User {
+                                username: (*a).to_owned(),
+                            })),
+                        ));
+                    } else {
+                        log::trace!("{:?} had non-one mention: {:?}", w, mentions);
+                        return None;
+                    }
+                }
+                other => {
+                    log::trace!("received odd review start token: {:?}", other);
+                    return None;
+                }
+            }
+        } else {
+            log::info!("identified potential command");
 
-        success.extend(parse_single_command(
-            relabel::RelabelCommand::parse,
-            Command::Relabel,
-            &original_tokenizer,
-        ));
-        success.extend(parse_single_command(
-            assign::AssignCommand::parse,
-            Command::Assign,
-            &original_tokenizer,
-        ));
-        success.extend(parse_single_command(
-            ping::PingCommand::parse,
-            Command::Ping,
-            &original_tokenizer,
-        ));
-        success.extend(parse_single_command(
-            nominate::NominateCommand::parse,
-            Command::Nominate,
-            &original_tokenizer,
-        ));
-        success.extend(parse_single_command(
-            prioritize::PrioritizeCommand::parse,
-            Command::Prioritize,
-            &original_tokenizer,
-        ));
-        success.extend(parse_single_command(
-            second::SecondCommand::parse,
-            Command::Second,
-            &original_tokenizer,
-        ));
-        success.extend(parse_single_command(
-            glacier::GlacierCommand::parse,
-            Command::Glacier,
-            &original_tokenizer,
-        ));
-        success.extend(parse_single_command(
-            close::CloseCommand::parse,
-            Command::Close,
-            &original_tokenizer,
-        ));
+            let original_tokenizer = tok.clone();
+
+            success.extend(parse_single_command(
+                relabel::RelabelCommand::parse,
+                Command::Relabel,
+                &original_tokenizer,
+            ));
+            success.extend(parse_single_command(
+                assign::AssignCommand::parse,
+                Command::Assign,
+                &original_tokenizer,
+            ));
+            success.extend(parse_single_command(
+                ping::PingCommand::parse,
+                Command::Ping,
+                &original_tokenizer,
+            ));
+            success.extend(parse_single_command(
+                nominate::NominateCommand::parse,
+                Command::Nominate,
+                &original_tokenizer,
+            ));
+            success.extend(parse_single_command(
+                prioritize::PrioritizeCommand::parse,
+                Command::Prioritize,
+                &original_tokenizer,
+            ));
+            success.extend(parse_single_command(
+                second::SecondCommand::parse,
+                Command::Second,
+                &original_tokenizer,
+            ));
+            success.extend(parse_single_command(
+                glacier::GlacierCommand::parse,
+                Command::Glacier,
+                &original_tokenizer,
+            ));
+            success.extend(parse_single_command(
+                close::CloseCommand::parse,
+                Command::Close,
+                &original_tokenizer,
+            ));
+        }
 
         if success.len() > 1 {
             panic!(
@@ -132,6 +174,8 @@ impl<'a> Input<'a> {
                 success
             );
         }
+
+        let (mut tok, c) = success.pop()?;
 
         if self
             .code
@@ -142,13 +186,8 @@ impl<'a> Input<'a> {
             return None;
         }
 
-        let (mut tok, c) = success.pop()?;
         // if we errored out while parsing the command do not move the input forwards
-        self.parsed += if c.is_ok() {
-            tok.position()
-        } else {
-            name_length
-        };
+        self.parsed += if c.is_ok() { tok.position() } else { 1 };
         Some(c)
     }
 }
@@ -158,16 +197,12 @@ impl<'a> Iterator for Input<'a> {
 
     fn next(&mut self) -> Option<Command<'a>> {
         loop {
-            let start = self
-                .bot
-                .iter()
-                .filter_map(|name| find_command_start(&self.all[self.parsed..], name))
-                .min()?;
+            let start = find_command_start(&self.all[self.parsed..], &self.bot)?;
             self.parsed += start;
             if let Some(command) = self.parse_command() {
                 return Some(command);
             }
-            self.parsed += self.bot.len() + 1;
+            self.parsed += 1;
         }
     }
 }
@@ -247,7 +282,7 @@ fn move_input_along_1() {
     let mut input = Input::new(input, vec!["bot"]);
     assert!(input.next().unwrap().is_err());
     // don't move input along if parsing the command fails
-    assert_eq!(&input.all[..input.parsed], "@bot");
+    assert_eq!(&input.all[..input.parsed], "@");
 }
 
 #[test]
@@ -260,5 +295,27 @@ fn multiname() {
         " Afterwards, delete the world. @triagebot prioritize"
     );
     assert!(input.next().unwrap().is_ok());
+    assert!(input.next().is_none());
+}
+
+#[test]
+fn parse_assign_review() {
+    let input = "R? @user";
+    let mut input = Input::new(input, vec!["bot"]);
+    match input.next().unwrap() {
+        Command::Assign(Ok(x)) => assert_eq!(
+            x,
+            assign::AssignCommand::User {
+                username: String::from("user"),
+            }
+        ),
+        o => panic!("unknown: {:?}", o),
+    };
+}
+
+#[test]
+fn parse_assign_review_no_panic() {
+    let input = "R ?";
+    let mut input = Input::new(input, vec!["bot"]);
     assert!(input.next().is_none());
 }
