@@ -42,11 +42,11 @@ impl ShortcutCommand {
 
         let mut toks = input.clone();
         if let Some(Token::Word(word)) = toks.peek_token()? {
+            if !shortcuts.contains_key(word) {
+                return Ok(None);
+            }
             toks.next_token()?;
             if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
-                if !shortcuts.contains_key(word) {
-                    return Ok(None);
-                }
                 toks.next_token()?;
                 *input = toks;
                 let command = shortcuts.get(word).unwrap();
