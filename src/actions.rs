@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
 use async_trait::async_trait;
@@ -35,6 +36,7 @@ pub struct IssueDecorator {
     pub repo_name: String,
     pub labels: String,
     pub assignees: String,
+    pub updated_at: String,
 }
 
 lazy_static! {
@@ -47,6 +49,16 @@ lazy_static! {
             }
         }
     };
+}
+
+fn to_human(d: DateTime<Utc>) -> String {
+    let d1 = chrono::Utc::now() - d;
+    let days = d1.num_days();
+    if days > 60 {
+        format!("{} months ago", days / 30)
+    } else {
+        format!("about {} days ago", days)
+    }
 }
 
 #[async_trait]
@@ -94,6 +106,7 @@ impl<'a> Action for Step<'a> {
                                                 .map(|u| u.login.as_ref())
                                                 .collect::<Vec<_>>()
                                                 .join(", "),
+                                            updated_at: to_human(issue.updated_at),
                                         })
                                         .collect();
 
