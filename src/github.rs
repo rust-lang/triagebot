@@ -244,6 +244,7 @@ pub struct Issue {
     pub number: u64,
     pub body: String,
     created_at: chrono::DateTime<Utc>,
+    pub updated_at: chrono::DateTime<Utc>,
     #[serde(default)]
     pub merge_commit_sha: Option<String>,
     pub title: String,

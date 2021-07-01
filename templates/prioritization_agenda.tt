@@ -13,7 +13,7 @@ tags: weekly, rustc
 - New MCPs (take a look, see if you like them!)
 {{-issues::render(issues=mcp_new_not_seconded, indent="  ", empty="No new proposals this time.")}}
 - Old MCPs (not seconded, take a look)
-{{-issues::render(issues=mcp_old_not_seconded, indent="  ", empty="No old proposals this time.")}}
+{{-issues::render(issues=mcp_old_not_seconded, indent="  ", with_age=true, empty="No old proposals this time.")}}
 - Pending FCP requests (check your boxes!)
 {{-issues::render(issues=in_pre_fcp, indent="  ", empty="No pending FCP requests this time.")}}
 - Things in FCP (make sure you're good with it)
