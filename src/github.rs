@@ -98,7 +98,7 @@ impl GithubClient {
         );
 
         async move {
-            tokio::time::delay_for(sleep).await;
+            tokio::time::sleep(sleep).await;
 
             // check rate limit
             let rate_resp = self
@@ -130,7 +130,7 @@ impl GithubClient {
             if rate_limit.remaining == 0 {
                 let sleep = Self::calc_sleep(rate_limit.reset);
                 if sleep > 0 {
-                    tokio::time::delay_for(Duration::from_secs(sleep)).await;
+                    tokio::time::sleep(Duration::from_secs(sleep)).await;
                 }
             }
 

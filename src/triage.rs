@@ -43,7 +43,7 @@ pub async fn pulls(
     let mut base_pulls = page.take_items();
     let mut next_page = page.next;
     while let Some(mut page) = octocrab
-        .get_page::<octocrab::models::PullRequest>(&next_page)
+        .get_page::<octocrab::models::pulls::PullRequest>(&next_page)
         .await
         .unwrap()
     {
@@ -119,7 +119,7 @@ pub async fn pulls(
 #[derive(Serialize)]
 struct PullRequest {
     pub html_url: Url,
-    pub number: i64,
+    pub number: u64,
     pub title: String,
     pub assignee: String,
     pub updated_at: String,

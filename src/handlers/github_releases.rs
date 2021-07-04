@@ -95,7 +95,7 @@ pub(super) async fn handle(
             }
 
             log::debug!("sleeping for one second to avoid hitting any rate limit");
-            tokio::time::delay_for(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
         } else {
             log::trace!(
                 "skipping tag {} since it doesn't have a changelog entry",
