@@ -69,33 +69,58 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let sha = bors.merge_sha;
+    let mut sha = bors.merge_sha;
+    let mut pr = Some(event.issue.number.try_into().unwrap());
 
-    // FIXME: ideally we would pull in all the commits here, but unfortunately
-    // in rust-lang/rust's case there's bors-authored commits that aren't
-    // actually from rust-lang/rust as they were merged into the clippy repo.
-    let mut gc = match ctx.github.rust_commit(&sha).await {
-        Some(c) => c,
-        None => {
-            log::error!("Could not find bors-reported sha: {:?}", sha);
-            return Ok(());
+    loop {
+        // FIXME: ideally we would pull in all the commits here, but unfortunately
+        // in rust-lang/rust's case there's bors-authored commits that aren't
+        // actually from rust-lang/rust as they were merged into the clippy repo.
+        let mut gc = match ctx.github.rust_commit(&sha).await {
+            Some(c) => c,
+            None => {
+                log::error!("Could not find bors-reported sha: {:?}", sha);
+                return Ok(());
+            }
+        };
+        let parent_sha = gc.parents.remove(0).sha;
+
+        if pr.is_none() {
+            if let Some(tail) = gc.message.strip_prefix("Auto merge of #") {
+                if let Some(end) = tail.find(' ') {
+                    if let Ok(number) = tail[..end].parse::<u32>() {
+                        pr = Some(number);
+                    }
+                }
+            }
         }
-    };
 
-    let res = rustc_commits::record_commit(
-        &ctx.db,
-        rustc_commits::Commit {
-            sha: gc.sha,
-            parent_sha: gc.parents.remove(0).sha,
-            time: gc.commit.author.date,
-            pr: Some(event.issue.number.try_into().unwrap()),
-        },
-    )
-    .await;
-    match res {
-        Ok(()) => {}
-        Err(e) => {
-            log::error!("Failed to record commit {:?}", e);
+        let pr = match pr.take() {
+            Some(number) => number,
+            None => break,
+        };
+
+        let res = rustc_commits::record_commit(
+            &ctx.db,
+            rustc_commits::Commit {
+                sha: gc.sha,
+                parent_sha: parent_sha.clone(),
+                time: gc.commit.author.date,
+                pr: Some(pr),
+            },
+        )
+        .await;
+        match res {
+            Ok(()) => {
+                // proceed to the next commit once we've recorded this one.
+                // We'll stop when we hit a duplicate commit, but this allows us
+                // to backfill commits.
+                sha = parent_sha;
+            }
+            Err(e) => {
+                log::error!("Failed to record commit {:?}", e);
+                break;
+            }
         }
     }
 

@@ -1162,6 +1162,8 @@ impl GithubClient {
 #[derive(Debug, serde::Deserialize)]
 pub struct GithubCommit {
     pub sha: String,
+    #[serde(default)]
+    pub message: String,
     pub commit: GitCommit,
     pub parents: Vec<Parent>,
 }
