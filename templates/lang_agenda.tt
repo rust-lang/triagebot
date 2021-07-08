@@ -35,6 +35,10 @@ tags: triage-meeting
 
 {{-issues_heading::render(issues=pending_lang_team_prs)}}
 
+## RFCs waiting to be merged
+
+{{-issues_heading::render(issues=rfcs_waiting_to_be_merged)}}
+
 ## Proposed FCPs
 
 **Check your boxes!**
