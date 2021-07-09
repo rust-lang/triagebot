@@ -29,6 +29,7 @@ pub(crate) struct Config {
     pub(crate) notify_zulip: Option<NotifyZulipConfig>,
     pub(crate) github_releases: Option<GitHubReleasesConfig>,
     pub(crate) review_submitted: Option<ReviewSubmittedConfig>,
+    pub(crate) shortcut: Option<ShortcutConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -80,6 +81,12 @@ pub(crate) struct AssignConfig {
 pub(crate) struct RelabelConfig {
     #[serde(default)]
     pub(crate) allow_unauthenticated: Vec<String>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct ShortcutConfig {
+    #[serde(default)]
+    _empty: (),
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -255,6 +262,8 @@ mod tests {
             release = "T-release"
             core = "T-core"
             infra = "T-infra"
+
+            [shortcut]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -290,6 +299,7 @@ mod tests {
                 nominate: Some(NominateConfig {
                     teams: nominate_teams
                 }),
+                shortcut: Some(ShortcutConfig { _empty: () }),
                 prioritize: None,
                 major_change: None,
                 glacier: None,

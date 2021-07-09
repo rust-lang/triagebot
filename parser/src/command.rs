@@ -10,6 +10,7 @@ pub mod ping;
 pub mod prioritize;
 pub mod relabel;
 pub mod second;
+pub mod shortcut;
 
 pub fn find_command_start(input: &str, bot: &str) -> Option<usize> {
     input.to_ascii_lowercase().find(&format!("@{}", bot))
@@ -24,6 +25,7 @@ pub enum Command<'a> {
     Prioritize(Result<prioritize::PrioritizeCommand, Error<'a>>),
     Second(Result<second::SecondCommand, Error<'a>>),
     Glacier(Result<glacier::GlacierCommand, Error<'a>>),
+    Shortcut(Result<shortcut::ShortcutCommand, Error<'a>>),
     Close(Result<close::CloseCommand, Error<'a>>),
 }
 
@@ -120,6 +122,11 @@ impl<'a> Input<'a> {
             &original_tokenizer,
         ));
         success.extend(parse_single_command(
+            shortcut::ShortcutCommand::parse,
+            Command::Shortcut,
+            &original_tokenizer,
+        ));
+        success.extend(parse_single_command(
             close::CloseCommand::parse,
             Command::Close,
             &original_tokenizer,
@@ -182,6 +189,7 @@ impl<'a> Command<'a> {
             Command::Prioritize(r) => r.is_ok(),
             Command::Second(r) => r.is_ok(),
             Command::Glacier(r) => r.is_ok(),
+            Command::Shortcut(r) => r.is_ok(),
             Command::Close(r) => r.is_ok(),
         }
     }

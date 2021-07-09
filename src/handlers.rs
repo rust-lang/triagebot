@@ -38,6 +38,7 @@ mod prioritize;
 mod relabel;
 mod review_submitted;
 mod rustc_commits;
+mod shortcut;
 
 pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo_name()).await;
@@ -240,6 +241,7 @@ command_handlers! {
     prioritize: Prioritize,
     relabel: Relabel,
     major_change: Second,
+    shortcut: Shortcut,
     close: Close,
 }
 
