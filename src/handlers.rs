@@ -142,6 +142,7 @@ macro_rules! issue_handlers {
 // Each module in the list must contain the functions `parse_input` and `handle_input`.
 issue_handlers! {
     autolabel,
+    beta_backport,
     major_change,
     notify_zulip,
 }

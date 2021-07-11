@@ -1,50 +1,83 @@
-use crate::github::{Event, IssuesAction, Label};
+use crate::config::BetaBackportConfig;
+use crate::github::{IssuesAction, IssuesEvent, Label};
 use crate::handlers::Context;
 use regex::Regex;
 
 lazy_static! {
     // See https://docs.github.com/en/issues/tracking-your-work-with-issues/creating-issues/linking-a-pull-request-to-an-issue
-    // Max 19 digits long to prevent u64 overflow
-    static ref CLOSES_ISSUE: Regex = Regex::new("(close[sd]|fix(e[sd])?|resolve[sd]) #(\\d{1,19})").unwrap();
+    static ref CLOSES_ISSUE: Regex = Regex::new("(close[sd]|fix(e[sd])?|resolve[sd]) #(\\d+)").unwrap();
 }
 
-pub(crate) async fn handle(
+pub(crate) struct BetaBackportInput {
+    ids: Vec<u64>,
+}
+
+pub(crate) fn parse_input(
+    _ctx: &Context,
+    event: &IssuesEvent,
+    config: Option<&BetaBackportConfig>,
+) -> Result<Option<BetaBackportInput>, String> {
+    if config.is_none() {
+        return Ok(None);
+    }
+
+    if event.action != IssuesAction::Opened {
+        return Ok(None);
+    }
+
+    if event.issue.pull_request.is_none() {
+        return Ok(None);
+    }
+
+    let mut ids = vec![];
+    for caps in CLOSES_ISSUE.captures_iter(&event.issue.body) {
+        let id = caps.get(1).unwrap().as_str();
+        let id = match id.parse::<u64>() {
+            Ok(id) => id,
+            Err(err) => {
+                return Err(format!("Failed to parse issue id `{}`, error: {}", id, err));
+            }
+        };
+        ids.push(id);
+    }
+
+    return Ok(Some(BetaBackportInput { ids }));
+}
+
+pub(super) async fn handle_input(
     ctx: &Context,
-    event: &Event,
+    config: &BetaBackportConfig,
+    event: &IssuesEvent,
+    input: BetaBackportInput,
 ) -> anyhow::Result<()> {
-    let issue_event = if let Event::Issue(event) = event {
-        event
-    } else {
-        return Ok(());
-    };
+    let mut issues = input
+        .ids
+        .iter()
+        .copied()
+        .map(|id| async move { event.repository.get_issue(&ctx.github, id).await });
 
-    if issue_event.action != IssuesAction::Opened {
-        return Ok(());
-    }
-
-    if issue_event.issue.pull_request.is_none() {
-        return Ok(());
-    }
-
-    for caps in CLOSES_ISSUE.captures_iter(&issue_event.issue.body) {
-        // Should never fail due to the regex
-        let issue_id = caps.get(1).unwrap().as_str().parse::<u64>().unwrap();
-        let issue = issue_event
-            .repository
-            .get_issue(&ctx.github, issue_id)
-            .await?;
-        if issue.labels.contains(&Label {
-            name: "regression-from-stable-to-beta".to_string(),
-        }) {
-            let mut labels = issue_event.issue.labels().to_owned();
-            labels.push(Label {
-                name: "beta-nominated".to_string(),
-            });
-            issue_event
-                .issue
-                .set_labels(&ctx.github, labels)
-                .await?;
-            break;
+    let trigger_labels: Vec<_> = config
+        .trigger_labels
+        .iter()
+        .cloned()
+        .map(|name| Label { name })
+        .collect();
+    while let Some(issue) = issues.next() {
+        let issue = issue.await.unwrap();
+        if issue
+            .labels
+            .iter()
+            .any(|issue_label| trigger_labels.contains(issue_label))
+        {
+            let mut new_labels = event.issue.labels().to_owned();
+            new_labels.extend(
+                config
+                    .labels_to_add
+                    .iter()
+                    .cloned()
+                    .map(|name| Label { name }),
+            );
+            return event.issue.set_labels(&ctx.github, new_labels).await;
         }
     }
 

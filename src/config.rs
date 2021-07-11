@@ -29,6 +29,7 @@ pub(crate) struct Config {
     pub(crate) notify_zulip: Option<NotifyZulipConfig>,
     pub(crate) github_releases: Option<GitHubReleasesConfig>,
     pub(crate) review_submitted: Option<ReviewSubmittedConfig>,
+    pub(crate) beta_backport: Option<BetaBackportConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -110,6 +111,13 @@ pub(crate) struct AutolabelLabelConfig {
     pub(crate) trigger_labels: Vec<String>,
     #[serde(default)]
     pub(crate) exclude_labels: Vec<String>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct BetaBackportConfig {
+    pub(crate) trigger_labels: Vec<String>,
+    #[serde(default)]
+    pub(crate) labels_to_add: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -298,6 +306,7 @@ mod tests {
                 notify_zulip: None,
                 github_releases: None,
                 review_submitted: None,
+                beta_backport: None,
             }
         );
     }
