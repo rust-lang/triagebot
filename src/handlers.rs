@@ -25,6 +25,7 @@ impl fmt::Display for HandlerError {
 
 mod assign;
 mod autolabel;
+mod beta_backport;
 mod close;
 mod github_releases;
 mod glacier;
@@ -141,6 +142,7 @@ macro_rules! issue_handlers {
 // Each module in the list must contain the functions `parse_input` and `handle_input`.
 issue_handlers! {
     autolabel,
+    beta_backport,
     major_change,
     notify_zulip,
 }
