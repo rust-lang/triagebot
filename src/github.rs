@@ -747,6 +747,26 @@ pub struct IssuesEvent {
     pub label: Option<Label>,
 }
 
+impl IssuesEvent {
+    /// Returns all files changed in the issue or PR.
+    pub(crate) fn files_changed(&self) -> Vec<String> {
+        let mut files = Vec::new();
+        if let Some(diff) = self.changes.as_ref().and_then(|changes| changes.body.as_ref()) {
+            for line in diff.from.lines() {
+                // mostly copied from highfive
+                if line.starts_with("diff --git ") {
+                    let parts = line[line.find(" b/").unwrap() + " b/".len()..].split("/");
+                    let path = parts.collect::<Vec<_>>().join("/");
+                    if !path.is_empty() {
+                        files.push(path);
+                    }
+                }
+            }
+        }
+        files
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 pub struct IssueSearchResult {
     pub total_count: usize,

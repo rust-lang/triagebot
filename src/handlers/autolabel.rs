@@ -12,6 +12,27 @@ pub(super) fn parse_input(
     event: &IssuesEvent,
     config: Option<&AutolabelConfig>,
 ) -> Result<Option<AutolabelInput>, String> {
+    if event.action == IssuesAction::Opened {
+        if let Some(config) = config {
+            let mut autolabels = Vec::new();
+            for trigger_file in event.files_changed() {
+                if trigger_file.is_empty() {
+                    // TODO: when would this be true?
+                    continue;
+                }
+                for (label, cfg) in config.files.iter() {
+                    if cfg.trigger_files.iter().any(|f| trigger_file.starts_with(f)) {
+                        autolabels.push(Label {
+                            name: label.to_owned(),
+                        });
+                    }
+                }
+                if !autolabels.is_empty() {
+                    return Ok(Some(AutolabelInput { labels: autolabels }));
+                }
+            }
+        }
+    }
     if event.action == IssuesAction::Labeled {
         if let Some(config) = config {
             let mut autolabels = Vec::new();
