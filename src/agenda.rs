@@ -580,7 +580,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                             kind: github::QueryKind::List,
                             filters: vec![("state", "open")],
                             include_labels: vec!["T-lang", "proposed-final-comment-period"],
-                            exclude_labels: vec![],
+                            exclude_labels: vec!["finished-final-comment-period"],
                         },
                     },
                     QueryMap {
@@ -589,7 +589,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                             kind: github::QueryKind::List,
                             filters: vec![("state", "open")],
                             include_labels: vec!["T-lang", "final-comment-period"],
-                            exclude_labels: vec![],
+                            exclude_labels: vec!["finished-final-comment-period"],
                         },
                     },
                     QueryMap {
