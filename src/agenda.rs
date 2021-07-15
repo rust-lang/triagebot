@@ -179,16 +179,6 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     queries.push(QueryMap {
-        name: "beta_nominated_libs_impl",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![],
-            include_labels: vec!["beta-nominated", "T-libs"],
-            exclude_labels: vec!["beta-accepted"],
-        },
-    });
-
-    queries.push(QueryMap {
         name: "beta_nominated_t_rustdoc",
         query: github::Query {
             kind: github::QueryKind::List,
@@ -210,16 +200,6 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     queries.push(QueryMap {
-        name: "stable_nominated_libs_impl",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![],
-            include_labels: vec!["stable-nominated", "T-libs"],
-            exclude_labels: vec!["stable-accepted"],
-        },
-    });
-
-    queries.push(QueryMap {
         name: "stable_nominated_t_rustdoc",
         query: github::Query {
             kind: github::QueryKind::List,
@@ -236,16 +216,6 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
             include_labels: vec!["S-waiting-on-team", "T-compiler"],
-            exclude_labels: vec![],
-        },
-    });
-
-    queries.push(QueryMap {
-        name: "prs_waiting_on_team_libs_impl",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![("state", "open")],
-            include_labels: vec!["S-waiting-on-team", "T-libs"],
             exclude_labels: vec![],
         },
     });
@@ -422,16 +392,6 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     queries.push(QueryMap {
-        name: "p_critical_libs_impl",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![("state", "open")],
-            include_labels: vec!["T-libs", "P-critical"],
-            exclude_labels: vec![],
-        },
-    });
-
-    queries.push(QueryMap {
         name: "p_critical_t_rustdoc",
         query: github::Query {
             kind: github::QueryKind::List,
@@ -467,16 +427,6 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
             include_labels: vec!["I-nominated", "T-compiler"],
-            exclude_labels: vec![],
-        },
-    });
-
-    queries.push(QueryMap {
-        name: "nominated_libs_impl",
-        query: github::Query {
-            kind: github::QueryKind::List,
-            filters: vec![("state", "open")],
-            include_labels: vec!["I-nominated", "T-libs"],
             exclude_labels: vec![],
         },
     });
