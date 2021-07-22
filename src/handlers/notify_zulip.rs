@@ -1,6 +1,6 @@
 use crate::{
     config::NotifyZulipConfig,
-    github::{IssuesAction, IssuesEvent},
+    github::{IssuesAction, IssuesEvent, Label},
     handlers::Context,
 };
 
@@ -21,23 +21,30 @@ pub(super) fn parse_input(
     if let IssuesAction::Labeled | IssuesAction::Unlabeled = event.action {
         let applied_label = &event.label.as_ref().expect("label").name;
         if let Some(config) = config.and_then(|c| c.labels.get(applied_label)) {
-            for label in &config.required_labels {
-                let pattern = match glob::Pattern::new(label) {
-                    Ok(pattern) => pattern,
-                    Err(err) => {
-                        log::error!("Invalid glob pattern: {}", err);
-                        continue;
+            let contains_label = |haystack: &[Label], needles: &[String]| {
+                for needle in needles {
+                    let pattern = match glob::Pattern::new(needle) {
+                        Ok(pattern) => pattern,
+                        Err(err) => {
+                            log::error!("Invalid glob pattern: {}", err);
+                            continue;
+                        }
+                    };
+                    if haystack.iter().any(|l| pattern.matches(&l.name)) {
+                        return true;
                     }
-                };
-                if !event
-                    .issue
-                    .labels()
-                    .iter()
-                    .any(|l| pattern.matches(&l.name))
-                {
-                    // Issue misses a required label, ignore this event
-                    return Ok(None);
                 }
+                false
+            };
+
+            if !contains_label(event.issue.labels(), &config.required_labels) {
+                // Issue misses a required label, ignore this event
+                return Ok(None);
+            }
+
+            if contains_label(event.issue.labels(), &config.disallowed_labels) {
+                // Issue contains a disallowed label, ignore this event
+                return Ok(None);
             }
 
             if event.action == IssuesAction::Labeled && config.message_on_add.is_some() {
