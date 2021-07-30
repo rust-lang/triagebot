@@ -18,6 +18,8 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                 "finished-final-comment-period",
                 "final-comment-period",
                 "major-change-accepted",
+                "t-libs",
+                "t-libs-api",
             ],
         },
     });
@@ -33,6 +35,8 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                 "proposed-final-comment-period",
                 "finished-final-comment-period",
                 "final-comment-period",
+                "t-libs",
+                "t-libs-api",
             ],
         },
     });
@@ -43,7 +47,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
             include_labels: vec!["proposed-final-comment-period"],
-            exclude_labels: vec![],
+            exclude_labels: vec!["t-libs", "t-libs-api"],
         },
     });
     queries.push(QueryMap {
@@ -52,7 +56,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
             include_labels: vec!["final-comment-period"],
-            exclude_labels: vec![],
+            exclude_labels: vec!["t-libs", "t-libs-api"],
         },
     });
 
@@ -62,7 +66,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "all")],
             include_labels: vec!["major-change-accepted", "to-announce"],
-            exclude_labels: vec![],
+            exclude_labels: vec!["t-libs", "t-libs-api"],
         },
     });
 
@@ -76,7 +80,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                 "disposition-merge",
                 "to-announce",
             ],
-            exclude_labels: vec![],
+            exclude_labels: vec!["t-libs", "t-libs-api"],
         },
     });
 
@@ -93,7 +97,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
             include_labels: vec!["proposed-final-comment-period", "T-compiler"],
-            exclude_labels: vec![],
+            exclude_labels: vec!["t-libs", "t-libs-api"],
         },
     });
     queries.push(QueryMap {
@@ -102,7 +106,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
             include_labels: vec!["final-comment-period", "T-compiler"],
-            exclude_labels: vec![],
+            exclude_labels: vec!["t-libs", "t-libs-api"],
         },
     });
 
@@ -116,7 +120,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                 "disposition-merge",
                 "to-announce",
             ],
-            exclude_labels: vec![],
+            exclude_labels: vec!["t-libs", "t-libs-api"],
         },
     });
 
@@ -133,7 +137,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
             include_labels: vec!["proposed-final-comment-period"],
-            exclude_labels: vec![],
+            exclude_labels: vec!["t-libs", "t-libs-api"],
         },
     });
     queries.push(QueryMap {
@@ -142,7 +146,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             kind: github::QueryKind::List,
             filters: vec![("state", "open")],
             include_labels: vec!["final-comment-period"],
-            exclude_labels: vec![],
+            exclude_labels: vec!["t-libs", "t-libs-api"],
         },
     });
 
@@ -156,7 +160,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                 "disposition-merge",
                 "to-announce",
             ],
-            exclude_labels: vec![],
+            exclude_labels: vec!["t-libs", "t-libs-api"],
         },
     });
 
