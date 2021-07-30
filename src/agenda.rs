@@ -499,6 +499,22 @@ pub fn lang<'a>() -> Box<dyn Action> {
                 ],
             },
             Query {
+                repos: vec!["rust-lang/rfcs"],
+                queries: vec![QueryMap {
+                    name: "rfcs_waiting_to_be_merged",
+                    query: github::Query {
+                        kind: github::QueryKind::List,
+                        filters: vec![("state", "open"), ("is", "pr")],
+                        include_labels: vec![
+                            "disposition-merge",
+                            "finished-final-comment-period",
+                            "T-lang",
+                        ],
+                        exclude_labels: vec![],
+                    },
+                }],
+            },
+            Query {
                 repos: vec![
                     "rust-lang/rfcs",
                     "rust-lang/rust",
@@ -552,6 +568,58 @@ pub fn lang<'a>() -> Box<dyn Action> {
                         },
                     },
                 ],
+            },
+        ],
+    })
+}
+
+pub fn lang_planning<'a>() -> Box<dyn Action> {
+    Box::new(Step {
+        name: "lang_planning_agenda",
+        actions: vec![
+            Query {
+                repos: vec!["rust-lang/lang-team"],
+                queries: vec![
+                    QueryMap {
+                        name: "pending_project_proposals",
+                        query: github::Query {
+                            kind: github::QueryKind::List,
+                            filters: vec![("state", "open"), ("is", "issue")],
+                            include_labels: vec!["major-change"],
+                            exclude_labels: vec!["charter-needed"],
+                        },
+                    },
+                    QueryMap {
+                        name: "pending_lang_team_prs",
+                        query: github::Query {
+                            kind: github::QueryKind::List,
+                            filters: vec![("state", "open"), ("is", "pr")],
+                            include_labels: vec![],
+                            exclude_labels: vec![],
+                        },
+                    },
+                    QueryMap {
+                        name: "proposed_meetings",
+                        query: github::Query {
+                            kind: github::QueryKind::List,
+                            filters: vec![("state", "open"), ("is", "issue")],
+                            include_labels: vec!["meeting-proposal"],
+                            exclude_labels: vec!["meeting-scheduled"],
+                        },
+                    },
+                ],
+            },
+            Query {
+                repos: vec!["rust-lang/lang-team"],
+                queries: vec![QueryMap {
+                    name: "active_initiatives",
+                    query: github::Query {
+                        kind: github::QueryKind::List,
+                        filters: vec![("state", "open"), ("is", "issue")],
+                        include_labels: vec!["lang-initiative"],
+                        exclude_labels: vec![],
+                    },
+                }],
             },
         ],
     })
