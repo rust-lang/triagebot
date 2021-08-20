@@ -8,6 +8,7 @@ use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
 use std::{
+    collections::HashMap,
     fmt,
     time::{Duration, SystemTime},
 };
@@ -771,6 +772,7 @@ impl Repository {
             filters,
             include_labels,
             exclude_labels,
+            ordering,
             ..
         } = query;
 
@@ -791,11 +793,11 @@ impl Repository {
             || is_pr && !include_labels.is_empty();
 
         let url = if use_search_api {
-            self.build_search_issues_url(filters, include_labels, exclude_labels)
+            self.build_search_issues_url(filters, include_labels, exclude_labels, ordering)
         } else if is_pr {
-            self.build_pulls_url(filters, include_labels)
+            self.build_pulls_url(filters, include_labels, ordering)
         } else {
-            self.build_issues_url(filters, include_labels)
+            self.build_issues_url(filters, include_labels, ordering)
         };
 
         let result = client.get(&url);
@@ -821,12 +823,22 @@ impl Repository {
         Ok(self.get_issues(client, query).await?.len())
     }
 
-    fn build_issues_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
-        self.build_endpoint_url("issues", filters, include_labels)
+    fn build_issues_url(
+        &self,
+        filters: &Vec<(&str, &str)>,
+        include_labels: &Vec<&str>,
+        ordering: &HashMap<&str, &str>,
+    ) -> String {
+        self.build_endpoint_url("issues", filters, include_labels, ordering)
     }
 
-    fn build_pulls_url(&self, filters: &Vec<(&str, &str)>, include_labels: &Vec<&str>) -> String {
-        self.build_endpoint_url("pulls", filters, include_labels)
+    fn build_pulls_url(
+        &self,
+        filters: &Vec<(&str, &str)>,
+        include_labels: &Vec<&str>,
+        ordering: &HashMap<&str, &str>,
+    ) -> String {
+        self.build_endpoint_url("pulls", filters, include_labels, ordering)
     }
 
     fn build_endpoint_url(
@@ -834,6 +846,7 @@ impl Repository {
         endpoint: &str,
         filters: &Vec<(&str, &str)>,
         include_labels: &Vec<&str>,
+        ordering: &HashMap<&str, &str>,
     ) -> String {
         let filters = filters
             .iter()
@@ -843,9 +856,18 @@ impl Repository {
                 include_labels.join(",")
             )))
             .chain(std::iter::once("filter=all".to_owned()))
-            .chain(std::iter::once(format!("sort=created")))
-            .chain(std::iter::once(format!("direction=asc")))
-            .chain(std::iter::once(format!("per_page=100")))
+            .chain(std::iter::once(format!(
+                "sort={}",
+                ordering.get("sort").unwrap_or(&"created")
+            )))
+            .chain(std::iter::once(format!(
+                "direction={}",
+                ordering.get("direction").unwrap_or(&"asc")
+            )))
+            .chain(std::iter::once(format!(
+                "per_page={}",
+                ordering.get("per_page").unwrap_or(&"100")
+            )))
             .collect::<Vec<_>>()
             .join("&");
         format!(
@@ -862,6 +884,7 @@ impl Repository {
         filters: &Vec<(&str, &str)>,
         include_labels: &Vec<&str>,
         exclude_labels: &Vec<&str>,
+        ordering: &HashMap<&str, &str>,
     ) -> String {
         let filters = filters
             .iter()
@@ -881,9 +904,12 @@ impl Repository {
             .collect::<Vec<_>>()
             .join("+");
         format!(
-            "{}/search/issues?q={}&sort=created&order=asc&per_page=100",
+            "{}/search/issues?q={}&sort={}&order={}&per_page={}",
             Repository::GITHUB_API_URL,
-            filters
+            filters,
+            ordering.get("sort").unwrap_or(&"created"),
+            ordering.get("direction").unwrap_or(&"asc"),
+            ordering.get("per_page").unwrap_or(&"100"),
         )
     }
 }
@@ -894,6 +920,7 @@ pub struct Query<'a> {
     pub filters: Vec<(&'a str, &'a str)>,
     pub include_labels: Vec<&'a str>,
     pub exclude_labels: Vec<&'a str>,
+    pub ordering: HashMap<&'a str, &'a str>,
 }
 
 pub enum QueryKind {

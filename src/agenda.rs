@@ -1,5 +1,6 @@
 use crate::actions::{Action, Query, QueryMap, Step};
 use crate::github;
+use std::collections::HashMap;
 
 pub fn prioritization<'a>() -> Box<dyn Action> {
     let mut actions = Vec::new();
@@ -21,6 +22,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                 "t-libs",
                 "t-libs-api",
             ],
+            ordering: HashMap::new(),
         },
     });
 
@@ -38,6 +40,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                 "t-libs",
                 "t-libs-api",
             ],
+            ordering: HashMap::new(),
         },
     });
 
@@ -48,6 +51,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["proposed-final-comment-period"],
             exclude_labels: vec!["t-libs", "t-libs-api"],
+            ordering: HashMap::new(),
         },
     });
     queries.push(QueryMap {
@@ -57,6 +61,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["final-comment-period"],
             exclude_labels: vec!["t-libs", "t-libs-api"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -67,6 +72,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "all")],
             include_labels: vec!["major-change-accepted", "to-announce"],
             exclude_labels: vec!["t-libs", "t-libs-api"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -81,6 +87,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                 "to-announce",
             ],
             exclude_labels: vec!["t-libs", "t-libs-api"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -98,6 +105,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["proposed-final-comment-period", "T-compiler"],
             exclude_labels: vec!["t-libs", "t-libs-api"],
+            ordering: HashMap::new(),
         },
     });
     queries.push(QueryMap {
@@ -107,6 +115,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["final-comment-period", "T-compiler"],
             exclude_labels: vec!["t-libs", "t-libs-api"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -121,6 +130,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                 "to-announce",
             ],
             exclude_labels: vec!["t-libs", "t-libs-api"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -138,6 +148,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["proposed-final-comment-period"],
             exclude_labels: vec!["t-libs", "t-libs-api"],
+            ordering: HashMap::new(),
         },
     });
     queries.push(QueryMap {
@@ -147,6 +158,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["final-comment-period"],
             exclude_labels: vec!["t-libs", "t-libs-api"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -161,6 +173,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                 "to-announce",
             ],
             exclude_labels: vec!["t-libs", "t-libs-api"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -179,6 +192,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![],
             include_labels: vec!["beta-nominated", "T-compiler"],
             exclude_labels: vec!["beta-accepted"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -189,6 +203,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![],
             include_labels: vec!["beta-nominated", "T-rustdoc"],
             exclude_labels: vec!["beta-accepted"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -200,6 +215,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![],
             include_labels: vec!["stable-nominated", "T-compiler"],
             exclude_labels: vec!["stable-accepted"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -210,6 +226,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![],
             include_labels: vec!["stable-nominated", "T-rustdoc"],
             exclude_labels: vec!["stable-accepted"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -221,6 +238,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["S-waiting-on-team", "T-compiler"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -232,6 +250,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["T-compiler", "P-critical"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -242,6 +261,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open"), ("no", "assignee")],
             include_labels: vec!["T-compiler", "P-critical"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -252,6 +272,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["T-compiler", "P-high"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -262,6 +283,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open"), ("no", "assignee")],
             include_labels: vec!["T-compiler", "P-high"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -272,6 +294,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-beta", "P-critical"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -282,6 +305,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-beta", "P-high"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -292,6 +316,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-beta", "P-medium"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -302,6 +327,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-beta", "P-low"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -312,6 +338,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-nightly", "P-critical"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -322,6 +349,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-nightly", "P-high"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -332,6 +360,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-nightly", "P-medium"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -342,6 +371,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-nightly", "P-low"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -352,6 +382,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-stable", "P-critical"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -362,6 +393,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-stable", "P-high"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -372,6 +404,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-stable", "P-medium"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -382,6 +415,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-stable", "P-low"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -392,6 +426,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["T-compiler", "P-critical"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -402,6 +437,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["T-rustdoc", "P-critical"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -412,6 +448,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["regression-from-stable-to-beta", "P-high"],
             exclude_labels: vec!["T-infra", "T-libs", "T-release", "T-rustdoc", "T-core"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -422,6 +459,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open"), ("no", "assignee")],
             include_labels: vec!["regression-from-stable-to-nightly", "P-high"],
             exclude_labels: vec!["T-infra", "T-libs", "T-release", "T-rustdoc", "T-core"],
+            ordering: HashMap::new(),
         },
     });
 
@@ -432,6 +470,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["I-nominated", "T-compiler"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -452,6 +491,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
             filters: vec![("state", "open")],
             include_labels: vec!["T-compiler", "I-nominated"],
             exclude_labels: vec![],
+            ordering: HashMap::new(),
         },
     });
 
@@ -480,6 +520,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                             filters: vec![("state", "open"), ("is", "issue")],
                             include_labels: vec!["major-change"],
                             exclude_labels: vec!["charter-needed"],
+                            ordering: HashMap::new(),
                         },
                     },
                     QueryMap {
@@ -489,6 +530,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                             filters: vec![("state", "open"), ("is", "pull-request")],
                             include_labels: vec![],
                             exclude_labels: vec![],
+                            ordering: HashMap::new(),
                         },
                     },
                     QueryMap {
@@ -498,6 +540,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                             filters: vec![("state", "open"), ("is", "issue")],
                             include_labels: vec!["meeting-proposal", "meeting-scheduled"],
                             exclude_labels: vec![],
+                            ordering: HashMap::new(),
                         },
                     },
                 ],
@@ -515,6 +558,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                             "T-lang",
                         ],
                         exclude_labels: vec![],
+                        ordering: HashMap::new(),
                     },
                 }],
             },
@@ -533,6 +577,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                             filters: vec![("state", "open")],
                             include_labels: vec!["T-lang", "P-critical"],
                             exclude_labels: vec![],
+                            ordering: HashMap::new(),
                         },
                     },
                     QueryMap {
@@ -542,6 +587,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                             filters: vec![("state", "open")],
                             include_labels: vec!["T-lang", "I-nominated"],
                             exclude_labels: vec![],
+                            ordering: HashMap::new(),
                         },
                     },
                     QueryMap {
@@ -551,6 +597,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                             filters: vec![("state", "open")],
                             include_labels: vec!["T-lang", "proposed-final-comment-period"],
                             exclude_labels: vec!["finished-final-comment-period"],
+                            ordering: HashMap::new(),
                         },
                     },
                     QueryMap {
@@ -560,6 +607,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                             filters: vec![("state", "open")],
                             include_labels: vec!["T-lang", "final-comment-period"],
                             exclude_labels: vec!["finished-final-comment-period"],
+                            ordering: HashMap::new(),
                         },
                     },
                     QueryMap {
@@ -569,6 +617,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                             filters: vec![("state", "open")],
                             include_labels: vec!["T-lang", "finished-final-comment-period"],
                             exclude_labels: vec![],
+                            ordering: HashMap::new(),
                         },
                     },
                 ],
@@ -591,6 +640,7 @@ pub fn lang_planning<'a>() -> Box<dyn Action> {
                             filters: vec![("state", "open"), ("is", "issue")],
                             include_labels: vec!["major-change"],
                             exclude_labels: vec!["charter-needed"],
+                            ordering: HashMap::new(),
                         },
                     },
                     QueryMap {
@@ -600,6 +650,7 @@ pub fn lang_planning<'a>() -> Box<dyn Action> {
                             filters: vec![("state", "open"), ("is", "pr")],
                             include_labels: vec![],
                             exclude_labels: vec![],
+                            ordering: HashMap::new(),
                         },
                     },
                     QueryMap {
@@ -609,6 +660,7 @@ pub fn lang_planning<'a>() -> Box<dyn Action> {
                             filters: vec![("state", "open"), ("is", "issue")],
                             include_labels: vec!["meeting-proposal"],
                             exclude_labels: vec!["meeting-scheduled"],
+                            ordering: HashMap::new(),
                         },
                     },
                 ],
@@ -622,6 +674,7 @@ pub fn lang_planning<'a>() -> Box<dyn Action> {
                         filters: vec![("state", "open"), ("is", "issue")],
                         include_labels: vec!["lang-initiative"],
                         exclude_labels: vec![],
+                        ordering: HashMap::new(),
                     },
                 }],
             },
