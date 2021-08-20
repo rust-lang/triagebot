@@ -474,6 +474,21 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
         },
     });
 
+    let mut ordering = HashMap::new();
+    ordering.insert("sort", "updated");
+    ordering.insert("per_page", "5");
+
+    queries.push(QueryMap {
+        name: "top_unreviewed_prs",
+        query: github::Query {
+            kind: github::QueryKind::List,
+            filters: vec![("state", "open"), ("is", "pull-request"), ("-is", "draft")],
+            include_labels: vec!["S-waiting-on-review", "T-compiler"],
+            exclude_labels: vec![],
+            ordering,
+        },
+    });
+
     actions.push(Query {
         repos: vec!["rust-lang/rust"],
         queries,
