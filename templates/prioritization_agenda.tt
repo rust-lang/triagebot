@@ -48,7 +48,7 @@ tags: weekly, rustc
 [T-compiler](https://github.com/rust-lang/rust/pulls?utf8=%E2%9C%93&q=is%3Aopen+label%3AS-waiting-on-team+label%3AT-compiler)
 {{-issues::render(issues=prs_waiting_on_team_t_compiler, empty="No PRs waiting on `T-compiler` this time.")}}
 
-### Top unreviewed PRs
+### Most recent PRs waiting for review
 
 [T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Apr+is%3Aopen+sort%3Aupdated-asc+label%3AS-waiting-on-review+draft%3Afalse+label%3AT-compiler)
 {{-issues::render(issues=top_unreviewed_prs, with_age=true, empty="No unreviewed PRs on `T-compiler` this time.")}}
