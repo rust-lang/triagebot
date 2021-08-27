@@ -36,6 +36,7 @@ serde_path_to_error = "0.1.2"
 octocrab = "0.9.1"
 comrak = "0.8.2"
 route-recognizer = "0.3.0"
+cynic = { version = "0.14" }
 
 [dependencies.serde]
 version = "1"

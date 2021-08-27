@@ -23,9 +23,15 @@ pub struct Query<'a> {
     pub queries: Vec<QueryMap<'a>>,
 }
 
+pub enum QueryKind {
+    List,
+    Count,
+}
+
 pub struct QueryMap<'a> {
     pub name: &'a str,
-    pub query: github::Query<'a>,
+    pub kind: QueryKind,
+    pub query: github::GithubQuery<'a>,
 }
 
 #[derive(serde::Serialize)]
@@ -75,9 +81,12 @@ impl<'a> Action for Step<'a> {
                     full_name: repo.to_string(),
                 };
 
-                for QueryMap { name, query } in queries {
-                    match query.kind {
-                        github::QueryKind::List => {
+                for QueryMap { name, kind, query } in queries {
+                    let query = match query {
+                        github::GithubQuery::REST(query) => query,
+                    };
+                    match kind {
+                        QueryKind::List => {
                             let issues_search_result = repository.get_issues(&gh, &query).await;
 
                             match issues_search_result {
@@ -125,7 +134,7 @@ impl<'a> Action for Step<'a> {
                             }
                         }
 
-                        github::QueryKind::Count => {
+                        QueryKind::Count => {
                             let count = repository.get_issues_count(&gh, &query).await;
 
                             match count {

@@ -13,6 +13,8 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+mod graphql;
+
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct User {
     pub login: String,
@@ -914,18 +916,16 @@ impl Repository {
     }
 }
 
+pub enum GithubQuery<'a> {
+    REST(Query<'a>),
+}
+
 pub struct Query<'a> {
-    pub kind: QueryKind,
     // key/value filter
     pub filters: Vec<(&'a str, &'a str)>,
     pub include_labels: Vec<&'a str>,
     pub exclude_labels: Vec<&'a str>,
     pub ordering: HashMap<&'a str, &'a str>,
-}
-
-pub enum QueryKind {
-    List,
-    Count,
 }
 
 #[derive(Debug, serde::Deserialize)]
