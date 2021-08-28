@@ -301,7 +301,7 @@ pub struct Comment {
 }
 
 #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "lowercase")]
 pub enum PullRequestReviewState {
     Approved,
     ChangesRequested,
