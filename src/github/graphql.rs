@@ -54,8 +54,8 @@ mod queries {
         pub assignees: UserConnection,
         #[arguments(first = 100, order_by = IssueCommentOrder { direction: OrderDirection::Desc, field: IssueCommentOrderField::UpdatedAt })]
         pub comments: IssueCommentConnection,
-        #[arguments(last = 5)]
-        pub reviews: Option<PullRequestReviewConnection>,
+        #[arguments(last = 20)]
+        pub latest_reviews: Option<PullRequestReviewConnection>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -171,7 +171,7 @@ impl super::IssuesQuery for LeastRecentlyReviewedPullRequests {
         let repository_owner = repo.owner().to_owned();
         let repository_name = repo.name().to_owned();
 
-        let mut prs = vec![];
+        let mut prs: Vec<Option<queries::PullRequest>> = vec![];
 
         let mut args = queries::LeastRecentlyReviewedPullRequestsArguments {
             repository_owner,
@@ -218,21 +218,18 @@ impl super::IssuesQuery for LeastRecentlyReviewedPullRequests {
                 if pr.is_draft {
                     return None;
                 }
-                let labels = pr
-                    .labels
-                    .map(|labels| {
-                        labels
-                            .nodes
-                            .map(|nodes| {
-                                nodes
-                                    .into_iter()
-                                    .filter_map(|node| node)
-                                    .map(|node| node.name)
-                                    .collect::<Vec<_>>()
-                            })
-                            .unwrap_or_default()
-                    })
-                    .unwrap_or_default();
+                let labels = pr.labels;
+                let labels = (|| -> Option<_> {
+                    let labels = labels?;
+                    let nodes = labels.nodes?;
+                    let labels = nodes
+                        .into_iter()
+                        .filter_map(|node| node)
+                        .map(|node| node.name)
+                        .collect::<Vec<_>>();
+                    Some(labels)
+                })()
+                .unwrap_or_default();
                 if !labels.iter().any(|label| label == "T-compiler") {
                     return None;
                 }
@@ -247,47 +244,39 @@ impl super::IssuesQuery for LeastRecentlyReviewedPullRequests {
                     .map(|user| user.login)
                     .collect();
 
-                let mut reviews = pr
-                    .reviews
-                    .map(|reviews| {
-                        reviews
-                            .nodes
-                            .map(|nodes| {
-                                nodes
-                                    .into_iter()
-                                    .filter_map(|n| n)
-                                    .map(|review| {
-                                        (
-                                            review
-                                                .author
-                                                .map(|a| a.login)
-                                                .unwrap_or("N/A".to_string()),
-                                            review.created_at,
-                                        )
-                                    })
-                                    .collect::<Vec<_>>()
-                            })
-                            .unwrap_or_default()
-                    })
-                    .unwrap_or_default();
+                let latest_reviews = pr.latest_reviews;
+                let mut reviews = (|| -> Option<_> {
+                    let reviews = latest_reviews?;
+                    let nodes = reviews.nodes?;
+                    let reviews = nodes
+                        .into_iter()
+                        .filter_map(|node| node)
+                        .filter_map(|node| {
+                            let created_at = node.created_at;
+                            node.author.map(|author| (author, created_at))
+                        })
+                        .map(|(author, created_at)| (author.login, created_at))
+                        .collect::<Vec<_>>();
+                    Some(reviews)
+                })()
+                .unwrap_or_default();
                 reviews.sort_by_key(|r| r.1);
 
-                let comments = pr
-                    .comments
-                    .nodes
-                    .map(|nodes| {
-                        nodes
-                            .into_iter()
-                            .filter_map(|n| n)
-                            .map(|comment| {
-                                (
-                                    comment.author.map(|a| a.login).unwrap_or("N/A".to_string()),
-                                    comment.created_at,
-                                )
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default();
+                let comments = pr.comments;
+                let comments = (|| -> Option<_> {
+                    let nodes = comments.nodes?;
+                    let comments = nodes
+                        .into_iter()
+                        .filter_map(|node| node)
+                        .filter_map(|node| {
+                            let created_at = node.created_at;
+                            node.author.map(|author| (author, created_at))
+                        })
+                        .map(|(author, created_at)| (author.login, created_at))
+                        .collect::<Vec<_>>();
+                    Some(comments)
+                })()
+                .unwrap_or_default();
                 let mut comments: Vec<_> = comments
                     .into_iter()
                     .filter(|comment| assignees.contains(&comment.0))
