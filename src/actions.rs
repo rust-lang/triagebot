@@ -32,7 +32,7 @@ pub enum QueryKind {
 pub struct QueryMap<'a> {
     pub name: &'a str,
     pub kind: QueryKind,
-    pub query: github::GithubQuery<'a>,
+    pub query: Box<dyn github::IssuesQuery + Send + Sync>,
 }
 
 #[derive(serde::Serialize)]
@@ -83,106 +83,35 @@ impl<'a> Action for Step<'a> {
                 };
 
                 for QueryMap { name, kind, query } in queries {
-                    match query {
-                        github::GithubQuery::REST(query) => match kind {
+                    let issues = query.query(&repository, &gh).await;
+
+                    match issues {
+                        Ok(issues_decorator) => match kind {
                             QueryKind::List => {
-                                let issues_search_result = repository.get_issues(&gh, &query).await;
-
-                                match issues_search_result {
-                                    Ok(issues) => {
-                                        let issues_decorator: Vec<_> = issues
-                                            .iter()
-                                            .map(|issue| IssueDecorator {
-                                                title: issue.title.clone(),
-                                                number: issue.number,
-                                                html_url: issue.html_url.clone(),
-                                                repo_name: repository.name().to_owned(),
-                                                labels: issue
-                                                    .labels
-                                                    .iter()
-                                                    .map(|l| l.name.as_ref())
-                                                    .collect::<Vec<_>>()
-                                                    .join(", "),
-                                                assignees: issue
-                                                    .assignees
-                                                    .iter()
-                                                    .map(|u| u.login.as_ref())
-                                                    .collect::<Vec<_>>()
-                                                    .join(", "),
-                                                updated_at: to_human(issue.updated_at),
-                                            })
-                                            .collect();
-
-                                        results
-                                            .entry(*name)
-                                            .or_insert(Vec::new())
-                                            .extend(issues_decorator);
-                                    }
-                                    Err(err) => {
-                                        eprintln!("ERROR: {}", err);
-                                        err.chain()
-                                            .skip(1)
-                                            .for_each(|cause| eprintln!("because: {}", cause));
-                                        std::process::exit(1);
-                                    }
-                                }
+                                results
+                                    .entry(*name)
+                                    .or_insert(Vec::new())
+                                    .extend(issues_decorator);
                             }
-
                             QueryKind::Count => {
-                                let count = repository.get_issues_count(&gh, &query).await;
+                                let count = issues_decorator.len();
+                                let result = if let Some(value) = context.get(*name) {
+                                    value.as_u64().unwrap() + count as u64
+                                } else {
+                                    count as u64
+                                };
 
-                                match count {
-                                    Ok(count) => {
-                                        let result = if let Some(value) = context.get(*name) {
-                                            value.as_u64().unwrap() + count as u64
-                                        } else {
-                                            count as u64
-                                        };
-
-                                        context.insert(*name, &result);
-                                    }
-                                    Err(err) => {
-                                        eprintln!("ERROR: {}", err);
-                                        err.chain()
-                                            .skip(1)
-                                            .for_each(|cause| eprintln!("because: {}", cause));
-                                        std::process::exit(1);
-                                    }
-                                }
+                                context.insert(*name, &result);
                             }
                         },
-                        github::GithubQuery::GraphQL(query) => {
-                            let issues = query.query(&repository, &gh).await;
-
-                            match issues {
-                                Ok(issues_decorator) => match kind {
-                                    QueryKind::List => {
-                                        results
-                                            .entry(*name)
-                                            .or_insert(Vec::new())
-                                            .extend(issues_decorator);
-                                    }
-                                    QueryKind::Count => {
-                                        let count = issues_decorator.len();
-                                        let result = if let Some(value) = context.get(*name) {
-                                            value.as_u64().unwrap() + count as u64
-                                        } else {
-                                            count as u64
-                                        };
-
-                                        context.insert(*name, &result);
-                                    }
-                                },
-                                Err(err) => {
-                                    eprintln!("ERROR: {}", err);
-                                    err.chain()
-                                        .skip(1)
-                                        .for_each(|cause| eprintln!("because: {}", cause));
-                                    std::process::exit(1);
-                                }
-                            }
+                        Err(err) => {
+                            eprintln!("ERROR: {}", err);
+                            err.chain()
+                                .skip(1)
+                                .for_each(|cause| eprintln!("because: {}", cause));
+                            std::process::exit(1);
                         }
-                    };
+                    }
                 }
             }
         }

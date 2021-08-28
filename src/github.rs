@@ -9,7 +9,6 @@ use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
 use std::{
-    collections::HashMap,
     fmt,
     time::{Duration, SystemTime},
 };
@@ -763,6 +762,12 @@ pub struct Repository {
     pub full_name: String,
 }
 
+struct Ordering<'a> {
+    pub sort: &'a str,
+    pub direction: &'a str,
+    pub per_page: &'a str,
+}
+
 impl Repository {
     const GITHUB_API_URL: &'static str = "https://api.github.com";
     const GITHUB_GRAPHQL_API_URL: &'static str = "https://api.github.com/graphql";
@@ -784,9 +789,26 @@ impl Repository {
             filters,
             include_labels,
             exclude_labels,
-            ordering,
-            ..
         } = query;
+
+        let mut ordering = Ordering {
+            sort: "created",
+            direction: "asc",
+            per_page: "100",
+        };
+        let filters: Vec<_> = filters
+            .clone()
+            .into_iter()
+            .filter(|(key, val)| {
+                match *key {
+                    "sort" => ordering.sort = val,
+                    "direction" => ordering.direction = val,
+                    "per_page" => ordering.per_page = val,
+                    _ => return true,
+                };
+                false
+            })
+            .collect();
 
         // `is: pull-request` indicates the query to retrieve PRs only
         let is_pr = filters
@@ -805,11 +827,11 @@ impl Repository {
             || is_pr && !include_labels.is_empty();
 
         let url = if use_search_api {
-            self.build_search_issues_url(filters, include_labels, exclude_labels, ordering)
+            self.build_search_issues_url(&filters, include_labels, exclude_labels, ordering)
         } else if is_pr {
-            self.build_pulls_url(filters, include_labels, ordering)
+            self.build_pulls_url(&filters, include_labels, ordering)
         } else {
-            self.build_issues_url(filters, include_labels, ordering)
+            self.build_issues_url(&filters, include_labels, ordering)
         };
 
         let result = client.get(&url);
@@ -827,19 +849,11 @@ impl Repository {
         }
     }
 
-    pub async fn get_issues_count<'a>(
-        &self,
-        client: &GithubClient,
-        query: &Query<'a>,
-    ) -> anyhow::Result<usize> {
-        Ok(self.get_issues(client, query).await?.len())
-    }
-
     fn build_issues_url(
         &self,
         filters: &Vec<(&str, &str)>,
         include_labels: &Vec<&str>,
-        ordering: &HashMap<&str, &str>,
+        ordering: Ordering<'_>,
     ) -> String {
         self.build_endpoint_url("issues", filters, include_labels, ordering)
     }
@@ -848,7 +862,7 @@ impl Repository {
         &self,
         filters: &Vec<(&str, &str)>,
         include_labels: &Vec<&str>,
-        ordering: &HashMap<&str, &str>,
+        ordering: Ordering<'_>,
     ) -> String {
         self.build_endpoint_url("pulls", filters, include_labels, ordering)
     }
@@ -858,7 +872,7 @@ impl Repository {
         endpoint: &str,
         filters: &Vec<(&str, &str)>,
         include_labels: &Vec<&str>,
-        ordering: &HashMap<&str, &str>,
+        ordering: Ordering<'_>,
     ) -> String {
         let filters = filters
             .iter()
@@ -868,18 +882,11 @@ impl Repository {
                 include_labels.join(",")
             )))
             .chain(std::iter::once("filter=all".to_owned()))
-            .chain(std::iter::once(format!(
-                "sort={}",
-                ordering.get("sort").unwrap_or(&"created")
-            )))
-            .chain(std::iter::once(format!(
-                "direction={}",
-                ordering.get("direction").unwrap_or(&"asc")
-            )))
-            .chain(std::iter::once(format!(
-                "per_page={}",
-                ordering.get("per_page").unwrap_or(&"100")
-            )))
+            .chain(std::iter::once(format!("sort={}", ordering.sort,)))
+            .chain(std::iter::once(
+                format!("direction={}", ordering.direction,),
+            ))
+            .chain(std::iter::once(format!("per_page={}", ordering.per_page,)))
             .collect::<Vec<_>>()
             .join("&");
         format!(
@@ -896,7 +903,7 @@ impl Repository {
         filters: &Vec<(&str, &str)>,
         include_labels: &Vec<&str>,
         exclude_labels: &Vec<&str>,
-        ordering: &HashMap<&str, &str>,
+        ordering: Ordering<'_>,
     ) -> String {
         let filters = filters
             .iter()
@@ -919,16 +926,11 @@ impl Repository {
             "{}/search/issues?q={}&sort={}&order={}&per_page={}",
             Repository::GITHUB_API_URL,
             filters,
-            ordering.get("sort").unwrap_or(&"created"),
-            ordering.get("direction").unwrap_or(&"asc"),
-            ordering.get("per_page").unwrap_or(&"100"),
+            ordering.sort,
+            ordering.direction,
+            ordering.per_page,
         )
     }
-}
-
-pub enum GithubQuery<'a> {
-    REST(Query<'a>),
-    GraphQL(Box<dyn IssuesQuery + Send + Sync>),
 }
 
 pub struct Query<'a> {
@@ -936,7 +938,45 @@ pub struct Query<'a> {
     pub filters: Vec<(&'a str, &'a str)>,
     pub include_labels: Vec<&'a str>,
     pub exclude_labels: Vec<&'a str>,
-    pub ordering: HashMap<&'a str, &'a str>,
+}
+
+#[async_trait]
+impl<'q> IssuesQuery for Query<'q> {
+    async fn query<'a>(
+        &'a self,
+        repo: &'a Repository,
+        client: &'a GithubClient,
+    ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
+        let issues = repo
+            .get_issues(&client, self)
+            .await
+            .with_context(|| "Unable to get issues.")?;
+
+        let issues_decorator: Vec<_> = issues
+            .iter()
+            .map(|issue| crate::actions::IssueDecorator {
+                title: issue.title.clone(),
+                number: issue.number,
+                html_url: issue.html_url.clone(),
+                repo_name: repo.name().to_owned(),
+                labels: issue
+                    .labels
+                    .iter()
+                    .map(|l| l.name.as_ref())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                assignees: issue
+                    .assignees
+                    .iter()
+                    .map(|u| u.login.as_ref())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                updated_at: crate::actions::to_human(issue.updated_at),
+            })
+            .collect();
+
+        Ok(issues_decorator)
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
