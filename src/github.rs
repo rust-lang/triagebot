@@ -1,5 +1,6 @@
 use anyhow::Context;
 
+use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{future::BoxFuture, FutureExt};
@@ -927,7 +928,7 @@ impl Repository {
 
 pub enum GithubQuery<'a> {
     REST(Query<'a>),
-    GraphQL(Box<dyn graphql::IssuesQuery + Send + Sync>),
+    GraphQL(Box<dyn IssuesQuery + Send + Sync>),
 }
 
 pub struct Query<'a> {
@@ -1219,4 +1220,13 @@ pub struct GitUser {
 #[derive(Debug, serde::Deserialize)]
 pub struct Parent {
     pub sha: String,
+}
+
+#[async_trait]
+pub trait IssuesQuery {
+    async fn query<'a>(
+        &'a self,
+        repo: &'a Repository,
+        client: &'a GithubClient,
+    ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>>;
 }

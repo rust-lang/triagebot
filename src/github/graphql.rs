@@ -158,18 +158,9 @@ mod schema {
     cynic::use_schema!("src/github/github.graphql");
 }
 
-#[async_trait]
-pub trait IssuesQuery {
-    async fn query<'a>(
-        &'a self,
-        repo: &'a super::Repository,
-        client: &'a super::GithubClient,
-    ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>>;
-}
-
 pub struct LeastRecentlyReviewedPullRequests;
 #[async_trait]
-impl IssuesQuery for LeastRecentlyReviewedPullRequests {
+impl super::IssuesQuery for LeastRecentlyReviewedPullRequests {
     async fn query<'a>(
         &'a self,
         repo: &'a super::Repository,
