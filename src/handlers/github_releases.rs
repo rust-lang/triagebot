@@ -115,7 +115,7 @@ async fn load_changelog(
     let resp = ctx
         .github
         .raw_file(
-            event.repo_name(),
+            &event.repo_name(),
             &config.changelog_branch,
             &config.changelog_path,
         )

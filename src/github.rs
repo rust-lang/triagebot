@@ -13,6 +13,8 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+pub mod graphql;
+
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct User {
     pub login: String,
@@ -757,11 +759,17 @@ pub struct IssueSearchResult {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Repository {
-    pub full_name: String,
+    pub owner: String,
+    pub name: String,
 }
 
 impl Repository {
     const GITHUB_API_URL: &'static str = "https://api.github.com";
+    const GITHUB_GRAPHQL_API_URL: &'static str = "https://api.github.com/graphql";
+
+    pub fn full_name(&self) -> String {
+        return format!("{}/{}", self.owner, self.name);
+    }
 
     pub async fn get_issues<'a>(
         &self,
@@ -873,7 +881,7 @@ impl Repository {
         format!(
             "{}/repos/{}/{}?{}",
             Repository::GITHUB_API_URL,
-            self.full_name,
+            self.full_name(),
             endpoint,
             filters
         )
@@ -900,7 +908,7 @@ impl Repository {
                     .iter()
                     .map(|label| format!("-label:{}", label)),
             )
-            .chain(std::iter::once(format!("repo:{}", self.full_name)))
+            .chain(std::iter::once(format!("repo:{}", self.full_name())))
             .collect::<Vec<_>>()
             .join("+");
         format!(
@@ -914,18 +922,17 @@ impl Repository {
     }
 }
 
+pub enum GithubQuery<'a> {
+    REST(Query<'a>),
+    GraphQL(Box<dyn graphql::IssuesQuery + Send + Sync>),
+}
+
 pub struct Query<'a> {
-    pub kind: QueryKind,
     // key/value filter
     pub filters: Vec<(&'a str, &'a str)>,
     pub include_labels: Vec<&'a str>,
     pub exclude_labels: Vec<&'a str>,
     pub ordering: HashMap<&'a str, &'a str>,
-}
-
-pub enum QueryKind {
-    List,
-    Count,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -959,12 +966,12 @@ pub enum Event {
 }
 
 impl Event {
-    pub fn repo_name(&self) -> &str {
+    pub fn repo_name(&self) -> String {
         match self {
-            Event::Create(event) => &event.repository.full_name,
-            Event::IssueComment(event) => &event.repository.full_name,
-            Event::Issue(event) => &event.repository.full_name,
-            Event::Push(event) => &event.repository.full_name,
+            Event::Create(event) => event.repository.full_name(),
+            Event::IssueComment(event) => event.repository.full_name(),
+            Event::Issue(event) => event.repository.full_name(),
+            Event::Push(event) => event.repository.full_name(),
         }
     }
 

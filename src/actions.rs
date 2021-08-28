@@ -19,13 +19,20 @@ pub struct Step<'a> {
 }
 
 pub struct Query<'a> {
-    pub repos: Vec<&'a str>,
+    /// Vec of (owner, name)
+    pub repos: Vec<(&'a str, &'a str)>,
     pub queries: Vec<QueryMap<'a>>,
+}
+
+pub enum QueryKind {
+    List,
+    Count,
 }
 
 pub struct QueryMap<'a> {
     pub name: &'a str,
-    pub query: github::Query<'a>,
+    pub kind: QueryKind,
+    pub query: github::GithubQuery<'a>,
 }
 
 #[derive(serde::Serialize)]
@@ -51,7 +58,7 @@ lazy_static! {
     };
 }
 
-fn to_human(d: DateTime<Utc>) -> String {
+pub fn to_human(d: DateTime<Utc>) -> String {
     let d1 = chrono::Utc::now() - d;
     let days = d1.num_days();
     if days > 60 {
@@ -72,72 +79,101 @@ impl<'a> Action for Step<'a> {
         for Query { repos, queries } in &self.actions {
             for repo in repos {
                 let repository = Repository {
-                    full_name: repo.to_string(),
+                    owner: repo.0.to_string(),
+                    name: repo.1.to_string(),
                 };
 
-                for QueryMap { name, query } in queries {
-                    match query.kind {
-                        github::QueryKind::List => {
-                            let issues_search_result = repository.get_issues(&gh, &query).await;
+                for QueryMap { name, kind, query } in queries {
+                    match query {
+                        github::GithubQuery::REST(query) => match kind {
+                            QueryKind::List => {
+                                let issues_search_result = repository.get_issues(&gh, &query).await;
 
-                            match issues_search_result {
-                                Ok(issues) => {
-                                    let issues_decorator: Vec<_> = issues
-                                        .iter()
-                                        .map(|issue| IssueDecorator {
-                                            title: issue.title.clone(),
-                                            number: issue.number,
-                                            html_url: issue.html_url.clone(),
-                                            repo_name: repository
-                                                .full_name
-                                                .split("/")
-                                                .last()
-                                                .expect("Failed to split repository name")
-                                                .to_string(),
-                                            labels: issue
-                                                .labels
-                                                .iter()
-                                                .map(|l| l.name.as_ref())
-                                                .collect::<Vec<_>>()
-                                                .join(", "),
-                                            assignees: issue
-                                                .assignees
-                                                .iter()
-                                                .map(|u| u.login.as_ref())
-                                                .collect::<Vec<_>>()
-                                                .join(", "),
-                                            updated_at: to_human(issue.updated_at),
-                                        })
-                                        .collect();
+                                match issues_search_result {
+                                    Ok(issues) => {
+                                        let issues_decorator: Vec<_> = issues
+                                            .iter()
+                                            .map(|issue| IssueDecorator {
+                                                title: issue.title.clone(),
+                                                number: issue.number,
+                                                html_url: issue.html_url.clone(),
+                                                repo_name: repository.name.clone(),
+                                                labels: issue
+                                                    .labels
+                                                    .iter()
+                                                    .map(|l| l.name.as_ref())
+                                                    .collect::<Vec<_>>()
+                                                    .join(", "),
+                                                assignees: issue
+                                                    .assignees
+                                                    .iter()
+                                                    .map(|u| u.login.as_ref())
+                                                    .collect::<Vec<_>>()
+                                                    .join(", "),
+                                                updated_at: to_human(issue.updated_at),
+                                            })
+                                            .collect();
 
-                                    results
-                                        .entry(*name)
-                                        .or_insert(Vec::new())
-                                        .extend(issues_decorator);
-                                }
-                                Err(err) => {
-                                    eprintln!("ERROR: {}", err);
-                                    err.chain()
-                                        .skip(1)
-                                        .for_each(|cause| eprintln!("because: {}", cause));
-                                    std::process::exit(1);
+                                        results
+                                            .entry(*name)
+                                            .or_insert(Vec::new())
+                                            .extend(issues_decorator);
+                                    }
+                                    Err(err) => {
+                                        eprintln!("ERROR: {}", err);
+                                        err.chain()
+                                            .skip(1)
+                                            .for_each(|cause| eprintln!("because: {}", cause));
+                                        std::process::exit(1);
+                                    }
                                 }
                             }
-                        }
 
-                        github::QueryKind::Count => {
-                            let count = repository.get_issues_count(&gh, &query).await;
+                            QueryKind::Count => {
+                                let count = repository.get_issues_count(&gh, &query).await;
 
-                            match count {
-                                Ok(count) => {
-                                    let result = if let Some(value) = context.get(*name) {
-                                        value.as_u64().unwrap() + count as u64
-                                    } else {
-                                        count as u64
-                                    };
+                                match count {
+                                    Ok(count) => {
+                                        let result = if let Some(value) = context.get(*name) {
+                                            value.as_u64().unwrap() + count as u64
+                                        } else {
+                                            count as u64
+                                        };
 
-                                    context.insert(*name, &result);
+                                        context.insert(*name, &result);
+                                    }
+                                    Err(err) => {
+                                        eprintln!("ERROR: {}", err);
+                                        err.chain()
+                                            .skip(1)
+                                            .for_each(|cause| eprintln!("because: {}", cause));
+                                        std::process::exit(1);
+                                    }
                                 }
+                            }
+                        },
+                        github::GithubQuery::GraphQL(query) => {
+                            let issues = query.query(&repository, &gh).await;
+
+                            match issues {
+                                Ok(issues_decorator) => match kind {
+                                    QueryKind::List => {
+                                        results
+                                            .entry(*name)
+                                            .or_insert(Vec::new())
+                                            .extend(issues_decorator);
+                                    }
+                                    QueryKind::Count => {
+                                        let count = issues_decorator.len();
+                                        let result = if let Some(value) = context.get(*name) {
+                                            value.as_u64().unwrap() + count as u64
+                                        } else {
+                                            count as u64
+                                        };
+
+                                        context.insert(*name, &result);
+                                    }
+                                },
                                 Err(err) => {
                                     eprintln!("ERROR: {}", err);
                                     err.chain()
