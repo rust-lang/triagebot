@@ -92,7 +92,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repos: vec!["rust-lang/compiler-team"],
+        repos: vec![("rust-lang", "compiler-team")],
         queries,
     });
 
@@ -135,7 +135,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repos: vec!["rust-lang/rust"],
+        repos: vec![("rust-lang", "rust")],
         queries,
     });
 
@@ -178,7 +178,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repos: vec!["rust-lang/rust-forge"],
+        repos: vec![("rust-lang", "rust-forge")],
         queries,
     });
 
@@ -481,16 +481,11 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     queries.push(QueryMap {
         name: "top_unreviewed_prs",
         kind: QueryKind::List,
-        query: github::GithubQuery::REST(github::Query {
-            filters: vec![("state", "open"), ("is", "pull-request"), ("draft", "false")],
-            include_labels: vec!["S-waiting-on-review", "T-compiler"],
-            exclude_labels: vec![],
-            ordering,
-        }),
+        query: github::GithubQuery::GraphQL(Box::new(github::graphql::LeastRecentlyReviewedPullRequests)),
     });
 
     actions.push(Query {
-        repos: vec!["rust-lang/rust"],
+        repos: vec![("rust-lang", "rust")],
         queries,
     });
 
@@ -511,7 +506,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     });
 
     actions.push(Query {
-        repos: vec!["rust-lang/rfcs"],
+        repos: vec![("rust-lang", "rfcs")],
         queries,
     });
 
@@ -526,7 +521,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
         name: "lang_agenda",
         actions: vec![
             Query {
-                repos: vec!["rust-lang/lang-team"],
+                repos: vec![("rust-lang", "lang-team")],
                 queries: vec![
                     QueryMap {
                         name: "pending_project_proposals",
@@ -561,7 +556,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                 ],
             },
             Query {
-                repos: vec!["rust-lang/rfcs"],
+                repos: vec![("rust-lang", "rfcs")],
                 queries: vec![QueryMap {
                     name: "rfcs_waiting_to_be_merged",
                     kind: QueryKind::List,
@@ -579,10 +574,10 @@ pub fn lang<'a>() -> Box<dyn Action> {
             },
             Query {
                 repos: vec![
-                    "rust-lang/rfcs",
-                    "rust-lang/rust",
-                    "rust-lang/reference",
-                    "rust-lang/lang-team",
+                    ("rust-lang", "rfcs"),
+                    ("rust-lang", "rust"),
+                    ("rust-lang", "reference"),
+                    ("rust-lang", "lang-team"),
                 ],
                 queries: vec![
                     QueryMap {
@@ -646,7 +641,7 @@ pub fn lang_planning<'a>() -> Box<dyn Action> {
         name: "lang_planning_agenda",
         actions: vec![
             Query {
-                repos: vec!["rust-lang/lang-team"],
+                repos: vec![("rust-lang", "lang-team")],
                 queries: vec![
                     QueryMap {
                         name: "pending_project_proposals",
@@ -681,7 +676,7 @@ pub fn lang_planning<'a>() -> Box<dyn Action> {
                 ],
             },
             Query {
-                repos: vec!["rust-lang/lang-team"],
+                repos: vec![("rust-lang", "lang-team")],
                 queries: vec![QueryMap {
                     name: "active_initiatives",
                     kind: QueryKind::List,

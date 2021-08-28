@@ -1,3 +1,6 @@
+use anyhow::Context;
+use async_trait::async_trait;
+
 #[cynic::schema_for_derives(file = "src/github/github.graphql", module = "schema")]
 mod queries {
     use super::schema;
@@ -8,13 +11,15 @@ mod queries {
 
     #[derive(cynic::FragmentArguments, Debug)]
     pub struct LeastRecentlyReviewedPullRequestsArguments {
+        pub repository_owner: String,
+        pub repository_name: String,
         pub after: Option<String>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
     #[cynic(graphql_type = "Query", argument_struct = "LeastRecentlyReviewedPullRequestsArguments")]
     pub struct LeastRecentlyReviewedPullRequests {
-        #[arguments(owner = "rust-lang", name = "rust")]
+        #[arguments(owner = &args.repository_owner, name = &args.repository_name)]
         pub repository: Option<Repository>,
     }
 
@@ -36,6 +41,8 @@ mod queries {
     pub struct PullRequest {
         pub number: i32,
         pub created_at: DateTime,
+        pub url: Uri,
+        pub title: String,
         #[arguments(first = 100)]
         pub labels: Option<LabelConnection>,
         pub is_draft: bool,
@@ -56,6 +63,7 @@ mod queries {
     #[derive(cynic::QueryFragment, Debug)]
     pub struct PullRequestReview {
         pub author: Option<Actor>,
+        pub created_at: DateTime,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -93,6 +101,7 @@ mod queries {
     #[derive(cynic::QueryFragment, Debug)]
     pub struct IssueComment {
         pub author: Option<Actor>,
+        pub created_at: DateTime,
     }
 
     #[derive(cynic::Enum, Clone, Copy, Debug)]
@@ -136,8 +145,153 @@ mod queries {
     pub struct Actor {
         pub login: String,
     }
+
+    #[derive(cynic::Scalar, Debug, Clone)]
+    pub struct Uri(pub String);
 }
 
 mod schema {
     cynic::use_schema!("src/github/github.graphql");
+}
+
+#[async_trait]
+pub trait IssuesQuery {
+    async fn query<'a>(&'a self, repo: &'a super::Repository, client: &'a super::GithubClient) -> anyhow::Result<Vec<crate::actions::IssueDecorator>>;
+}
+
+pub struct LeastRecentlyReviewedPullRequests;
+#[async_trait]
+impl IssuesQuery for LeastRecentlyReviewedPullRequests {
+    async fn query<'a>(&'a self, repo: &'a super::Repository, client: &'a super::GithubClient) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
+        use cynic::QueryBuilder;
+
+        let repo_name = repo.name.clone();
+        let repository_owner = repo.owner.clone();
+        let repository_name = repo.name.clone();
+
+        let mut prs = vec![];
+
+        let mut args = queries::LeastRecentlyReviewedPullRequestsArguments {
+            repository_owner,
+            repository_name,
+            after: None,
+        };
+        loop {
+            let query = queries::LeastRecentlyReviewedPullRequests::build(&args);
+            let req = client.post(super::Repository::GITHUB_GRAPHQL_API_URL);
+            let req = req.json(&query);
+
+            let (resp, req_dbg) = client._send_req(req).await?;
+            let response = resp.json().await.context(req_dbg)?;
+            let data: cynic::GraphQlResponse<queries::LeastRecentlyReviewedPullRequests> = query.decode_response(response).with_context(|| format!("failed to parse response for `LeastRecentlyReviewedPullRequests`"))?;
+            if let Some(errors) = data.errors {
+                anyhow::bail!("There were graphql errors. {:?}", errors);
+            }
+            let repository = data.data.ok_or_else(|| anyhow::anyhow!("No data returned."))?.repository.ok_or_else(|| anyhow::anyhow!("No repository."))?;
+            prs.extend(repository.pull_requests.nodes.unwrap_or_default().into_iter());
+            let page_info = repository.pull_requests.page_info;
+            if !page_info.has_next_page || page_info.end_cursor.is_none() {
+                break;
+            }
+            args.after = page_info.end_cursor;
+        }
+
+        let mut prs: Vec<_> = prs
+            .into_iter()
+            .filter_map(|pr| pr)
+            .filter_map(|pr| {
+                if pr.is_draft {
+                    return None;
+                }
+                let labels = pr
+                    .labels
+                    .map(|labels|
+                        labels
+                            .nodes
+                            .map(|nodes|
+                                nodes
+                                    .into_iter()
+                                    .filter_map(|node| node)
+                                    .map(|node| node.name)
+                                    .collect::<Vec<_>>()
+                            )
+                            .unwrap_or_default()
+                    )
+                    .unwrap_or_default();
+                if !labels.iter().any(|label| label == "T-compiler") {
+                    return None;
+                }
+                let labels = labels.join(", ");
+
+                let assignees: Vec<_> = pr
+                    .assignees
+                    .nodes
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|user| user)
+                    .map(|user| user.login)
+                    .collect();
+
+                let mut reviews = pr
+                    .reviews
+                    .map(|reviews|
+                        reviews
+                        .nodes
+                        .map(|nodes|
+                            nodes
+                            .into_iter()
+                            .filter_map(|n| n)
+                            .map(|review| (review.author.map(|a| a.login).unwrap_or("N/A".to_string()), review.created_at))
+                            .collect::<Vec<_>>()
+                        )
+                        .unwrap_or_default()
+                    )
+                    .unwrap_or_default();
+                reviews.sort_by_key(|r| r.1);
+
+                let comments = pr
+                    .comments
+                    .nodes
+                    .map(|nodes|
+                        nodes
+                            .into_iter()
+                            .filter_map(|n| n)
+                            .map(|comment| (comment.author.map(|a| a.login).unwrap_or("N/A".to_string()), comment.created_at))
+                            .collect::<Vec<_>>()
+                    )
+                    .unwrap_or_default();
+                let mut comments: Vec<_> = comments.into_iter().filter(|comment| assignees.contains(&comment.0)).collect();
+                comments.sort_by_key(|c| c.1);
+
+                let updated_at = std::cmp::max(
+                    reviews.last().map(|t| t.1).unwrap_or(pr.created_at),
+                    comments.last().map(|t| t.1).unwrap_or(pr.created_at),
+                );
+                let assignees = assignees.join(", ");
+
+                Some((updated_at, pr.number as u64, pr.title, pr.url.0, repo_name.clone(), labels, assignees))
+            })
+            .collect();
+        prs.sort_by_key(|pr| pr.0);
+
+        let prs: Vec<_> = prs
+            .into_iter()
+            .take(5)
+            .map(|(updated_at, number, title, html_url, repo_name, labels, assignees)| {
+                let updated_at = crate::actions::to_human(updated_at);
+
+                crate::actions::IssueDecorator {
+                    number,
+                    title,
+                    html_url,
+                    repo_name,
+                    labels,
+                    assignees,
+                    updated_at,
+                }
+            })
+            .collect();
+
+        Ok(prs)
+    }
 }
