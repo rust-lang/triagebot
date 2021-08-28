@@ -17,7 +17,10 @@ mod queries {
     }
 
     #[derive(cynic::QueryFragment, Debug)]
-    #[cynic(graphql_type = "Query", argument_struct = "LeastRecentlyReviewedPullRequestsArguments")]
+    #[cynic(
+        graphql_type = "Query",
+        argument_struct = "LeastRecentlyReviewedPullRequestsArguments"
+    )]
     pub struct LeastRecentlyReviewedPullRequests {
         #[arguments(owner = &args.repository_owner, name = &args.repository_name)]
         pub repository: Option<Repository>,
@@ -156,13 +159,21 @@ mod schema {
 
 #[async_trait]
 pub trait IssuesQuery {
-    async fn query<'a>(&'a self, repo: &'a super::Repository, client: &'a super::GithubClient) -> anyhow::Result<Vec<crate::actions::IssueDecorator>>;
+    async fn query<'a>(
+        &'a self,
+        repo: &'a super::Repository,
+        client: &'a super::GithubClient,
+    ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>>;
 }
 
 pub struct LeastRecentlyReviewedPullRequests;
 #[async_trait]
 impl IssuesQuery for LeastRecentlyReviewedPullRequests {
-    async fn query<'a>(&'a self, repo: &'a super::Repository, client: &'a super::GithubClient) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
+    async fn query<'a>(
+        &'a self,
+        repo: &'a super::Repository,
+        client: &'a super::GithubClient,
+    ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         use cynic::QueryBuilder;
 
         let repo_name = repo.name.clone();
@@ -183,12 +194,25 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
 
             let (resp, req_dbg) = client._send_req(req).await?;
             let response = resp.json().await.context(req_dbg)?;
-            let data: cynic::GraphQlResponse<queries::LeastRecentlyReviewedPullRequests> = query.decode_response(response).with_context(|| format!("failed to parse response for `LeastRecentlyReviewedPullRequests`"))?;
+            let data: cynic::GraphQlResponse<queries::LeastRecentlyReviewedPullRequests> =
+                query.decode_response(response).with_context(|| {
+                    format!("failed to parse response for `LeastRecentlyReviewedPullRequests`")
+                })?;
             if let Some(errors) = data.errors {
                 anyhow::bail!("There were graphql errors. {:?}", errors);
             }
-            let repository = data.data.ok_or_else(|| anyhow::anyhow!("No data returned."))?.repository.ok_or_else(|| anyhow::anyhow!("No repository."))?;
-            prs.extend(repository.pull_requests.nodes.unwrap_or_default().into_iter());
+            let repository = data
+                .data
+                .ok_or_else(|| anyhow::anyhow!("No data returned."))?
+                .repository
+                .ok_or_else(|| anyhow::anyhow!("No repository."))?;
+            prs.extend(
+                repository
+                    .pull_requests
+                    .nodes
+                    .unwrap_or_default()
+                    .into_iter(),
+            );
             let page_info = repository.pull_requests.page_info;
             if !page_info.has_next_page || page_info.end_cursor.is_none() {
                 break;
@@ -205,18 +229,18 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                 }
                 let labels = pr
                     .labels
-                    .map(|labels|
+                    .map(|labels| {
                         labels
                             .nodes
-                            .map(|nodes|
+                            .map(|nodes| {
                                 nodes
                                     .into_iter()
                                     .filter_map(|node| node)
                                     .map(|node| node.name)
                                     .collect::<Vec<_>>()
-                            )
+                            })
                             .unwrap_or_default()
-                    )
+                    })
                     .unwrap_or_default();
                 if !labels.iter().any(|label| label == "T-compiler") {
                     return None;
@@ -234,33 +258,49 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
 
                 let mut reviews = pr
                     .reviews
-                    .map(|reviews|
+                    .map(|reviews| {
                         reviews
-                        .nodes
-                        .map(|nodes|
-                            nodes
-                            .into_iter()
-                            .filter_map(|n| n)
-                            .map(|review| (review.author.map(|a| a.login).unwrap_or("N/A".to_string()), review.created_at))
-                            .collect::<Vec<_>>()
-                        )
-                        .unwrap_or_default()
-                    )
+                            .nodes
+                            .map(|nodes| {
+                                nodes
+                                    .into_iter()
+                                    .filter_map(|n| n)
+                                    .map(|review| {
+                                        (
+                                            review
+                                                .author
+                                                .map(|a| a.login)
+                                                .unwrap_or("N/A".to_string()),
+                                            review.created_at,
+                                        )
+                                    })
+                                    .collect::<Vec<_>>()
+                            })
+                            .unwrap_or_default()
+                    })
                     .unwrap_or_default();
                 reviews.sort_by_key(|r| r.1);
 
                 let comments = pr
                     .comments
                     .nodes
-                    .map(|nodes|
+                    .map(|nodes| {
                         nodes
                             .into_iter()
                             .filter_map(|n| n)
-                            .map(|comment| (comment.author.map(|a| a.login).unwrap_or("N/A".to_string()), comment.created_at))
+                            .map(|comment| {
+                                (
+                                    comment.author.map(|a| a.login).unwrap_or("N/A".to_string()),
+                                    comment.created_at,
+                                )
+                            })
                             .collect::<Vec<_>>()
-                    )
+                    })
                     .unwrap_or_default();
-                let mut comments: Vec<_> = comments.into_iter().filter(|comment| assignees.contains(&comment.0)).collect();
+                let mut comments: Vec<_> = comments
+                    .into_iter()
+                    .filter(|comment| assignees.contains(&comment.0))
+                    .collect();
                 comments.sort_by_key(|c| c.1);
 
                 let updated_at = std::cmp::max(
@@ -269,7 +309,15 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                 );
                 let assignees = assignees.join(", ");
 
-                Some((updated_at, pr.number as u64, pr.title, pr.url.0, repo_name.clone(), labels, assignees))
+                Some((
+                    updated_at,
+                    pr.number as u64,
+                    pr.title,
+                    pr.url.0,
+                    repo_name.clone(),
+                    labels,
+                    assignees,
+                ))
             })
             .collect();
         prs.sort_by_key(|pr| pr.0);
@@ -277,19 +325,21 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
         let prs: Vec<_> = prs
             .into_iter()
             .take(5)
-            .map(|(updated_at, number, title, html_url, repo_name, labels, assignees)| {
-                let updated_at = crate::actions::to_human(updated_at);
+            .map(
+                |(updated_at, number, title, html_url, repo_name, labels, assignees)| {
+                    let updated_at = crate::actions::to_human(updated_at);
 
-                crate::actions::IssueDecorator {
-                    number,
-                    title,
-                    html_url,
-                    repo_name,
-                    labels,
-                    assignees,
-                    updated_at,
-                }
-            })
+                    crate::actions::IssueDecorator {
+                        number,
+                        title,
+                        html_url,
+                        repo_name,
+                        labels,
+                        assignees,
+                        updated_at,
+                    }
+                },
+            )
             .collect();
 
         Ok(prs)

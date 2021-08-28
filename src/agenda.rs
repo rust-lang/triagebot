@@ -481,7 +481,9 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     queries.push(QueryMap {
         name: "top_unreviewed_prs",
         kind: QueryKind::List,
-        query: github::GithubQuery::GraphQL(Box::new(github::graphql::LeastRecentlyReviewedPullRequests)),
+        query: github::GithubQuery::GraphQL(Box::new(
+            github::graphql::LeastRecentlyReviewedPullRequests,
+        )),
     });
 
     actions.push(Query {
