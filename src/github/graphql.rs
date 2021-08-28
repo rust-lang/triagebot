@@ -1,6 +1,7 @@
 use anyhow::Context;
 use async_trait::async_trait;
 
+// This schema can be downloaded from https://docs.github.com/en/graphql/overview/public-schema
 #[cynic::schema_for_derives(file = "src/github/github.graphql", module = "schema")]
 mod queries {
     use super::schema;
