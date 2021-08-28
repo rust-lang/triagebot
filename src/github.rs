@@ -759,16 +759,19 @@ pub struct IssueSearchResult {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Repository {
-    pub owner: String,
-    pub name: String,
+    pub full_name: String,
 }
 
 impl Repository {
     const GITHUB_API_URL: &'static str = "https://api.github.com";
     const GITHUB_GRAPHQL_API_URL: &'static str = "https://api.github.com/graphql";
 
-    pub fn full_name(&self) -> String {
-        return format!("{}/{}", self.owner, self.name);
+    pub fn owner(&self) -> &str {
+        self.full_name.split_once('/').unwrap().0
+    }
+
+    pub fn name(&self) -> &str {
+        self.full_name.split_once('/').unwrap().1
     }
 
     pub async fn get_issues<'a>(
@@ -881,7 +884,7 @@ impl Repository {
         format!(
             "{}/repos/{}/{}?{}",
             Repository::GITHUB_API_URL,
-            self.full_name(),
+            self.full_name,
             endpoint,
             filters
         )
@@ -908,7 +911,7 @@ impl Repository {
                     .iter()
                     .map(|label| format!("-label:{}", label)),
             )
-            .chain(std::iter::once(format!("repo:{}", self.full_name())))
+            .chain(std::iter::once(format!("repo:{}", self.full_name)))
             .collect::<Vec<_>>()
             .join("+");
         format!(
@@ -968,10 +971,10 @@ pub enum Event {
 impl Event {
     pub fn repo_name(&self) -> String {
         match self {
-            Event::Create(event) => event.repository.full_name(),
-            Event::IssueComment(event) => event.repository.full_name(),
-            Event::Issue(event) => event.repository.full_name(),
-            Event::Push(event) => event.repository.full_name(),
+            Event::Create(event) => event.repository.full_name.clone(),
+            Event::IssueComment(event) => event.repository.full_name.clone(),
+            Event::Issue(event) => event.repository.full_name.clone(),
+            Event::Push(event) => event.repository.full_name.clone(),
         }
     }
 
