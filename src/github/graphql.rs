@@ -176,15 +176,14 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         use cynic::QueryBuilder;
 
-        let repo_name = repo.name.clone();
-        let repository_owner = repo.owner.clone();
-        let repository_name = repo.name.clone();
+        let repository_owner = repo.owner().to_owned();
+        let repository_name = repo.name().to_owned();
 
         let mut prs = vec![];
 
         let mut args = queries::LeastRecentlyReviewedPullRequestsArguments {
             repository_owner,
-            repository_name,
+            repository_name: repository_name.clone(),
             after: None,
         };
         loop {
@@ -314,7 +313,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                     pr.number as u64,
                     pr.title,
                     pr.url.0,
-                    repo_name.clone(),
+                    repository_name.clone(),
                     labels,
                     assignees,
                 ))

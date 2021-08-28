@@ -79,8 +79,7 @@ impl<'a> Action for Step<'a> {
         for Query { repos, queries } in &self.actions {
             for repo in repos {
                 let repository = Repository {
-                    owner: repo.0.to_string(),
-                    name: repo.1.to_string(),
+                    full_name: format!("{}/{}", repo.0, repo.1),
                 };
 
                 for QueryMap { name, kind, query } in queries {
@@ -97,7 +96,7 @@ impl<'a> Action for Step<'a> {
                                                 title: issue.title.clone(),
                                                 number: issue.number,
                                                 html_url: issue.html_url.clone(),
-                                                repo_name: repository.name.clone(),
+                                                repo_name: repository.name().to_owned(),
                                                 labels: issue
                                                     .labels
                                                     .iter()
