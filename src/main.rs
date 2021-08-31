@@ -34,7 +34,7 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
             .unwrap());
     }
     if req.uri.path() == "/bors-commit-list" {
-        let res = db::rustc_commits::get_commits_with_artifacts(&ctx.db).await;
+        let res = db::rustc_commits::get_commits_with_artifacts(&*ctx.db.get().await).await;
         let res = match res {
             Ok(r) => r,
             Err(e) => {
@@ -57,7 +57,7 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
                     .body(Body::from(
-                        notification_listing::render(&ctx.db, &*name).await,
+                        notification_listing::render(&ctx.db.get().await, &*name).await,
                     ))
                     .unwrap());
             }
@@ -187,10 +187,8 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     log::info!("Listening on http://{}", addr);
 
-    let db_client = db::make_client()
-        .await
-        .context("open database connection")?;
-    db::run_migrations(&db_client)
+    let pool = db::ClientPool::new();
+    db::run_migrations(&*pool.get().await)
         .await
         .context("database migrations")?;
 
@@ -202,7 +200,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .expect("Failed to build octograb.");
     let ctx = Arc::new(Context {
         username: String::from("rustbot"),
-        db: db_client,
+        db: pool,
         github: gh,
         octocrab: oc,
     });

@@ -4,7 +4,6 @@ use octocrab::Octocrab;
 use parser::command::{Command, Input};
 use std::fmt;
 use std::sync::Arc;
-use tokio_postgres::Client as DbClient;
 
 #[derive(Debug)]
 pub enum HandlerError {
@@ -247,7 +246,7 @@ command_handlers! {
 
 pub struct Context {
     pub github: GithubClient,
-    pub db: DbClient,
+    pub db: crate::db::ClientPool,
     pub username: String,
     pub octocrab: Octocrab,
 }

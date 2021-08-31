@@ -119,7 +119,7 @@ fn handle_command<'a>(
         };
 
         match next {
-            Some("acknowledge") | Some("ack") => match acknowledge(gh_id, words).await {
+            Some("acknowledge") | Some("ack") => match acknowledge(&ctx, gh_id, words).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
                     content: &format!(
@@ -139,7 +139,7 @@ fn handle_command<'a>(
                 })
                 .unwrap(),
             },
-            Some("move") => match move_notification(gh_id, words).await {
+            Some("move") => match move_notification(&ctx, gh_id, words).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
                     content: &format!(
@@ -149,7 +149,7 @@ fn handle_command<'a>(
                 })
                 .unwrap(),
             },
-            Some("meta") => match add_meta_notification(gh_id, words).await {
+            Some("meta") => match add_meta_notification(&ctx, gh_id, words).await {
                 Ok(r) => r,
                 Err(e) => serde_json::to_string(&Response {
                     content: &format!(
@@ -513,7 +513,11 @@ impl<'a> UpdateMessageApiRequest<'a> {
     }
 }
 
-async fn acknowledge(gh_id: i64, mut words: impl Iterator<Item = &str>) -> anyhow::Result<String> {
+async fn acknowledge(
+    ctx: &Context,
+    gh_id: i64,
+    mut words: impl Iterator<Item = &str>,
+) -> anyhow::Result<String> {
     let filter = match words.next() {
         Some(filter) => {
             if words.next().is_some() {
@@ -533,7 +537,8 @@ async fn acknowledge(gh_id: i64, mut words: impl Iterator<Item = &str>) -> anyho
     } else {
         Identifier::Url(filter)
     };
-    match delete_ping(&mut crate::db::make_client().await?, gh_id, ident).await {
+    let mut db = ctx.db.get().await;
+    match delete_ping(&mut *db, gh_id, ident).await {
         Ok(deleted) => {
             let resp = if deleted.is_empty() {
                 format!(
@@ -588,7 +593,7 @@ async fn add_notification(
         Some(description)
     };
     match record_ping(
-        &ctx.db,
+        &*ctx.db.get().await,
         &notifications::Notification {
             user_id: gh_id,
             origin_url: url.to_owned(),
@@ -612,6 +617,7 @@ async fn add_notification(
 }
 
 async fn add_meta_notification(
+    ctx: &Context,
     gh_id: i64,
     mut words: impl Iterator<Item = &str>,
 ) -> anyhow::Result<String> {
@@ -635,14 +641,8 @@ async fn add_meta_notification(
         assert_eq!(description.pop(), Some(' ')); // pop trailing space
         Some(description)
     };
-    match add_metadata(
-        &mut crate::db::make_client().await?,
-        gh_id,
-        idx,
-        description.as_deref(),
-    )
-    .await
-    {
+    let mut db = ctx.db.get().await;
+    match add_metadata(&mut db, gh_id, idx, description.as_deref()).await {
         Ok(()) => Ok(serde_json::to_string(&Response {
             content: "Added metadata!",
         })
@@ -655,6 +655,7 @@ async fn add_meta_notification(
 }
 
 async fn move_notification(
+    ctx: &Context,
     gh_id: i64,
     mut words: impl Iterator<Item = &str>,
 ) -> anyhow::Result<String> {
@@ -676,7 +677,7 @@ async fn move_notification(
         .context("to index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
-    match move_indices(&mut crate::db::make_client().await?, gh_id, from, to).await {
+    match move_indices(&mut *ctx.db.get().await, gh_id, from, to).await {
         Ok(()) => Ok(serde_json::to_string(&Response {
             // to 1-base indices
             content: &format!("Moved {} to {}.", from + 1, to + 1),
