@@ -1,7 +1,6 @@
 use crate::db::notifications::get_notifications;
-use crate::db::DbClient;
 
-pub async fn render(db: &DbClient, user: &str) -> String {
+pub async fn render(db: &crate::db::PooledClient, user: &str) -> String {
     let notifications = match get_notifications(db, user).await {
         Ok(n) => n,
         Err(e) => {

@@ -92,13 +92,14 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             }
         };
 
+        let client = ctx.db.get().await;
         for user in users {
             if !users_notified.insert(user.id.unwrap()) {
                 // Skip users already associated with this event.
                 continue;
             }
 
-            if let Err(err) = notifications::record_username(&ctx.db, user.id.unwrap(), user.login)
+            if let Err(err) = notifications::record_username(&client, user.id.unwrap(), user.login)
                 .await
                 .context("failed to record username")
             {
@@ -106,7 +107,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             }
 
             if let Err(err) = notifications::record_ping(
-                &ctx.db,
+                &client,
                 &notifications::Notification {
                     user_id: user.id.unwrap(),
                     origin_url: event.html_url().unwrap().to_owned(),

@@ -72,6 +72,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let mut sha = bors.merge_sha;
     let mut pr = Some(event.issue.number.try_into().unwrap());
 
+    let db = ctx.db.get().await;
     loop {
         // FIXME: ideally we would pull in all the commits here, but unfortunately
         // in rust-lang/rust's case there's bors-authored commits that aren't
@@ -101,7 +102,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         };
 
         let res = rustc_commits::record_commit(
-            &ctx.db,
+            &db,
             rustc_commits::Commit {
                 sha: gc.sha,
                 parent_sha: parent_sha.clone(),

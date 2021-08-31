@@ -1,7 +1,9 @@
 use anyhow::Context as _;
 use native_tls::{Certificate, TlsConnector};
 use postgres_native_tls::MakeTlsConnector;
-pub use tokio_postgres::Client as DbClient;
+use std::sync::{Arc, Mutex};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio_postgres::Client as DbClient;
 
 pub mod notifications;
 pub mod rustc_commits;
@@ -19,7 +21,73 @@ lazy_static::lazy_static! {
     };
 }
 
-pub async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
+pub struct ClientPool {
+    connections: Arc<Mutex<Vec<tokio_postgres::Client>>>,
+    permits: Arc<Semaphore>,
+}
+
+pub struct PooledClient {
+    client: Option<tokio_postgres::Client>,
+    #[allow(unused)] // only used for drop impl
+    permit: OwnedSemaphorePermit,
+    pool: Arc<Mutex<Vec<tokio_postgres::Client>>>,
+}
+
+impl Drop for PooledClient {
+    fn drop(&mut self) {
+        let mut clients = self.pool.lock().unwrap_or_else(|e| e.into_inner());
+        clients.push(self.client.take().unwrap());
+    }
+}
+
+impl std::ops::Deref for PooledClient {
+    type Target = tokio_postgres::Client;
+
+    fn deref(&self) -> &Self::Target {
+        self.client.as_ref().unwrap()
+    }
+}
+
+impl std::ops::DerefMut for PooledClient {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.client.as_mut().unwrap()
+    }
+}
+
+impl ClientPool {
+    pub fn new() -> ClientPool {
+        ClientPool {
+            connections: Arc::new(Mutex::new(Vec::with_capacity(16))),
+            permits: Arc::new(Semaphore::new(16)),
+        }
+    }
+
+    pub async fn get(&self) -> PooledClient {
+        let permit = self.permits.clone().acquire_owned().await.unwrap();
+        {
+            let mut slots = self.connections.lock().unwrap_or_else(|e| e.into_inner());
+            // Pop connections until we hit a non-closed connection (or there are no
+            // "possibly open" connections left).
+            while let Some(c) = slots.pop() {
+                if !c.is_closed() {
+                    return PooledClient {
+                        client: Some(c),
+                        permit,
+                        pool: self.connections.clone(),
+                    };
+                }
+            }
+        }
+
+        PooledClient {
+            client: Some(make_client().await.unwrap()),
+            permit,
+            pool: self.connections.clone(),
+        }
+    }
+}
+
+async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
     let db_url = std::env::var("DATABASE_URL").expect("needs DATABASE_URL");
     if db_url.contains("rds.amazonaws.com") {
         let cert = &CERTIFICATE_PEM[..];
