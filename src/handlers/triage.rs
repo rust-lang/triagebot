@@ -34,6 +34,7 @@ pub(super) async fn handle_command(
 
     let mut labels = event.issue.labels().to_owned();
     let add = match cmd.priority {
+        Priority::Critical => &config.critical,
         Priority::High => &config.high,
         Priority::Medium => &config.medium,
         Priority::Low => &config.low,

@@ -162,6 +162,7 @@ pub(crate) struct ReviewSubmittedConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct TriageConfig {
     pub(crate) remove: Vec<String>,
+    pub(crate) critical: String,
     pub(crate) high: String,
     pub(crate) medium: String,
     pub(crate) low: String,

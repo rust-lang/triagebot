@@ -14,9 +14,10 @@ use std::fmt;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Priority {
+    Critical,
     High,
-    Low,
     Medium,
+    Low,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -35,7 +36,7 @@ impl std::error::Error for ParseError {}
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ParseError::ExpectedPriority => write!(f, "expected priority (high, medium, low)"),
+            ParseError::ExpectedPriority => write!(f, "expected priority (critical, high, medium, low)"),
             ParseError::ExpectedEnd => write!(f, "expected end of command"),
         }
     }
@@ -47,6 +48,10 @@ impl TriageCommand {
         if let Some(Token::Word("triage")) = toks.peek_token()? {
             toks.next_token()?;
             let priority = match toks.peek_token()? {
+                Some(Token::Word("critical")) | Some(Token::Word("P-critical")) => {
+                    toks.next_token()?;
+                    Priority::Critical
+                }
                 Some(Token::Word("high")) | Some(Token::Word("P-high")) => {
                     toks.next_token()?;
                     Priority::High
