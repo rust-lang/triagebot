@@ -19,6 +19,20 @@ impl IgnoreBlocks {
                         break;
                     }
                 }
+            } else if let Event::Start(Tag::BlockQuote) = event {
+                let start = range.start;
+                let mut count = 1;
+                while let Some((event, range)) = parser.next() {
+                    if let Event::Start(Tag::BlockQuote) = event {
+                        count += 1;
+                    } else if let Event::End(Tag::BlockQuote) = event {
+                        count -= 1;
+                        if count == 0 {
+                            ignore.push(start..range.end);
+                            break;
+                        }
+                    }
+                }
             } else if let Event::Code(_) = event {
                 ignore.push(range);
             }
@@ -165,5 +179,63 @@ fn cbs_8() {
             Ignore::No(" not "),
             Ignore::Yes("`two`")
         ]
+    );
+}
+
+#[test]
+fn cbs_9() {
+    assert_eq!(
+        bodies(
+            "
+some text
+> testing citations
+still in citation
+
+more text
+"
+        ),
+        [
+            Ignore::No("\nsome text\n"),
+            Ignore::Yes("> testing citations\nstill in citation\n"),
+            Ignore::No("\nmore text\n")
+        ],
+    );
+}
+
+#[test]
+fn cbs_10() {
+    assert_eq!(
+        bodies(
+            "
+# abc
+
+> multiline
+> citation
+
+lorem ipsum
+"
+        ),
+        [
+            Ignore::No("\n# abc\n\n"),
+            Ignore::Yes("> multiline\n> citation\n"),
+            Ignore::No("\nlorem ipsum\n")
+        ],
+    );
+}
+
+#[test]
+fn cbs_11() {
+    assert_eq!(
+        bodies(
+            "
+> some
+> > nested
+> citations
+"
+        ),
+        [
+            Ignore::No("\n"),
+            Ignore::Yes("> some\n> > nested\n> citations\n"),
+        ],
     );
 }
