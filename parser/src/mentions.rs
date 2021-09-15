@@ -6,7 +6,7 @@
 ///
 /// Note that the `@` is skipped in the final output.
 pub fn get_mentions(input: &str) -> Vec<&str> {
-    let code_regions = crate::code_block::ColorCodeBlocks::new(input);
+    let ignore_regions = crate::ignore_block::IgnoreBlocks::new(input);
 
     let mut mentions = Vec::new();
     for (idx, _) in input.match_indices('@') {
@@ -41,8 +41,8 @@ pub fn get_mentions(input: &str) -> Vec<&str> {
         if username.is_empty() {
             continue;
         }
-        if code_regions
-            .overlaps_code(idx..idx + username.len())
+        if ignore_regions
+            .overlaps_ignore(idx..idx + username.len())
             .is_some()
         {
             continue;

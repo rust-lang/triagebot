@@ -1,5 +1,5 @@
-use crate::code_block::ColorCodeBlocks;
 use crate::error::Error;
+use crate::ignore_block::IgnoreBlocks;
 use crate::token::{Token, Tokenizer};
 
 pub mod assign;
@@ -33,7 +33,7 @@ pub enum Command<'a> {
 pub struct Input<'a> {
     all: &'a str,
     parsed: usize,
-    code: ColorCodeBlocks,
+    ignore: IgnoreBlocks,
 
     // A list of possible bot names.
     bot: Vec<&'a str>,
@@ -64,7 +64,7 @@ impl<'a> Input<'a> {
         Input {
             all: input,
             parsed: 0,
-            code: ColorCodeBlocks::new(input),
+            ignore: IgnoreBlocks::new(input),
             bot,
         }
     }
@@ -141,11 +141,11 @@ impl<'a> Input<'a> {
         }
 
         if self
-            .code
-            .overlaps_code((self.parsed)..(self.parsed + tok.position()))
+            .ignore
+            .overlaps_ignore((self.parsed)..(self.parsed + tok.position()))
             .is_some()
         {
-            log::info!("command overlaps code; code: {:?}", self.code);
+            log::info!("command overlaps ignored block; ignore: {:?}", self.ignore);
             return None;
         }
 
