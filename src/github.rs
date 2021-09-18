@@ -245,7 +245,7 @@ pub struct PullRequestDetails {
 #[derive(Debug, serde::Deserialize)]
 pub struct Issue {
     pub number: u64,
-    #[serde(default)]
+    #[serde(deserialize_with = "opt_string")]
     pub body: String,
     created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
