@@ -378,6 +378,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                             exclude_labels: vec![
                                 "T-infra",
                                 "T-libs",
+                                "T-libs-api",
                                 "T-release",
                                 "T-rustdoc",
                                 "T-core",
@@ -393,6 +394,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                             exclude_labels: vec![
                                 "T-infra",
                                 "T-libs",
+                                "T-libs-api",
                                 "T-release",
                                 "T-rustdoc",
                                 "T-core",
