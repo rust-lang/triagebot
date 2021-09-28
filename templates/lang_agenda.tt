@@ -23,6 +23,10 @@ tags: triage-meeting
 
 {{-issues::render(issues=scheduled_meetings, indent="", empty="No pending proposals this time.")}}
 
+## Announcements or custom items
+
+(Meeting attendees, feel free to add items here!)
+
 ## Action item review
 
 * [Action items list](https://hackmd.io/gstfhtXYTHa3Jv-P_2RK7A)
