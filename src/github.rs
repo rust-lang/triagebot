@@ -188,15 +188,19 @@ impl User {
         let is_pri_member = map
             .get("wg-prioritization")
             .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
+        let is_async_member = map
+            .get("wg-async-foundations")
+            .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
         let in_all = map["all"].members.iter().any(|g| g.github == self.login);
         log::trace!(
-            "{:?} is all?={:?}, triager?={:?}, prioritizer?={:?}",
+            "{:?} is all?={:?}, triager?={:?}, prioritizer?={:?}, async?={:?}",
             self.login,
             in_all,
             is_triager,
-            is_pri_member
+            is_pri_member,
+            is_async_member,
         );
-        Ok(in_all || is_triager || is_pri_member)
+        Ok(in_all || is_triager || is_pri_member || is_async_member)
     }
 
     // Returns the ID of the given user, if the user is in the `all` team.
