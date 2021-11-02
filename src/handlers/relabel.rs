@@ -185,7 +185,7 @@ mod tests {
         macro_rules! t {
             ($($member:ident { $($label:expr => $res:ident,)* })*) => {
                 let config = RelabelConfig {
-                    allow_unauthenticated: vec!["T-*".into(), "I-*".into(), "!I-nominated".into()],
+                    allow_unauthenticated: vec!["T-*".into(), "I-*".into(), "!I-*nominated".into()],
                 };
                 $($(assert_eq!(
                     check_filter($label, &config, TeamMembership::$member),
@@ -197,18 +197,21 @@ mod tests {
             Member {
                 "T-release" => Allow,
                 "I-slow" => Allow,
+                "I-lang-nominated" => Allow,
                 "I-nominated" => Allow,
                 "A-spurious" => Allow,
             }
             Outsider {
                 "T-release" => Allow,
                 "I-slow" => Allow,
+                "I-lang-nominated" => Deny,
                 "I-nominated" => Deny,
                 "A-spurious" => Deny,
             }
             Unknown {
                 "T-release" => Allow,
                 "I-slow" => Allow,
+                "I-lang-nominated" => DenyUnknown,
                 "I-nominated" => DenyUnknown,
                 "A-spurious" => DenyUnknown,
             }

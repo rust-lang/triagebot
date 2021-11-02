@@ -406,7 +406,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         kind: QueryKind::List,
                         query: Box::new(github::Query {
                             filters: vec![("state", "open")],
-                            include_labels: vec!["I-nominated", "T-compiler"],
+                            include_labels: vec!["I-compiler-nominated"],
                             exclude_labels: vec![],
                         }),
                     },
@@ -421,13 +421,13 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                 repos: vec![("rust-lang", "rfcs")],
                 queries: vec![
                     // retrieve some RFCs for the T-compiler agenda
-                    // https://github.com/rust-lang/rfcs/pulls?q=is%3Aopen+label%3AI-nominated+label%3AT-compiler
+                    // https://github.com/rust-lang/rfcs/pulls?q=is%3Aopen+label%3AI-compiler-nominated
                     QueryMap {
                         name: "nominated_rfcs_t_compiler",
                         kind: QueryKind::List,
                         query: Box::new(github::Query {
                             filters: vec![("state", "open")],
-                            include_labels: vec!["T-compiler", "I-nominated"],
+                            include_labels: vec!["I-compiler-nominated"],
                             exclude_labels: vec![],
                         }),
                     },
@@ -511,7 +511,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                         kind: QueryKind::List,
                         query: Box::new(github::Query {
                             filters: vec![("state", "open")],
-                            include_labels: vec!["T-lang", "I-nominated"],
+                            include_labels: vec!["I-lang-nominated"],
                             exclude_labels: vec![],
                         }),
                     },
