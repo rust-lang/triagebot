@@ -753,6 +753,52 @@ pub struct IssuesEvent {
     pub repository: Repository,
     /// Some if action is IssuesAction::Labeled, for example
     pub label: Option<Label>,
+
+    // These fields are the sha fields before/after a synchronize operation,
+    // used to compute the diff between these two commits.
+    #[serde(default)]
+    before: Option<String>,
+    #[serde(default)]
+    after: Option<String>,
+
+    #[serde(default)]
+    base: Option<CommitBase>,
+    #[serde(default)]
+    head: Option<CommitBase>,
+}
+
+#[derive(Default, Clone, Debug, serde::Deserialize)]
+pub struct CommitBase {
+    sha: String,
+}
+
+impl IssuesEvent {
+    /// Returns the diff in this event, for Open and Synchronize events for now.
+    pub async fn diff_between(&self, client: &GithubClient) -> anyhow::Result<Option<String>> {
+        let (before, after) = if self.action == IssuesAction::Synchronize {
+            (
+                self.before.clone().unwrap_or_default(),
+                self.after.clone().unwrap_or_default(),
+            )
+        } else if self.action == IssuesAction::Opened {
+            (
+                self.base.clone().unwrap_or_default().sha,
+                self.head.clone().unwrap_or_default().sha,
+            )
+        } else {
+            return Ok(None);
+        };
+
+        let mut req = client.get(&format!(
+            "{}/compare/{}...{}",
+            self.issue.repository().url(),
+            before,
+            after
+        ));
+        req = req.header("Accept", "application/vnd.github.v3.diff");
+        let diff = client.send_req(req).await?;
+        Ok(Some(String::from(String::from_utf8_lossy(&diff))))
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]

@@ -115,7 +115,7 @@ macro_rules! issue_handlers {
             errors: &mut Vec<HandlerError>,
         ) {
             $(
-            match $name::parse_input(ctx, event, config.$name.as_ref()) {
+            match $name::parse_input(ctx, event, config.$name.as_ref()).await {
                 Err(err) => errors.push(HandlerError::Message(err)),
                 Ok(Some(input)) => {
                     if let Some(config) = &config.$name {

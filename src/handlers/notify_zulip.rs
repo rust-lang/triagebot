@@ -20,7 +20,7 @@ pub(super) enum NotificationType {
     Reopened,
 }
 
-pub(super) fn parse_input(
+pub(super) async fn parse_input(
     _ctx: &Context,
     event: &IssuesEvent,
     config: Option<&NotifyZulipConfig>,
