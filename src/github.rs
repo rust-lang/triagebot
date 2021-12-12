@@ -788,7 +788,7 @@ impl IssuesEvent {
             )
         } else if self.action == IssuesAction::Opened {
             if let Some(pr) = &self.pull_request {
-                (pr.base.clone(), pr.head.clone())
+                (pr.base.sha.clone(), pr.head.sha.clone())
             } else {
                 return Ok(None);
             }
