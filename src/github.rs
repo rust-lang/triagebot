@@ -777,13 +777,15 @@ impl IssuesEvent {
     pub async fn diff_between(&self, client: &GithubClient) -> anyhow::Result<Option<String>> {
         let (before, after) = if self.action == IssuesAction::Synchronize {
             (
-                self.before.clone().unwrap_or_default(),
-                self.after.clone().unwrap_or_default(),
+                self.before
+                    .clone()
+                    .expect("synchronize has before populated"),
+                self.after.clone().expect("synchronize has after populated"),
             )
         } else if self.action == IssuesAction::Opened {
             (
-                self.base.clone().unwrap_or_default().sha,
-                self.head.clone().unwrap_or_default().sha,
+                self.base.clone().expect("open has base populated").sha,
+                self.head.clone().expect("open has head populated").sha,
             )
         } else {
             return Ok(None);

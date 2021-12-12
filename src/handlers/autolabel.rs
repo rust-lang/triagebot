@@ -25,11 +25,11 @@ pub(super) async fn parse_input(
             for line in diff.lines() {
                 // mostly copied from highfive
                 if line.starts_with("diff --git ") {
-                    let parts = line[line.find(" b/").unwrap() + " b/".len()..].split("/");
-                    let path = parts.collect::<Vec<_>>().join("/");
-                    if !path.is_empty() {
-                        files.push(path);
-                    }
+                    files.push(
+                        &line[line.find(" b/").unwrap()..]
+                            .strip_prefix(" b/")
+                            .unwrap(),
+                    );
                 }
             }
             let mut autolabels = Vec::new();
