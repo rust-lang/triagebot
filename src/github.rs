@@ -762,9 +762,13 @@ pub struct IssuesEvent {
     after: Option<String>,
 
     #[serde(default)]
-    base: Option<CommitBase>,
-    #[serde(default)]
-    head: Option<CommitBase>,
+    pull_request: Option<PullRequestEventFields>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct PullRequestEventFields {
+    base: CommitBase,
+    head: CommitBase,
 }
 
 #[derive(Default, Clone, Debug, serde::Deserialize)]
@@ -783,10 +787,11 @@ impl IssuesEvent {
                 self.after.clone().expect("synchronize has after populated"),
             )
         } else if self.action == IssuesAction::Opened {
-            (
-                self.base.clone().expect("open has base populated").sha,
-                self.head.clone().expect("open has head populated").sha,
-            )
+            if let Some(pr) = &self.pull_request {
+                (pr.base.clone(), pr.head.clone())
+            } else {
+                return Ok(None);
+            }
         } else {
             return Ok(None);
         };
