@@ -14,7 +14,7 @@ pub enum Invocation {
     Rename { prev_issue: ZulipGitHubReference },
 }
 
-pub(super) fn parse_input(
+pub(super) async fn parse_input(
     _ctx: &Context,
     event: &IssuesEvent,
     _config: Option<&MajorChangeConfig>,

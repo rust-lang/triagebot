@@ -7,11 +7,55 @@ pub(super) struct AutolabelInput {
     labels: Vec<Label>,
 }
 
-pub(super) fn parse_input(
-    _ctx: &Context,
+pub(super) async fn parse_input(
+    ctx: &Context,
     event: &IssuesEvent,
     config: Option<&AutolabelConfig>,
 ) -> Result<Option<AutolabelInput>, String> {
+    if let Some(diff) = event
+        .diff_between(&ctx.github)
+        .await
+        .map_err(|e| {
+            log::error!("failed to fetch diff: {:?}", e);
+        })
+        .unwrap_or_default()
+    {
+        if let Some(config) = config {
+            let mut files = Vec::new();
+            for line in diff.lines() {
+                // mostly copied from highfive
+                if line.starts_with("diff --git ") {
+                    let parts = line[line.find(" b/").unwrap() + " b/".len()..].split("/");
+                    let path = parts.collect::<Vec<_>>().join("/");
+                    if !path.is_empty() {
+                        files.push(path);
+                    }
+                }
+            }
+            let mut autolabels = Vec::new();
+            for trigger_file in files {
+                if trigger_file.is_empty() {
+                    // TODO: when would this be true?
+                    continue;
+                }
+                for (label, cfg) in config.labels.iter() {
+                    if cfg
+                        .trigger_files
+                        .iter()
+                        .any(|f| trigger_file.starts_with(f))
+                    {
+                        autolabels.push(Label {
+                            name: label.to_owned(),
+                        });
+                    }
+                }
+                if !autolabels.is_empty() {
+                    return Ok(Some(AutolabelInput { labels: autolabels }));
+                }
+            }
+        }
+    }
+
     if event.action == IssuesAction::Labeled {
         if let Some(config) = config {
             let mut autolabels = Vec::new();
