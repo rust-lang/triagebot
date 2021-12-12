@@ -5,7 +5,7 @@
 #  Build image  #
 #################
 
-FROM rust:1.53 AS build
+FROM rust:1.57 AS build
 
 COPY . .
 RUN cargo test --release --all
