@@ -23,8 +23,8 @@ pub(super) async fn parse_input(
         if let Some(config) = config {
             let files = extract_files_from_diff(&diff);
             let mut autolabels = Vec::new();
-            for trigger_file in files {
-                if trigger_file.is_empty() {
+            for changed_file in files {
+                if changed_file.is_empty() {
                     // TODO: when would this be true?
                     continue;
                 }
@@ -32,7 +32,7 @@ pub(super) async fn parse_input(
                     if cfg
                         .trigger_files
                         .iter()
-                        .any(|f| trigger_file.starts_with(f))
+                        .any(|f| changed_file.starts_with(f))
                     {
                         autolabels.push(Label {
                             name: label.to_owned(),
