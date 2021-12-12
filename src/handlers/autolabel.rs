@@ -12,21 +12,21 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&AutolabelConfig>,
 ) -> Result<Option<AutolabelInput>, String> {
-    if let Some(diff) = event
-        .diff_between(&ctx.github)
-        .await
-        .map_err(|e| {
-            log::error!("failed to fetch diff: {:?}", e);
-        })
-        .unwrap_or_default()
-    {
-        if let Some(config) = config {
+    if let Some(config) = config {
+        if let Some(diff) = event
+            .diff_between(&ctx.github)
+            .await
+            .map_err(|e| {
+                log::error!("failed to fetch diff: {:?}", e);
+            })
+            .unwrap_or_default()
+        {
             let mut files = Vec::new();
             for line in diff.lines() {
                 // mostly copied from highfive
                 if line.starts_with("diff --git ") {
                     files.push(
-                        &line[line.find(" b/").unwrap()..]
+                        line[line.find(" b/").unwrap()..]
                             .strip_prefix(" b/")
                             .unwrap(),
                     );
