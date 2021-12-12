@@ -114,6 +114,7 @@ impl AutolabelConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct AutolabelLabelConfig {
+    #[serde(default)]
     pub(crate) trigger_labels: Vec<String>,
     #[serde(default)]
     pub(crate) exclude_labels: Vec<String>,
