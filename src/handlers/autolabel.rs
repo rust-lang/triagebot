@@ -3,10 +3,12 @@ use crate::{
     github::{files_changed, IssuesAction, IssuesEvent, Label},
     handlers::Context,
 };
+use anyhow::Context as _;
 use tracing as log;
 
 pub(super) struct AutolabelInput {
-    labels: Vec<Label>,
+    add: Vec<Label>,
+    remove: Vec<Label>,
 }
 
 pub(super) async fn parse_input(
@@ -37,7 +39,10 @@ pub(super) async fn parse_input(
                 }
             }
             if !autolabels.is_empty() {
-                return Ok(Some(AutolabelInput { labels: autolabels }));
+                return Ok(Some(AutolabelInput {
+                    add: autolabels,
+                    remove: vec![],
+                }));
             }
         }
     }
@@ -75,17 +80,21 @@ pub(super) async fn parse_input(
                 });
             }
             if !autolabels.is_empty() {
-                return Ok(Some(AutolabelInput { labels: autolabels }));
+                return Ok(Some(AutolabelInput {
+                    add: autolabels,
+                    remove: vec![],
+                }));
             }
         }
     }
     if event.action == IssuesAction::Closed {
         let labels = event.issue.labels();
-        if let Some(x) = labels.iter().position(|x| x.name == "I-prioritize") {
-            let mut labels_excluded = labels.to_vec();
-            labels_excluded.remove(x);
+        if labels.iter().any(|x| x.name == "I-prioritize") {
             return Ok(Some(AutolabelInput {
-                labels: labels_excluded,
+                add: vec![],
+                remove: vec![Label {
+                    name: "I-prioritize".to_owned(),
+                }],
             }));
         }
     }
@@ -98,13 +107,19 @@ pub(super) async fn handle_input(
     event: &IssuesEvent,
     input: AutolabelInput,
 ) -> anyhow::Result<()> {
-    let mut labels = event.issue.labels().to_owned();
-    for label in input.labels {
-        // Don't add the label if it's already there
-        if !labels.contains(&label) {
-            labels.push(label);
-        }
+    event.issue.add_labels(&ctx.github, input.add).await?;
+    for label in input.remove {
+        event
+            .issue
+            .remove_label(&ctx.github, &label.name)
+            .await
+            .with_context(|| {
+                format!(
+                    "failed to remove {:?} from {:?}",
+                    label,
+                    event.issue.global_id()
+                )
+            })?;
     }
-    event.issue.set_labels(&ctx.github, labels).await?;
     Ok(())
 }

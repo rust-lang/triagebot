@@ -3,7 +3,6 @@ use tracing as log;
 
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, Utc};
-use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{future::BoxFuture, FutureExt};
 use hyper::header::HeaderValue;
 use once_cell::sync::OnceCell;
@@ -233,18 +232,6 @@ pub struct Label {
     pub name: String,
 }
 
-impl Label {
-    async fn exists<'a>(&'a self, repo_api_prefix: &'a str, client: &'a GithubClient) -> bool {
-        #[allow(clippy::redundant_pattern_matching)]
-        let url = format!("{}/labels/{}", repo_api_prefix, self.name);
-        match client.send_req(client.get(&url)).await {
-            Ok(_) => true,
-            // XXX: Error handling if the request failed for reasons beyond 'label didn't exist'
-            Err(_) => false,
-        }
-    }
-}
-
 #[derive(Debug, serde::Deserialize)]
 pub struct PullRequestDetails {
     // none for now
@@ -468,13 +455,40 @@ impl Issue {
         Ok(())
     }
 
-    pub async fn set_labels(
+    pub async fn remove_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<()> {
+        log::info!("remove_label from {}: {:?}", self.global_id(), label);
+        // DELETE /repos/:owner/:repo/issues/:number/labels/{name}
+        let url = format!(
+            "{repo_url}/issues/{number}/labels/{name}",
+            repo_url = self.repository().url(),
+            number = self.number,
+            name = label,
+        );
+
+        if !self.labels().iter().any(|l| l.name == label) {
+            log::info!(
+                "remove_label from {}: {:?} already not present, skipping",
+                self.global_id(),
+                label
+            );
+            return Ok(());
+        }
+
+        client
+            ._send_req(client.delete(&url))
+            .await
+            .context("failed to delete label")?;
+
+        Ok(())
+    }
+
+    pub async fn add_labels(
         &self,
         client: &GithubClient,
         labels: Vec<Label>,
     ) -> anyhow::Result<()> {
-        log::info!("set_labels {} to {:?}", self.global_id(), labels);
-        // PUT /repos/:owner/:repo/issues/:number/labels
+        log::info!("add_labels: {} +{:?}", self.global_id(), labels);
+        // POST /repos/:owner/:repo/issues/:number/labels
         // repo_url = https://api.github.com/repos/Codertocat/Hello-World
         let url = format!(
             "{repo_url}/issues/{number}/labels",
@@ -482,13 +496,17 @@ impl Issue {
             number = self.number
         );
 
-        let mut stream = labels
+        // Don't try to add labels already present on this issue.
+        let labels = labels
             .into_iter()
-            .map(|label| async { (label.exists(&self.repository().url(), &client).await, label) })
-            .collect::<FuturesUnordered<_>>();
-        let mut labels = Vec::new();
-        while let Some((true, label)) = stream.next().await {
-            labels.push(label);
+            .filter(|l| !self.labels().contains(&l))
+            .map(|l| l.name)
+            .collect::<Vec<_>>();
+
+        log::info!("add_labels: {} filtered to {:?}", self.global_id(), labels);
+
+        if labels.is_empty() {
+            return Ok(());
         }
 
         #[derive(serde::Serialize)]
@@ -496,11 +514,9 @@ impl Issue {
             labels: Vec<String>,
         }
         client
-            ._send_req(client.put(&url).json(&LabelsReq {
-                labels: labels.iter().map(|l| l.name.clone()).collect(),
-            }))
+            ._send_req(client.post(&url).json(&LabelsReq { labels }))
             .await
-            .context("failed to set labels")?;
+            .context("failed to add labels")?;
 
         Ok(())
     }
@@ -1282,6 +1298,7 @@ impl GithubClient {
         self.client.post(url).configure(self)
     }
 
+    #[allow(unused)]
     fn put(&self, url: &str) -> RequestBuilder {
         log::trace!("put {:?}", url);
         self.client.put(url).configure(self)

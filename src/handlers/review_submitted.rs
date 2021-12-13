@@ -24,20 +24,19 @@ pub(crate) async fn handle(
         }
 
         if event.issue.assignees.contains(&event.comment.user) {
-            let labels = event
-                .issue
-                .labels()
-                .iter()
-                // Remove review related labels
-                .filter(|label| !config.review_labels.contains(&label.name))
-                .cloned()
-                // Add waiting on author label
-                .chain(std::iter::once(Label {
-                    name: config.reviewed_label.clone(),
-                }));
+            // Remove review labels
+            for label in &config.review_labels {
+                event.issue.remove_label(&ctx.github, &label).await?;
+            }
+            // Add waiting on author
             event
                 .issue
-                .set_labels(&ctx.github, labels.collect())
+                .add_labels(
+                    &ctx.github,
+                    vec![Label {
+                        name: config.reviewed_label.clone(),
+                    }],
+                )
                 .await?;
         }
     }

@@ -22,8 +22,8 @@ pub(super) async fn handle_command(
     event: &Event,
     input: RelabelCommand,
 ) -> anyhow::Result<()> {
-    let mut issue_labels = event.issue().unwrap().labels().to_owned();
-    let mut changed = false;
+    let mut results = vec![];
+    let mut to_add = vec![];
     for delta in &input.0 {
         let name = delta.label().as_str();
         let err = match check_filter(name, config, is_member(&event.user(), &ctx.github).await) {
@@ -46,28 +46,46 @@ pub(super) async fn handle_command(
         }
         match delta {
             LabelDelta::Add(label) => {
-                if !issue_labels.iter().any(|l| l.name == label.as_str()) {
-                    changed = true;
-                    issue_labels.push(github::Label {
-                        name: label.to_string(),
-                    });
-                }
+                to_add.push(github::Label {
+                    name: label.to_string(),
+                });
             }
             LabelDelta::Remove(label) => {
-                if let Some(pos) = issue_labels.iter().position(|l| l.name == label.as_str()) {
-                    changed = true;
-                    issue_labels.remove(pos);
-                }
+                results.push((
+                    label,
+                    event
+                        .issue()
+                        .unwrap()
+                        .remove_label(&ctx.github, &label)
+                        .await,
+                ));
             }
         }
     }
 
-    if changed {
-        event
-            .issue()
-            .unwrap()
-            .set_labels(&ctx.github, issue_labels)
-            .await?;
+    if let Err(e) = event
+        .issue()
+        .unwrap()
+        .add_labels(&ctx.github, to_add.clone())
+        .await
+    {
+        tracing::error!(
+            "failed to add {:?} from issue {}: {:?}",
+            to_add,
+            event.issue().unwrap().global_id(),
+            e
+        );
+    }
+
+    for (label, res) in &results {
+        if let Err(e) = res {
+            tracing::error!(
+                "failed to remove {:?} from issue {}: {:?}",
+                label,
+                event.issue().unwrap().global_id(),
+                e
+            );
+        }
     }
 
     Ok(())
