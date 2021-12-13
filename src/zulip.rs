@@ -22,12 +22,14 @@ pub struct Request {
 #[derive(Debug, serde::Deserialize)]
 struct Message {
     sender_id: u64,
+    #[allow(unused)]
     recipient_id: u64,
     sender_short_name: Option<String>,
     sender_full_name: String,
     stream_id: Option<u64>,
     // The topic of the incoming message. Not the stream name.
     subject: Option<String>,
+    #[allow(unused)]
     #[serde(rename = "type")]
     type_: String,
 }

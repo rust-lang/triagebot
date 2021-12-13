@@ -76,6 +76,7 @@ impl GithubClient {
     ) -> BoxFuture<Result<Response, reqwest::Error>> {
         #[derive(Debug, serde::Deserialize)]
         struct RateLimit {
+            #[allow(unused)]
             pub limit: u64,
             pub remaining: u64,
             pub reset: u64,
@@ -90,7 +91,9 @@ impl GithubClient {
         struct Resources {
             pub core: RateLimit,
             pub search: RateLimit,
+            #[allow(unused)]
             pub graphql: RateLimit,
+            #[allow(unused)]
             pub source_import: RateLimit,
         }
 
