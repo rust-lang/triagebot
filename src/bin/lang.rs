@@ -1,9 +1,9 @@
-use triagebot::{agenda, logger};
+use triagebot::agenda;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     dotenv::dotenv().ok();
-    logger::init();
+    tracing_subscriber::fmt::init();
 
     let args: Vec<String> = std::env::args().collect();
     if args.len() == 2 {

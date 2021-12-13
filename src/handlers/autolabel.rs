@@ -3,6 +3,8 @@ use crate::{
     github::{IssuesAction, IssuesEvent, Label},
     handlers::Context,
 };
+use tracing as log;
+
 pub(super) struct AutolabelInput {
     labels: Vec<Label>,
 }

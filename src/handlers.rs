@@ -4,6 +4,7 @@ use octocrab::Octocrab;
 use parser::command::{Command, Input};
 use std::fmt;
 use std::sync::Arc;
+use tracing as log;
 
 #[derive(Debug)]
 pub enum HandlerError {

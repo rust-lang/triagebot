@@ -7,6 +7,7 @@ use crate::{
 use anyhow::Context as _;
 use octocrab::Page;
 use std::{collections::HashMap, time::Duration};
+use tracing as log;
 
 pub(super) async fn handle(
     ctx: &Context,

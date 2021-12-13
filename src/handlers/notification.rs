@@ -12,6 +12,7 @@ use crate::{
 use anyhow::Context as _;
 use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
+use tracing as log;
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let body = match event.comment_body() {

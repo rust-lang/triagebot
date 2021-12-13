@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
+use tracing as log;
 
 static CONFIG_FILE_NAME: &str = "triagebot.toml";
 const REFRESH_EVERY: Duration = Duration::from_secs(2 * 60); // Every two minutes

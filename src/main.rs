@@ -7,8 +7,9 @@ use hyper::{header, Body, Request, Response, Server, StatusCode};
 use reqwest::Client;
 use route_recognizer::Router;
 use std::{env, net::SocketAddr, sync::Arc};
-use triagebot::{db, github, handlers::Context, logger, notification_listing, payload, EventName};
-use uuid::Uuid;
+use tracing as log;
+use tracing::Instrument;
+use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
 
 async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Body>, hyper::Error> {
     log::info!("request = {:?}", req);
@@ -208,19 +209,19 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     let svc = hyper::service::make_service_fn(move |_conn| {
         let ctx = ctx.clone();
         async move {
-            let uuid = Uuid::new_v4();
             Ok::<_, hyper::Error>(hyper::service::service_fn(move |req| {
-                logger::LogFuture::new(
-                    uuid,
-                    serve_req(req, ctx.clone()).map(move |mut resp| {
+                let uuid = uuid::Uuid::new_v4();
+                let span = tracing::span!(tracing::Level::INFO, "request", ?uuid);
+                serve_req(req, ctx.clone())
+                    .map(move |mut resp| {
                         if let Ok(resp) = &mut resp {
                             resp.headers_mut()
                                 .insert("X-Request-Id", uuid.to_string().parse().unwrap());
                         }
                         log::info!("response = {:?}", resp);
                         resp
-                    }),
-                )
+                    })
+                    .instrument(span)
             }))
         }
     });
@@ -233,7 +234,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     dotenv::dotenv().ok();
-    logger::init();
+    tracing_subscriber::fmt::init();
 
     let port = env::var("PORT")
         .ok()

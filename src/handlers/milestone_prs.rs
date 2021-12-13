@@ -4,6 +4,7 @@ use crate::{
 };
 use anyhow::Context as _;
 use reqwest::StatusCode;
+use tracing as log;
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let e = if let Event::Issue(e) = event {

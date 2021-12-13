@@ -19,6 +19,7 @@ use crate::{
 };
 use anyhow::Context as _;
 use parser::command::assign::AssignCommand;
+use tracing as log;
 
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct AssignData {

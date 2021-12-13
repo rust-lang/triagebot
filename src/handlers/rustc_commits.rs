@@ -4,6 +4,7 @@ use crate::{
     handlers::Context,
 };
 use std::convert::TryInto;
+use tracing as log;
 
 const BORS_GH_ID: i64 = 3372342;
 

@@ -17,7 +17,7 @@ pub fn assert_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPayloa
     let signature = match hex::decode(&signature) {
         Ok(e) => e,
         Err(e) => {
-            log::trace!("hex decode failed for {:?}: {:?}", signature, e);
+            tracing::trace!("hex decode failed for {:?}: {:?}", signature, e);
             return Err(SignedPayloadError);
         }
     };

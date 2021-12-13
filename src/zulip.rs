@@ -6,6 +6,7 @@ use anyhow::Context as _;
 use std::convert::TryInto;
 use std::env;
 use std::fmt::Write as _;
+use tracing as log;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Request {

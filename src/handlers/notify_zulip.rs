@@ -3,6 +3,7 @@ use crate::{
     github::{Issue, IssuesAction, IssuesEvent, Label},
     handlers::Context,
 };
+use tracing as log;
 
 pub(super) struct NotifyZulipInput {
     notification_type: NotificationType,

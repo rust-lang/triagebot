@@ -6,6 +6,7 @@ use crate::{
 };
 use anyhow::Context as _;
 use parser::command::second::SecondCommand;
+use tracing as log;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Invocation {

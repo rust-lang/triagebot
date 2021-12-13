@@ -1,9 +1,9 @@
-use triagebot::{agenda, logger};
+use triagebot::agenda;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     dotenv::dotenv().ok();
-    logger::init();
+    tracing_subscriber::fmt::init();
 
     let agenda = agenda::prioritization();
 
