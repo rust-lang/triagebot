@@ -271,6 +271,11 @@ pub struct Issue {
     comments_url: String,
     #[serde(skip)]
     repository: OnceCell<IssueRepository>,
+
+    #[serde(default)]
+    base: Option<CommitBase>,
+    #[serde(default)]
+    head: Option<CommitBase>,
 }
 
 /// Contains only the parts of `Issue` that are needed for turning the issue title into a Zulip
@@ -764,16 +769,10 @@ pub struct IssuesEvent {
     before: Option<String>,
     #[serde(default)]
     after: Option<String>,
-
-    #[serde(default)]
-    pull_request: Option<PullRequestEventFields>,
 }
 
 #[derive(Debug, serde::Deserialize)]
-struct PullRequestEventFields {
-    base: CommitBase,
-    head: CommitBase,
-}
+struct PullRequestEventFields {}
 
 #[derive(Default, Clone, Debug, serde::Deserialize)]
 pub struct CommitBase {
@@ -791,8 +790,8 @@ impl IssuesEvent {
                 self.after.clone().expect("synchronize has after populated"),
             )
         } else if self.action == IssuesAction::Opened {
-            if let Some(pr) = &self.pull_request {
-                (pr.base.sha.clone(), pr.head.sha.clone())
+            if let (Some(base), Some(head)) = (&self.issue.base, &self.issue.head) {
+                (base.sha.clone(), head.sha.clone())
             } else {
                 return Ok(None);
             }
