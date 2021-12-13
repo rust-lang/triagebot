@@ -1,6 +1,6 @@
 use crate::{
     config::AutolabelConfig,
-    github::{IssuesAction, IssuesEvent, Label},
+    github::{files_changed, IssuesAction, IssuesEvent, Label},
     handlers::Context,
 };
 use tracing as log;
@@ -23,37 +23,21 @@ pub(super) async fn parse_input(
             })
             .unwrap_or_default()
         {
-            let mut files = Vec::new();
-            for line in diff.lines() {
-                // mostly copied from highfive
-                if line.starts_with("diff --git ") {
-                    files.push(
-                        line[line.find(" b/").unwrap()..]
-                            .strip_prefix(" b/")
-                            .unwrap(),
-                    );
+            let files = files_changed(&diff);
+            let mut autolabels = Vec::new();
+            for (label, cfg) in config.labels.iter() {
+                if cfg
+                    .trigger_files
+                    .iter()
+                    .any(|f| files.iter().any(|diff_file| diff_file.starts_with(f)))
+                {
+                    autolabels.push(Label {
+                        name: label.to_owned(),
+                    });
                 }
             }
-            let mut autolabels = Vec::new();
-            for trigger_file in files {
-                if trigger_file.is_empty() {
-                    // TODO: when would this be true?
-                    continue;
-                }
-                for (label, cfg) in config.labels.iter() {
-                    if cfg
-                        .trigger_files
-                        .iter()
-                        .any(|f| trigger_file.starts_with(f))
-                    {
-                        autolabels.push(Label {
-                            name: label.to_owned(),
-                        });
-                    }
-                }
-                if !autolabels.is_empty() {
-                    return Ok(Some(AutolabelInput { labels: autolabels }));
-                }
+            if !autolabels.is_empty() {
+                return Ok(Some(AutolabelInput { labels: autolabels }));
             }
         }
     }

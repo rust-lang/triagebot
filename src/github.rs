@@ -779,6 +779,21 @@ pub struct CommitBase {
     sha: String,
 }
 
+pub fn files_changed(diff: &str) -> Vec<&str> {
+    let mut files = Vec::new();
+    for line in diff.lines() {
+        // mostly copied from highfive
+        if line.starts_with("diff --git ") {
+            files.push(
+                line[line.find(" b/").unwrap()..]
+                    .strip_prefix(" b/")
+                    .unwrap(),
+            );
+        }
+    }
+    files
+}
+
 impl IssuesEvent {
     /// Returns the diff in this event, for Open and Synchronize events for now.
     pub async fn diff_between(&self, client: &GithubClient) -> anyhow::Result<Option<String>> {
@@ -1330,4 +1345,74 @@ pub trait IssuesQuery {
         repo: &'a Repository,
         client: &'a GithubClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_one_file() {
+        let input = r##"\
+diff --git a/triagebot.toml b/triagebot.toml
+index fb9cee43b2d..b484c25ea51 100644
+--- a/triagebot.toml
++++ b/triagebot.toml
+@@ -114,6 +114,15 @@ trigger_files = [
+        "src/tools/rustdoc-themes",
+    ]
++[autolabel."T-compiler"]
++trigger_files = [
++    # Source code
++    "compiler",
++
++    # Tests
++    "src/test/ui",
++]
++
+    [notify-zulip."I-prioritize"]
+    zulip_stream = 245100 # #t-compiler/wg-prioritization/alerts
+    topic = "#{number} {title}"
+         "##;
+        assert_eq!(files_changed(input), vec!["triagebot.toml".to_string()]);
+    }
+
+    #[test]
+    fn extract_several_files() {
+        let input = r##"\
+diff --git a/library/stdarch b/library/stdarch
+index b70ae88ef2a..cfba59fccd9 160000
+--- a/library/stdarch
++++ b/library/stdarch
+@@ -1 +1 @@
+-Subproject commit b70ae88ef2a6c83acad0a1e83d5bd78f9655fd05
++Subproject commit cfba59fccd90b3b52a614120834320f764ab08d1
+diff --git a/src/librustdoc/clean/types.rs b/src/librustdoc/clean/types.rs
+index 1fe4aa9023e..f0330f1e424 100644
+--- a/src/librustdoc/clean/types.rs
++++ b/src/librustdoc/clean/types.rs
+@@ -2322,3 +2322,4 @@ impl SubstParam {
+        if let Self::Lifetime(lt) = self { Some(lt) } else { None }
+    }
+}
++
+diff --git a/src/librustdoc/core.rs b/src/librustdoc/core.rs
+index c58310947d2..3b0854d4a9b 100644
+--- a/src/librustdoc/core.rs
++++ b/src/librustdoc/core.rs
+@@ -591,3 +591,4 @@ fn from(idx: u32) -> Self {
+        ImplTraitParam::ParamIndex(idx)
+    }
+}
++
+"##;
+        assert_eq!(
+            files_changed(input),
+            vec![
+                "library/stdarch".to_string(),
+                "src/librustdoc/clean/types.rs".to_string(),
+                "src/librustdoc/core.rs".to_string(),
+            ]
+        )
+    }
 }
