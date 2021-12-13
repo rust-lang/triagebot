@@ -675,6 +675,25 @@ impl Issue {
             .context("failed to close issue")?;
         Ok(())
     }
+
+    /// Returns the diff in this event, for Open and Synchronize events for now.
+    pub async fn diff(&self, client: &GithubClient) -> anyhow::Result<Option<String>> {
+        let (before, after) = if let (Some(base), Some(head)) = (&self.base, &self.head) {
+            (base.sha.clone(), head.sha.clone())
+        } else {
+            return Ok(None);
+        };
+
+        let mut req = client.get(&format!(
+            "{}/compare/{}...{}",
+            self.repository().url(),
+            before,
+            after
+        ));
+        req = req.header("Accept", "application/vnd.github.v3.diff");
+        let diff = client.send_req(req).await?;
+        Ok(Some(String::from(String::from_utf8_lossy(&diff))))
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -778,13 +797,6 @@ pub struct IssuesEvent {
     pub repository: Repository,
     /// Some if action is IssuesAction::Labeled, for example
     pub label: Option<Label>,
-
-    // These fields are the sha fields before/after a synchronize operation,
-    // used to compute the diff between these two commits.
-    #[serde(default)]
-    before: Option<String>,
-    #[serde(default)]
-    after: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -810,37 +822,7 @@ pub fn files_changed(diff: &str) -> Vec<&str> {
     files
 }
 
-impl IssuesEvent {
-    /// Returns the diff in this event, for Open and Synchronize events for now.
-    pub async fn diff_between(&self, client: &GithubClient) -> anyhow::Result<Option<String>> {
-        let (before, after) = if self.action == IssuesAction::Synchronize {
-            (
-                self.before
-                    .clone()
-                    .expect("synchronize has before populated"),
-                self.after.clone().expect("synchronize has after populated"),
-            )
-        } else if self.action == IssuesAction::Opened {
-            if let (Some(base), Some(head)) = (&self.issue.base, &self.issue.head) {
-                (base.sha.clone(), head.sha.clone())
-            } else {
-                return Ok(None);
-            }
-        } else {
-            return Ok(None);
-        };
-
-        let mut req = client.get(&format!(
-            "{}/compare/{}...{}",
-            self.issue.repository().url(),
-            before,
-            after
-        ));
-        req = req.header("Accept", "application/vnd.github.v3.diff");
-        let diff = client.send_req(req).await?;
-        Ok(Some(String::from(String::from_utf8_lossy(&diff))))
-    }
-}
+impl IssuesEvent {}
 
 #[derive(Debug, serde::Deserialize)]
 pub struct IssueSearchResult {
