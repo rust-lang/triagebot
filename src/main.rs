@@ -234,7 +234,11 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     dotenv::dotenv().ok();
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt::Subscriber::builder()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_ansi(std::env::var_os("DISABLE_COLOR").is_none())
+        .try_init()
+        .unwrap();
 
     let port = env::var("PORT")
         .ok()
