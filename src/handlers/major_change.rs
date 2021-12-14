@@ -217,9 +217,7 @@ async fn handle(
     label_to_add: String,
     new_proposal: bool,
 ) -> anyhow::Result<()> {
-    let mut labels = issue.labels().to_owned();
-    labels.push(Label { name: label_to_add });
-    let github_req = issue.set_labels(&ctx.github, labels);
+    let github_req = issue.add_labels(&ctx.github, vec![Label { name: label_to_add }]);
 
     let partial_issue = issue.to_zulip_github_reference();
     let zulip_topic = zulip_topic_from_issue(&partial_issue);

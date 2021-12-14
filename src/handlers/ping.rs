@@ -66,16 +66,11 @@ pub(super) async fn handle_command(
     };
 
     if let Some(label) = config.label.clone() {
-        let issue_labels = event.issue().unwrap().labels();
-        if !issue_labels.iter().any(|l| l.name == label) {
-            let mut issue_labels = issue_labels.to_owned();
-            issue_labels.push(github::Label { name: label });
-            event
-                .issue()
-                .unwrap()
-                .set_labels(&ctx.github, issue_labels)
-                .await?;
-        }
+        event
+            .issue()
+            .unwrap()
+            .add_labels(&ctx.github, vec![github::Label { name: label }])
+            .await?;
     }
 
     let mut users = Vec::new();

@@ -33,7 +33,8 @@ pub(super) async fn handle_command(
         return Ok(());
     }
 
-    let mut issue_labels = event.issue().unwrap().labels().to_owned();
+    let issue_labels = event.issue().unwrap().labels();
+    let mut labels_to_add = vec![];
     if cmd.style == Style::BetaApprove {
         if !issue_labels.iter().any(|l| l.name == "beta-nominated") {
             let cmnt = ErrorComment::new(
@@ -50,11 +51,9 @@ pub(super) async fn handle_command(
 
         // Add the beta-accepted label, but don't attempt to remove beta-nominated or the team
         // label.
-        if !issue_labels.iter().any(|l| l.name == "beta-accepted") {
-            issue_labels.push(github::Label {
-                name: "beta-accepted".into(),
-            });
-        }
+        labels_to_add.push(github::Label {
+            name: "beta-accepted".into(),
+        });
     } else {
         if !config.teams.contains_key(&cmd.team) {
             let cmnt = ErrorComment::new(
@@ -70,29 +69,23 @@ pub(super) async fn handle_command(
         }
 
         let label = config.teams[&cmd.team].clone();
-        if !issue_labels.iter().any(|l| l.name == label) {
-            issue_labels.push(github::Label { name: label });
-        }
+        labels_to_add.push(github::Label { name: label });
 
         let style_label = match cmd.style {
             Style::Decision => "I-nominated",
             Style::Beta => "beta-nominated",
             Style::BetaApprove => unreachable!(),
         };
-        if !issue_labels.iter().any(|l| l.name == style_label) {
-            issue_labels.push(github::Label {
-                name: style_label.into(),
-            });
-        }
+        labels_to_add.push(github::Label {
+            name: style_label.into(),
+        });
     }
 
-    if &issue_labels[..] != event.issue().unwrap().labels() {
-        event
-            .issue()
-            .unwrap()
-            .set_labels(&ctx.github, issue_labels)
-            .await?;
-    }
+    event
+        .issue()
+        .unwrap()
+        .add_labels(&ctx.github, labels_to_add)
+        .await?;
 
     Ok(())
 }
