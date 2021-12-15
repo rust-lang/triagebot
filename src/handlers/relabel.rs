@@ -53,11 +53,7 @@ pub(super) async fn handle_command(
             LabelDelta::Remove(label) => {
                 results.push((
                     label,
-                    event
-                        .issue()
-                        .unwrap()
-                        .remove_label(&ctx.github, &label)
-                        .await,
+                    event.issue().unwrap().remove_label(&ctx.github, &label),
                 ));
             }
         }
@@ -75,16 +71,18 @@ pub(super) async fn handle_command(
             event.issue().unwrap().global_id(),
             e
         );
+        return Err(e);
     }
 
-    for (label, res) in &results {
-        if let Err(e) = res {
+    for (label, res) in results {
+        if let Err(e) = res.await {
             tracing::error!(
                 "failed to remove {:?} from issue {}: {:?}",
                 label,
                 event.issue().unwrap().global_id(),
                 e
             );
+            return Err(e);
         }
     }
 

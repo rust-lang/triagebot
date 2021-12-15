@@ -365,6 +365,16 @@ impl IssueRepository {
             self.organization, self.repository
         )
     }
+
+    async fn has_label(&self, client: &GithubClient, label: &str) -> bool {
+        #[allow(clippy::redundant_pattern_matching)]
+        let url = format!("{}/labels/{}", self.url(), label);
+        match client.send_req(client.get(&url)).await {
+            Ok(_) => true,
+            // XXX: Error handling if the request failed for reasons beyond 'label didn't exist'
+            Err(_) => false,
+        }
+    }
 }
 
 impl Issue {
@@ -507,6 +517,12 @@ impl Issue {
 
         if labels.is_empty() {
             return Ok(());
+        }
+
+        for label in &labels {
+            if !self.repository().has_label(client, &label).await {
+                anyhow::bail!("Label {} does not exist in {}", label, self.global_id());
+            }
         }
 
         #[derive(serde::Serialize)]
