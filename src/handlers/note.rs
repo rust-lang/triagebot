@@ -21,5 +21,19 @@ pub(super) async fn handle_command(
     cmd: NoteCommand,
 ) -> anyhow::Result<()> {
     log::debug!("Handling Note Command");
+
+    // TODO: edit the original post to include:
+    //
+    // ```md
+    // <!-- start rustbot summary-->
+    // - [title](LINK_TO_SUMMARY_COMMENT)
+    // <!-- end rustbot summary-->
+    // ```
+
+    let issue = event.issue().unwrap();
+    if issue.is_pr() {
+        let NoteCommand::Summary { title, summary } = &cmd;
+        log::debug!("Note: {}, {}", title, summary);
+    }
     Ok(())
 }
