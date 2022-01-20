@@ -31,6 +31,7 @@ pub(crate) struct Config {
     pub(crate) github_releases: Option<GitHubReleasesConfig>,
     pub(crate) review_submitted: Option<ReviewSubmittedConfig>,
     pub(crate) shortcut: Option<ShortcutConfig>,
+    pub(crate) note: Option<NoteConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -73,6 +74,12 @@ pub(crate) struct PingTeamConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct AssignConfig {
+    #[serde(default)]
+    _empty: (),
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct NoteConfig {
     #[serde(default)]
     _empty: (),
 }
@@ -252,6 +259,8 @@ mod tests {
 
             [assign]
 
+            [note]
+
             [ping.compiler]
             message = """\
             So many people!\
@@ -301,6 +310,7 @@ mod tests {
                     allow_unauthenticated: vec!["C-*".into()],
                 }),
                 assign: Some(AssignConfig { _empty: () }),
+                note: Some(NoteConfig { _empty: () }),
                 ping: Some(PingConfig { teams: ping_teams }),
                 nominate: Some(NominateConfig {
                     teams: nominate_teams

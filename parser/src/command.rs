@@ -6,6 +6,7 @@ pub mod assign;
 pub mod close;
 pub mod glacier;
 pub mod nominate;
+pub mod note;
 pub mod ping;
 pub mod prioritize;
 pub mod relabel;
@@ -27,6 +28,7 @@ pub enum Command<'a> {
     Glacier(Result<glacier::GlacierCommand, Error<'a>>),
     Shortcut(Result<shortcut::ShortcutCommand, Error<'a>>),
     Close(Result<close::CloseCommand, Error<'a>>),
+    Note(Result<note::NoteCommand, Error<'a>>),
 }
 
 #[derive(Debug)]
@@ -191,6 +193,7 @@ impl<'a> Command<'a> {
             Command::Glacier(r) => r.is_ok(),
             Command::Shortcut(r) => r.is_ok(),
             Command::Close(r) => r.is_ok(),
+            Command::Note(r) => r.is_ok(),
         }
     }
 
