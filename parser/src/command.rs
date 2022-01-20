@@ -99,6 +99,11 @@ impl<'a> Input<'a> {
             &original_tokenizer,
         ));
         success.extend(parse_single_command(
+            note::NoteCommand::parse,
+            Command::Note,
+            &original_tokenizer,
+        ));
+        success.extend(parse_single_command(
             ping::PingCommand::parse,
             Command::Ping,
             &original_tokenizer,
