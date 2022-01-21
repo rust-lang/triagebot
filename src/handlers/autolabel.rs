@@ -96,17 +96,6 @@ pub(super) async fn parse_input(
             }
         }
     }
-    if event.action == IssuesAction::Closed {
-        let labels = event.issue.labels();
-        if labels.iter().any(|x| x.name == "I-prioritize") {
-            return Ok(Some(AutolabelInput {
-                add: vec![],
-                remove: vec![Label {
-                    name: "I-prioritize".to_owned(),
-                }],
-            }));
-        }
-    }
     Ok(None)
 }
 
