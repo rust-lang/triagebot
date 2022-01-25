@@ -39,6 +39,7 @@ mod relabel;
 mod review_submitted;
 mod rustc_commits;
 mod shortcut;
+mod triage;
 
 pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, &event.repo_name()).await;
@@ -243,6 +244,7 @@ command_handlers! {
     major_change: Second,
     shortcut: Shortcut,
     close: Close,
+    triage: Triage,
 }
 
 pub struct Context {
