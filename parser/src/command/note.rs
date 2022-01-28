@@ -10,14 +10,12 @@ pub enum NoteCommand {
 #[derive(PartialEq, Eq, Debug)]
 pub enum ParseError {
     MissingTitle,
-    MissingBody,
 }
 impl std::error::Error for ParseError {}
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ParseError::MissingTitle => write!(f, "missing required summary title"),
-            ParseError::MissingBody => write!(f, "missing summary notes"),
         }
     }
 }
