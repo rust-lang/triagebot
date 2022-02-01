@@ -35,6 +35,7 @@
 //!
 
 use crate::{config::NoteConfig, github::Event, handlers::Context, interactions::EditIssueBody};
+use anyhow::Context as _;
 use parser::command::note::NoteCommand;
 use tracing as log;
 
@@ -62,14 +63,19 @@ struct NoteData {
 }
 
 impl NoteData {
-    pub fn remove(&mut self, title: &str) -> () {
-        let idx = self.entries.iter().position(|x| x.title == title).unwrap();
+    pub fn remove(&mut self, title: &str) -> anyhow::Result<()> {
+        let idx = self
+            .entries
+            .iter()
+            .position(|x| x.title == title)
+            .context("Summary with title does not exist")?;
         log::debug!(
-            "Removing element {:#?} from index {}",
+            "Removing summary {:?} from index {}",
             self.entries[idx],
             idx
         );
         self.entries.remove(idx);
+        Ok(())
     }
     pub fn to_markdown(&self) -> String {
         if self.entries.is_empty() {
@@ -110,7 +116,7 @@ pub(super) async fn handle_command(
             current.entries.push(new_entry);
         }
         NoteCommand::Remove { title } => {
-            current.remove(title);
+            current.remove(title)?;
         }
     }
 
