@@ -5,6 +5,7 @@ use std::fmt;
 #[derive(PartialEq, Eq, Debug)]
 pub enum NoteCommand {
     Summary { title: String },
+    Remove { title: String },
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -25,17 +26,27 @@ impl NoteCommand {
         let mut toks = input.clone();
         if let Some(Token::Word("note")) = toks.peek_token()? {
             toks.next_token()?;
-            let title = match toks.next_token()? {
-                Some(Token::Word(title)) => Some(title),
-                Some(Token::Quote(multi_word_title)) => Some(multi_word_title),
-                _ => None,
-            };
-            if let Some(title) = title {
-                Ok(Some(NoteCommand::Summary {
-                    title: title.to_string(),
-                }))
-            } else {
-                Err(toks.error(ParseError::MissingTitle))
+            let mut remove = false;
+            loop {
+                match toks.next_token()? {
+                    Some(Token::Word(title)) if title == "remove" => {
+                        remove = true;
+                        continue;
+                    }
+                    Some(Token::Word(title)) | Some(Token::Quote(title)) => {
+                        let command = if remove {
+                            NoteCommand::Remove {
+                                title: title.to_string(),
+                            }
+                        } else {
+                            NoteCommand::Summary {
+                                title: title.to_string(),
+                            }
+                        };
+                        break Ok(Some(command));
+                    }
+                    _ => break Err(toks.error(ParseError::MissingTitle)),
+                };
             }
         } else {
             Ok(None)

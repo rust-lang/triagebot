@@ -62,6 +62,15 @@ struct NoteData {
 }
 
 impl NoteData {
+    pub fn remove(&mut self, title: &str) -> () {
+        let idx = self.entries.iter().position(|x| x.title == title).unwrap();
+        log::debug!(
+            "Removing element {:#?} from index {}",
+            self.entries[idx],
+            idx
+        );
+        self.entries.remove(idx);
+    }
     pub fn to_markdown(&self) -> String {
         if self.entries.is_empty() {
             return String::new();
@@ -88,16 +97,23 @@ pub(super) async fn handle_command(
 
     let comment_url = String::from(event.html_url().unwrap());
     let author = event.user().login.to_owned();
-    let NoteCommand::Summary { title } = &cmd;
 
-    let new_entry = NoteDataEntry {
-        title: title.to_owned(),
-        comment_url,
-        author,
-    };
+    match &cmd {
+        NoteCommand::Summary { title } => {
+            let new_entry = NoteDataEntry {
+                title: title.to_owned(),
+                comment_url,
+                author,
+            };
 
-    log::debug!("New Note Entry: {:#?}", new_entry);
-    current.entries.push(new_entry);
+            log::debug!("New Note Entry: {:#?}", new_entry);
+            current.entries.push(new_entry);
+        }
+        NoteCommand::Remove { title } => {
+            current.remove(title);
+        }
+    }
+
     let new_markdown = current.to_markdown();
     log::debug!("New MD: {:#?}", new_markdown);
 
