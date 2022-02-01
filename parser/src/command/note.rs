@@ -25,7 +25,12 @@ impl NoteCommand {
         let mut toks = input.clone();
         if let Some(Token::Word("note")) = toks.peek_token()? {
             toks.next_token()?;
-            if let Some(Token::Word(title)) = toks.next_token()? {
+            let title = match toks.next_token()? {
+                Some(Token::Word(title)) => Some(title),
+                Some(Token::Quote(multi_word_title)) => Some(multi_word_title),
+                _ => None,
+            };
+            if let Some(title) = title {
                 Ok(Some(NoteCommand::Summary {
                     title: title.to_string(),
                 }))
