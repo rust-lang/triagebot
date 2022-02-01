@@ -8,7 +8,7 @@
 //! ...details details details...
 //! ```
 //!
-//! If this is the first summary entry, rustbot will amend the original post (the top-level comment) to add a "Notes" section:
+//! If this is the first summary entry, rustbot will amend the original post (the top-level comment) to add a "Notes" section. The section should **not** be edited by hand.
 //!
 //! ```md
 //! <!-- TRIAGEBOT_SUMMARY_START -->
