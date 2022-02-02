@@ -86,15 +86,12 @@ impl NoteData {
     }
 
     pub fn remove_by_title(&mut self, title: &str) -> Option<NoteDataEntry> {
-        let url_to_remove = self.get_url_from_title(title);
-
-        if let Some(url_to_remove) = url_to_remove {
-            let message = format!("UNABLE TO REMOVE ENTRY WITH URL: {:?}", &url_to_remove);
+        if let Some(url_to_remove) = self.get_url_from_title(title) {
             if let Some(entry) = self.entries_by_url.remove(&url_to_remove) {
                 log::debug!("SUCCESSFULLY REMOVED ENTRY: {:#?}", &entry);
                 Some(entry)
             } else {
-                log::debug!("{:?}", &message);
+                log::debug!("UNABLE TO REMOVE ENTRY WITH URL: {:?}", &url_to_remove);
                 None
             }
         } else {
@@ -139,14 +136,14 @@ pub(super) async fn handle_command(
                 log::debug!("Updated existing entry: {:#?}", existing_entry);
             } else {
                 let new_entry = NoteDataEntry {
-                    title: title.clone(),
+                    title,
                     comment_url: comment_url.clone(),
                     author,
                 };
                 log::debug!("New Note Entry: {:#?}", new_entry);
                 current
                     .entries_by_url
-                    .insert(comment_url, new_entry.clone());
+                    .insert(comment_url, new_entry);
                 log::debug!("Entries by URL: {:#?}", current.entries_by_url);
             }
         }
