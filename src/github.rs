@@ -192,7 +192,7 @@ impl User {
             .get("wg-prioritization")
             .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
         let is_async_member = map
-            .get("wg-async-foundations")
+            .get("wg-async")
             .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
         let in_all = map["all"].members.iter().any(|g| g.github == self.login);
         log::trace!(
