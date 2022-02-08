@@ -37,6 +37,7 @@ octocrab = "0.9.1"
 comrak = "0.8.2"
 route-recognizer = "0.3.0"
 cynic = { version = "0.14" }
+itertools = "0.10.2"
 
 [dependencies.serde]
 version = "1"

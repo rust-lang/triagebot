@@ -31,6 +31,7 @@ mod glacier;
 mod major_change;
 mod milestone_prs;
 mod nominate;
+mod note;
 mod notification;
 mod notify_zulip;
 mod ping;
@@ -243,6 +244,7 @@ command_handlers! {
     major_change: Second,
     shortcut: Shortcut,
     close: Close,
+    note: Note,
 }
 
 pub struct Context {
