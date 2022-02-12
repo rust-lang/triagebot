@@ -35,12 +35,32 @@ pub(super) async fn parse_input(
             {
                 let files = files_changed(&diff);
                 let mut autolabels = Vec::new();
-                for (label, cfg) in config.labels.iter() {
+                'outer: for (label, cfg) in config.labels.iter() {
                     if cfg
                         .trigger_files
                         .iter()
                         .any(|f| files.iter().any(|diff_file| diff_file.starts_with(f)))
                     {
+                        let exclude_patterns: Vec<glob::Pattern> = cfg
+                            .exclude_labels
+                            .iter()
+                            .filter_map(|label| match glob::Pattern::new(label) {
+                                Ok(exclude_glob) => Some(exclude_glob),
+                                Err(error) => {
+                                    log::error!("Invalid glob pattern: {}", error);
+                                    None
+                                }
+                            })
+                            .collect();
+                        for label in event.issue.labels() {
+                            for pat in &exclude_patterns {
+                                if pat.matches(&label.name) {
+                                    // If we hit an excluded label, ignore this autolabel and check the next
+                                    continue 'outer;
+                                }
+                            }
+                        }
+
                         autolabels.push(Label {
                             name: label.to_owned(),
                         });
