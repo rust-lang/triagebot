@@ -1,6 +1,7 @@
 use crate::config::{self, Config, ConfigurationError};
 use crate::github::{Event, GithubClient, IssueCommentAction, IssuesAction, IssuesEvent};
 use octocrab::Octocrab;
+use parser::command::note::NoteCommand;
 use parser::command::{Command, Input};
 use std::fmt;
 use std::sync::Arc;
@@ -176,7 +177,27 @@ macro_rules! command_handlers {
             let input = Input::new(&body, vec![&ctx.username, "triagebot"]);
             let commands = if let Some(previous) = event.comment_from() {
                 let prev_commands = Input::new(&previous, vec![&ctx.username, "triagebot"]).collect::<Vec<_>>();
-                input.filter(|cmd| !prev_commands.contains(cmd)).collect::<Vec<_>>()
+                let mut filtered = input.filter(|cmd| !prev_commands.contains(cmd)).collect::<Vec<_>>();
+                for prev in prev_commands {
+                    // if user has edited an existing note comment
+                    if let Command::Note(Ok(NoteCommand::Summary { title })) = prev {
+                        let comment_body = event.comment_body().unwrap();
+                        let cmd = if comment_body.contains("@triagebot note") || comment_body.contains(&format!("@{} note", ctx.username)) {
+                            // in this case, they may have edited the title of the note
+                            NoteCommand::Summary {
+                                title: title.clone(),
+                            }
+                        } else {
+                            // in this case, they deleted the `@rustbot note` portion of the comment
+                            // so we will assume they'd like to remove it as a note entry
+                            NoteCommand::Remove {
+                                title: title.clone(),
+                            }
+                        };
+                        filtered.push(Command::Note(Ok(cmd)));
+                    }
+                }
+                filtered
             } else {
                 input.collect()
             };
@@ -233,7 +254,7 @@ macro_rules! command_handlers {
 //
 // This is for handlers for commands parsed by the `parser` crate.
 // Each variant of `parser::command::Command` must be in this list,
-// preceded by the module containing the coresponding `handle_command` function
+// preceded by the module containing the corresponding `handle_command` function
 command_handlers! {
     assign: Assign,
     glacier: Glacier,
