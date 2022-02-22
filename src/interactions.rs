@@ -1,5 +1,6 @@
 use crate::github::{GithubClient, Issue};
 use std::fmt::Write;
+use tracing as log;
 
 pub struct ErrorComment<'a> {
     issue: &'a Issue,
@@ -53,22 +54,29 @@ pub struct EditIssueBody<'a> {
     id: &'static str,
 }
 
-static START_BOT: &str = "<!-- TRIAGEBOT_START -->\r\n";
+static START_BOT: &str = "<!-- TRIAGEBOT_START -->\n\n";
 static END_BOT: &str = "<!-- TRIAGEBOT_END -->";
+
+fn normalize_body(body: &str) -> String {
+    str::replace(body, "\r\n", "\n").to_string()
+}
 
 impl<'a> EditIssueBody<'a> {
     pub fn new(issue: &'a Issue, id: &'static str) -> EditIssueBody<'a> {
         EditIssueBody { issue, id }
     }
 
-    fn get_current(&self) -> Option<&str> {
+    fn get_current(&self) -> Option<String> {
+        let self_issue_body = normalize_body(&self.issue.body);
         let start_section = self.start_section();
         let end_section = self.end_section();
-        if self.issue.body.contains(START_BOT) {
-            if self.issue.body.contains(&start_section) {
-                let start_idx = self.issue.body.find(&start_section).unwrap();
-                let end_idx = self.issue.body.find(&end_section).unwrap();
-                Some(&self.issue.body[start_idx..(end_idx + end_section.len())])
+        if self_issue_body.contains(START_BOT) {
+            if self_issue_body.contains(&start_section) {
+                let start_idx = self_issue_body.find(&start_section).unwrap();
+                let end_idx = self_issue_body.find(&end_section).unwrap();
+                let current =
+                    String::from(&self_issue_body[start_idx..(end_idx + end_section.len())]);
+                Some(current)
             } else {
                 None
             }
@@ -121,7 +129,7 @@ impl<'a> EditIssueBody<'a> {
     where
         T: serde::Serialize,
     {
-        let mut current_body = self.issue.body.clone();
+        let mut current_body = normalize_body(&self.issue.body.clone());
         let start_section = self.start_section();
         let end_section = self.end_section();
 
