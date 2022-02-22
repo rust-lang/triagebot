@@ -58,7 +58,7 @@ static START_BOT: &str = "<!-- TRIAGEBOT_START -->\n\n";
 static END_BOT: &str = "<!-- TRIAGEBOT_END -->";
 
 fn normalize_body(body: &str) -> String {
-    str::replace(body, "\r\n", "\n").to_string()
+    str::replace(body, "\r\n", "\n")
 }
 
 impl<'a> EditIssueBody<'a> {
