@@ -852,10 +852,12 @@ pub struct Repository {
     pub full_name: String,
 }
 
+#[derive(Copy, Clone)]
 struct Ordering<'a> {
     pub sort: &'a str,
     pub direction: &'a str,
     pub per_page: &'a str,
+    pub page: usize,
 }
 
 impl Repository {
@@ -885,6 +887,7 @@ impl Repository {
             sort: "created",
             direction: "asc",
             per_page: "100",
+            page: 1,
         };
         let filters: Vec<_> = filters
             .clone()
@@ -916,27 +919,39 @@ impl Repository {
             || filters.iter().any(|&(key, _)| key == "no")
             || is_pr && !include_labels.is_empty();
 
-        let url = if use_search_api {
-            self.build_search_issues_url(&filters, include_labels, exclude_labels, ordering)
-        } else if is_pr {
-            self.build_pulls_url(&filters, include_labels, ordering)
-        } else {
-            self.build_issues_url(&filters, include_labels, ordering)
-        };
+        // If there are more than `per_page` of issues, we need to paginate
+        let mut issues = vec![];
+        loop {
+            let url = if use_search_api {
+                self.build_search_issues_url(&filters, include_labels, exclude_labels, ordering)
+            } else if is_pr {
+                self.build_pulls_url(&filters, include_labels, ordering)
+            } else {
+                self.build_issues_url(&filters, include_labels, ordering)
+            };
+    
+            let result = client.get(&url);
+            if use_search_api {
+                let result = client
+                    .json::<IssueSearchResult>(result)
+                    .await
+                    .with_context(|| format!("failed to list issues from {}", url))?;
+                issues.extend(result.items);
+                if issues.len() < result.total_count {
+                    ordering.page += 1;
+                    continue
+                }
+            } else {
+                // FIXME: paginate with non-search
+                issues = client
+                    .json(result)
+                    .await
+                    .with_context(|| format!("failed to list issues from {}", url))?
+            }
 
-        let result = client.get(&url);
-        if use_search_api {
-            let result = client
-                .json::<IssueSearchResult>(result)
-                .await
-                .with_context(|| format!("failed to list issues from {}", url))?;
-            Ok(result.items)
-        } else {
-            client
-                .json(result)
-                .await
-                .with_context(|| format!("failed to list issues from {}", url))
+            break;
         }
+        Ok(issues)
     }
 
     fn build_issues_url(
@@ -1013,12 +1028,13 @@ impl Repository {
             .collect::<Vec<_>>()
             .join("+");
         format!(
-            "{}/search/issues?q={}&sort={}&order={}&per_page={}",
+            "{}/search/issues?q={}&sort={}&order={}&per_page={}&page={}",
             Repository::GITHUB_API_URL,
             filters,
             ordering.sort,
             ordering.direction,
             ordering.per_page,
+            ordering.page,
         )
     }
 }

@@ -599,3 +599,30 @@ pub fn lang_planning<'a>() -> Box<dyn Action> {
         ],
     })
 }
+
+// Things to add (maybe):
+// - Compiler RFCs
+// - P-high issues
+pub fn compiler_backlog_bonanza<'a>() -> Box<dyn Action> {
+    Box::new(Step {
+        name: "compiler_backlog_bonanza",
+        actions: vec![
+            Query {
+                repos: vec![
+                    ("rust-lang", "rust"),
+                ],
+                queries: vec![
+                    QueryMap {
+                        name: "tracking_issues",
+                        kind: QueryKind::List,
+                        query: Box::new(github::Query {
+                            filters: vec![("state", "open")],
+                            include_labels: vec!["C-tracking-issue"],
+                            exclude_labels: vec!["T-libs-api", "T-libs", "T-lang", "T-rustdoc"],
+                        }),
+                    },
+                ],
+            },
+        ],
+    })
+}
