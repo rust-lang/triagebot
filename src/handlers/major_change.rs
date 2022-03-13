@@ -139,7 +139,7 @@ pub(super) async fn handle_input(
             let zulip_update_req = crate::zulip::UpdateMessageApiRequest {
                 message_id: zulip_send_res.message_id,
                 topic: Some(&new_topic),
-                propagate_mode: None,
+                propagate_mode: Some("change_all"),
                 content: None,
             };
             zulip_update_req
