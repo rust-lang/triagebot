@@ -156,7 +156,7 @@ pub(super) async fn handle_input(
         &event.issue,
         zulip_msg,
         config.meeting_label.clone(),
-        cmd == Invocation::NewProposal,
+        Some(cmd),
     )
     .await
 }
@@ -204,7 +204,7 @@ pub(super) async fn handle_command(
         issue,
         zulip_msg,
         config.second_label.clone(),
-        false,
+        None,
     )
     .await
 }
@@ -215,7 +215,7 @@ async fn handle(
     issue: &Issue,
     zulip_msg: String,
     label_to_add: String,
-    new_proposal: bool,
+    cmd: Option<Invocation>,
 ) -> anyhow::Result<()> {
     let github_req = issue.add_labels(&ctx.github, vec![Label { name: label_to_add }]);
 
@@ -230,19 +230,31 @@ async fn handle(
         content: &zulip_msg,
     };
 
-    if new_proposal {
+    if matches!(cmd, Some(Invocation::NewProposal | Invocation::Rename { .. })) {
         let topic_url = zulip_req.url();
-        let comment = format!(
-            "This issue is not meant to be used for technical discussion. \
-        There is a Zulip [stream] for that. Use this issue to leave \
-        procedural comments, such as volunteering to review, indicating that you \
-        second the proposal (or third, etc), or raising a concern that you would \
-        like to be addressed. \
-        \n\n{} \
-        \n\n[stream]: {}",
-            config.open_extra_text.as_deref().unwrap_or_default(),
-            topic_url
-        );
+        let comment = match cmd {
+            Some(Invocation::NewProposal) =>
+                format!(
+                    "This issue is not meant to be used for technical discussion. \
+                There is a Zulip [stream] for that. Use this issue to leave \
+                procedural comments, such as volunteering to review, indicating that you \
+                second the proposal (or third, etc), or raising a concern that you would \
+                like to be addressed. \
+                \n\n{} \
+                \n\n[stream]: {}",
+                    config.open_extra_text.as_deref().unwrap_or_default(),
+                    topic_url
+                ),
+            Some(Invocation::Rename { .. }) =>
+                format!(
+                    "This issue has been renamed, please see the renamed Zulip [stream] for technical discussion. \
+                \n\n{} \
+                \n\n[stream]: {}",
+                    config.open_extra_text.as_deref().unwrap_or_default(),
+                    topic_url
+                ),
+            _ => unreachable!(),
+        };
         issue
             .post_comment(&ctx.github, &comment)
             .await
