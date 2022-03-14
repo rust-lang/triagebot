@@ -147,6 +147,28 @@ pub(super) async fn handle_input(
                 .await
                 .context("zulip message update failed")?;
 
+            // after renaming the zulip topic, post an additional comment under the old topic with a url to the new, renamed topic
+            // this is necessary due to the lack of topic permalinks, see https://github.com/zulip/zulip/issues/15290
+            let new_topic_url = crate::zulip::Recipient::Stream {
+                id: config.zulip_stream,
+                topic: &new_topic,
+            }.url();
+            let breadcrumb_comment = format!(
+                "The associated GitHub issue has been renamed. Please see the [renamed Zulip topic]({}).",
+                new_topic_url
+            );
+            let zulip_send_breadcrumb_req = crate::zulip::MessageApiRequest {
+                recipient: crate::zulip::Recipient::Stream {
+                    id: config.zulip_stream,
+                    topic: &prev_topic,
+                },
+                content: &breadcrumb_comment,
+            };
+            zulip_send_breadcrumb_req
+                .send(&ctx.github.raw())
+                .await
+                .context("zulip post failed")?;
+
             return Ok(());
         }
     };
