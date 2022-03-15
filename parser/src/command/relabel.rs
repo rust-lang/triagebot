@@ -129,7 +129,7 @@ impl RelabelCommand {
         let mut toks = input.clone();
 
         if toks.eat_token(Token::Word("modify"))? {
-            if toks.eat_token(Token::Word("labels"))? {
+            if toks.eat_token(Token::Word("labels"))? || toks.eat_token(Token::Word("label"))? {
                 if toks.eat_token(Token::Colon)? {
                     // ate the colon
                 } else if toks.eat_token(Token::Word("to"))? {
@@ -145,7 +145,7 @@ impl RelabelCommand {
             } else {
                 return Ok(None);
             }
-        } else if toks.eat_token(Token::Word("label"))? {
+        } else if toks.eat_token(Token::Word("labels"))? || toks.eat_token(Token::Word("label"))? {
             // optionally eat a colon
             toks.eat_token(Token::Colon)?;
             // continue
@@ -258,7 +258,7 @@ fn parse_shorter_command() {
 #[test]
 fn parse_shorter_command_with_colon() {
     assert_eq!(
-        parse("label: +T-compiler -T-lang bug"),
+        parse("labels: +T-compiler -T-lang bug"),
         Ok(Some(vec![
             LabelDelta::Add(Label("T-compiler".into())),
             LabelDelta::Remove(Label("T-lang".into())),
