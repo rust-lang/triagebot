@@ -242,7 +242,7 @@ fn edit_1() {
 
 #[test]
 fn edit_2() {
-    let input_old = "@bot modify label: +bug.";
+    let input_old = "@bot modify labeled: +bug.";
     let mut input_old = Input::new(input_old, vec!["bot"]);
     let input_new = "@bot modify labels: +bug.";
     let mut input_new = Input::new(input_new, vec!["bot"]);
