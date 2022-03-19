@@ -304,7 +304,7 @@ impl super::IssuesQuery for LeastRecentlyReviewedPullRequests {
 
         let prs: Vec<_> = prs
             .into_iter()
-            .take(5)
+            .take(50)
             .map(
                 |(updated_at, number, title, html_url, repo_name, labels, assignees)| {
                     let updated_at = crate::actions::to_human(updated_at);
