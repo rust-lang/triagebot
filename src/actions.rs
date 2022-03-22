@@ -35,7 +35,7 @@ pub struct QueryMap<'a> {
     pub query: Box<dyn github::IssuesQuery + Send + Sync>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub struct IssueDecorator {
     pub number: u64,
     pub title: String,
@@ -75,6 +75,7 @@ impl<'a> Action for Step<'a> {
 
         let mut context = Context::new();
         let mut results = HashMap::new();
+        let mut results_fcp = HashMap::new();
 
         for Query { repos, queries } in &self.actions {
             for repo in repos {
@@ -84,6 +85,36 @@ impl<'a> Action for Step<'a> {
 
                 for QueryMap { name, kind, query } in queries {
                     let issues = query.query(&repository, &gh).await;
+
+                    if let Some(issues_fcp) = issues.query_fcp(&repository, &gh).await {
+                        match issues_fcp {
+                            Ok(issues_fcp_decorators) => match kind {
+                                QueryKind::List => {
+                                    results_fcp
+                                        .entry(*name)
+                                        .or_insert(Vec::new())
+                                        .extend(issues_fcp_decorators);
+                                }
+                                QueryKind::Count => {
+                                    let count = issues_fcp_decorators.len();
+                                    let result = if let Some(value) = context.get(*name) {
+                                        value.as_u64().unwrap() + count as u64
+                                    } else {
+                                        count as u64
+                                    };
+
+                                    context.insert(*name, &result);
+                                }
+                            },
+                            Err(err) => {
+                                eprintln!("ERROR: {}", err);
+                                err.chain()
+                                    .skip(1)
+                                    .for_each(|cause| eprintln!("because: {}", cause));
+                                std::process::exit(1);
+                            }
+                        }
+                    }
 
                     match issues {
                         Ok(issues_decorator) => match kind {
@@ -117,8 +148,14 @@ impl<'a> Action for Step<'a> {
         }
 
         for (name, issues) in &results {
-            context.insert(*name, issues);
+            if name == &"proposed_fcp" {
+                println!("result (name, issues): ({}, {:#?})", &name, &issues);
+                context.insert(*name, issues);
+            }
         }
+
+        println!("self.name: {}", self.name);
+        println!("context: {:#?}", context);
 
         TEMPLATES
             .render(&format!("{}.tt", self.name), &context)
