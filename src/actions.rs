@@ -44,6 +44,16 @@ pub struct IssueDecorator {
     pub labels: String,
     pub assignees: String,
     pub updated_at: String,
+
+    pub fcp_details: Option<FCPDetails>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FCPDetails {
+    pub bot_tracking_comment_html_url: String,
+    pub bot_tracking_comment_content: String,
+    pub initiating_comment_html_url: String,
+    pub initiating_comment_content: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -99,7 +109,7 @@ impl<'a> Action for Step<'a> {
                 };
 
                 for QueryMap { name, kind, query } in queries {
-                    let issues = query.query(&repository, &gh).await;
+                    let issues = query.query(&repository, name == &"proposed_fcp", &gh).await;
 
                     match issues {
                         Ok(issues_decorator) => match kind {
@@ -133,30 +143,12 @@ impl<'a> Action for Step<'a> {
         }
 
         for (name, issues) in &results {
-            if name == &"proposed_fcp" {
-                let fcp_map = crate::rfcbot::get_all_fcps().await.unwrap();
+            // if name == &"proposed_fcp" {
 
-                let fcp_results = issues
-                    .into_iter()
-                    .filter_map(|issue_decorator| {
-                        let key = format!(
-                            "rust-lang/{}:{}:{}",
-                            issue_decorator.repo_name.clone(),
-                            issue_decorator.number.clone(),
-                            issue_decorator.title.clone(),
-                        );
-                        if let Some(fcp) = fcp_map.get(&key) {
-                            Some(FCPDecorator::from_issue_fcp(&fcp, &issue_decorator))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<_>>();
-
-                context.insert(*name, &fcp_results);
-            } else {
-                context.insert(*name, issues);
-            }
+            //     context.insert(*name, &fcp_results);
+            // } else {
+            // }
+            context.insert(*name, issues);
         }
 
         TEMPLATES

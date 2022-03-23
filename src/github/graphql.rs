@@ -164,6 +164,7 @@ impl super::IssuesQuery for LeastRecentlyReviewedPullRequests {
     async fn query<'a>(
         &'a self,
         repo: &'a super::Repository,
+        _include_fcp_details: bool,
         client: &'a super::GithubClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         use cynic::QueryBuilder;
@@ -317,6 +318,7 @@ impl super::IssuesQuery for LeastRecentlyReviewedPullRequests {
                         labels,
                         assignees,
                         updated_at,
+                        fcp_details: None,
                     }
                 },
             )
