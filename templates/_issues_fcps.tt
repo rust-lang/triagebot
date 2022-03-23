@@ -4,7 +4,13 @@
 {%- for issue in issues %}
 {{heading}} "{{issue.title}}" {{issue.repo_name}}#{{issue.number}}
 
-**Link:** {{issue.html_url}}
+- **Link:** {{issue.html_url}}
+- [**Tracking Comment**]({{issue.bot_tracking_comment_html_url}}): {{issue.bot_tracking_comment_content}}
+- [**Initiating Comment**]({{issue.initiating_comment_html_url}}): {{issue.initiating_comment_content}}
+
+
+
+
 {%else%}
 
 None.
