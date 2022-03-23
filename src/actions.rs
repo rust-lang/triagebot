@@ -56,22 +56,6 @@ pub struct FCPDetails {
     pub initiating_comment_content: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct FCPDecorator {
-    pub number: u64,
-    pub title: String,
-    pub html_url: String,
-    pub repo_name: String,
-    pub labels: String,
-    pub assignees: String,
-    pub updated_at: String,
-
-    pub bot_tracking_comment_html_url: String,
-    pub bot_tracking_comment_content: String,
-    pub initiating_comment_html_url: String,
-    pub initiating_comment_content: String,
-}
-
 lazy_static! {
     pub static ref TEMPLATES: Tera = {
         match Tera::new("templates/*") {
@@ -143,11 +127,6 @@ impl<'a> Action for Step<'a> {
         }
 
         for (name, issues) in &results {
-            // if name == &"proposed_fcp" {
-
-            //     context.insert(*name, &fcp_results);
-            // } else {
-            // }
             context.insert(*name, issues);
         }
 

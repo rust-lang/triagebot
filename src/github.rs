@@ -1065,16 +1065,10 @@ impl<'q> IssuesQuery for Query<'q> {
             .get_issues(&client, self)
             .await
             .with_context(|| "Unable to get issues.")?;
-
-        // let fcp_collection = crate::rfcbot::FCPCollectionBox {};
-        // fcp_collection.get_all_fcps().await?;
-
-        // let fcp_map = crate::rfcbot::get_all_fcps().await?;
-
         let issues_decorator: Vec<_> = issues
             .into_iter()
             .map(|issue| async move {
-                // TODO: seems like a *really* bad approach but not sure how to make it better
+                // TODO: this seems like a *really* bad approach, but I'm not sure how to make it better
                 let fcp_map = crate::rfcbot::get_all_fcps().await?;
                 let fcp_details = if include_fcp_details {
                     let repository_name = if let Some(repo) = issue.repository.get() {
@@ -1098,22 +1092,12 @@ impl<'q> IssuesQuery for Query<'q> {
                         let fk_initiating_comment = fcp.fcp.fk_initiating_comment;
                         let initiating_comment_html_url =
                             format!("{}#issuecomment-{}", issue.html_url, fk_initiating_comment,);
-                        // TODO: get from GitHub
-                        // let url = format!(
-                        //     "{}/repos/rust-lang/{}/issues/comments/{}",
-                        //     Repository::GITHUB_API_URL,
-                        //     repository_name,
-                        //     fk_initiating_comment
-                        // );
                         let init_comment = issue
-                            .get_comment(&client, fk_initiating_comment.try_into().unwrap())
+                            .get_comment(&client, fk_initiating_comment.try_into()?)
                             .await?;
-                        // let init_comment_content = init_comment.body;
-                        // client.json::<String>(client.get(&url)).await.unwrap();
                         let initiating_comment_content = quote_reply(&init_comment.body);
 
                         Some(crate::actions::FCPDetails {
-                            // additional properties from FullFCP (from rfcbot)
                             bot_tracking_comment_html_url,
                             bot_tracking_comment_content,
                             initiating_comment_html_url,
