@@ -119,11 +119,8 @@ impl<'a> Action for Step<'a> {
         for (name, issues) in &results {
             if name == &"proposed_fcp" {
                 let fcp_map = crate::rfcbot::get_all_fcps().await.unwrap();
-                println!("fcp_map: {:#?}", fcp_map);
                 let mut fcp_results = Vec::new();
                 for issue_decorator in issues.into_iter() {
-                    println!("issue_decorator: {:#?}", &issue_decorator);
-                    println!("issue_decorator.html_url: {:#?}", &issue_decorator.html_url);
                     let key = format!(
                         "rust-lang/{}:{}:{}",
                         issue_decorator.repo_name.clone(),
@@ -142,9 +139,6 @@ impl<'a> Action for Step<'a> {
                 context.insert(*name, issues);
             }
         }
-
-        println!("self.name: {}", self.name);
-        println!("context: {:#?}", context);
 
         TEMPLATES
             .render(&format!("{}.tt", self.name), &context)

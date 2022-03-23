@@ -122,8 +122,6 @@ impl FCPDecorator {
 pub async fn get_all_fcps() -> anyhow::Result<HashMap<String, FullFCP>> {
     let url = Url::parse(&"https://rfcbot.rs/api/all")?;
     let res = reqwest::get(url).await?.json::<Vec<FullFCP>>().await?;
-    println!("res: {:#?}", res);
-
     let mut map: HashMap<String, FullFCP> = HashMap::new();
     for full_fcp in res.into_iter() {
         map.insert(

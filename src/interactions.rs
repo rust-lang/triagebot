@@ -1,6 +1,5 @@
 use crate::github::{GithubClient, Issue};
 use std::fmt::Write;
-use tracing as log;
 
 pub struct ErrorComment<'a> {
     issue: &'a Issue,
