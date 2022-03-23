@@ -1086,62 +1086,62 @@ impl<'q> IssuesQuery for Query<'q> {
     }
 }
 
-// impl<'q> FCPQuery for Query<'q>
-// where
-//     Query<'q>: IssuesQuery,
-#[async_trait]
-impl<'q> FCPQuery for IssuesQuery {
-    async fn query_fcp<'a>(
-        &'a self,
-        repo: &'a Repository,
-        client: &'a GithubClient,
-    ) -> anyhow::Result<Vec<crate::rfcbot::FCPDecorator>> {
-        let url = Url::parse(&"https://rfcbot.rs/api/all")?;
-        let res = reqwest::get(url)
-            .await?
-            .json::<Vec<crate::rfcbot::FullFCP>>()
-            .await?;
+// // impl<'q> FCPQuery for Query<'q>
+// // where
+// //     Query<'q>: IssuesQuery,
+// #[async_trait]
+// impl<'q> FCPQuery for IssuesQuery {
+//     async fn query_fcp<'a>(
+//         &'a self,
+//         repo: &'a Repository,
+//         client: &'a GithubClient,
+//     ) -> anyhow::Result<Vec<crate::rfcbot::FCPDecorator>> {
+//         let url = Url::parse(&"https://rfcbot.rs/api/all")?;
+//         let res = reqwest::get(url)
+//             .await?
+//             .json::<Vec<crate::rfcbot::FullFCP>>()
+//             .await?;
 
-        let mut map: HashMap<String, crate::rfcbot::FullFCP> = HashMap::new();
-        for full_fcp in res.into_iter() {
-            map.insert(
-                format!(
-                    "https://github.com/{}/{}",
-                    full_fcp.issue.repository.clone(),
-                    full_fcp.issue.number.clone()
-                ),
-                full_fcp,
-            );
-        }
+//         let mut map: HashMap<String, crate::rfcbot::FullFCP> = HashMap::new();
+//         for full_fcp in res.into_iter() {
+//             map.insert(
+//                 format!(
+//                     "https://github.com/{}/{}",
+//                     full_fcp.issue.repository.clone(),
+//                     full_fcp.issue.number.clone()
+//                 ),
+//                 full_fcp,
+//             );
+//         }
 
-        let decorators = self.query(&repo, &client).await?;
+//         let decorators = self.query(&repo, &client).await?;
 
-        let fcp_decorators: Vec<_> = decorators
-            .iter()
-            .filter_map(|issue_decorator| {
-                if let Some(full_fcp) = map.get(&issue_decorator.html_url) {
-                    Some(crate::rfcbot::FCPDecorator {
-                        number: issue_decorator.number.clone(),
-                        title: issue_decorator.title.clone(),
-                        html_url: issue_decorator.html_url.clone(),
-                        repo_name: issue_decorator.repo_name.clone(),
-                        labels: issue_decorator.labels.clone(),
-                        assignees: issue_decorator.assignees.clone(),
-                        updated_at: issue_decorator.updated_at.clone(),
+//         let fcp_decorators: Vec<_> = decorators
+//             .iter()
+//             .filter_map(|issue_decorator| {
+//                 if let Some(full_fcp) = map.get(&issue_decorator.html_url) {
+//                     Some(crate::rfcbot::FCPDecorator {
+//                         number: issue_decorator.number.clone(),
+//                         title: issue_decorator.title.clone(),
+//                         html_url: issue_decorator.html_url.clone(),
+//                         repo_name: issue_decorator.repo_name.clone(),
+//                         labels: issue_decorator.labels.clone(),
+//                         assignees: issue_decorator.assignees.clone(),
+//                         updated_at: issue_decorator.updated_at.clone(),
 
-                        bot_tracking_comment: full_fcp.fcp.fk_bot_tracking_comment.to_string(),
-                        bot_tracking_comment_content: full_fcp.status_comment.body.clone(),
-                        initiating_comment: full_fcp.fcp.fk_initiating_comment.to_string(),
-                        initiating_comment_content: String::new(),
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect();
-        Ok(fcp_decorators)
-    }
-}
+//                         bot_tracking_comment: full_fcp.fcp.fk_bot_tracking_comment.to_string(),
+//                         bot_tracking_comment_content: full_fcp.status_comment.body.clone(),
+//                         initiating_comment: full_fcp.fcp.fk_initiating_comment.to_string(),
+//                         initiating_comment_content: String::new(),
+//                     })
+//                 } else {
+//                     None
+//                 }
+//             })
+//             .collect();
+//         Ok(fcp_decorators)
+//     }
+// }
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1435,14 +1435,14 @@ pub trait IssuesQuery {
         client: &'a GithubClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>>;
 }
-#[async_trait]
-pub trait FCPQuery {
-    async fn query_fcp<'a>(
-        &'a self,
-        repo: &'a Repository,
-        client: &'a GithubClient,
-    ) -> anyhow::Result<Vec<crate::rfcbot::FCPDecorator>>;
-}
+// #[async_trait]
+// pub trait FCPQuery {
+//     async fn query_fcp<'a>(
+//         &'a self,
+//         repo: &'a Repository,
+//         client: &'a GithubClient,
+//     ) -> anyhow::Result<Vec<crate::rfcbot::FCPDecorator>>;
+// }
 
 #[cfg(test)]
 mod tests {
