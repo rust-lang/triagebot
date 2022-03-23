@@ -2,8 +2,8 @@ use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
 
 use crate::github::{self, GithubClient, Repository};
@@ -44,6 +44,22 @@ pub struct IssueDecorator {
     pub labels: String,
     pub assignees: String,
     pub updated_at: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FCPDecorator {
+    pub number: u64,
+    pub title: String,
+    pub html_url: String,
+    pub repo_name: String,
+    pub labels: String,
+    pub assignees: String,
+    pub updated_at: String,
+
+    pub bot_tracking_comment_html_url: String,
+    pub bot_tracking_comment_content: String,
+    pub initiating_comment_html_url: String,
+    pub initiating_comment_content: String,
 }
 
 lazy_static! {
@@ -119,21 +135,24 @@ impl<'a> Action for Step<'a> {
         for (name, issues) in &results {
             if name == &"proposed_fcp" {
                 let fcp_map = crate::rfcbot::get_all_fcps().await.unwrap();
-                let mut fcp_results = Vec::new();
-                for issue_decorator in issues.into_iter() {
-                    let key = format!(
-                        "rust-lang/{}:{}:{}",
-                        issue_decorator.repo_name.clone(),
-                        issue_decorator.number.clone(),
-                        issue_decorator.title.clone(),
-                    );
-                    if let Some(fcp) = fcp_map.get(&key) {
-                        let fcp_detail =
-                            crate::rfcbot::FCPDecorator::from_issue_fcp(&fcp, &issue_decorator);
 
-                        fcp_results.push(fcp_detail);
-                    }
-                }
+                let fcp_results = issues
+                    .into_iter()
+                    .filter_map(|issue_decorator| {
+                        let key = format!(
+                            "rust-lang/{}:{}:{}",
+                            issue_decorator.repo_name.clone(),
+                            issue_decorator.number.clone(),
+                            issue_decorator.title.clone(),
+                        );
+                        if let Some(fcp) = fcp_map.get(&key) {
+                            Some(FCPDecorator::from_issue_fcp(&fcp, &issue_decorator))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
                 context.insert(*name, &fcp_results);
             } else {
                 context.insert(*name, issues);

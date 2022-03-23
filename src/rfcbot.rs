@@ -1,3 +1,4 @@
+use crate::actions::FCPDecorator;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -61,24 +62,6 @@ pub struct FullFCP {
     pub status_comment: StatusComment,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct FCPDecorator {
-    pub number: u64,
-    pub title: String,
-    pub html_url: String,
-    pub repo_name: String,
-    pub labels: String,
-    pub assignees: String,
-    pub updated_at: String,
-
-    pub bot_tracking_comment: String,
-    pub bot_tracking_comment_html_url: String,
-    pub bot_tracking_comment_content: String,
-    pub initiating_comment: String,
-    pub initiating_comment_html_url: String,
-    pub initiating_comment_content: String,
-}
-
 fn quote_reply(markdown: &str) -> String {
     if markdown.is_empty() {
         String::from("*No content*")
@@ -92,6 +75,18 @@ impl FCPDecorator {
         full_fcp: &FullFCP,
         issue_decorator: &crate::actions::IssueDecorator,
     ) -> Self {
+        let bot_tracking_comment_html_url = format!(
+            "{}#issuecomment-{}",
+            issue_decorator.html_url, full_fcp.fcp.fk_bot_tracking_comment
+        );
+        let bot_tracking_comment_content = quote_reply(&full_fcp.status_comment.body);
+        let initiating_comment_html_url = format!(
+            "{}#issuecomment-{}",
+            issue_decorator.html_url, full_fcp.fcp.fk_initiating_comment
+        );
+        // TODO: get from GitHub
+        let initiating_comment_content = quote_reply(&String::new());
+
         Self {
             // shared properties with IssueDecorator
             number: issue_decorator.number.clone(),
@@ -103,18 +98,10 @@ impl FCPDecorator {
             updated_at: issue_decorator.updated_at.clone(),
 
             // additional properties from FullFCP (from rfcbot)
-            bot_tracking_comment: full_fcp.fcp.fk_bot_tracking_comment.to_string(),
-            bot_tracking_comment_html_url: format!(
-                "{}#issuecomment-{}",
-                issue_decorator.html_url, full_fcp.fcp.fk_bot_tracking_comment
-            ),
-            bot_tracking_comment_content: quote_reply(&full_fcp.status_comment.body),
-            initiating_comment: full_fcp.fcp.fk_initiating_comment.to_string(),
-            initiating_comment_html_url: format!(
-                "{}#issuecomment-{}",
-                issue_decorator.html_url, full_fcp.fcp.fk_initiating_comment
-            ),
-            initiating_comment_content: quote_reply(&String::new()), // TODO: get from GitHub
+            bot_tracking_comment_html_url,
+            bot_tracking_comment_content,
+            initiating_comment_html_url,
+            initiating_comment_content,
         }
     }
 }
