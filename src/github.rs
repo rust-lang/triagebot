@@ -1065,12 +1065,13 @@ impl<'q> IssuesQuery for Query<'q> {
             .get_issues(&client, self)
             .await
             .with_context(|| "Unable to get issues.")?;
+
         let issues_decorator: Vec<_> = issues
-            .into_iter()
+            .iter()
             .map(|issue| async move {
-                // TODO: this seems like a *really* bad approach, but I'm not sure how to make it better
-                let fcp_map = crate::rfcbot::get_all_fcps().await?;
                 let fcp_details = if include_fcp_details {
+                    // TODO: this seems like a *really* bad approach, but I'm not sure how to make it better
+                    let fcp_map = crate::rfcbot::get_all_fcps().await?;
                     let repository_name = if let Some(repo) = issue.repository.get() {
                         repo.repository.clone()
                     } else {
