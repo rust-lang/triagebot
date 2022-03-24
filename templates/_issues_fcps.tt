@@ -8,9 +8,6 @@
 - [**Tracking Comment**]({{issue.fcp_details.bot_tracking_comment_html_url}}): {{issue.fcp_details.bot_tracking_comment_content}}
 - [**Initiating Comment**]({{issue.fcp_details.initiating_comment_html_url}}): {{issue.fcp_details.initiating_comment_content}}
 
-
-
-
 {%else%}
 
 None.

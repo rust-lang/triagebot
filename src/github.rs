@@ -1090,19 +1090,17 @@ impl<'q> IssuesQuery for Query<'q> {
                             issue.html_url, fcp.fcp.fk_bot_tracking_comment
                         );
                         let bot_tracking_comment_content = quote_reply(&fcp.status_comment.body);
+
                         let fk_initiating_comment = fcp.fcp.fk_initiating_comment;
-                        let initiating_comment_html_url =
-                            format!("{}#issuecomment-{}", issue.html_url, fk_initiating_comment,);
                         let init_comment = issue
                             .get_comment(&client, fk_initiating_comment.try_into()?)
                             .await?;
-                        let initiating_comment_content = quote_reply(&init_comment.body);
 
                         Some(crate::actions::FCPDetails {
                             bot_tracking_comment_html_url,
                             bot_tracking_comment_content,
-                            initiating_comment_html_url,
-                            initiating_comment_content,
+                            initiating_comment_html_url: init_comment.html_url.clone(),
+                            initiating_comment_content: quote_reply(&init_comment.body),
                         })
                     } else {
                         None
