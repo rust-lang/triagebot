@@ -17,6 +17,7 @@ use std::fmt;
 pub enum ShortcutCommand {
     Ready,
     Author,
+    Blocked,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -39,6 +40,7 @@ impl ShortcutCommand {
         let mut shortcuts = HashMap::new();
         shortcuts.insert("ready", ShortcutCommand::Ready);
         shortcuts.insert("author", ShortcutCommand::Author);
+        shortcuts.insert("blocked", ShortcutCommand::Blocked);
 
         let mut toks = input.clone();
         if let Some(Token::Word(word)) = toks.peek_token()? {
@@ -91,4 +93,9 @@ fn test_4() {
             .downcast_ref(),
         Some(&ParseError::ExpectedEnd),
     );
+}
+
+#[test]
+fn test_5() {
+    assert_eq!(parse("blocked"), Ok(Some(ShortcutCommand::Blocked)));
 }
