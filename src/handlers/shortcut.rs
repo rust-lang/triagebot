@@ -25,17 +25,24 @@ pub(super) async fn handle_command(
         return Ok(());
     }
 
-    let issue_labels = issue.labels().to_owned();
+    let issue_labels = issue.labels();
     let waiting_on_review = "S-waiting-on-review";
     let waiting_on_author = "S-waiting-on-author";
+    let blocked = "S-blocked";
+    let status_labels = [waiting_on_review, waiting_on_author, blocked];
 
-    let (add, remove) = match input {
-        ShortcutCommand::Ready => (waiting_on_review, waiting_on_author),
-        ShortcutCommand::Author => (waiting_on_author, waiting_on_review),
+    let add = match input {
+        ShortcutCommand::Ready => waiting_on_review,
+        ShortcutCommand::Author => waiting_on_author,
+        ShortcutCommand::Blocked => blocked,
     };
 
     if !issue_labels.iter().any(|l| l.name == add) {
-        issue.remove_label(&ctx.github, remove).await?;
+        for remove in status_labels {
+            if remove != add {
+                issue.remove_label(&ctx.github, remove).await?;
+            }
+        }
         issue
             .add_labels(
                 &ctx.github,
