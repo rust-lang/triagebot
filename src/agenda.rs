@@ -450,7 +450,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                         query: Box::new(github::Query {
                             filters: vec![("state", "open"), ("is", "issue")],
                             include_labels: vec!["major-change"],
-                            exclude_labels: vec!["charter-needed"],
+                            exclude_labels: vec!["charter-needed", "proposed-final-comment-period"],
                         }),
                     },
                     QueryMap {
@@ -495,6 +495,7 @@ pub fn lang<'a>() -> Box<dyn Action> {
                     ("rust-lang", "rust"),
                     ("rust-lang", "reference"),
                     ("rust-lang", "lang-team"),
+                    ("rust-lang", "compiler-team"),
                 ],
                 queries: vec![
                     QueryMap {
