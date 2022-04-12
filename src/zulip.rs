@@ -393,6 +393,10 @@ impl Recipient<'_> {
             Recipient::Private { id, .. } => format!("pm-with/{}-xxx", id),
         }
     }
+
+    pub fn url(&self) -> String {
+        format!("https://rust-lang.zulipchat.com/#narrow/{}", self.narrow())
+    }
 }
 
 #[cfg(test)]
@@ -430,10 +434,7 @@ pub struct MessageApiRequest<'a> {
 
 impl<'a> MessageApiRequest<'a> {
     pub fn url(&self) -> String {
-        format!(
-            "https://rust-lang.zulipchat.com/#narrow/{}",
-            self.recipient.narrow()
-        )
+        self.recipient.url()
     }
 
     pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
