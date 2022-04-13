@@ -38,7 +38,7 @@ pub(super) fn parse_input(
             };
 
             if !contains_label(event.issue.labels(), &config.required_labels) {
-                // Issue misses a required label, ignore this event
+                // Ignore this event when none of the required labels are present. (Only one is enough).
                 return Ok(None);
             }
 
