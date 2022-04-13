@@ -1,4 +1,5 @@
 {% import "_issues_heading.tt" as issues_heading %}
+{% import "_issues_fcps.tt" as issues_fcps %}
 {% import "_issues.tt" as issues %}
 ---
 title: Triage meeting DATE
@@ -47,7 +48,7 @@ tags: triage-meeting
 
 **Check your boxes!**
 
-{{-issues_heading::render(issues=proposed_fcp)}}
+{{-issues_fcps::render(issues=proposed_fcp)}}
 
 ## Active FCPs
 

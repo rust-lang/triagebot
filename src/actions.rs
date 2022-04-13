@@ -2,8 +2,8 @@ use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
 
 use crate::github::{self, GithubClient, Repository};
@@ -35,7 +35,7 @@ pub struct QueryMap<'a> {
     pub query: Box<dyn github::IssuesQuery + Send + Sync>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub struct IssueDecorator {
     pub number: u64,
     pub title: String,
@@ -44,6 +44,16 @@ pub struct IssueDecorator {
     pub labels: String,
     pub assignees: String,
     pub updated_at: String,
+
+    pub fcp_details: Option<FCPDetails>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FCPDetails {
+    pub bot_tracking_comment_html_url: String,
+    pub bot_tracking_comment_content: String,
+    pub initiating_comment_html_url: String,
+    pub initiating_comment_content: String,
 }
 
 lazy_static! {
@@ -83,7 +93,7 @@ impl<'a> Action for Step<'a> {
                 };
 
                 for QueryMap { name, kind, query } in queries {
-                    let issues = query.query(&repository, &gh).await;
+                    let issues = query.query(&repository, name == &"proposed_fcp", &gh).await;
 
                     match issues {
                         Ok(issues_decorator) => match kind {

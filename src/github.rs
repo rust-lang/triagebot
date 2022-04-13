@@ -1,6 +1,4 @@
 use anyhow::Context;
-use tracing as log;
-
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::{future::BoxFuture, FutureExt};
@@ -8,10 +6,12 @@ use hyper::header::HeaderValue;
 use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
+use std::convert::TryInto;
 use std::{
     fmt,
     time::{Duration, SystemTime},
 };
+use tracing as log;
 
 pub mod graphql;
 
@@ -838,8 +838,6 @@ pub fn files_changed(diff: &str) -> Vec<&str> {
     files
 }
 
-impl IssuesEvent {}
-
 #[derive(Debug, serde::Deserialize)]
 pub struct IssueSearchResult {
     pub total_count: usize,
@@ -929,7 +927,7 @@ impl Repository {
             } else {
                 self.build_issues_url(&filters, include_labels, ordering)
             };
-    
+
             let result = client.get(&url);
             if use_search_api {
                 let result = client
@@ -939,7 +937,7 @@ impl Repository {
                 issues.extend(result.items);
                 if issues.len() < result.total_count {
                     ordering.page += 1;
-                    continue
+                    continue;
                 }
             } else {
                 // FIXME: paginate with non-search
@@ -1046,11 +1044,20 @@ pub struct Query<'a> {
     pub exclude_labels: Vec<&'a str>,
 }
 
+fn quote_reply(markdown: &str) -> String {
+    if markdown.is_empty() {
+        String::from("*No content*")
+    } else {
+        format!("\n\t> {}", markdown.replace("\n", "\n\t> "))
+    }
+}
+
 #[async_trait]
 impl<'q> IssuesQuery for Query<'q> {
     async fn query<'a>(
         &'a self,
         repo: &'a Repository,
+        include_fcp_details: bool,
         client: &'a GithubClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         let issues = repo
@@ -1058,9 +1065,48 @@ impl<'q> IssuesQuery for Query<'q> {
             .await
             .with_context(|| "Unable to get issues.")?;
 
-        let issues_decorator: Vec<_> = issues
-            .iter()
-            .map(|issue| crate::actions::IssueDecorator {
+        let fcp_map = crate::rfcbot::get_all_fcps().await?;
+
+        let mut issues_decorator = Vec::new();
+        for issue in issues {
+            let fcp_details = if include_fcp_details {
+                let repository_name = if let Some(repo) = issue.repository.get() {
+                    repo.repository.clone()
+                } else {
+                    let re = regex::Regex::new("https://github.com/rust-lang/|/").unwrap();
+                    let split = re.split(&issue.html_url).collect::<Vec<&str>>();
+                    split[1].to_string()
+                };
+                let key = format!(
+                    "rust-lang/{}:{}:{}",
+                    repository_name, issue.number, issue.title,
+                );
+
+                if let Some(fcp) = fcp_map.get(&key) {
+                    let bot_tracking_comment_html_url = format!(
+                        "{}#issuecomment-{}",
+                        issue.html_url, fcp.fcp.fk_bot_tracking_comment
+                    );
+                    let bot_tracking_comment_content = quote_reply(&fcp.status_comment.body);
+
+                    let fk_initiating_comment = fcp.fcp.fk_initiating_comment;
+                    let init_comment = issue
+                        .get_comment(&client, fk_initiating_comment.try_into()?)
+                        .await?;
+
+                    Some(crate::actions::FCPDetails {
+                        bot_tracking_comment_html_url,
+                        bot_tracking_comment_content,
+                        initiating_comment_html_url: init_comment.html_url.clone(),
+                        initiating_comment_content: quote_reply(&init_comment.body),
+                    })
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            issues_decorator.push(crate::actions::IssueDecorator {
                 title: issue.title.clone(),
                 number: issue.number,
                 html_url: issue.html_url.clone(),
@@ -1078,8 +1124,9 @@ impl<'q> IssuesQuery for Query<'q> {
                     .collect::<Vec<_>>()
                     .join(", "),
                 updated_at: crate::actions::to_human(issue.updated_at),
-            })
-            .collect();
+                fcp_details,
+            });
+        }
 
         Ok(issues_decorator)
     }
@@ -1374,6 +1421,7 @@ pub trait IssuesQuery {
     async fn query<'a>(
         &'a self,
         repo: &'a Repository,
+        include_fcp_details: bool,
         client: &'a GithubClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>>;
 }
