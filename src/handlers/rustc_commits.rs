@@ -1,8 +1,10 @@
 use crate::db::rustc_commits;
+use crate::db::rustc_commits::get_missing_commits;
 use crate::{
     github::{self, Event},
     handlers::Context,
 };
+use std::collections::VecDeque;
 use std::convert::TryInto;
 use tracing as log;
 
@@ -70,19 +72,28 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let mut sha = bors.merge_sha;
-    let mut pr = Some(event.issue.number.try_into().unwrap());
+    synchronize_commits(ctx, &bors.merge_sha, event.issue.number.try_into().unwrap()).await;
 
+    Ok(())
+}
+
+/// Fetch commits that are not present in the database.
+async fn synchronize_commits(ctx: &Context, sha: &str, pr: u32) {
     let db = ctx.db.get().await;
-    loop {
-        // FIXME: ideally we would pull in all the commits here, but unfortunately
-        // in rust-lang/rust's case there's bors-authored commits that aren't
-        // actually from rust-lang/rust as they were merged into the clippy repo.
+    let mut pr = Some(pr);
+
+    // List of roots to be resolved. Each root and its parents will be recursively resolved
+    // until an existing commit is found.
+    let mut to_be_resolved = VecDeque::new();
+    to_be_resolved.push_back(sha.to_string());
+    to_be_resolved.extend(get_missing_commits(&db).await);
+
+    while let Some(sha) = to_be_resolved.pop_front() {
         let mut gc = match ctx.github.rust_commit(&sha).await {
             Some(c) => c,
             None => {
                 log::error!("Could not find bors-reported sha: {:?}", sha);
-                return Ok(());
+                continue;
             }
         };
         let parent_sha = gc.parents.remove(0).sha;
@@ -99,7 +110,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
 
         let pr = match pr.take() {
             Some(number) => number,
-            None => break,
+            None => continue,
         };
 
         let res = rustc_commits::record_commit(
@@ -114,19 +125,13 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         .await;
         match res {
             Ok(()) => {
-                // proceed to the next commit once we've recorded this one.
-                // We'll stop when we hit a duplicate commit, but this allows us
-                // to backfill commits.
-                sha = parent_sha;
+                if !rustc_commits::has_commit(&db, &parent_sha).await {
+                    to_be_resolved.push_back(parent_sha)
+                }
             }
-            Err(e) => {
-                log::error!("Failed to record commit {:?}", e);
-                break;
-            }
+            Err(e) => log::error!("Failed to record commit {:?}", e),
         }
     }
-
-    Ok(())
 }
 
 #[derive(Debug, serde::Deserialize)]

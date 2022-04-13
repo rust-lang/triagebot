@@ -22,6 +22,30 @@ pub async fn record_commit(db: &DbClient, commit: Commit) -> anyhow::Result<()> 
     Ok(())
 }
 
+pub async fn has_commit(db: &DbClient, sha: &str) -> bool {
+    !db.query("SELECT 1 FROM rustc_commits WHERE sha = $1", &[&sha])
+        .await
+        .unwrap()
+        .is_empty()
+}
+
+pub async fn get_missing_commits(db: &DbClient) -> Vec<String> {
+    let missing = db
+        .query(
+            "
+        SELECT parent_sha
+        FROM rustc_commits
+        WHERE parent_sha NOT IN (
+            SELECT sha
+            FROM rustc_commits
+        )",
+            &[],
+        )
+        .await
+        .unwrap();
+    missing.into_iter().map(|row| row.get(0)).collect()
+}
+
 pub async fn get_commits_with_artifacts(db: &DbClient) -> anyhow::Result<Vec<Commit>> {
     let commits = db
         .query(
