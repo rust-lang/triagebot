@@ -125,7 +125,18 @@ pub(super) async fn handle_input(
     event: &IssuesEvent,
     input: AutolabelInput,
 ) -> anyhow::Result<()> {
-    event.issue.add_labels(&ctx.github, input.add).await?;
+    match event.issue.add_labels(&ctx.github, input.add).await {
+        Ok(()) => {}
+        Err(e) => {
+            use crate::github::UnknownLabels;
+            if let Some(err @ UnknownLabels { .. }) = e.downcast_ref() {
+                event.issue.post_comment(&ctx.github, &err.to_string()).await.context("failed to post missing label comment")?;
+                return Ok(());
+            }
+            return Err(e);
+        }
+    }
+
     for label in input.remove {
         event
             .issue

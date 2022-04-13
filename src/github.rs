@@ -366,16 +366,35 @@ impl IssueRepository {
         )
     }
 
-    async fn has_label(&self, client: &GithubClient, label: &str) -> bool {
+    async fn has_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<bool> {
         #[allow(clippy::redundant_pattern_matching)]
         let url = format!("{}/labels/{}", self.url(), label);
-        match client.send_req(client.get(&url)).await {
-            Ok(_) => true,
-            // XXX: Error handling if the request failed for reasons beyond 'label didn't exist'
-            Err(_) => false,
+        match client._send_req(client.get(&url)).await {
+            Ok((_, _)) => Ok(true),
+            Err(e) => {
+                if e.downcast_ref::<reqwest::Error>().map_or(false, |e| e.status() == Some(StatusCode::NOT_FOUND)) {
+                    Ok(false)
+                } else {
+                    Err(e)
+                }
+            }
         }
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct UnknownLabels {
+    labels: Vec<String>,
+}
+
+// NOTE: This is used to post the Github comment; make sure it's valid markdown.
+impl fmt::Display for UnknownLabels {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Unknown labels: {}", &self.labels.join(", "))
+    }
+}
+
+impl std::error::Error for UnknownLabels {}
 
 impl Issue {
     pub fn to_zulip_github_reference(&self) -> ZulipGitHubReference {
@@ -519,18 +538,27 @@ impl Issue {
             return Ok(());
         }
 
-        for label in &labels {
-            if !self.repository().has_label(client, &label).await {
-                anyhow::bail!("Label {} does not exist in {}", label, self.global_id());
+        let mut unknown_labels = vec![];
+        let mut known_labels = vec![];
+        for label in labels {
+            if !self.repository().has_label(client, &label).await? {
+                unknown_labels.push(label);
+            } else {
+                known_labels.push(label);
             }
+        }
+
+        if !unknown_labels.is_empty() {
+            return Err(UnknownLabels { labels: unknown_labels }.into());
         }
 
         #[derive(serde::Serialize)]
         struct LabelsReq {
             labels: Vec<String>,
         }
+
         client
-            ._send_req(client.post(&url).json(&LabelsReq { labels }))
+            ._send_req(client.post(&url).json(&LabelsReq { labels: known_labels }))
             .await
             .context("failed to add labels")?;
 
@@ -1381,6 +1409,12 @@ pub trait IssuesQuery {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn display_labels() {
+        let x = UnknownLabels { labels: vec!["A-bootstrap".into(), "xxx".into()] };
+        assert_eq!(x.to_string(), "Unknown labels: A-bootstrap, xxx");
+    }
 
     #[test]
     fn extract_one_file() {
