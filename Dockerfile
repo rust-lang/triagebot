@@ -15,7 +15,7 @@ RUN cargo build --release
 #  Output image  #
 ##################
 
-FROM ubuntu:bionic AS binary
+FROM ubuntu:latest AS binary
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ca-certificates
