@@ -50,7 +50,6 @@ pub enum ParseError {
     EmptyLabel,
     ExpectedLabelDelta,
     MisleadingTo,
-    NoSeparator,
 }
 
 impl std::error::Error for ParseError {}
@@ -61,7 +60,6 @@ impl fmt::Display for ParseError {
             ParseError::EmptyLabel => write!(f, "empty label"),
             ParseError::ExpectedLabelDelta => write!(f, "a label delta"),
             ParseError::MisleadingTo => write!(f, "forbidden `to`, use `+to`"),
-            ParseError::NoSeparator => write!(f, "must have `:` or `to` as label starter"),
         }
     }
 }
