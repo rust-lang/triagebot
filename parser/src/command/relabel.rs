@@ -133,16 +133,9 @@ impl RelabelCommand {
         toks.eat_token(Token::Word("modify"))?;
 
         if toks.eat_token(Token::Word("labels"))? || toks.eat_token(Token::Word("label"))? {
-            if toks.eat_token(Token::Colon)? {
-                // ate the colon
-            } else if toks.eat_token(Token::Word("to"))? {
-                // optionally eat the colon after to, e.g.:
-                // @rustbot modify labels to: -S-waiting-on-author, +S-waiting-on-review
-                toks.eat_token(Token::Colon)?;
-            } else {
-                // It's okay if there's no to or colon, we can just eat labels
-                // afterwards.
-            }
+            toks.eat_token(Token::Word("to"))?;
+            toks.eat_token(Token::Colon)?;
+
             // continue
         } else {
             return Ok(None);
@@ -157,12 +150,8 @@ impl RelabelCommand {
             deltas.push(LabelDelta::parse(&mut toks)?);
 
             // optional `, and` separator
-            if let Some(Token::Comma) = toks.peek_token()? {
-                toks.next_token()?;
-            }
-            if let Some(Token::Word("and")) = toks.peek_token()? {
-                toks.next_token()?;
-            }
+            toks.eat_token(Token::Comma)?;
+            toks.eat_token(Token::Word("and"))?;
 
             if let Some(Token::Semi) | Some(Token::Dot) | Some(Token::EndOfLine) =
                 toks.peek_token()?
