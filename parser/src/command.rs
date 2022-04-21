@@ -246,7 +246,7 @@ fn edit_2() {
     let mut input_old = Input::new(input_old, vec!["bot"]);
     let input_new = "@bot modify labels to: +bug.";
     let mut input_new = Input::new(input_new, vec!["bot"]);
-    assert_ne!(input_old.next(), input_new.next());
+    assert_eq!(input_old.next(), input_new.next());
 }
 
 #[test]
