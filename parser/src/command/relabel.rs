@@ -5,7 +5,11 @@
 //! The grammar is as follows:
 //!
 //! ```text
-//! Command: `@bot modify labels:? to? <label-list>.` or `@bot label:? <label-list>.`
+//! Command: `@bot modify? <label-w> to? :? <label-list>.`
+//!
+//! <label-w>:
+//!  - label
+//!  - labels
 //!
 //! <label-list>:
 //!  - <label-delta>
@@ -128,28 +132,20 @@ impl RelabelCommand {
     pub fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
         let mut toks = input.clone();
 
-        if toks.eat_token(Token::Word("modify"))? {
-            if toks.eat_token(Token::Word("labels"))? || toks.eat_token(Token::Word("label"))? {
-                if toks.eat_token(Token::Colon)? {
-                    // ate the colon
-                } else if toks.eat_token(Token::Word("to"))? {
-                    // optionally eat the colon after to, e.g.:
-                    // @rustbot modify labels to: -S-waiting-on-author, +S-waiting-on-review
-                    toks.eat_token(Token::Colon)?;
-                } else {
-                    // It's okay if there's no to or colon, we can just eat labels
-                    // afterwards.
-                }
-                // continue
-                {} // FIXME(rustfmt#4506): this is needed to get rustfmt to indent the comment correctly
+        toks.eat_token(Token::Word("modify"))?;
+
+        if toks.eat_token(Token::Word("labels"))? || toks.eat_token(Token::Word("label"))? {
+            if toks.eat_token(Token::Colon)? {
+                // ate the colon
+            } else if toks.eat_token(Token::Word("to"))? {
+                // optionally eat the colon after to, e.g.:
+                // @rustbot modify labels to: -S-waiting-on-author, +S-waiting-on-review
+                toks.eat_token(Token::Colon)?;
             } else {
-                return Ok(None);
+                // It's okay if there's no to or colon, we can just eat labels
+                // afterwards.
             }
-        } else if toks.eat_token(Token::Word("labels"))? || toks.eat_token(Token::Word("label"))? {
-            // optionally eat a colon
-            toks.eat_token(Token::Colon)?;
             // continue
-            {} // FIXME(rustfmt#4506): this is needed to get rustfmt to indent the comment correctly
         } else {
             return Ok(None);
         }
