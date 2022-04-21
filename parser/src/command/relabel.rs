@@ -264,23 +264,23 @@ fn parse_shorter_command_with_colon() {
 #[test]
 fn parse_shorter_command_with_to() {
     assert_eq!(
-        parse("label to +T-compiler -T-lang bug")
-            .unwrap_err()
-            .source()
-            .unwrap()
-            .downcast_ref(),
-        Some(&ParseError::MisleadingTo)
+        parse("label to +T-compiler -T-lang bug"),
+        Ok(Some(vec![
+            LabelDelta::Add(Label("T-compiler".into())),
+            LabelDelta::Remove(Label("T-lang".into())),
+            LabelDelta::Add(Label("bug".into())),
+        ]))
     );
 }
 
 #[test]
 fn parse_shorter_command_with_to_colon() {
     assert_eq!(
-        parse("label to: +T-compiler -T-lang bug")
-            .unwrap_err()
-            .source()
-            .unwrap()
-            .downcast_ref(),
-        Some(&ParseError::MisleadingTo)
+        parse("label to: +T-compiler -T-lang bug"),
+        Ok(Some(vec![
+            LabelDelta::Add(Label("T-compiler".into())),
+            LabelDelta::Remove(Label("T-lang".into())),
+            LabelDelta::Add(Label("bug".into())),
+        ]))
     );
 }
