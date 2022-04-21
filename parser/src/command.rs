@@ -210,14 +210,14 @@ impl<'a> Command<'a> {
 #[test]
 fn errors_outside_command_are_fine() {
     let input =
-        "haha\" unterminated quotes @bot modify labels: +bug. Terminating after the command";
+        "haha\" unterminated quotes @bot labels +bug. Terminating after the command";
     let mut input = Input::new(input, vec!["bot"]);
     assert!(input.next().unwrap().is_ok());
 }
 
 #[test]
 fn code_1() {
-    let input = "`@bot modify labels: +bug.`";
+    let input = "`@bot modify label: +bug.`";
     let mut input = Input::new(input, vec!["bot"]);
     assert!(input.next().is_none());
 }
@@ -235,23 +235,23 @@ fn code_2() {
 fn edit_1() {
     let input_old = "@bot modify labels: +bug.";
     let mut input_old = Input::new(input_old, vec!["bot"]);
-    let input_new = "Adding labels: @bot modify labels: +bug. some other text";
+    let input_new = "Adding labels: @bot modify label +bug. some other text";
     let mut input_new = Input::new(input_new, vec!["bot"]);
     assert_eq!(input_old.next(), input_new.next());
 }
 
 #[test]
 fn edit_2() {
-    let input_old = "@bot modify labeled: +bug.";
+    let input_old = "@bot label bug.";
     let mut input_old = Input::new(input_old, vec!["bot"]);
-    let input_new = "@bot modify labels: +bug.";
+    let input_new = "@bot modify labels to: +bug.";
     let mut input_new = Input::new(input_new, vec!["bot"]);
     assert_ne!(input_old.next(), input_new.next());
 }
 
 #[test]
 fn move_input_along() {
-    let input = "@bot modify labels: +bug. Afterwards, delete the world.";
+    let input = "@bot labels: +bug. Afterwards, delete the world.";
     let mut input = Input::new(input, vec!["bot"]);
     assert!(input.next().unwrap().is_ok());
     assert_eq!(&input.all[input.parsed..], " Afterwards, delete the world.");
@@ -268,7 +268,7 @@ fn move_input_along_1() {
 
 #[test]
 fn multiname() {
-    let input = "@rustbot modify labels: +bug. Afterwards, delete the world. @triagebot prioritize";
+    let input = "@rustbot label to: +bug. Afterwards, delete the world. @triagebot prioritize";
     let mut input = Input::new(input, vec!["triagebot", "rustbot"]);
     assert!(dbg!(input.next().unwrap()).is_ok());
     assert_eq!(
