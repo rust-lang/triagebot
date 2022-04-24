@@ -5,7 +5,11 @@
 //! The grammar is as follows:
 //!
 //! ```text
-//! Command: `@bot modify labels:? to? <label-list>.` or `@bot label:? <label-list>.`
+//! Command: `@bot modify? <label-w> to? :? <label-list>.`
+//!
+//! <label-w>:
+//!  - label
+//!  - labels
 //!
 //! <label-list>:
 //!  - <label-delta>
@@ -46,7 +50,6 @@ pub enum ParseError {
     EmptyLabel,
     ExpectedLabelDelta,
     MisleadingTo,
-    NoSeparator,
 }
 
 impl std::error::Error for ParseError {}
@@ -57,7 +60,6 @@ impl fmt::Display for ParseError {
             ParseError::EmptyLabel => write!(f, "empty label"),
             ParseError::ExpectedLabelDelta => write!(f, "a label delta"),
             ParseError::MisleadingTo => write!(f, "forbidden `to`, use `+to`"),
-            ParseError::NoSeparator => write!(f, "must have `:` or `to` as label starter"),
         }
     }
 }
@@ -128,28 +130,13 @@ impl RelabelCommand {
     pub fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
         let mut toks = input.clone();
 
-        if toks.eat_token(Token::Word("modify"))? {
-            if toks.eat_token(Token::Word("labels"))? {
-                if toks.eat_token(Token::Colon)? {
-                    // ate the colon
-                } else if toks.eat_token(Token::Word("to"))? {
-                    // optionally eat the colon after to, e.g.:
-                    // @rustbot modify labels to: -S-waiting-on-author, +S-waiting-on-review
-                    toks.eat_token(Token::Colon)?;
-                } else {
-                    // It's okay if there's no to or colon, we can just eat labels
-                    // afterwards.
-                }
-                // continue
-                {} // FIXME(rustfmt#4506): this is needed to get rustfmt to indent the comment correctly
-            } else {
-                return Ok(None);
-            }
-        } else if toks.eat_token(Token::Word("label"))? {
-            // optionally eat a colon
+        toks.eat_token(Token::Word("modify"))?;
+
+        if toks.eat_token(Token::Word("labels"))? || toks.eat_token(Token::Word("label"))? {
+            toks.eat_token(Token::Word("to"))?;
             toks.eat_token(Token::Colon)?;
+
             // continue
-            {} // FIXME(rustfmt#4506): this is needed to get rustfmt to indent the comment correctly
         } else {
             return Ok(None);
         }
@@ -163,12 +150,8 @@ impl RelabelCommand {
             deltas.push(LabelDelta::parse(&mut toks)?);
 
             // optional `, and` separator
-            if let Some(Token::Comma) = toks.peek_token()? {
-                toks.next_token()?;
-            }
-            if let Some(Token::Word("and")) = toks.peek_token()? {
-                toks.next_token()?;
-            }
+            toks.eat_token(Token::Comma)?;
+            toks.eat_token(Token::Word("and"))?;
 
             if let Some(Token::Semi) | Some(Token::Dot) | Some(Token::EndOfLine) =
                 toks.peek_token()?
@@ -258,7 +241,7 @@ fn parse_shorter_command() {
 #[test]
 fn parse_shorter_command_with_colon() {
     assert_eq!(
-        parse("label: +T-compiler -T-lang bug"),
+        parse("labels: +T-compiler -T-lang bug"),
         Ok(Some(vec![
             LabelDelta::Add(Label("T-compiler".into())),
             LabelDelta::Remove(Label("T-lang".into())),
@@ -270,23 +253,23 @@ fn parse_shorter_command_with_colon() {
 #[test]
 fn parse_shorter_command_with_to() {
     assert_eq!(
-        parse("label to +T-compiler -T-lang bug")
-            .unwrap_err()
-            .source()
-            .unwrap()
-            .downcast_ref(),
-        Some(&ParseError::MisleadingTo)
+        parse("label to +T-compiler -T-lang bug"),
+        Ok(Some(vec![
+            LabelDelta::Add(Label("T-compiler".into())),
+            LabelDelta::Remove(Label("T-lang".into())),
+            LabelDelta::Add(Label("bug".into())),
+        ]))
     );
 }
 
 #[test]
 fn parse_shorter_command_with_to_colon() {
     assert_eq!(
-        parse("label to: +T-compiler -T-lang bug")
-            .unwrap_err()
-            .source()
-            .unwrap()
-            .downcast_ref(),
-        Some(&ParseError::MisleadingTo)
+        parse("label to: +T-compiler -T-lang bug"),
+        Ok(Some(vec![
+            LabelDelta::Add(Label("T-compiler".into())),
+            LabelDelta::Remove(Label("T-lang".into())),
+            LabelDelta::Add(Label("bug".into())),
+        ]))
     );
 }
