@@ -5,7 +5,7 @@
 //! The grammar is as follows:
 //!
 //! ```text
-//! Command: `@bot ready`, or `@bot author`.
+//! Command: `@bot ready`/`@bot review`, or `@bot author`.
 //! ```
 
 use crate::error::Error;
@@ -39,6 +39,7 @@ impl ShortcutCommand {
     pub fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
         let mut shortcuts = HashMap::new();
         shortcuts.insert("ready", ShortcutCommand::Ready);
+        shortcuts.insert("review", ShortcutCommand::Ready);
         shortcuts.insert("author", ShortcutCommand::Author);
         shortcuts.insert("blocked", ShortcutCommand::Blocked);
 
