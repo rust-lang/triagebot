@@ -181,6 +181,8 @@ macro_rules! command_handlers {
                 input.collect()
             };
 
+            log::info!("Comment parsed to {:?}", commands);
+
             if commands.is_empty() {
                 return;
             }
