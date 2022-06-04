@@ -9,6 +9,8 @@ use interactions::ErrorComment;
 use std::fmt;
 use tracing as log;
 
+use crate::github::PullRequestDetails;
+
 pub mod actions;
 pub mod agenda;
 mod changelogs;
@@ -100,11 +102,17 @@ pub async fn webhook(
 ) -> Result<bool, WebhookError> {
     let event = match event {
         EventName::PullRequestReview => {
-            let payload = deserialize_payload::<github::PullRequestReviewEvent>(&payload)
+            let mut payload = deserialize_payload::<github::PullRequestReviewEvent>(&payload)
                 .context("PullRequestReview failed to deserialize")
                 .map_err(anyhow::Error::from)?;
 
             log::info!("handling pull request review comment {:?}", payload);
+
+            // Github doesn't send a pull_request field nested into the
+            // pull_request field, so we need to adjust the deserialized result
+            // to preserve that this event came from a pull request (since it's
+            // a PR review, that's obviously the case).
+            payload.pull_request.pull_request = Some(PullRequestDetails {});
 
             // Treat pull request review comments exactly like pull request
             // review comments.
@@ -125,9 +133,15 @@ pub async fn webhook(
             })
         }
         EventName::PullRequestReviewComment => {
-            let payload = deserialize_payload::<github::PullRequestReviewComment>(&payload)
+            let mut payload = deserialize_payload::<github::PullRequestReviewComment>(&payload)
                 .context("PullRequestReview(Comment) failed to deserialize")
                 .map_err(anyhow::Error::from)?;
+
+            // Github doesn't send a pull_request field nested into the
+            // pull_request field, so we need to adjust the deserialized result
+            // to preserve that this event came from a pull request (since it's
+            // a PR review, that's obviously the case).
+            payload.issue.pull_request = Some(PullRequestDetails {});
 
             log::info!("handling pull request review comment {:?}", payload);
 
