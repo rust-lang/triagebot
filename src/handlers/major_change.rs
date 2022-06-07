@@ -18,8 +18,15 @@ pub enum Invocation {
 pub(super) async fn parse_input(
     _ctx: &Context,
     event: &IssuesEvent,
-    _config: Option<&MajorChangeConfig>,
+    config: Option<&MajorChangeConfig>,
 ) -> Result<Option<Invocation>, String> {
+    let config = if let Some(config) = config {
+        config
+    } else {
+        return Ok(None);
+    };
+    let enabling_label = config.enabling_label.as_str();
+
     if event.action == IssuesAction::Edited {
         if let Some(changes) = &event.changes {
             if let Some(previous_title) = &changes.title {
@@ -32,13 +39,12 @@ pub(super) async fn parse_input(
                     .issue
                     .labels()
                     .iter()
-                    .any(|l| l.name == "major-change")
+                    .any(|l| l.name == enabling_label)
                 {
                     return Ok(Some(Invocation::Rename { prev_issue }));
                 } else {
-                    // Ignore renamed issues without major-change label
-                    // to avoid warning about the major-change feature not being
-                    // enabled.
+                    // Ignore renamed issues without primary label (e.g., major-change)
+                    // to avoid warning about the feature not being enabled.
                     return Ok(None);
                 }
             }
@@ -53,7 +59,7 @@ pub(super) async fn parse_input(
         && event
             .label
             .as_ref()
-            .map_or(false, |l| l.name == "major-change-accepted")
+            .map_or(false, |l| l.name == config.accept_label)
     {
         return Ok(Some(Invocation::AcceptedProposal));
     }
@@ -69,12 +75,12 @@ pub(super) async fn parse_input(
             .issue
             .labels()
             .iter()
-            .any(|l| l.name == "major-change"))
+            .any(|l| l.name == enabling_label))
         || (event.action == IssuesAction::Labeled
             && event
                 .label
                 .as_ref()
-                .map_or(false, |l| l.name == "major-change"))
+                .map_or(false, |l| l.name == enabling_label))
     {
         return Ok(Some(Invocation::NewProposal));
     }
@@ -93,11 +99,14 @@ pub(super) async fn handle_input(
         .issue
         .labels()
         .iter()
-        .any(|l| l.name == "major-change")
+        .any(|l| l.name == config.enabling_label)
     {
         let cmnt = ErrorComment::new(
             &event.issue,
-            "This is not a major change (it lacks the `major-change` label).",
+            format!(
+                "This issue is not ready for proposals; it lacks the `{}` label.",
+                config.enabling_label
+            ),
         );
         cmnt.post(&ctx.github).await?;
         return Ok(());
@@ -152,7 +161,8 @@ pub(super) async fn handle_input(
             let new_topic_url = crate::zulip::Recipient::Stream {
                 id: config.zulip_stream,
                 topic: &new_topic,
-            }.url();
+            }
+            .url();
             let breadcrumb_comment = format!(
                 "The associated GitHub issue has been renamed. Please see the [renamed Zulip topic]({}).",
                 new_topic_url
@@ -191,10 +201,17 @@ pub(super) async fn handle_command(
 ) -> anyhow::Result<()> {
     let issue = event.issue().unwrap();
 
-    if !issue.labels().iter().any(|l| l.name == "major-change") {
+    if !issue
+        .labels()
+        .iter()
+        .any(|l| l.name == config.enabling_label)
+    {
         let cmnt = ErrorComment::new(
             &issue,
-            "This is not a major change (it lacks the `major-change` label).",
+            &format!(
+                "This issue cannot be seconded; it lacks the `{}` label.",
+                config.enabling_label
+            ),
         );
         cmnt.post(&ctx.github).await?;
         return Ok(());

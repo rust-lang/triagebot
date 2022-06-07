@@ -150,11 +150,37 @@ pub(crate) struct NotifyZulipLabelConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct MajorChangeConfig {
+    /// A username (typically a group, e.g. T-lang) to ping on Zulip for newly
+    /// opened proposals.
     pub(crate) zulip_ping: String,
+    /// This label allows an issue to participate in the major change process
+    /// (i.e., creates a Zulip thread, tracks seconding, etc.)
+    // This has a default primarily for backwards compatibility.
+    #[serde(default = "MajorChangeConfig::enabling_label_default")]
+    pub(crate) enabling_label: String,
+    /// This is the label applied when issuing a `@rustbot second` command, it
+    /// indicates that the proposal has moved into the 10 day waiting period.
     pub(crate) second_label: String,
+    /// This is the label applied after the waiting period has successfully
+    /// elapsed (currently not automatically applied; this must be done
+    /// manually).
+    // This has a default primarily for backwards compatibility.
+    #[serde(default = "MajorChangeConfig::accept_label_default")]
+    pub(crate) accept_label: String,
+    /// This is the label to be added to newly opened proposals, so they can be
+    /// discussed in a meeting.
     pub(crate) meeting_label: String,
     pub(crate) zulip_stream: u64,
     pub(crate) open_extra_text: Option<String>,
+}
+
+impl MajorChangeConfig {
+    fn enabling_label_default() -> String {
+        String::from("major-change")
+    }
+    fn accept_label_default() -> String {
+        String::from("major-change-accepted")
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
