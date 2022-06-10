@@ -308,7 +308,7 @@ impl super::IssuesQuery for LeastRecentlyReviewedPullRequests {
             .take(50)
             .map(
                 |(updated_at, number, title, html_url, repo_name, labels, assignees)| {
-                    let updated_at = crate::actions::to_human(updated_at);
+                    let updated_at_hts = crate::actions::to_human(updated_at);
 
                     crate::actions::IssueDecorator {
                         number,
@@ -317,7 +317,7 @@ impl super::IssuesQuery for LeastRecentlyReviewedPullRequests {
                         repo_name,
                         labels,
                         assignees,
-                        updated_at,
+                        updated_at_hts,
                         fcp_details: None,
                     }
                 },

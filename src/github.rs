@@ -1151,7 +1151,7 @@ impl<'q> IssuesQuery for Query<'q> {
                     .map(|u| u.login.as_ref())
                     .collect::<Vec<_>>()
                     .join(", "),
-                updated_at: crate::actions::to_human(issue.updated_at),
+                updated_at_hts: crate::actions::to_human(issue.updated_at),
                 fcp_details,
             });
         }
