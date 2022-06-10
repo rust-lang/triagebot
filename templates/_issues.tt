@@ -1,7 +1,11 @@
 {% import "_issue.tt" as issue %}
 
 {% macro render(issues, indent="", branch="", with_age=false, empty="No issues this time.") %}
+{#- If "branch" is not empty add a trailing space but no newlines before or after -#}
+{%- if branch -%}
+{%- set branch = branch ~ " " -%}
+{%- endif -%}
 {%- for issue in issues %}
-{{indent}}- {{ branch }} {{issue::render(issue=issue, with_age=with_age)}}{% else %}
+{{indent}}- {{ branch }}{{issue::render(issue=issue, with_age=with_age)}}{% else %}
 {{indent}}- {{empty}}{% endfor -%}
 {% endmacro %}
