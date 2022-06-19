@@ -1,7 +1,7 @@
 use triagebot::agenda;
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
     tracing_subscriber::fmt::init();
 
@@ -10,12 +10,14 @@ async fn main() {
         match &args[1][..] {
             "backlog_bonanza" => {
                 let agenda = agenda::compiler_backlog_bonanza();
-                print!("{}", agenda.call().await);
-                return;
+                print!("{}", agenda.call().await?);
+                return Ok(());
             }
             _ => {}
         }
     }
 
-    eprintln!("Usage: compiler (backlog_bonanza)")
+    eprintln!("Usage: compiler (backlog_bonanza)");
+
+    Ok(())
 }

@@ -372,7 +372,9 @@ impl IssueRepository {
         match client._send_req(client.get(&url)).await {
             Ok((_, _)) => Ok(true),
             Err(e) => {
-                if e.downcast_ref::<reqwest::Error>().map_or(false, |e| e.status() == Some(StatusCode::NOT_FOUND)) {
+                if e.downcast_ref::<reqwest::Error>()
+                    .map_or(false, |e| e.status() == Some(StatusCode::NOT_FOUND))
+                {
                     Ok(false)
                 } else {
                     Err(e)
@@ -549,7 +551,10 @@ impl Issue {
         }
 
         if !unknown_labels.is_empty() {
-            return Err(UnknownLabels { labels: unknown_labels }.into());
+            return Err(UnknownLabels {
+                labels: unknown_labels,
+            }
+            .into());
         }
 
         #[derive(serde::Serialize)]
@@ -558,7 +563,9 @@ impl Issue {
         }
 
         client
-            ._send_req(client.post(&url).json(&LabelsReq { labels: known_labels }))
+            ._send_req(client.post(&url).json(&LabelsReq {
+                labels: known_labels,
+            }))
             .await
             .context("failed to add labels")?;
 
@@ -873,7 +880,7 @@ pub struct IssueSearchResult {
     pub items: Vec<Issue>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct Repository {
     pub full_name: String,
 }
@@ -1460,7 +1467,9 @@ mod tests {
 
     #[test]
     fn display_labels() {
-        let x = UnknownLabels { labels: vec!["A-bootstrap".into(), "xxx".into()] };
+        let x = UnknownLabels {
+            labels: vec!["A-bootstrap".into(), "xxx".into()],
+        };
         assert_eq!(x.to_string(), "Unknown labels: A-bootstrap, xxx");
     }
 

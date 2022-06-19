@@ -7,11 +7,27 @@ use hyper::{header, Body, Request, Response, Server, StatusCode};
 use reqwest::Client;
 use route_recognizer::Router;
 use std::{env, net::SocketAddr, sync::Arc};
+use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
 use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
 
-async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Body>, hyper::Error> {
+async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
+    if req == "/agenda/lang/triage" {
+        return triagebot::agenda::lang().call().await;
+    }
+    if req == "/agenda/lang/planning" {
+        return triagebot::agenda::lang_planning().call().await;
+    }
+
+    anyhow::bail!("Unknown agenda; see /agenda for index.")
+}
+
+async fn serve_req(
+    req: Request<Body>,
+    ctx: Arc<Context>,
+    mut agenda: impl Service<String, Response = String, Error = tower::BoxError>,
+) -> Result<Response<Body>, hyper::Error> {
     log::info!("request = {:?}", req);
     let mut router = Router::new();
     router.add("/triage", "index".to_string());
@@ -28,6 +44,36 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
             return triagebot::triage::index();
         }
     }
+
+    if req.uri.path() == "/agenda" {
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::from(triagebot::agenda::INDEX))
+            .unwrap());
+    }
+    if req.uri.path() == "/agenda/lang/triage" || req.uri.path() == "/agenda/lang/planning" {
+        match agenda
+            .ready()
+            .await
+            .expect("agenda keeps running")
+            .call(req.uri.path().to_owned())
+            .await
+        {
+            Ok(agenda) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .body(Body::from(agenda))
+                    .unwrap())
+            }
+            Err(err) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Body::from(err.to_string()))
+                    .unwrap())
+            }
+        }
+    }
+
     if req.uri.path() == "/" {
         return Ok(Response::builder()
             .status(StatusCode::OK)
@@ -186,8 +232,6 @@ async fn serve_req(req: Request<Body>, ctx: Arc<Context>) -> Result<Response<Bod
 }
 
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
-    log::info!("Listening on http://{}", addr);
-
     let pool = db::ClientPool::new();
     db::run_migrations(&*pool.get().await)
         .await
@@ -206,13 +250,27 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         octocrab: oc,
     });
 
+    let agenda = tower::ServiceBuilder::new()
+        .buffer(10)
+        .layer_fn(|input| {
+            tower::util::MapErr::new(
+                tower::load_shed::LoadShed::new(tower::limit::RateLimit::new(
+                    input,
+                    tower::limit::rate::Rate::new(2, std::time::Duration::from_secs(60)),
+                )),
+                |_| anyhow::anyhow!("Rate limit of 2 request / 60 seconds exceeded"),
+            )
+        })
+        .service_fn(handle_agenda_request);
+
     let svc = hyper::service::make_service_fn(move |_conn| {
         let ctx = ctx.clone();
+        let agenda = agenda.clone();
         async move {
             Ok::<_, hyper::Error>(hyper::service::service_fn(move |req| {
                 let uuid = uuid::Uuid::new_v4();
                 let span = tracing::span!(tracing::Level::INFO, "request", ?uuid);
-                serve_req(req, ctx.clone())
+                serve_req(req, ctx.clone(), agenda.clone())
                     .map(move |mut resp| {
                         if let Ok(resp) = &mut resp {
                             resp.headers_mut()
@@ -225,6 +283,8 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             }))
         }
     });
+    log::info!("Listening on http://{}", addr);
+
     let serve_future = Server::bind(&addr).serve(svc);
 
     serve_future.await?;

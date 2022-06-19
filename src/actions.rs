@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use reqwest::Client;
@@ -10,7 +11,7 @@ use crate::github::{self, GithubClient, Repository};
 
 #[async_trait]
 pub trait Action {
-    async fn call(&self) -> String;
+    async fn call(&self) -> anyhow::Result<String>;
 }
 
 pub struct Step<'a> {
@@ -24,6 +25,7 @@ pub struct Query<'a> {
     pub queries: Vec<QueryMap<'a>>,
 }
 
+#[derive(Copy, Clone)]
 pub enum QueryKind {
     List,
     Count,
@@ -32,7 +34,7 @@ pub enum QueryKind {
 pub struct QueryMap<'a> {
     pub name: &'a str,
     pub kind: QueryKind,
-    pub query: Box<dyn github::IssuesQuery + Send + Sync>,
+    pub query: Arc<dyn github::IssuesQuery + Send + Sync>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -81,11 +83,15 @@ pub fn to_human(d: DateTime<Utc>) -> String {
 
 #[async_trait]
 impl<'a> Action for Step<'a> {
-    async fn call(&self) -> String {
+    async fn call(&self) -> anyhow::Result<String> {
         let gh = GithubClient::new_with_default_token(Client::new());
 
         let mut context = Context::new();
         let mut results = HashMap::new();
+
+        let mut handles: Vec<tokio::task::JoinHandle<anyhow::Result<(String, QueryKind, Vec<_>)>>> =
+            Vec::new();
+        let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(5));
 
         for Query { repos, queries } in &self.actions {
             for repo in repos {
@@ -94,45 +100,48 @@ impl<'a> Action for Step<'a> {
                 };
 
                 for QueryMap { name, kind, query } in queries {
-                    let issues = query.query(&repository, name == &"proposed_fcp", &gh).await;
+                    let semaphore = semaphore.clone();
+                    let name = String::from(*name);
+                    let kind = *kind;
+                    let repository = repository.clone();
+                    let gh = gh.clone();
+                    let query = query.clone();
+                    handles.push(tokio::task::spawn(async move {
+                        let _permit = semaphore.acquire().await?;
+                        let issues = query
+                            .query(&repository, name == "proposed_fcp", &gh)
+                            .await?;
+                        Ok((name, kind, issues))
+                    }));
+                }
+            }
+        }
 
-                    match issues {
-                        Ok(issues_decorator) => match kind {
-                            QueryKind::List => {
-                                results
-                                    .entry(*name)
-                                    .or_insert(Vec::new())
-                                    .extend(issues_decorator);
-                            }
-                            QueryKind::Count => {
-                                let count = issues_decorator.len();
-                                let result = if let Some(value) = context.get(*name) {
-                                    value.as_u64().unwrap() + count as u64
-                                } else {
-                                    count as u64
-                                };
+        for handle in handles {
+            let (name, kind, issues) = handle.await.unwrap()?;
+            match kind {
+                QueryKind::List => {
+                    results.entry(name).or_insert(Vec::new()).extend(issues);
+                }
+                QueryKind::Count => {
+                    let count = issues.len();
+                    let result = if let Some(value) = context.get(&name) {
+                        value.as_u64().unwrap() + count as u64
+                    } else {
+                        count as u64
+                    };
 
-                                context.insert(*name, &result);
-                            }
-                        },
-                        Err(err) => {
-                            eprintln!("ERROR: {}", err);
-                            err.chain()
-                                .skip(1)
-                                .for_each(|cause| eprintln!("because: {}", cause));
-                            std::process::exit(1);
-                        }
-                    }
+                    context.insert(name, &result);
                 }
             }
         }
 
         for (name, issues) in &results {
-            context.insert(*name, issues);
+            context.insert(name, issues);
         }
 
-        TEMPLATES
+        Ok(TEMPLATES
             .render(&format!("{}.tt", self.name), &context)
-            .unwrap()
+            .unwrap())
     }
 }

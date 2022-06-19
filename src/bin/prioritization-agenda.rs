@@ -1,11 +1,12 @@
 use triagebot::agenda;
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
     tracing_subscriber::fmt::init();
 
     let agenda = agenda::prioritization();
 
-    print!("{}", agenda.call().await);
+    print!("{}", agenda.call().await?);
+    Ok(())
 }
