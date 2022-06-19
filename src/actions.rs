@@ -140,6 +140,9 @@ impl<'a> Action for Step<'a> {
             context.insert(name, issues);
         }
 
+        let date = chrono::Utc::today().format("%Y-%m-%d").to_string();
+        context.insert("CURRENT_DATE", &date);
+
         Ok(TEMPLATES
             .render(&format!("{}.tt", self.name), &context)
             .unwrap())

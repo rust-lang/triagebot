@@ -2,13 +2,13 @@
 {% import "_issues_fcps.tt" as issues_fcps %}
 {% import "_issues.tt" as issues %}
 ---
-title: Triage meeting DATE
+title: Triage meeting {{CURRENT_DATE}}
 tags: triage-meeting
 ---
 
 # T-lang meeting agenda
 
-* Meeting date: DATE
+* Meeting date: {{CURRENT_DATE}}
 
 ## Attendance
 

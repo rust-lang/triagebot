@@ -1,13 +1,13 @@
 {% import "_issues_heading.tt" as issues_heading %}
 {% import "_issues.tt" as issues %}
 ---
-title: Planning meeting DATE
+title: Planning meeting {{CURRENT_DATE}}
 tags: planning-meeting
 ---
 
 # T-lang planning meeting agenda
 
-* Meeting date: DATE
+* Meeting date: {{CURRENT_DATE}}
 
 ## Attendance
 
