@@ -745,6 +745,26 @@ impl Issue {
         let diff = client.send_req(req).await?;
         Ok(Some(String::from(String::from_utf8_lossy(&diff))))
     }
+
+    pub async fn files(&self, client: &GithubClient) -> anyhow::Result<Vec<PullRequestFile>> {
+        if !self.is_pr() {
+            return Ok(vec![]);
+        }
+
+        let req = client.get(&format!(
+            "{}/pulls/{}/files",
+            self.repository().url(),
+            self.number
+        ));
+        Ok(client.json(req).await?)
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct PullRequestFile {
+    pub sha: String,
+    pub filename: String,
+    pub blob_url: String,
 }
 
 #[derive(serde::Serialize)]
@@ -853,7 +873,7 @@ pub struct IssuesEvent {
 #[derive(Debug, serde::Deserialize)]
 struct PullRequestEventFields {}
 
-#[derive(Default, Clone, Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct CommitBase {
     sha: String,
 }

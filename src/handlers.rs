@@ -38,6 +38,7 @@ mod ping;
 mod prioritize;
 mod relabel;
 mod review_submitted;
+mod rfc_helper;
 mod rustc_commits;
 mod shortcut;
 
@@ -72,6 +73,14 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
     if let Err(e) = milestone_prs::handle(ctx, event).await {
         log::error!(
             "failed to process event {:?} with milestone_prs handler: {:?}",
+            event,
+            e
+        );
+    }
+
+    if let Err(e) = rfc_helper::handle(ctx, event).await {
+        log::error!(
+            "failed to process event {:?} with rfc_helper handler: {:?}",
             event,
             e
         );
