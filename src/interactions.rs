@@ -23,7 +23,8 @@ impl<'a> ErrorComment<'a> {
         writeln!(body)?;
         writeln!(
             body,
-            "Please let **`@rust-lang/release`** know if you're having trouble with this bot."
+            "Please file an issue on GitHub at [triagebot](https://github.com/rust-lang/triagebot) if there's \
+            a problem with this bot, or reach out on [#t-infra](https://rust-lang.zulipchat.com/#narrow/stream/242791-t-infra) on Zulip."
         )?;
         self.issue.post_comment(client, &body).await
     }
