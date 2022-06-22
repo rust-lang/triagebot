@@ -6,6 +6,7 @@ use hyper::header::HeaderValue;
 use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::{
     fmt,
@@ -1093,7 +1094,11 @@ impl<'q> IssuesQuery for Query<'q> {
             .await
             .with_context(|| "Unable to get issues.")?;
 
-        let fcp_map = crate::rfcbot::get_all_fcps().await?;
+        let fcp_map = if include_fcp_details {
+            crate::rfcbot::get_all_fcps().await?
+        } else {
+            HashMap::new()
+        };
 
         let mut issues_decorator = Vec::new();
         for issue in issues {
