@@ -1,4 +1,5 @@
 {% import "_issues.tt" as issues %}
+{% import "_meetings.tt" as meetings %}
 
 ---
 tags: weekly, rustc
@@ -9,6 +10,9 @@ tags: weekly, rustc
 [Tracking Issue](https://github.com/rust-lang/rust/issues/54818)
 
 ## Announcements
+
+### Other WG meetings ([calendar link](https://calendar.google.com/calendar/embed?src=6u5rrtce6lrtv07pfi3damgjus%40group.calendar.google.com))
+{{-meetings::render(meetings=meetings_tcompiler, empty="No meetings scheduled for next week")}}
 
 - New MCPs (take a look, see if you like them!)
 {{-issues::render(issues=mcp_new_not_seconded, indent="  ", empty="No new proposals this time.")}}
