@@ -7,9 +7,7 @@ pub(crate) async fn handle(
     config: &ReviewSubmittedConfig,
 ) -> anyhow::Result<()> {
     if let Event::IssueComment(
-        event
-        @
-        IssueCommentEvent {
+        event @ IssueCommentEvent {
             action: IssueCommentAction::Created,
             issue: Issue {
                 pull_request: Some(_),
