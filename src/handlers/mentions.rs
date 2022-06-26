@@ -98,7 +98,7 @@ pub(super) async fn handle_input(
             None => write!(result, "Some changes occurred in {to_mention}").unwrap(),
         }
         if !reviewers.is_empty() {
-            write!(result, "\n\ncc {}", reviewers.join(",")).unwrap();
+            write!(result, "\n\ncc {}", reviewers.join(", ")).unwrap();
         }
         state.paths.push(to_mention.to_string());
     }
