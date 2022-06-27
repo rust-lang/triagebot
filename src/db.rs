@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_postgres::Client as DbClient;
 
+pub mod issue_data;
 pub mod notifications;
 pub mod rustc_commits;
 
@@ -206,4 +207,13 @@ CREATE TABLE rustc_commits (
 );
 ",
     "ALTER TABLE rustc_commits ADD COLUMN pr INTEGER;",
+    "
+CREATE TABLE issue_data (
+    repo TEXT,
+    issue_number INTEGER,
+    key TEXT,
+    data JSONB,
+    PRIMARY KEY (repo, issue_number, key)
+);
+",
 ];

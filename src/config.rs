@@ -32,6 +32,7 @@ pub(crate) struct Config {
     pub(crate) review_submitted: Option<ReviewSubmittedConfig>,
     pub(crate) shortcut: Option<ShortcutConfig>,
     pub(crate) note: Option<NoteConfig>,
+    pub(crate) mentions: Option<MentionsConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -82,6 +83,19 @@ pub(crate) struct AssignConfig {
 pub(crate) struct NoteConfig {
     #[serde(default)]
     _empty: (),
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct MentionsConfig {
+    #[serde(flatten)]
+    pub(crate) paths: HashMap<String, MentionsPathConfig>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct MentionsPathConfig {
+    pub(crate) message: Option<String>,
+    #[serde(default)]
+    pub(crate) reviewers: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -350,6 +364,7 @@ mod tests {
                 notify_zulip: None,
                 github_releases: None,
                 review_submitted: None,
+                mentions: None,
             }
         );
     }

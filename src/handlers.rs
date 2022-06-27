@@ -29,6 +29,7 @@ mod close;
 mod github_releases;
 mod glacier;
 mod major_change;
+mod mentions;
 mod milestone_prs;
 mod nominate;
 mod note;
@@ -153,6 +154,7 @@ macro_rules! issue_handlers {
 issue_handlers! {
     autolabel,
     major_change,
+    mentions,
     notify_zulip,
 }
 
