@@ -209,8 +209,7 @@ impl<'a> Command<'a> {
 
 #[test]
 fn errors_outside_command_are_fine() {
-    let input =
-        "haha\" unterminated quotes @bot labels +bug. Terminating after the command";
+    let input = "haha\" unterminated quotes @bot labels +bug. Terminating after the command";
     let mut input = Input::new(input, vec!["bot"]);
     assert!(input.next().unwrap().is_ok());
 }

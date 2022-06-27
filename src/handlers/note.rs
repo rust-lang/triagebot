@@ -141,9 +141,7 @@ pub(super) async fn handle_command(
                     author,
                 };
                 log::debug!("New Note Entry: {:#?}", new_entry);
-                current
-                    .entries_by_url
-                    .insert(comment_url, new_entry);
+                current.entries_by_url.insert(comment_url, new_entry);
                 log::debug!("Entries by URL: {:#?}", current.entries_by_url);
             }
         }

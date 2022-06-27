@@ -130,7 +130,11 @@ pub(super) async fn handle_input(
         Err(e) => {
             use crate::github::UnknownLabels;
             if let Some(err @ UnknownLabels { .. }) = e.downcast_ref() {
-                event.issue.post_comment(&ctx.github, &err.to_string()).await.context("failed to post missing label comment")?;
+                event
+                    .issue
+                    .post_comment(&ctx.github, &err.to_string())
+                    .await
+                    .context("failed to post missing label comment")?;
                 return Ok(());
             }
             return Err(e);
