@@ -95,7 +95,7 @@ pub(crate) struct MentionsConfig {
 pub(crate) struct MentionsPathConfig {
     pub(crate) message: Option<String>,
     #[serde(default)]
-    pub(crate) reviewers: Vec<String>,
+    pub(crate) cc: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]

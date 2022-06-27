@@ -58,10 +58,10 @@ pub(super) async fn parse_input(
             .iter()
             // Only mention matching paths.
             // Don't mention if the author is in the list.
-            .filter(|(path, MentionsPathConfig { reviewers, .. })| {
+            .filter(|(path, MentionsPathConfig { cc, .. })| {
                 let path = Path::new(path);
                 file_paths.iter().any(|p| p.starts_with(path))
-                    && !reviewers.iter().any(|r| r == &event.issue.user.login)
+                    && !cc.iter().any(|r| r == &event.issue.user.login)
             })
             .map(|(key, _mention)| key.to_string())
             .collect();
@@ -88,7 +88,7 @@ pub(super) async fn handle_input(
             // Avoid duplicate mentions.
             continue;
         }
-        let MentionsPathConfig { message, reviewers } = &config.paths[to_mention];
+        let MentionsPathConfig { message, cc } = &config.paths[to_mention];
         if !result.is_empty() {
             result.push_str("\n\n");
         }
@@ -96,8 +96,8 @@ pub(super) async fn handle_input(
             Some(m) => result.push_str(m),
             None => write!(result, "Some changes occurred in {to_mention}").unwrap(),
         }
-        if !reviewers.is_empty() {
-            write!(result, "\n\ncc {}", reviewers.join(", ")).unwrap();
+        if !cc.is_empty() {
+            write!(result, "\n\ncc {}", cc.join(", ")).unwrap();
         }
         state.data.paths.push(to_mention.to_string());
     }
