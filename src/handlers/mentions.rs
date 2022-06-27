@@ -4,7 +4,7 @@
 
 use crate::{
     config::{MentionsConfig, MentionsPathConfig},
-    db::issue_data,
+    db::issue_data::IssueData,
     github::{files_changed, IssuesAction, IssuesEvent},
     handlers::Context,
 };
@@ -78,14 +78,13 @@ pub(super) async fn handle_input(
     event: &IssuesEvent,
     input: MentionsInput,
 ) -> anyhow::Result<()> {
-    let client = ctx.db.get().await;
-    let mut state: MentionState = issue_data::load(&client, &event.issue, MENTIONS_KEY)
-        .await?
-        .unwrap_or_default();
+    let mut client = ctx.db.get().await;
+    let mut state: IssueData<'_, MentionState> =
+        IssueData::load(&mut client, &event.issue, MENTIONS_KEY).await?;
     // Build the message to post to the issue.
     let mut result = String::new();
     for to_mention in &input.paths {
-        if state.paths.iter().any(|p| p == to_mention) {
+        if state.data.paths.iter().any(|p| p == to_mention) {
             // Avoid duplicate mentions.
             continue;
         }
@@ -100,7 +99,7 @@ pub(super) async fn handle_input(
         if !reviewers.is_empty() {
             write!(result, "\n\ncc {}", reviewers.join(", ")).unwrap();
         }
-        state.paths.push(to_mention.to_string());
+        state.data.paths.push(to_mention.to_string());
     }
     if !result.is_empty() {
         event
@@ -108,7 +107,7 @@ pub(super) async fn handle_input(
             .post_comment(&ctx.github, &result)
             .await
             .context("failed to post mentions comment")?;
-        issue_data::save(&client, &event.issue, MENTIONS_KEY, &state).await?;
+        state.save().await?;
     }
     Ok(())
 }
