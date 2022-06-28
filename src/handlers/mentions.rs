@@ -61,7 +61,9 @@ pub(super) async fn parse_input(
             .filter(|(path, MentionsPathConfig { cc, .. })| {
                 let path = Path::new(path);
                 file_paths.iter().any(|p| p.starts_with(path))
-                    && !cc.iter().any(|r| r == &event.issue.user.login)
+                    && !cc
+                        .iter()
+                        .any(|r| r.trim_start_matches('@') == &event.issue.user.login)
             })
             .map(|(key, _mention)| key.to_string())
             .collect();
