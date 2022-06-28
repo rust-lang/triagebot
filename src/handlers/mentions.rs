@@ -42,6 +42,11 @@ pub(super) async fn parse_input(
         return Ok(None);
     }
 
+    // Don't ping on rollups.
+    if event.issue.title.starts_with("Rollup of") {
+        return Ok(None);
+    }
+
     if let Some(diff) = event
         .issue
         .diff(&ctx.github)
