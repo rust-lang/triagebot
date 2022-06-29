@@ -181,6 +181,13 @@ fn handle_command<'a>(
                                 })
                                 .unwrap(),
                             },
+                            Some("read") => return match post_waiter(&ctx, message_data, WaitingMessage::start_reading()).await {
+                                Ok(r) => r,
+                                Err(e) => serde_json::to_string(&Response {
+                                    content: &format!("Failed to await at this time: {:?}", e),
+                                })
+                                .unwrap(),
+                            },
                             _ => {}
                         }
                     }
@@ -747,6 +754,13 @@ impl WaitingMessage<'static> {
                   React with :working_on_it: if you have something to say.\n\
                   React with :all_good: if you're ready to end the meeting.",
             emoji: &["working_on_it", "all_good"],
+        }
+    }
+    fn start_reading() -> Self {
+        WaitingMessage {
+            primary: "Click on the :book: when you start reading (and leave it clicked).\n\
+                      Click on the :checkered_flag: when you finish reading.",
+            emoji: &["book", "checkered_flag"],
         }
     }
 }
