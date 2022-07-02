@@ -273,3 +273,27 @@ fn parse_shorter_command_with_to_colon() {
         ]))
     );
 }
+
+#[test]
+fn parse_delta_empty() {
+    assert_eq!(
+        parse("label + T-lang")
+            .unwrap_err()
+            .source()
+            .unwrap()
+            .downcast_ref(),
+        Some(&ParseError::EmptyLabel),
+    );
+}
+
+#[test]
+fn parse_unknown_url() {
+    assert_eq!(
+        parse("label +https://rust-lang.org")
+            .unwrap_err()
+            .source()
+            .unwrap()
+            .downcast_ref(),
+        Some(&ParseError::ExpectedLabelDelta),
+    );
+}
