@@ -24,7 +24,9 @@
 //!  is with the previous two variants of this (i.e., ++label and -+label).
 //!  - <label>
 //!
-//! <label>: \S+
+//! <label>:
+//! - \S+
+//! - https://github.com/\S+/\S+/labels/\S+
 //! ```
 
 use crate::error::Error;
@@ -50,6 +52,7 @@ pub enum ParseError {
     EmptyLabel,
     ExpectedLabelDelta,
     MisleadingTo,
+    UnrecognizedUrl,
 }
 
 impl std::error::Error for ParseError {}
@@ -60,6 +63,7 @@ impl fmt::Display for ParseError {
             ParseError::EmptyLabel => write!(f, "empty label"),
             ParseError::ExpectedLabelDelta => write!(f, "a label delta"),
             ParseError::MisleadingTo => write!(f, "forbidden `to`, use `+to`"),
+            ParseError::UnrecognizedUrl => write!(f, "unrecognized URL"),
         }
     }
 }
@@ -83,7 +87,7 @@ impl std::ops::Deref for Label {
 
 impl LabelDelta {
     fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<LabelDelta, Error<'a>> {
-        let delta = match input.peek_token()? {
+        let mut delta = match input.peek_token()? {
             Some(Token::Word(delta)) => {
                 input.next_token()?;
                 delta
@@ -92,19 +96,39 @@ impl LabelDelta {
                 return Err(input.error(ParseError::ExpectedLabelDelta));
             }
         };
-        if delta.starts_with('+') {
-            Ok(LabelDelta::Add(
-                Label::parse(&delta[1..]).map_err(|e| input.error(e))?,
-            ))
+
+        let label_action = if delta.starts_with('+') {
+            delta = &delta[1..];
+            LabelDelta::Add
         } else if delta.starts_with('-') {
-            Ok(LabelDelta::Remove(
-                Label::parse(&delta[1..]).map_err(|e| input.error(e))?,
-            ))
+            delta = &delta[1..];
+            LabelDelta::Remove
         } else {
-            Ok(LabelDelta::Add(
-                Label::parse(delta).map_err(|e| input.error(e))?,
-            ))
+            LabelDelta::Add
+        };
+
+        // Handle URLs of the form https://github.com/.../.../labels/...
+        let mut urldecoded_label = None;
+        if delta == "https" && input.starts_with("://") {
+            let rest_of_url = input.take_until_whitespace();
+            let mut pieces = rest_of_url.splitn(7, '/');
+            if pieces.nth(2) == Some("github.com") && pieces.nth(2) == Some("labels") {
+                if let Some(encoded_label) = pieces.next() {
+                    if let Ok(decoded) = urlencoding::decode(encoded_label) {
+                        urldecoded_label = Some(decoded);
+                    }
+                }
+            }
+            if let Some(urldecoded_label) = &urldecoded_label {
+                delta = urldecoded_label;
+            } else {
+                return Err(input.error(ParseError::UnrecognizedUrl));
+            }
         }
+
+        Label::parse(delta)
+            .map(label_action)
+            .map_err(|e| input.error(e))
     }
 
     pub fn label(&self) -> &Label {
@@ -287,9 +311,52 @@ fn parse_delta_empty() {
 }
 
 #[test]
-fn parse_unknown_url() {
+fn parse_unrecognized_url() {
     assert_eq!(
         parse("label +https://rust-lang.org")
+            .unwrap_err()
+            .source()
+            .unwrap()
+            .downcast_ref(),
+        Some(&ParseError::UnrecognizedUrl),
+    );
+}
+
+#[test]
+fn parse_label_url() {
+    assert_eq!(
+        parse("label -https://github.com/rust-lang/triagebot/labels/T-libs +https://github.com/rust-lang/triagebot/labels/T-libs-api"),
+        Ok(Some(vec![
+            LabelDelta::Remove(Label("T-libs".into())),
+            LabelDelta::Add(Label("T-libs-api".into())),
+        ])),
+    );
+}
+
+#[test]
+fn parse_label_url_with_percent_encoding() {
+    assert_eq!(
+        parse("label https://github.com/rust-lang/triagebot/labels/help%20wanted"),
+        Ok(Some(vec![LabelDelta::Add(Label("help wanted".into()))])),
+    );
+}
+
+#[test]
+fn parse_space_before_url() {
+    assert_eq!(
+        parse("label + https://github.com/rust-lang/triagebot/labels/T-lang")
+            .unwrap_err()
+            .source()
+            .unwrap()
+            .downcast_ref(),
+        Some(&ParseError::EmptyLabel),
+    );
+}
+
+#[test]
+fn parse_space_inside_url() {
+    assert_eq!(
+        parse("label +https ://github.com/rust-lang/triagebot/labels/T-lang")
             .unwrap_err()
             .source()
             .unwrap()

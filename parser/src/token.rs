@@ -219,6 +219,18 @@ impl<'a> Tokenizer<'a> {
             _ => Ok(false),
         }
     }
+
+    pub fn starts_with(&mut self, string: &str) -> bool {
+        self.input[self.cur_pos()..].starts_with(string)
+    }
+
+    pub fn take_until_whitespace(&mut self) -> &'a str {
+        let start = self.cur_pos();
+        while self.cur().map_or(false, |(_, ch)| !ch.is_whitespace()) {
+            self.advance();
+        }
+        &self.str_from(start)
+    }
 }
 
 #[cfg(test)]

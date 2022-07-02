@@ -5,5 +5,6 @@ authors = ["Mark Rousskov <mark.simulacrum@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-pulldown-cmark = "0.7.0"
 log = "0.4"
+pulldown-cmark = "0.7.0"
+urlencoding = "2.1"
