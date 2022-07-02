@@ -100,7 +100,7 @@ async fn synchronize_commits(ctx: &Context, sha: &str, pr: u32) {
         let parent_sha = gc.parents.remove(0).sha;
 
         if pr.is_none() {
-            if let Some(tail) = gc.message.strip_prefix("Auto merge of #") {
+            if let Some(tail) = gc.commit.message.strip_prefix("Auto merge of #") {
                 if let Some(end) = tail.find(' ') {
                     if let Ok(number) = tail[..end].parse::<u32>() {
                         pr = Some(number);
