@@ -12,6 +12,7 @@ pub struct Commit {
 }
 
 pub async fn record_commit(db: &DbClient, commit: Commit) -> anyhow::Result<()> {
+    tracing::trace!("record_commit(sha={})", commit.sha);
     let pr = commit.pr.expect("commit has pr");
     db.execute(
         "INSERT INTO rustc_commits (sha, parent_sha, time, pr) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",

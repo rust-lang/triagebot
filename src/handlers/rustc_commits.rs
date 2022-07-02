@@ -79,6 +79,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
 
 /// Fetch commits that are not present in the database.
 async fn synchronize_commits(ctx: &Context, sha: &str, pr: u32) {
+    log::trace!("synchronize_commits for sha={:?}, pr={}", sha, pr);
     let db = ctx.db.get().await;
     let mut pr = Some(pr);
 
@@ -110,7 +111,10 @@ async fn synchronize_commits(ctx: &Context, sha: &str, pr: u32) {
 
         let pr = match pr.take() {
             Some(number) => number,
-            None => continue,
+            None => {
+                log::warn!("Failed to find PR number for commit {}", sha);
+                continue;
+            }
         };
 
         let res = rustc_commits::record_commit(
