@@ -255,6 +255,8 @@ pub struct Issue {
     pub pull_request: Option<PullRequestDetails>,
     #[serde(default)]
     pub merged: bool,
+    #[serde(default)]
+    pub draft: bool,
     // API URL
     comments_url: String,
     #[serde(skip)]
