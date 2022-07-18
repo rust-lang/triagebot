@@ -37,13 +37,13 @@ pub(super) async fn parse_input(
 
     if !matches!(
         event.action,
-        IssuesAction::Opened | IssuesAction::Synchronize
+        IssuesAction::Opened | IssuesAction::Synchronize | IssuesAction::ReadyForReview
     ) {
         return Ok(None);
     }
 
-    // Don't ping on rollups.
-    if event.issue.title.starts_with("Rollup of") {
+    // Don't ping on rollups or draft PRs.
+    if event.issue.title.starts_with("Rollup of") || event.issue.draft {
         return Ok(None);
     }
 
