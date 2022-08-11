@@ -82,7 +82,7 @@ pub(super) async fn handle(
                 }
             } else {
                 log::info!("creating release {} on {}", tag, event.repo_name());
-                let _: serde_json::Value = ctx
+                let e: octocrab::Result<serde_json::Value> = ctx
                     .octocrab
                     .post(
                         format!("repos/{}/releases", event.repo_name()),
@@ -92,7 +92,16 @@ pub(super) async fn handle(
                             "body": expected_body,
                         })),
                     )
-                    .await?;
+                    .await;
+                match e {
+                    Ok(v) => log::debug!("created release: {:?}", v),
+                    Err(e) => {
+                        log::error!("Failed to create release: {:?}", e);
+
+                        // Don't stop creating future releases just because this
+                        // one failed.
+                    }
+                }
             }
 
             log::debug!("sleeping for one second to avoid hitting any rate limit");
