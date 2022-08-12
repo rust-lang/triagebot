@@ -21,17 +21,13 @@ pub enum ShortcutCommand {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub enum ParseError {
-    ExpectedEnd,
-}
+pub enum ParseError {}
 
 impl std::error::Error for ParseError {}
 
 impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ParseError::ExpectedEnd => write!(f, "expected end of command"),
-        }
+    fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {
+        match *self {}
     }
 }
 
@@ -49,14 +45,9 @@ impl ShortcutCommand {
                 return Ok(None);
             }
             toks.next_token()?;
-            if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
-                toks.next_token()?;
-                *input = toks;
-                let command = shortcuts.get(word).unwrap();
-                return Ok(Some(*command));
-            } else {
-                return Err(toks.error(ParseError::ExpectedEnd));
-            }
+            *input = toks;
+            let command = shortcuts.get(word).unwrap();
+            return Ok(Some(*command));
         }
         Ok(None)
     }
@@ -70,12 +61,12 @@ fn parse(input: &str) -> Result<Option<ShortcutCommand>, Error<'_>> {
 
 #[test]
 fn test_1() {
-    assert_eq!(parse("ready."), Ok(Some(ShortcutCommand::Ready)),);
+    assert_eq!(parse("ready."), Ok(Some(ShortcutCommand::Ready)));
 }
 
 #[test]
 fn test_2() {
-    assert_eq!(parse("ready"), Ok(Some(ShortcutCommand::Ready)),);
+    assert_eq!(parse("ready"), Ok(Some(ShortcutCommand::Ready)));
 }
 
 #[test]
@@ -85,15 +76,7 @@ fn test_3() {
 
 #[test]
 fn test_4() {
-    use std::error::Error;
-    assert_eq!(
-        parse("ready word")
-            .unwrap_err()
-            .source()
-            .unwrap()
-            .downcast_ref(),
-        Some(&ParseError::ExpectedEnd),
-    );
+    assert_eq!(parse("ready word"), Ok(Some(ShortcutCommand::Ready)));
 }
 
 #[test]
