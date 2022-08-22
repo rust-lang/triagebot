@@ -62,13 +62,13 @@ pub(super) async fn parse_input(
             .paths
             .iter()
             // Only mention matching paths.
-            // Don't mention if the author is in the list.
+            // Don't mention if only the author is in the list.
             .filter(|(path, MentionsPathConfig { cc, .. })| {
                 let path = Path::new(path);
                 file_paths.iter().any(|p| p.starts_with(path))
                     && !cc
                         .iter()
-                        .any(|r| r.trim_start_matches('@') == &event.issue.user.login)
+                        .all(|r| r.trim_start_matches('@') == &event.issue.user.login)
             })
             .map(|(key, _mention)| key.to_string())
             .collect();
