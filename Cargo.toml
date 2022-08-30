@@ -44,6 +44,7 @@ rand = "0.8.5"
 ignore = "0.4.18"
 postgres-types = { version = "0.2.4", features = ["derive"] }
 cron = { version = "0.12.0" }
+pretty_assertions = "1.2"
 
 [dependencies.serde]
 version = "1"

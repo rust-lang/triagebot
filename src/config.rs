@@ -34,6 +34,7 @@ pub(crate) struct Config {
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
     pub(crate) no_merges: Option<NoMergesConfig>,
+    pub(crate) decision: Option<DecisionConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -257,6 +258,12 @@ pub(crate) struct GitHubReleasesConfig {
     pub(crate) changelog_branch: String,
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct DecisionConfig {
+    #[serde(default)]
+    _empty: (),
+}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -343,6 +350,8 @@ mod tests {
             infra = "T-infra"
 
             [shortcut]
+
+            [decision-process]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -395,6 +404,7 @@ mod tests {
                 review_submitted: None,
                 mentions: None,
                 no_merges: None,
+                decision: None
             }
         );
     }

@@ -13,6 +13,7 @@ pub mod prioritize;
 pub mod relabel;
 pub mod second;
 pub mod shortcut;
+pub mod decision;
 
 #[derive(Debug, PartialEq)]
 pub enum Command<'a> {
@@ -26,6 +27,7 @@ pub enum Command<'a> {
     Shortcut(Result<shortcut::ShortcutCommand, Error<'a>>),
     Close(Result<close::CloseCommand, Error<'a>>),
     Note(Result<note::NoteCommand, Error<'a>>),
+    Decision(Result<decision::DecisionCommand, Error<'a>>),
 }
 
 #[derive(Debug)]
@@ -132,6 +134,11 @@ impl<'a> Input<'a> {
             Command::Close,
             &original_tokenizer,
         ));
+        success.extend(parse_single_command(
+            decision::DecisionCommand::parse,
+            Command::Decision,
+            &original_tokenizer,
+        ));
 
         if success.len() > 1 {
             panic!(
@@ -207,6 +214,7 @@ impl<'a> Command<'a> {
             Command::Shortcut(r) => r.is_ok(),
             Command::Close(r) => r.is_ok(),
             Command::Note(r) => r.is_ok(),
+            Command::Decision(r) => r.is_ok(),
         }
     }
 
