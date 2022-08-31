@@ -33,6 +33,7 @@ pub(crate) struct Config {
     pub(crate) shortcut: Option<ShortcutConfig>,
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
+    pub(crate) no_merges: Option<NoMergesConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -75,6 +76,12 @@ pub(crate) struct PingTeamConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct AssignConfig {
+    #[serde(default)]
+    _empty: (),
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct NoMergesConfig {
     #[serde(default)]
     _empty: (),
 }
@@ -365,6 +372,7 @@ mod tests {
                 github_releases: None,
                 review_submitted: None,
                 mentions: None,
+                no_merges: None,
             }
         );
     }
