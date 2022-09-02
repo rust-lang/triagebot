@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_postgres::Client as DbClient;
 
+pub mod events;
 pub mod issue_data;
 pub mod notifications;
 pub mod rustc_commits;
@@ -214,6 +215,16 @@ CREATE TABLE issue_data (
     key TEXT,
     data JSONB,
     PRIMARY KEY (repo, issue_number, key)
+);
+",
+    "
+CREATE TABLE events (
+    event_id UUID PRIMARY KEY,
+    event_name TEXT NOT NULL,
+    expected_event_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    event_metadata JSONB,
+    executed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    failed TEXT
 );
 ",
 ];
