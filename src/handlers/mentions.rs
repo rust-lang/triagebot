@@ -61,14 +61,16 @@ pub(super) async fn parse_input(
         let to_mention: Vec<_> = config
             .paths
             .iter()
-            // Only mention matching paths.
-            // Don't mention if only the author is in the list.
             .filter(|(path, MentionsPathConfig { cc, .. })| {
                 let path = Path::new(path);
-                file_paths.iter().any(|p| p.starts_with(path))
-                    && !cc
-                        .iter()
-                        .all(|r| r.trim_start_matches('@') == &event.issue.user.login)
+                // Only mention matching paths.
+                let touches_relevant_files = file_paths.iter().any(|p| p.starts_with(path));
+                // Don't mention if only the author is in the list.
+                let pings_non_author = match &cc[..] {
+                    [only_cc] => only_cc.trim_start_matches('@') != &event.issue.user.login,
+                    _ => true,
+                };
+                touches_relevant_files && pings_non_author
             })
             .map(|(key, _mention)| key.to_string())
             .collect();
