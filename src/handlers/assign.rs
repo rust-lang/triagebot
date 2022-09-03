@@ -51,6 +51,7 @@ pub(super) async fn handle_command(
                 );
                 return Ok(());
             }
+            AssignCommand::ReviewName { .. } => todo!(),
         };
         // Don't re-assign if already assigned, e.g. on comment edit
         if issue.contain_assignee(&username) {
@@ -109,6 +110,7 @@ pub(super) async fn handle_command(
                 }
             };
         }
+        AssignCommand::ReviewName { .. } => todo!(),
     };
     // Don't re-assign if aleady assigned, e.g. on comment edit
     if issue.contain_assignee(&to_assign) {
