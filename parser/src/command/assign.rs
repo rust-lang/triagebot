@@ -79,40 +79,44 @@ impl AssignCommand {
 }
 
 #[cfg(test)]
-fn parse<'a>(input: &'a str) -> Result<Option<AssignCommand>, Error<'a>> {
-    let mut toks = Tokenizer::new(input);
-    Ok(AssignCommand::parse(&mut toks)?)
-}
+mod tests {
+    use super::*;
 
-#[test]
-fn test_1() {
-    assert_eq!(parse("claim."), Ok(Some(AssignCommand::Own)),);
-}
+    fn parse<'a>(input: &'a str) -> Result<Option<AssignCommand>, Error<'a>> {
+        let mut toks = Tokenizer::new(input);
+        Ok(AssignCommand::parse(&mut toks)?)
+    }
 
-#[test]
-fn test_2() {
-    assert_eq!(parse("claim"), Ok(Some(AssignCommand::Own)),);
-}
+    #[test]
+    fn test_1() {
+        assert_eq!(parse("claim."), Ok(Some(AssignCommand::Own)),);
+    }
 
-#[test]
-fn test_3() {
-    assert_eq!(
-        parse("assign @user"),
-        Ok(Some(AssignCommand::User {
-            username: "user".to_owned()
-        })),
-    );
-}
+    #[test]
+    fn test_2() {
+        assert_eq!(parse("claim"), Ok(Some(AssignCommand::Own)),);
+    }
 
-#[test]
-fn test_4() {
-    use std::error::Error;
-    assert_eq!(
-        parse("assign @")
-            .unwrap_err()
-            .source()
-            .unwrap()
-            .downcast_ref(),
-        Some(&ParseError::MentionUser),
-    );
+    #[test]
+    fn test_3() {
+        assert_eq!(
+            parse("assign @user"),
+            Ok(Some(AssignCommand::User {
+                username: "user".to_owned()
+            })),
+        );
+    }
+
+    #[test]
+    fn test_4() {
+        use std::error::Error;
+        assert_eq!(
+            parse("assign @")
+                .unwrap_err()
+                .source()
+                .unwrap()
+                .downcast_ref(),
+            Some(&ParseError::MentionUser),
+        );
+    }
 }
