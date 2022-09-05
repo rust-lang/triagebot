@@ -11,6 +11,8 @@ use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
 use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
+// use std::{time::Duration, thread};
+// use tokio::task;
 
 async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
     if req == "/agenda/lang/triage" {
@@ -236,6 +238,20 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     db::run_migrations(&*pool.get().await)
         .await
         .context("database migrations")?;
+
+    db::run_scheduled_events(&*pool.get().await)
+        .await
+        .context("database scheduled_events")?;
+
+    // task::spawn(async move {
+    //     loop {
+    //         thread::sleep(Duration::from_secs(60)); // every one minute
+
+    //         db::run_scheduled_events(&*pool.get().await)
+    //             .await
+    //             .context("database scheduled_events")?; 
+    //     }
+    // });
 
     let client = Client::new();
     let gh = github::GithubClient::new_with_default_token(client.clone());

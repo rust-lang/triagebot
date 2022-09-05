@@ -4,6 +4,7 @@ use postgres_native_tls::MakeTlsConnector;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_postgres::Client as DbClient;
+use crate::db::events::*;
 
 pub mod events;
 pub mod issue_data;
@@ -174,6 +175,29 @@ pub async fn run_migrations(client: &DbClient) -> anyhow::Result<()> {
                 )
                 .await
                 .with_context(|| format!("updating migration counter to {}", idx))?;
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn run_scheduled_events(db: &DbClient) -> anyhow::Result<()> {
+    // table lock ????
+    
+    let events = get_events_to_execute(&db).await;
+    println!("events to execute: {:#?}", events);
+
+    for event in events.unwrap().iter() {
+        update_event_executed_at(&db, &event.event_id).await;
+        match call_event_handler_based_on_event_name {
+            Ok(r) => {
+                tracing::trace!("event succesfully executed (id={})", event.event_id);
+                delete_event(&db, &event.event_id).await;
+            },
+            Err(e) => {
+                tracing::trace!("event failed on execution (id={:?}, error={:?})", event.event_id, e);
+                update_event_failed_message(&db, &event.event_id, &e).await;
+            },
         }
     }
 
