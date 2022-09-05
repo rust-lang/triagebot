@@ -68,6 +68,11 @@ pub(super) async fn parse_input(
                         name: label.to_owned(),
                     });
                 }
+                if cfg.new_pr && event.action == IssuesAction::Opened {
+                    autolabels.push(Label {
+                        name: label.to_owned(),
+                    });
+                }
             }
             if !autolabels.is_empty() {
                 return Ok(Some(AutolabelInput {
