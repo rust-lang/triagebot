@@ -44,7 +44,10 @@ mod rustc_commits;
 mod shortcut;
 
 pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
-    let config = config::get(&ctx.github, &event.repo_name()).await;
+    let config = config::get(&ctx.github, event.repo()).await;
+    if let Err(e) = &config {
+        log::warn!("failed to load configuration: {e}");
+    }
     let mut errors = Vec::new();
 
     if let (Ok(config), Event::Issue(event)) = (config.as_ref(), event) {
