@@ -1,5 +1,5 @@
 use crate::changelogs::ChangelogFormat;
-use crate::github::GithubClient;
+use crate::github::{GithubClient, Repository};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::{Arc, RwLock};
@@ -209,17 +209,20 @@ pub(crate) struct ReviewSubmittedConfig {
     pub(crate) reviewed_label: String,
 }
 
-pub(crate) async fn get(gh: &GithubClient, repo: &str) -> Result<Arc<Config>, ConfigurationError> {
-    if let Some(config) = get_cached_config(repo) {
-        log::trace!("returning config for {} from cache", repo);
+pub(crate) async fn get(
+    gh: &GithubClient,
+    repo: &Repository,
+) -> Result<Arc<Config>, ConfigurationError> {
+    if let Some(config) = get_cached_config(&repo.full_name) {
+        log::trace!("returning config for {} from cache", repo.full_name);
         config
     } else {
-        log::trace!("fetching fresh config for {}", repo);
+        log::trace!("fetching fresh config for {}", repo.full_name);
         let res = get_fresh_config(gh, repo).await;
         CONFIG_CACHE
             .write()
             .unwrap()
-            .insert(repo.to_string(), (res.clone(), Instant::now()));
+            .insert(repo.full_name.to_string(), (res.clone(), Instant::now()));
         res
     }
 }
@@ -246,15 +249,15 @@ fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationErro
 
 async fn get_fresh_config(
     gh: &GithubClient,
-    repo: &str,
+    repo: &Repository,
 ) -> Result<Arc<Config>, ConfigurationError> {
     let contents = gh
-        .raw_file(repo, "master", CONFIG_FILE_NAME)
+        .raw_file(&repo.full_name, &repo.default_branch, CONFIG_FILE_NAME)
         .await
         .map_err(|e| ConfigurationError::Http(Arc::new(e)))?
         .ok_or(ConfigurationError::Missing)?;
     let config = Arc::new(toml::from_slice::<Config>(&contents).map_err(ConfigurationError::Toml)?);
-    log::debug!("fresh configuration for {}: {:?}", repo, config);
+    log::debug!("fresh configuration for {}: {:?}", repo.full_name, config);
     Ok(config)
 }
 
@@ -273,10 +276,10 @@ impl fmt::Display for ConfigurationError {
             ConfigurationError::Missing => write!(
                 f,
                 "This repository is not enabled to use triagebot.\n\
-                 Add a `triagebot.toml` in the root of the master branch to enable it."
+                 Add a `triagebot.toml` in the root of the default branch to enable it."
             ),
             ConfigurationError::Toml(e) => {
-                write!(f, "Malformed `triagebot.toml` in master branch.\n{}", e)
+                write!(f, "Malformed `triagebot.toml` in default branch.\n{}", e)
             }
             ConfigurationError::Http(_) => {
                 write!(f, "Failed to query configuration for this repository.")

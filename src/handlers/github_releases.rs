@@ -31,7 +31,7 @@ pub(super) async fn handle(
         format!(
             "failed to load changelog file {} from repo {} in branch {}",
             config.changelog_path,
-            event.repo_name(),
+            event.repo().full_name,
             config.changelog_branch
         )
     })?;
@@ -40,7 +40,7 @@ pub(super) async fn handle(
     log::debug!("loading the git tags");
     let tags = load_paginated(
         ctx,
-        &format!("repos/{}/git/matching-refs/tags", event.repo_name()),
+        &format!("repos/{}/git/matching-refs/tags", event.repo().full_name),
         |git_ref: &GitRef| {
             git_ref
                 .name
@@ -54,7 +54,7 @@ pub(super) async fn handle(
     log::debug!("loading the existing releases");
     let releases = load_paginated(
         ctx,
-        &format!("repos/{}/releases", event.repo_name()),
+        &format!("repos/{}/releases", event.repo().full_name),
         |release: &Release| release.tag_name.clone(),
     )
     .await?;
@@ -65,7 +65,7 @@ pub(super) async fn handle(
 
             if let Some(release) = releases.get(tag) {
                 if release.name != expected_name || release.body != expected_body {
-                    log::info!("updating release {} on {}", tag, event.repo_name());
+                    log::info!("updating release {} on {}", tag, event.repo().full_name);
                     let _: serde_json::Value = ctx
                         .octocrab
                         .patch(
@@ -81,11 +81,11 @@ pub(super) async fn handle(
                     continue;
                 }
             } else {
-                log::info!("creating release {} on {}", tag, event.repo_name());
+                log::info!("creating release {} on {}", tag, event.repo().full_name);
                 let e: octocrab::Result<serde_json::Value> = ctx
                     .octocrab
                     .post(
-                        format!("repos/{}/releases", event.repo_name()),
+                        format!("repos/{}/releases", event.repo().full_name),
                         Some(&serde_json::json!({
                             "tag_name": tag,
                             "name": expected_name,
@@ -125,7 +125,7 @@ async fn load_changelog(
     let resp = ctx
         .github
         .raw_file(
-            &event.repo_name(),
+            &event.repo().full_name,
             &config.changelog_branch,
             &config.changelog_path,
         )

@@ -60,7 +60,7 @@ pub(super) async fn handle_command(
                 &event.issue().unwrap(),
                 format!(
                     "This team (`{}`) cannot be nominated for via this command;\
-                     it may need to be added to `triagebot.toml` on the master branch.",
+                     it may need to be added to `triagebot.toml` on the default branch.",
                     cmd.team,
                 ),
             );

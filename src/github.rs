@@ -906,6 +906,7 @@ pub struct IssueSearchResult {
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct Repository {
     pub full_name: String,
+    pub default_branch: String,
 }
 
 #[derive(Copy, Clone)]
@@ -1225,12 +1226,12 @@ pub enum Event {
 }
 
 impl Event {
-    pub fn repo_name(&self) -> String {
+    pub fn repo(&self) -> &Repository {
         match self {
-            Event::Create(event) => event.repository.full_name.clone(),
-            Event::IssueComment(event) => event.repository.full_name.clone(),
-            Event::Issue(event) => event.repository.full_name.clone(),
-            Event::Push(event) => event.repository.full_name.clone(),
+            Event::Create(event) => &event.repository,
+            Event::IssueComment(event) => &event.repository,
+            Event::Issue(event) => &event.repository,
+            Event::Push(event) => &event.repository,
         }
     }
 

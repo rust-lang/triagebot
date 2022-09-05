@@ -109,6 +109,8 @@ impl<'a> Action for Step<'a> {
             for repo in repos {
                 let repository = Repository {
                     full_name: format!("{}/{}", repo.0, repo.1),
+                    // This is unused for query.
+                    default_branch: "master".to_string(),
                 };
 
                 for QueryMap { name, kind, query } in queries {
