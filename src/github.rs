@@ -232,11 +232,6 @@ pub struct Label {
 }
 
 #[derive(Debug, serde::Deserialize)]
-pub struct PullRequestDetails {
-    // none for now
-}
-
-#[derive(Debug, serde::Deserialize)]
 pub struct Issue {
     pub number: u64,
     #[serde(deserialize_with = "opt_string")]
@@ -250,7 +245,8 @@ pub struct Issue {
     pub user: User,
     pub labels: Vec<Label>,
     pub assignees: Vec<User>,
-    pub pull_request: Option<PullRequestDetails>,
+    #[serde(default)]
+    pub pull_request: bool,
     #[serde(default)]
     pub merged: bool,
     #[serde(default)]
@@ -431,7 +427,7 @@ impl Issue {
     }
 
     pub fn is_pr(&self) -> bool {
-        self.pull_request.is_some()
+        self.pull_request
     }
 
     pub async fn get_comment(&self, client: &GithubClient, id: usize) -> anyhow::Result<Comment> {
