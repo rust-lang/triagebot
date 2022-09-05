@@ -231,6 +231,12 @@ pub struct Label {
     pub name: String,
 }
 
+/// An issue or pull request.
+///
+/// For convenience, since issues and pull requests share most of their
+/// fields, this struct is used for both. The `pull_request` field can be used
+/// to determine which it is. Some fields are only available on pull requests
+/// (but not always, check the GitHub API for details).
 #[derive(Debug, serde::Deserialize)]
 pub struct Issue {
     pub number: u64,
@@ -238,26 +244,48 @@ pub struct Issue {
     pub body: String,
     created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
+    /// The SHA for a merge commit.
+    ///
+    /// This field is complicated, see the [Pull Request
+    /// docs](https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request)
+    /// for details.
     #[serde(default)]
     pub merge_commit_sha: Option<String>,
     pub title: String,
+    /// The common URL for viewing this issue or PR.
+    ///
+    /// Example: `https://github.com/octocat/Hello-World/pull/1347`
     pub html_url: String,
     pub user: User,
     pub labels: Vec<Label>,
     pub assignees: Vec<User>,
+    /// This is true if this is a pull request.
+    ///
+    /// Note that this field does not come from GitHub. This is manually added
+    /// when the webhook arrives to help differentiate between an event
+    /// related to an issue versus a pull request.
     #[serde(default)]
     pub pull_request: bool,
+    /// Whether or not the pull request was merged.
     #[serde(default)]
     pub merged: bool,
     #[serde(default)]
     pub draft: bool,
-    // API URL
+    /// The API URL for discussion comments.
+    ///
+    /// Example: `https://api.github.com/repos/octocat/Hello-World/issues/1347/comments`
     comments_url: String,
+    /// The repository for this issue.
+    ///
+    /// Note that this is constructed via the [`Issue::repository`] method.
+    /// It is not deserialized from the GitHub API.
     #[serde(skip)]
     repository: OnceCell<IssueRepository>,
 
+    /// The base commit for a PR (the branch of the destination repo).
     #[serde(default)]
     base: Option<CommitBase>,
+    /// The head commit for a PR (the branch from the source repo).
     #[serde(default)]
     head: Option<CommitBase>,
 }
@@ -794,6 +822,9 @@ pub enum PullRequestReviewAction {
     Dismissed,
 }
 
+/// A pull request review event.
+///
+/// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request_review>
 #[derive(Debug, serde::Deserialize)]
 pub struct PullRequestReviewEvent {
     pub action: PullRequestReviewAction,
@@ -1211,11 +1242,21 @@ pub struct PushEvent {
     sender: User,
 }
 
+/// An event triggered by a webhook.
 #[derive(Debug)]
 pub enum Event {
+    /// A Git branch or tag is created.
     Create(CreateEvent),
+    /// A comment on an issue or PR.
+    ///
+    /// Can be:
+    /// - Regular comment on an issue or PR.
+    /// - A PR review.
+    /// - A comment on a PR review.
     IssueComment(IssueCommentEvent),
+    /// Activity on an issue or PR.
     Issue(IssuesEvent),
+    /// One or more commits are pushed to a repository branch or tag.
     Push(PushEvent),
 }
 

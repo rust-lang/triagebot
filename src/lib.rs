@@ -26,15 +26,52 @@ mod team_data;
 pub mod triage;
 pub mod zulip;
 
+/// The name of a webhook event.
 #[derive(Debug)]
 pub enum EventName {
+    /// Pull request activity.
+    ///
+    /// This gets translated to [`github::Event::Issue`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request>
     PullRequest,
+    /// Pull request review activity.
+    ///
+    /// This gets translated to [`github::Event::IssueComment`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request_review>
     PullRequestReview,
+    /// A comment on a pull request review.
+    ///
+    /// This gets translated to [`github::Event::IssueComment`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request_review_comment>
     PullRequestReviewComment,
+    /// An issue or PR comment.
+    ///
+    /// This gets translated to [`github::Event::IssueComment`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#issue_comment>
     IssueComment,
+    /// Issue activity.
+    ///
+    /// This gets translated to [`github::Event::Issue`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#issues>
     Issue,
+    /// One or more commits are pushed to a repository branch or tag.
+    ///
+    /// This gets translated to [`github::Event::Push`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#push>
     Push,
+    /// A Git branch or tag is created.
+    ///
+    /// This gets translated to [`github::Event::Create`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#create>
     Create,
+    /// All other unhandled webhooks.
     Other,
 }
 
