@@ -16,97 +16,58 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&AutolabelConfig>,
 ) -> Result<Option<AutolabelInput>, String> {
+    let config = match config {
+        Some(config) => config,
+        None => return Ok(None),
+    };
     // On opening a new PR or sync'ing the branch, look at the diff and try to
     // add any appropriate labels.
     //
     // FIXME: This will re-apply labels after a push that the user had tried to
     // remove. Not much can be done about that currently; the before/after on
     // synchronize may be straddling a rebase, which will break diff generation.
-    if let Some(config) = config {
-        if event.action == IssuesAction::Opened || event.action == IssuesAction::Synchronize {
-            if let Some(diff) = event
-                .issue
-                .diff(&ctx.github)
-                .await
-                .map_err(|e| {
-                    log::error!("failed to fetch diff: {:?}", e);
-                })
-                .unwrap_or_default()
-            {
-                let files = files_changed(&diff);
-                let mut autolabels = Vec::new();
-                'outer: for (label, cfg) in config.labels.iter() {
-                    if cfg
-                        .trigger_files
+    if event.action == IssuesAction::Opened || event.action == IssuesAction::Synchronize {
+        if let Some(diff) = event
+            .issue
+            .diff(&ctx.github)
+            .await
+            .map_err(|e| {
+                log::error!("failed to fetch diff: {:?}", e);
+            })
+            .unwrap_or_default()
+        {
+            let files = files_changed(&diff);
+            let mut autolabels = Vec::new();
+            'outer: for (label, cfg) in config.labels.iter() {
+                if cfg
+                    .trigger_files
+                    .iter()
+                    .any(|f| files.iter().any(|diff_file| diff_file.starts_with(f)))
+                {
+                    let exclude_patterns: Vec<glob::Pattern> = cfg
+                        .exclude_labels
                         .iter()
-                        .any(|f| files.iter().any(|diff_file| diff_file.starts_with(f)))
-                    {
-                        let exclude_patterns: Vec<glob::Pattern> = cfg
-                            .exclude_labels
-                            .iter()
-                            .filter_map(|label| match glob::Pattern::new(label) {
-                                Ok(exclude_glob) => Some(exclude_glob),
-                                Err(error) => {
-                                    log::error!("Invalid glob pattern: {}", error);
-                                    None
-                                }
-                            })
-                            .collect();
-                        for label in event.issue.labels() {
-                            for pat in &exclude_patterns {
-                                if pat.matches(&label.name) {
-                                    // If we hit an excluded label, ignore this autolabel and check the next
-                                    continue 'outer;
-                                }
+                        .filter_map(|label| match glob::Pattern::new(label) {
+                            Ok(exclude_glob) => Some(exclude_glob),
+                            Err(error) => {
+                                log::error!("Invalid glob pattern: {}", error);
+                                None
+                            }
+                        })
+                        .collect();
+                    for label in event.issue.labels() {
+                        for pat in &exclude_patterns {
+                            if pat.matches(&label.name) {
+                                // If we hit an excluded label, ignore this autolabel and check the next
+                                continue 'outer;
                             }
                         }
-
-                        autolabels.push(Label {
-                            name: label.to_owned(),
-                        });
                     }
+
+                    autolabels.push(Label {
+                        name: label.to_owned(),
+                    });
                 }
-                if !autolabels.is_empty() {
-                    return Ok(Some(AutolabelInput {
-                        add: autolabels,
-                        remove: vec![],
-                    }));
-                }
-            }
-        }
-    }
-
-    if event.action == IssuesAction::Labeled {
-        if let Some(config) = config {
-            let mut autolabels = Vec::new();
-            let applied_label = &event.label.as_ref().expect("label").name;
-
-            'outer: for (label, config) in config.get_by_trigger(applied_label) {
-                let exclude_patterns: Vec<glob::Pattern> = config
-                    .exclude_labels
-                    .iter()
-                    .filter_map(|label| match glob::Pattern::new(label) {
-                        Ok(exclude_glob) => Some(exclude_glob),
-                        Err(error) => {
-                            log::error!("Invalid glob pattern: {}", error);
-                            None
-                        }
-                    })
-                    .collect();
-
-                for label in event.issue.labels() {
-                    for pat in &exclude_patterns {
-                        if pat.matches(&label.name) {
-                            // If we hit an excluded label, ignore this autolabel and check the next
-                            continue 'outer;
-                        }
-                    }
-                }
-
-                // If we reach here, no excluded labels were found, so we should apply the autolabel.
-                autolabels.push(Label {
-                    name: label.to_owned(),
-                });
             }
             if !autolabels.is_empty() {
                 return Ok(Some(AutolabelInput {
@@ -114,6 +75,45 @@ pub(super) async fn parse_input(
                     remove: vec![],
                 }));
             }
+        }
+    }
+
+    if event.action == IssuesAction::Labeled {
+        let mut autolabels = Vec::new();
+        let applied_label = &event.label.as_ref().expect("label").name;
+
+        'outer: for (label, config) in config.get_by_trigger(applied_label) {
+            let exclude_patterns: Vec<glob::Pattern> = config
+                .exclude_labels
+                .iter()
+                .filter_map(|label| match glob::Pattern::new(label) {
+                    Ok(exclude_glob) => Some(exclude_glob),
+                    Err(error) => {
+                        log::error!("Invalid glob pattern: {}", error);
+                        None
+                    }
+                })
+                .collect();
+
+            for label in event.issue.labels() {
+                for pat in &exclude_patterns {
+                    if pat.matches(&label.name) {
+                        // If we hit an excluded label, ignore this autolabel and check the next
+                        continue 'outer;
+                    }
+                }
+            }
+
+            // If we reach here, no excluded labels were found, so we should apply the autolabel.
+            autolabels.push(Label {
+                name: label.to_owned(),
+            });
+        }
+        if !autolabels.is_empty() {
+            return Ok(Some(AutolabelInput {
+                add: autolabels,
+                remove: vec![],
+            }));
         }
     }
     Ok(None)
