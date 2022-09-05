@@ -284,10 +284,10 @@ pub struct Issue {
 
     /// The base commit for a PR (the branch of the destination repo).
     #[serde(default)]
-    base: Option<CommitBase>,
+    pub base: Option<CommitBase>,
     /// The head commit for a PR (the branch from the source repo).
     #[serde(default)]
-    head: Option<CommitBase>,
+    pub head: Option<CommitBase>,
 }
 
 /// Contains only the parts of `Issue` that are needed for turning the issue title into a Zulip
@@ -904,6 +904,9 @@ struct PullRequestEventFields {}
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct CommitBase {
     sha: String,
+    #[serde(rename = "ref")]
+    pub git_ref: String,
+    pub repo: Repository,
 }
 
 pub fn files_changed(diff: &str) -> Vec<&str> {
