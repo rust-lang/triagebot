@@ -4,10 +4,10 @@ use postgres_native_tls::MakeTlsConnector;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_postgres::Client as DbClient;
-use crate::db::events::*;
-use crate::handlers::events::handle_event;
+use crate::db::jobs::*;
+use crate::handlers::jobs::handle_job;
 
-pub mod events;
+pub mod jobs;
 pub mod issue_data;
 pub mod notifications;
 pub mod rustc_commits;
@@ -182,26 +182,26 @@ pub async fn run_migrations(client: &DbClient) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn run_scheduled_events(db: &DbClient) -> anyhow::Result<()> {
-    let events = get_events_to_execute(&db).await.unwrap();
-    println!("events to execute: {:#?}", events);
-    tracing::trace!("events to execute: {:#?}", events);
+pub async fn run_scheduled_jobs(db: &DbClient) -> anyhow::Result<()> {
+    let jobs = get_jobs_to_execute(&db).await.unwrap();
+    println!("jobs to execute: {:#?}", jobs);
+    tracing::trace!("jobs to execute: {:#?}", jobs);
 
-    for event in events.iter() {
-        update_event_executed_at(&db, &event.event_id).await?;
+    for job in jobs.iter() {
+        update_job_executed_at(&db, &job.id).await?;
 
-        match handle_event(&event.event_name, &event.event_metadata).await {
+        match handle_job(&job.name, &job.metadata).await {
             Ok(_) => {
-                println!("event succesfully executed (id={})", event.event_id);
-                tracing::trace!("event succesfully executed (id={})", event.event_id);
+                println!("job succesfully executed (id={})", job.id);
+                tracing::trace!("job succesfully executed (id={})", job.id);
 
-                delete_event(&db, &event.event_id).await?;
+                delete_job(&db, &job.id).await?;
             },
             Err(e) => {
-                println!("event failed on execution (id={:?}, error={:?})", event.event_id, e);
-                tracing::trace!("event failed on execution (id={:?}, error={:?})", event.event_id, e);
+                println!("job failed on execution (id={:?}, error={:?})", job.id, e);
+                tracing::trace!("job failed on execution (id={:?}, error={:?})", job.id, e);
 
-                update_event_failed_message(&db, &event.event_id, &e.to_string()).await?;
+                update_job_error_message(&db, &job.id, &e.to_string()).await?;
             },
         }
     }
@@ -247,13 +247,19 @@ CREATE TABLE issue_data (
 );
 ",
     "
-CREATE TABLE events (
-    event_id UUID PRIMARY KEY,
-    event_name TEXT NOT NULL,
-    expected_event_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    event_metadata JSONB,
-    executed_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    failed TEXT
+CREATE TABLE jobs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    expected_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    metadata JSONB,
+    executed_at TIMESTAMP WITH TIME ZONE,
+    error_message TEXT
 );
 ",
+    "
+CREATE UNIQUE INDEX jobs_name_expected_time_unique_index 
+    ON jobs (
+        name, expected_time
+    );
+"
 ];
