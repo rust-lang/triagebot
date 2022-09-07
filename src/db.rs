@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_postgres::Client as DbClient;
 use crate::db::events::*;
+use crate::handlers::events::handle_event;
 
 pub mod events;
 pub mod issue_data;
@@ -182,21 +183,25 @@ pub async fn run_migrations(client: &DbClient) -> anyhow::Result<()> {
 }
 
 pub async fn run_scheduled_events(db: &DbClient) -> anyhow::Result<()> {
-    // table lock ????
-    
-    let events = get_events_to_execute(&db).await;
+    let events = get_events_to_execute(&db).await.unwrap();
     println!("events to execute: {:#?}", events);
+    tracing::trace!("events to execute: {:#?}", events);
 
-    for event in events.unwrap().iter() {
-        update_event_executed_at(&db, &event.event_id).await;
-        match call_event_handler_based_on_event_name {
-            Ok(r) => {
+    for event in events.iter() {
+        update_event_executed_at(&db, &event.event_id).await?;
+
+        match handle_event(&event.event_name, &event.event_metadata).await {
+            Ok(_) => {
+                println!("event succesfully executed (id={})", event.event_id);
                 tracing::trace!("event succesfully executed (id={})", event.event_id);
-                delete_event(&db, &event.event_id).await;
+
+                delete_event(&db, &event.event_id).await?;
             },
             Err(e) => {
+                println!("event failed on execution (id={:?}, error={:?})", event.event_id, e);
                 tracing::trace!("event failed on execution (id={:?}, error={:?})", event.event_id, e);
-                update_event_failed_message(&db, &event.event_id, &e).await;
+
+                update_event_failed_message(&db, &event.event_id, &e.to_string()).await?;
             },
         }
     }

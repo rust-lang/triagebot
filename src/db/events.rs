@@ -10,7 +10,7 @@ pub struct Event {
     pub event_id: Uuid,
     pub event_name: String,
     pub expected_event_time: DateTime<FixedOffset>,
-    // pub event_metadata: String,
+    pub event_metadata: serde_json::Value,
     pub executed_at: DateTime<FixedOffset>,
     pub failed: Option<String>,
 }
@@ -85,7 +85,7 @@ pub async fn get_events_to_execute(db: &DbClient) -> Result<Vec<Event>>  {
         let event_id: Uuid = event.get(0);
         let event_name: String = event.get(1);
         let expected_event_time: DateTime<FixedOffset> = event.get(2);
-        // let event_metadata: String = event.get(3);
+        let event_metadata: serde_json::Value = event.get(3);
         let executed_at: DateTime<FixedOffset> = event.get(4);
         let failed: Option<String> = event.get(5);
 
@@ -93,7 +93,7 @@ pub async fn get_events_to_execute(db: &DbClient) -> Result<Vec<Event>>  {
             event_id,
             event_name,
             expected_event_time,
-            // event_metadata,
+            event_metadata,
             executed_at,
             failed
         });
