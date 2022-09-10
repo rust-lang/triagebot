@@ -14,8 +14,6 @@ use std::{
 };
 use tracing as log;
 
-pub mod graphql;
-
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct User {
     pub login: String,
@@ -1486,6 +1484,177 @@ pub trait IssuesQuery {
         include_fcp_details: bool,
         client: &'a GithubClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>>;
+}
+
+pub struct LeastRecentlyReviewedPullRequests;
+#[async_trait]
+impl IssuesQuery for LeastRecentlyReviewedPullRequests {
+    async fn query<'a>(
+        &'a self,
+        repo: &'a Repository,
+        _include_fcp_details: bool,
+        client: &'a GithubClient,
+    ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
+        use cynic::QueryBuilder;
+        use github_graphql::queries;
+
+        let repository_owner = repo.owner().to_owned();
+        let repository_name = repo.name().to_owned();
+
+        let mut prs: Vec<Option<queries::PullRequest>> = vec![];
+
+        let mut args = queries::LeastRecentlyReviewedPullRequestsArguments {
+            repository_owner,
+            repository_name: repository_name.clone(),
+            after: None,
+        };
+        loop {
+            let query = queries::LeastRecentlyReviewedPullRequests::build(&args);
+            let req = client.post(Repository::GITHUB_GRAPHQL_API_URL);
+            let req = req.json(&query);
+
+            let (resp, req_dbg) = client._send_req(req).await?;
+            let response = resp.json().await.context(req_dbg)?;
+            let data: cynic::GraphQlResponse<queries::LeastRecentlyReviewedPullRequests> =
+                query.decode_response(response).with_context(|| {
+                    format!("failed to parse response for `LeastRecentlyReviewedPullRequests`")
+                })?;
+            if let Some(errors) = data.errors {
+                anyhow::bail!("There were graphql errors. {:?}", errors);
+            }
+            let repository = data
+                .data
+                .ok_or_else(|| anyhow::anyhow!("No data returned."))?
+                .repository
+                .ok_or_else(|| anyhow::anyhow!("No repository."))?;
+            prs.extend(
+                repository
+                    .pull_requests
+                    .nodes
+                    .unwrap_or_default()
+                    .into_iter(),
+            );
+            let page_info = repository.pull_requests.page_info;
+            if !page_info.has_next_page || page_info.end_cursor.is_none() {
+                break;
+            }
+            args.after = page_info.end_cursor;
+        }
+
+        let mut prs: Vec<_> = prs
+            .into_iter()
+            .filter_map(|pr| pr)
+            .filter_map(|pr| {
+                if pr.is_draft {
+                    return None;
+                }
+                let labels = pr.labels;
+                let labels = (|| -> Option<_> {
+                    let labels = labels?;
+                    let nodes = labels.nodes?;
+                    let labels = nodes
+                        .into_iter()
+                        .filter_map(|node| node)
+                        .map(|node| node.name)
+                        .collect::<Vec<_>>();
+                    Some(labels)
+                })()
+                .unwrap_or_default();
+                if !labels.iter().any(|label| label == "T-compiler") {
+                    return None;
+                }
+                let labels = labels.join(", ");
+
+                let assignees: Vec<_> = pr
+                    .assignees
+                    .nodes
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|user| user)
+                    .map(|user| user.login)
+                    .collect();
+
+                let latest_reviews = pr.latest_reviews;
+                let mut reviews = (|| -> Option<_> {
+                    let reviews = latest_reviews?;
+                    let nodes = reviews.nodes?;
+                    let reviews = nodes
+                        .into_iter()
+                        .filter_map(|node| node)
+                        .filter_map(|node| {
+                            let created_at = node.created_at;
+                            node.author.map(|author| (author, created_at))
+                        })
+                        .map(|(author, created_at)| (author.login, created_at))
+                        .collect::<Vec<_>>();
+                    Some(reviews)
+                })()
+                .unwrap_or_default();
+                reviews.sort_by_key(|r| r.1);
+
+                let comments = pr.comments;
+                let comments = (|| -> Option<_> {
+                    let nodes = comments.nodes?;
+                    let comments = nodes
+                        .into_iter()
+                        .filter_map(|node| node)
+                        .filter_map(|node| {
+                            let created_at = node.created_at;
+                            node.author.map(|author| (author, created_at))
+                        })
+                        .map(|(author, created_at)| (author.login, created_at))
+                        .collect::<Vec<_>>();
+                    Some(comments)
+                })()
+                .unwrap_or_default();
+                let mut comments: Vec<_> = comments
+                    .into_iter()
+                    .filter(|comment| assignees.contains(&comment.0))
+                    .collect();
+                comments.sort_by_key(|c| c.1);
+
+                let updated_at = std::cmp::max(
+                    reviews.last().map(|t| t.1).unwrap_or(pr.created_at),
+                    comments.last().map(|t| t.1).unwrap_or(pr.created_at),
+                );
+                let assignees = assignees.join(", ");
+
+                Some((
+                    updated_at,
+                    pr.number as u64,
+                    pr.title,
+                    pr.url.0,
+                    repository_name.clone(),
+                    labels,
+                    assignees,
+                ))
+            })
+            .collect();
+        prs.sort_by_key(|pr| pr.0);
+
+        let prs: Vec<_> = prs
+            .into_iter()
+            .take(50)
+            .map(
+                |(updated_at, number, title, html_url, repo_name, labels, assignees)| {
+                    let updated_at_hts = crate::actions::to_human(updated_at);
+
+                    crate::actions::IssueDecorator {
+                        number,
+                        title,
+                        html_url,
+                        repo_name,
+                        labels,
+                        assignees,
+                        updated_at_hts,
+                        fcp_details: None,
+                    }
+                },
+            )
+            .collect();
+
+        Ok(prs)
+    }
 }
 
 #[cfg(test)]
