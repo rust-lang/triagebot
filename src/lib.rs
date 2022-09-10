@@ -9,8 +9,6 @@ use interactions::ErrorComment;
 use std::fmt;
 use tracing as log;
 
-use crate::github::PullRequestDetails;
-
 pub mod actions;
 pub mod agenda;
 mod changelogs;
@@ -28,15 +26,52 @@ mod team_data;
 pub mod triage;
 pub mod zulip;
 
+/// The name of a webhook event.
 #[derive(Debug)]
 pub enum EventName {
+    /// Pull request activity.
+    ///
+    /// This gets translated to [`github::Event::Issue`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request>
     PullRequest,
+    /// Pull request review activity.
+    ///
+    /// This gets translated to [`github::Event::IssueComment`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request_review>
     PullRequestReview,
+    /// A comment on a pull request review.
+    ///
+    /// This gets translated to [`github::Event::IssueComment`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request_review_comment>
     PullRequestReviewComment,
+    /// An issue or PR comment.
+    ///
+    /// This gets translated to [`github::Event::IssueComment`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#issue_comment>
     IssueComment,
+    /// Issue activity.
+    ///
+    /// This gets translated to [`github::Event::Issue`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#issues>
     Issue,
+    /// One or more commits are pushed to a repository branch or tag.
+    ///
+    /// This gets translated to [`github::Event::Push`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#push>
     Push,
+    /// A Git branch or tag is created.
+    ///
+    /// This gets translated to [`github::Event::Create`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#create>
     Create,
+    /// All other unhandled webhooks.
     Other,
 }
 
@@ -108,12 +143,7 @@ pub async fn webhook(
                 .map_err(anyhow::Error::from)?;
 
             log::info!("handling pull request review comment {:?}", payload);
-
-            // Github doesn't send a pull_request field nested into the
-            // pull_request field, so we need to adjust the deserialized result
-            // to preserve that this event came from a pull request (since it's
-            // a PR review, that's obviously the case).
-            payload.pull_request.pull_request = Some(PullRequestDetails {});
+            payload.pull_request.pull_request = true;
 
             // Treat pull request review comments exactly like pull request
             // review comments.
@@ -138,11 +168,7 @@ pub async fn webhook(
                 .context("PullRequestReview(Comment) failed to deserialize")
                 .map_err(anyhow::Error::from)?;
 
-            // Github doesn't send a pull_request field nested into the
-            // pull_request field, so we need to adjust the deserialized result
-            // to preserve that this event came from a pull request (since it's
-            // a PR review, that's obviously the case).
-            payload.issue.pull_request = Some(PullRequestDetails {});
+            payload.issue.pull_request = true;
 
             log::info!("handling pull request review comment {:?}", payload);
 
@@ -166,9 +192,13 @@ pub async fn webhook(
             github::Event::IssueComment(payload)
         }
         EventName::Issue | EventName::PullRequest => {
-            let payload = deserialize_payload::<github::IssuesEvent>(&payload)
+            let mut payload = deserialize_payload::<github::IssuesEvent>(&payload)
                 .context(format!("{:?} failed to deserialize", event))
                 .map_err(anyhow::Error::from)?;
+
+            if matches!(event, EventName::PullRequest) {
+                payload.issue.pull_request = true;
+            }
 
             log::info!("handling issue event {:?}", payload);
 
