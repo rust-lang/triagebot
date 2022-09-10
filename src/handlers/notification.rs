@@ -151,7 +151,14 @@ async fn id_from_user(
         let team = match github::get_team(&ctx.github, team).await {
             Ok(Some(team)) => team,
             Ok(None) => {
-                log::error!("team ping ({}) failed to resolve to a known team", login);
+                // If the team is in rust-lang*, then this is probably an error (potentially user
+                // error, but should be investigated). Otherwise it's probably not going to be in
+                // the team repository so isn't actually an error.
+                if login.starts_with("rust") {
+                    log::error!("team ping ({}) failed to resolve to a known team", login);
+                } else {
+                    log::info!("team ping ({}) failed to resolve to a known team", login);
+                }
                 return Ok(None);
             }
             Err(err) => {
