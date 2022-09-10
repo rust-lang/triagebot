@@ -1256,6 +1256,9 @@ pub enum Event {
     /// - Regular comment on an issue or PR.
     /// - A PR review.
     /// - A comment on a PR review.
+    ///
+    /// These different scenarios are unified into the `IssueComment` variant
+    /// when triagebot receives the corresponding webhook event.
     IssueComment(IssueCommentEvent),
     /// Activity on an issue or PR.
     Issue(IssuesEvent),
