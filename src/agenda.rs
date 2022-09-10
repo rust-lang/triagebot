@@ -414,7 +414,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                     QueryMap {
                         name: "top_unreviewed_prs",
                         kind: QueryKind::List,
-                        query: Arc::new(github::graphql::LeastRecentlyReviewedPullRequests),
+                        query: Arc::new(github::LeastRecentlyReviewedPullRequests),
                     },
                 ],
             },
