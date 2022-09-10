@@ -264,7 +264,10 @@ pub struct Issue {
     /// Note that this field does not come from GitHub. This is manually added
     /// when the webhook arrives to help differentiate between an event
     /// related to an issue versus a pull request.
-    #[serde(default)]
+    ///
+    /// GitHub *does* actually populate this field on some events, but triagebot ignores that data
+    /// and just stores a bool here when appropriate.
+    #[serde(skip)]
     pub pull_request: bool,
     /// Whether or not the pull request was merged.
     #[serde(default)]
