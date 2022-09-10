@@ -888,6 +888,8 @@ pub enum IssuesAction {
     ReadyForReview,
     Synchronize,
     ConvertedToDraft,
+    AutoMergeEnabled,
+    AutoMergeDisabled,
 }
 
 #[derive(Debug, serde::Deserialize)]
