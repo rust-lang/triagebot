@@ -10,7 +10,8 @@ pub(crate) async fn handle(
         event @ IssueCommentEvent {
             action: IssueCommentAction::Created,
             issue: Issue {
-                pull_request: true, ..
+                pull_request: Some(_),
+                ..
             },
             ..
         },

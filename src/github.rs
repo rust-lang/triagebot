@@ -231,6 +231,16 @@ pub struct Label {
     pub name: String,
 }
 
+/// An indicator used to differentiate between an issue and a pull request.
+///
+/// Some webhook events include a `pull_request` field in the Issue object,
+/// and some don't. GitHub does include a few fields here, but they aren't
+/// needed at this time (merged_at, diff_url, html_url, patch_url, url).
+#[derive(Debug, serde::Deserialize)]
+pub struct PullRequestDetails {
+    // none for now
+}
+
 /// An issue or pull request.
 ///
 /// For convenience, since issues and pull requests share most of their
@@ -259,16 +269,12 @@ pub struct Issue {
     pub user: User,
     pub labels: Vec<Label>,
     pub assignees: Vec<User>,
-    /// This is true if this is a pull request.
+    /// Indicator if this is a pull request.
     ///
-    /// Note that this field does not come from GitHub. This is manually added
-    /// when the webhook arrives to help differentiate between an event
-    /// related to an issue versus a pull request.
-    ///
-    /// GitHub *does* actually populate this field on some events, but triagebot ignores that data
-    /// and just stores a bool here when appropriate.
-    #[serde(skip)]
-    pub pull_request: bool,
+    /// This is `Some` if this is a PR (as opposed to an issue). Note that
+    /// this does not always get filled in by GitHub, and must be manually
+    /// populated (because some webhook events do not set it).
+    pub pull_request: Option<PullRequestDetails>,
     /// Whether or not the pull request was merged.
     #[serde(default)]
     pub merged: bool,
@@ -458,7 +464,7 @@ impl Issue {
     }
 
     pub fn is_pr(&self) -> bool {
-        self.pull_request
+        self.pull_request.is_some()
     }
 
     pub async fn get_comment(&self, client: &GithubClient, id: usize) -> anyhow::Result<Comment> {
