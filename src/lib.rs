@@ -3,6 +3,8 @@
 #[macro_use]
 extern crate lazy_static;
 
+use crate::github::PullRequestDetails;
+
 use anyhow::Context;
 use handlers::HandlerError;
 use interactions::ErrorComment;
@@ -143,7 +145,7 @@ pub async fn webhook(
                 .map_err(anyhow::Error::from)?;
 
             log::info!("handling pull request review comment {:?}", payload);
-            payload.pull_request.pull_request = true;
+            payload.pull_request.pull_request = Some(PullRequestDetails {});
 
             // Treat pull request review comments exactly like pull request
             // review comments.
@@ -168,7 +170,7 @@ pub async fn webhook(
                 .context("PullRequestReview(Comment) failed to deserialize")
                 .map_err(anyhow::Error::from)?;
 
-            payload.issue.pull_request = true;
+            payload.issue.pull_request = Some(PullRequestDetails {});
 
             log::info!("handling pull request review comment {:?}", payload);
 
@@ -197,7 +199,7 @@ pub async fn webhook(
                 .map_err(anyhow::Error::from)?;
 
             if matches!(event, EventName::PullRequest) {
-                payload.issue.pull_request = true;
+                payload.issue.pull_request = Some(PullRequestDetails {});
             }
 
             log::info!("handling issue event {:?}", payload);
