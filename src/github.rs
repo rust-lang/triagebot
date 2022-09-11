@@ -261,13 +261,10 @@ pub struct Issue {
     pub assignees: Vec<User>,
     /// This is true if this is a pull request.
     ///
-    /// Note that this field does not come from GitHub. This is manually added
-    /// when the webhook arrives to help differentiate between an event
-    /// related to an issue versus a pull request.
-    ///
-    /// GitHub *does* actually populate this field on some events, but triagebot ignores that data
-    /// and just stores a bool here when appropriate.
-    #[serde(skip)]
+    /// On some events, such as pull request comments, GitHub passes an empty map type
+    /// in this field, but most of the time this is only set by triagebot where
+    /// appropriate.
+    #[serde(default, deserialize_with = "is_pull_request")]
     pub pull_request: bool,
     /// Whether or not the pull request was merged.
     #[serde(default)]
@@ -291,6 +288,22 @@ pub struct Issue {
     /// The head commit for a PR (the branch from the source repo).
     #[serde(default)]
     pub head: Option<CommitBase>,
+}
+
+fn is_pull_request<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    #[derive(serde::Deserialize)]
+    struct PullRequestDetails {
+        // none for now
+    }
+
+    use serde::de::Deserialize;
+    match PullRequestDetails::deserialize(deserializer) {
+        Ok(_) => Ok(true),
+        Err(e) => Err(e),
+    }
 }
 
 /// Contains only the parts of `Issue` that are needed for turning the issue title into a Zulip
