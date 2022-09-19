@@ -195,6 +195,15 @@ pub async fn run_scheduled_jobs(db: &DbClient) -> anyhow::Result<()> {
                 println!("job succesfully executed (id={})", job.id);
                 tracing::trace!("job succesfully executed (id={})", job.id);
 
+                if let Some(frequency) = job.frequency {
+                    let duration = get_duration_from_cron(frequency, job.frequency_unit.as_ref().unwrap());
+                    let new_expected_time = job.expected_time.checked_add_signed(duration).unwrap();
+
+                    insert_job(&db, &job.name, &new_expected_time, &Some(frequency), &job.frequency_unit, &job.metadata).await?;
+                    println!("job succesfully reinserted (name={})", job.name);
+                    tracing::trace!("job succesfully reinserted (name={})", job.name);
+                }
+
                 delete_job(&db, &job.id).await?;
             },
             Err(e) => {
@@ -246,11 +255,16 @@ CREATE TABLE issue_data (
     PRIMARY KEY (repo, issue_number, key)
 );
 ",
+"
+CREATE TYPE frequency_unit AS ENUM ('days', 'hours', 'minutes', 'seconds');
+",
     "
 CREATE TABLE jobs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL,
     expected_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    frequency INTEGER,
+    frequency_unit frequency_unit,
     metadata JSONB,
     executed_at TIMESTAMP WITH TIME ZONE,
     error_message TEXT

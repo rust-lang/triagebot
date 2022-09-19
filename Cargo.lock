@@ -1295,6 +1295,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1df8c4ec4b0627e53bdf214615ad287367e482558cf84b109250b37464dc03ae"
 
 [[package]]
+name = "postgres-derive"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0c2c18e40b92144b05e6f3ae9d1ee931f0d1afa9410ac8b97486c6eaaf91201"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "postgres-native-tls"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1309,9 +1320,9 @@ dependencies = [
 
 [[package]]
 name = "postgres-protocol"
-version = "0.6.3"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79ec03bce71f18b4a27c4c64c6ba2ddf74686d69b91d8714fb32ead3adaed713"
+checksum = "878c6cbf956e03af9aa8204b407b9cbf47c072164800aa918c516cd4b056c50c"
 dependencies = [
  "base64",
  "byteorder",
@@ -1327,13 +1338,14 @@ dependencies = [
 
 [[package]]
 name = "postgres-types"
-version = "0.2.2"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04619f94ba0cc80999f4fc7073607cb825bc739a883cb6d20900fc5e009d6b0d"
+checksum = "73d946ec7d256b04dfadc4e6a3292324e6f417124750fc5c0950f981b703a0f1"
 dependencies = [
  "bytes",
  "chrono",
  "fallible-iterator",
+ "postgres-derive",
  "postgres-protocol",
  "serde",
  "serde_json",
@@ -2059,6 +2071,7 @@ dependencies = [
  "openssl",
  "parser",
  "postgres-native-tls",
+ "postgres-types",
  "rand",
  "regex",
  "reqwest",
