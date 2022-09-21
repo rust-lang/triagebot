@@ -40,6 +40,8 @@ cynic = { version = "0.14" }
 itertools = "0.10.2"
 tower = { version = "0.4.13", features = ["util", "limit", "buffer", "load-shed"] }
 github-graphql = { path = "github-graphql" }
+rand = "0.8.5"
+ignore = "0.4.18"
 
 [dependencies.serde]
 version = "1"

@@ -611,7 +611,9 @@ impl Issue {
     }
 
     pub fn contain_assignee(&self, user: &str) -> bool {
-        self.assignees.iter().any(|a| a.login == user)
+        self.assignees
+            .iter()
+            .any(|a| a.login.to_lowercase() == user.to_lowercase())
     }
 
     pub async fn remove_assignees(
@@ -637,7 +639,7 @@ impl Issue {
                 .assignees
                 .iter()
                 .map(|u| u.login.as_str())
-                .filter(|&u| u != user)
+                .filter(|&u| u.to_lowercase() != user.to_lowercase())
                 .collect::<Vec<_>>(),
         };
 
@@ -677,7 +679,10 @@ impl Issue {
             .map_err(AssignmentError::Http)?;
         // Invalid assignees are silently ignored. We can just check if the user is now
         // contained in the assignees list.
-        let success = result.assignees.iter().any(|u| u.login.as_str() == user);
+        let success = result
+            .assignees
+            .iter()
+            .any(|u| u.login.as_str().to_lowercase() == user.to_lowercase());
 
         if success {
             Ok(())
@@ -942,10 +947,17 @@ pub struct IssueSearchResult {
     pub items: Vec<Issue>,
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct CommitSearchResult {
+    total_count: u32,
+}
+
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct Repository {
     pub full_name: String,
     pub default_branch: String,
+    #[serde(default)]
+    pub fork: bool,
 }
 
 #[derive(Copy, Clone)]
@@ -1502,6 +1514,39 @@ impl GithubClient {
             Err(e) => {
                 log::error!("Failed to query commit list: {:?}", e);
                 Vec::new()
+            }
+        }
+    }
+
+    /// Returns whether or not the given GitHub login has made any commits to
+    /// the given repo.
+    pub async fn is_new_contributor(&self, repo: &Repository, author: &str) -> bool {
+        if repo.fork {
+            // Forks always return 0 results.
+            return false;
+        }
+        let url = format!(
+            "{}/search/commits?q=repo:{}+author:{}",
+            Repository::GITHUB_API_URL,
+            repo.full_name,
+            author,
+        );
+        let req = self.get(&url);
+        match self.json::<CommitSearchResult>(req).await {
+            Ok(res) => res.total_count == 0,
+            Err(e) => {
+                // 422 is returned for unknown user
+                if e.downcast_ref::<reqwest::Error>().map_or(false, |e| {
+                    e.status() == Some(StatusCode::UNPROCESSABLE_ENTITY)
+                }) {
+                    true
+                } else {
+                    log::warn!(
+                        "failed to search for user commits in {} for author {author}: {e}",
+                        repo.full_name
+                    );
+                    false
+                }
             }
         }
     }
