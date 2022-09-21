@@ -1560,8 +1560,12 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
         let mut args = queries::LeastRecentlyReviewedPullRequestsArguments {
             repository_owner,
             repository_name: repository_name.clone(),
+            // NOTE: this number of items per page sometimes causes a 502 HTTP error
+            // (doesn't look like rate limiting)
+            first: Some(50),
             after: None,
         };
+
         loop {
             let query = queries::LeastRecentlyReviewedPullRequests::build(&args);
             let req = client.post(Repository::GITHUB_GRAPHQL_API_URL);
@@ -1581,13 +1585,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                 .ok_or_else(|| anyhow::anyhow!("No data returned."))?
                 .repository
                 .ok_or_else(|| anyhow::anyhow!("No repository."))?;
-            prs.extend(
-                repository
-                    .pull_requests
-                    .nodes
-                    .unwrap_or_default()
-                    .into_iter(),
-            );
+            prs.extend(repository.pull_requests.nodes.unwrap_or_default());
             let page_info = repository.pull_requests.page_info;
             if !page_info.has_next_page || page_info.end_cursor.is_none() {
                 break;
@@ -1614,7 +1612,10 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                     Some(labels)
                 })()
                 .unwrap_or_default();
-                if !labels.iter().any(|label| label == "T-compiler") {
+                if !labels.iter().any(|label| label == "T-compiler")
+                    || !labels.iter().any(|label| label == "S-waiting-on-review")
+                {
+                    log::debug!("Discarding #{}: {:?}", pr.number, labels);
                     return None;
                 }
                 let labels = labels.join(", ");

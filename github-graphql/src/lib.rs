@@ -15,6 +15,7 @@ pub mod queries {
     pub struct LeastRecentlyReviewedPullRequestsArguments {
         pub repository_owner: String,
         pub repository_name: String,
+        pub first: Option<i32>,
         pub after: Option<String>,
     }
 
@@ -31,7 +32,7 @@ pub mod queries {
     #[derive(cynic::QueryFragment, Debug)]
     #[cynic(argument_struct = "LeastRecentlyReviewedPullRequestsArguments")]
     pub struct Repository {
-        #[arguments(states = Some(vec![PullRequestState::Open]), first = 100, after = &args.after, labels = Some(vec!["S-waiting-on-review".to_string()]), order_by = IssueOrder { direction: OrderDirection::Asc, field: IssueOrderField::UpdatedAt })]
+        #[arguments(states = Some(vec![PullRequestState::Open]), first = &args.first, after = &args.after, labels = Some(vec!["T-compiler".to_string(), "S-waiting-on-review".to_string()]), order_by = IssueOrder { direction: OrderDirection::Asc, field: IssueOrderField::UpdatedAt })]
         pub pull_requests: PullRequestConnection,
     }
 
