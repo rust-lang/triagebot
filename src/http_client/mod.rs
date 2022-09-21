@@ -64,6 +64,7 @@ impl HttpClient for CompilerMeeting {
                 ("timeMin", time_min),
                 ("timeMax", time_max),
                 ("singleEvents", "true".to_string()),
+                ("orderBy", "startTime".to_string()),
             ],
         )?;
         let calendar = reqwest::get(url).await?.json::<CompilerMeetings>().await?;
