@@ -33,9 +33,10 @@ use std::fmt;
 use tracing as log;
 
 #[cfg(test)]
-mod tests_candidates;
-#[cfg(test)]
-mod tests_from_diff;
+mod tests {
+    mod tests_candidates;
+    mod tests_from_diff;
+}
 
 const NEW_USER_WELCOME_MESSAGE: &str = "Thanks for the pull request, and welcome! \
 The Rust team is excited to review your changes, and you should hear from {who} soon.";
@@ -68,7 +69,7 @@ struct AssignData {
 
 /// Input for auto-assignment when a PR is created.
 pub(super) struct AssignInput {
-    diff: String,
+    git_diff: String,
 }
 
 /// Prepares the input when a new PR is opened.
@@ -87,7 +88,7 @@ pub(super) async fn parse_input(
     {
         return Ok(None);
     }
-    let diff = match event.issue.diff(&ctx.github).await {
+    let git_diff = match event.issue.diff(&ctx.github).await {
         Ok(None) => return Ok(None),
         Err(e) => {
             log::error!("failed to fetch diff: {:?}", e);
@@ -95,7 +96,7 @@ pub(super) async fn parse_input(
         }
         Ok(Some(diff)) => diff,
     };
-    Ok(Some(AssignInput { diff }))
+    Ok(Some(AssignInput { git_diff }))
 }
 
 /// Handles the work of setting an assignment for a new PR and posting a
@@ -161,7 +162,7 @@ pub(super) async fn handle_input(
     if config.warn_non_default_branch {
         warnings.extend(non_default_branch(event));
     }
-    warnings.extend(modifies_submodule(&input.diff));
+    warnings.extend(modifies_submodule(&input.git_diff));
     if !warnings.is_empty() {
         let warnings: Vec<_> = warnings
             .iter()
@@ -272,7 +273,7 @@ async fn determine_assignee(
         }
     }
     // Errors fall-through to try fallback group.
-    match find_reviewers_from_diff(config, &input.diff) {
+    match find_reviewers_from_diff(config, &input.git_diff) {
         Ok(candidates) if !candidates.is_empty() => {
             match find_reviewer_from_names(&teams, config, &event.issue, &candidates) {
                 Ok(assignee) => return Ok((Some(assignee), false)),
@@ -378,7 +379,7 @@ fn find_reviewers_from_diff(config: &AssignConfig, diff: &str) -> anyhow::Result
     let max_paths = counts
         .iter()
         .filter(|(_, count)| **count == max_count)
-        .map(|x| x.0);
+        .map(|(path, _)| path);
     let mut potential: Vec<_> = max_paths
         .flat_map(|owner_path| &config.owners[*owner_path])
         .map(|owner| owner.to_string())

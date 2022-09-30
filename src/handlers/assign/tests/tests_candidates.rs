@@ -1,6 +1,6 @@
 //! Tests for `candidate_reviewers_from_names`
 
-use super::*;
+use super::super::*;
 
 /// Basic test function for testing `candidate_reviewers_from_names`.
 fn test_from_names(

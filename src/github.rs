@@ -1522,7 +1522,8 @@ impl GithubClient {
     /// the given repo.
     pub async fn is_new_contributor(&self, repo: &Repository, author: &str) -> bool {
         if repo.fork {
-            // Forks always return 0 results.
+            // GitHub always returns 0 results in forked repos, so this cannot
+            // work for them.
             return false;
         }
         let url = format!(
