@@ -78,12 +78,12 @@ pub(crate) struct AssignConfig {
     /// If `true`, then posts a warning comment if the PR is opened against a
     /// different branch than the default (usually master or main).
     #[serde(default)]
-    pub(crate) non_default_branch: bool,
+    pub(crate) warn_non_default_branch: bool,
     /// A URL to include in the welcome message.
     pub(crate) contributing_url: Option<String>,
     /// Ad-hoc groups that can be referred to in `owners`.
     #[serde(default)]
-    pub(crate) groups: HashMap<String, Vec<String>>,
+    pub(crate) adhoc_groups: HashMap<String, Vec<String>>,
     /// Users to assign when a new PR is opened.
     /// The key is a gitignore-style path, and the value is a list of
     /// usernames, team names, or ad-hoc groups.
@@ -367,9 +367,9 @@ mod tests {
                     allow_unauthenticated: vec!["C-*".into()],
                 }),
                 assign: Some(AssignConfig {
-                    non_default_branch: false,
+                    warn_non_default_branch: false,
                     contributing_url: None,
-                    groups: HashMap::new(),
+                    adhoc_groups: HashMap::new(),
                     owners: HashMap::new(),
                 }),
                 note: Some(NoteConfig { _empty: () }),

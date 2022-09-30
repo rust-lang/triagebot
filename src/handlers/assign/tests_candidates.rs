@@ -72,7 +72,7 @@ fn generic_issue(author: &str, repo: &str) -> serde_json::Value {
 fn circular_groups() {
     // A cycle in the groups map.
     let config = toml::toml!(
-        [groups]
+        [adhoc_groups]
         compiler = ["other"]
         other = ["compiler"]
     );
@@ -84,7 +84,7 @@ fn circular_groups() {
 fn nested_groups() {
     // Test choosing a reviewer from group with nested groups.
     let config = toml::toml!(
-        [groups]
+        [adhoc_groups]
         a = ["@pnkfelix"]
         b = ["@nrc"]
         c = ["a", "b"]
@@ -97,7 +97,7 @@ fn nested_groups() {
 fn candidate_filtered_author_only_candidate() {
     // When the author is the only candidate.
     let config = toml::toml!(
-        [groups]
+        [adhoc_groups]
         compiler = ["nikomatsakis"]
     );
     let issue = generic_issue("nikomatsakis", "rust-lang/rust");
@@ -108,7 +108,7 @@ fn candidate_filtered_author_only_candidate() {
 fn candidate_filtered_author() {
     // Filter out the author from the candidates.
     let config = toml::toml!(
-        [groups]
+        [adhoc_groups]
         compiler = ["user1", "user2", "user3", "group2"]
         group2 = ["user2", "user4"]
     );
@@ -126,7 +126,7 @@ fn candidate_filtered_author() {
 fn candidate_filtered_assignee() {
     // Filter out an existing assignee from the candidates.
     let config = toml::toml!(
-        [groups]
+        [adhoc_groups]
         compiler = ["user1", "user2", "user3", "user4"]
     );
     let mut issue = generic_issue("user2", "rust-lang/rust");
@@ -145,7 +145,7 @@ fn groups_teams_users() {
         team2 = ["t-user2"]
     );
     let config = toml::toml!(
-        [groups]
+        [adhoc_groups]
         group1 = ["user1", "rust-lang/team2"]
     );
     let issue = generic_issue("octocat", "rust-lang/rust");
@@ -163,7 +163,7 @@ fn group_team_user_precedence() {
     // How it handles ambiguity when names overlap.
     let teams = toml::toml!(compiler = ["t-user1"]);
     let config = toml::toml!(
-        [groups]
+        [adhoc_groups]
         compiler = ["user2"]
     );
     let issue = generic_issue("octocat", "rust-lang/rust");
@@ -188,7 +188,7 @@ fn what_do_slashes_mean() {
     // How slashed names are handled.
     let teams = toml::toml!(compiler = ["t-user1"]);
     let config = toml::toml!(
-        [groups]
+        [adhoc_groups]
         compiler = ["user2"]
         "foo/bar" = ["foo-user"]
     );
@@ -222,7 +222,7 @@ fn what_do_slashes_mean() {
 fn invalid_org_doesnt_match() {
     let teams = toml::toml!(compiler = ["t-user1"]);
     let config = toml::toml!(
-        [groups]
+        [adhoc_groups]
         compiler = ["user2"]
     );
     let issue = generic_issue("octocat", "rust-lang/rust");

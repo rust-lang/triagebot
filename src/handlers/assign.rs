@@ -158,7 +158,7 @@ pub(super) async fn handle_input(
 
     // Compute some warning messages to post to new PRs.
     let mut warnings = Vec::new();
-    if config.non_default_branch {
+    if config.warn_non_default_branch {
         warnings.extend(non_default_branch(event));
     }
     warnings.extend(modifies_submodule(&input.diff));
@@ -297,7 +297,7 @@ async fn determine_assignee(
         }
     }
 
-    if let Some(fallback) = config.groups.get("fallback") {
+    if let Some(fallback) = config.adhoc_groups.get("fallback") {
         match find_reviewer_from_names(&teams, config, &event.issue, fallback) {
             Ok(assignee) => return Ok((Some(assignee), false)),
             Err(e) => {
@@ -638,7 +638,7 @@ fn candidate_reviewers_from_names<'a>(
         let maybe_group = group_or_user
             .strip_prefix(&org_prefix)
             .unwrap_or(group_or_user);
-        if let Some(group_members) = config.groups.get(maybe_group) {
+        if let Some(group_members) = config.adhoc_groups.get(maybe_group) {
             // If a group has already been expanded, don't expand it again.
             if seen.insert(maybe_group) {
                 group_expansion.extend(
