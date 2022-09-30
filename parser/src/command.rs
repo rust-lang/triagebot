@@ -307,6 +307,7 @@ fn review_commands() {
         ("r? octocat", "octocat"),
         ("R? @octocat", "octocat"),
         ("can I r? someone?", "someone"),
+        ("Please r? @octocat can you review?", "octocat"),
         ("r? rust-lang/compiler", "rust-lang/compiler"),
         ("r? @D--a--s-h", "D--a--s-h"),
     ] {
