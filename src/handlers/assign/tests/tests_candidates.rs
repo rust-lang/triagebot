@@ -65,6 +65,7 @@ fn generic_issue(author: &str, repo: &str) -> serde_json::Value {
         "labels": [],
         "assignees": [],
         "comments_url": format!("https://api.github.com/repos/{repo}/pull/1234/comments"),
+        "state": "open",
     })
 }
 

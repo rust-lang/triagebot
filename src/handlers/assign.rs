@@ -414,6 +414,12 @@ pub(super) async fn handle_command(
 
     let issue = event.issue().unwrap();
     if issue.is_pr() {
+        if !issue.is_open() {
+            issue
+                .post_comment(&ctx.github, "Assignment is not allowed on a closed PR.")
+                .await?;
+            return Ok(());
+        }
         let username = match cmd {
             AssignCommand::Own => event.user().login.clone(),
             AssignCommand::User { username } => username,

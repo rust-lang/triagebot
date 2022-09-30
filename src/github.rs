@@ -297,6 +297,15 @@ pub struct Issue {
     /// The head commit for a PR (the branch from the source repo).
     #[serde(default)]
     pub head: Option<CommitBase>,
+    /// Whether it is open or closed.
+    pub state: IssueState,
+}
+
+#[derive(Debug, serde::Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueState {
+    Open,
+    Closed,
 }
 
 /// Contains only the parts of `Issue` that are needed for turning the issue title into a Zulip
@@ -465,6 +474,10 @@ impl Issue {
 
     pub fn is_pr(&self) -> bool {
         self.pull_request.is_some()
+    }
+
+    pub fn is_open(&self) -> bool {
+        self.state == IssueState::Open
     }
 
     pub async fn get_comment(&self, client: &GithubClient, id: usize) -> anyhow::Result<Comment> {
