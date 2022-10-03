@@ -1,14 +1,14 @@
+use crate::db::jobs::*;
+use crate::handlers::jobs::handle_job;
 use anyhow::Context as _;
 use native_tls::{Certificate, TlsConnector};
 use postgres_native_tls::MakeTlsConnector;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_postgres::Client as DbClient;
-use crate::db::jobs::*;
-use crate::handlers::jobs::handle_job;
 
-pub mod jobs;
 pub mod issue_data;
+pub mod jobs;
 pub mod notifications;
 pub mod rustc_commits;
 
@@ -196,22 +196,31 @@ pub async fn run_scheduled_jobs(db: &DbClient) -> anyhow::Result<()> {
                 tracing::trace!("job succesfully executed (id={})", job.id);
 
                 if let Some(frequency) = job.frequency {
-                    let duration = get_duration_from_cron(frequency, job.frequency_unit.as_ref().unwrap());
+                    let duration =
+                        get_duration_from_cron(frequency, job.frequency_unit.as_ref().unwrap());
                     let new_expected_time = job.expected_time.checked_add_signed(duration).unwrap();
 
-                    insert_job(&db, &job.name, &new_expected_time, &Some(frequency), &job.frequency_unit, &job.metadata).await?;
+                    insert_job(
+                        &db,
+                        &job.name,
+                        &new_expected_time,
+                        &Some(frequency),
+                        &job.frequency_unit,
+                        &job.metadata,
+                    )
+                    .await?;
                     println!("job succesfully reinserted (name={})", job.name);
                     tracing::trace!("job succesfully reinserted (name={})", job.name);
                 }
 
                 delete_job(&db, &job.id).await?;
-            },
+            }
             Err(e) => {
                 println!("job failed on execution (id={:?}, error={:?})", job.id, e);
                 tracing::trace!("job failed on execution (id={:?}, error={:?})", job.id, e);
 
                 update_job_error_message(&db, &job.id, &e.to_string()).await?;
-            },
+            }
         }
     }
 
@@ -255,7 +264,7 @@ CREATE TABLE issue_data (
     PRIMARY KEY (repo, issue_number, key)
 );
 ",
-"
+    "
 CREATE TYPE frequency_unit AS ENUM ('days', 'hours', 'minutes', 'seconds');
 ",
     "
@@ -275,5 +284,5 @@ CREATE UNIQUE INDEX jobs_name_expected_time_unique_index
     ON jobs (
         name, expected_time
     );
-"
+",
 ];

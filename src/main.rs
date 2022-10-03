@@ -7,11 +7,11 @@ use hyper::{header, Body, Request, Response, Server, StatusCode};
 use reqwest::Client;
 use route_recognizer::Router;
 use std::{env, net::SocketAddr, sync::Arc, time::Duration};
+use tokio::{task, time::sleep};
 use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
 use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
-use tokio::{task, time::sleep};
 
 const JOB_PROCESSING_CADENCE_IN_SECS: u64 = 60;
 
@@ -238,17 +238,18 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     let pool = db::ClientPool::new();
     db::run_migrations(&*pool.get().await)
         .await
-        .context("database migrations")?;  
+        .context("database migrations")?;
 
     // spawning a background task that will run the scheduled jobs
     // every JOB_PROCESSING_CADENCE_IN_SECS
     task::spawn(async move {
         let pool = db::ClientPool::new();
 
-        loop { 
+        loop {
             db::run_scheduled_jobs(&*pool.get().await)
                 .await
-                .context("run database scheduled jobs").unwrap(); 
+                .context("run database scheduled jobs")
+                .unwrap();
 
             sleep(Duration::from_secs(JOB_PROCESSING_CADENCE_IN_SECS)).await;
         }

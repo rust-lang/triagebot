@@ -1,10 +1,10 @@
 //! The `jobs` table provides a way to have scheduled jobs
-use anyhow::{Result, Context as _};
-use chrono::{DateTime, FixedOffset, Duration};
-use tokio_postgres::{Client as DbClient};
-use uuid::Uuid;
+use anyhow::{Context as _, Result};
+use chrono::{DateTime, Duration, FixedOffset};
+use postgres_types::{FromSql, ToSql};
 use serde::{Deserialize, Serialize};
-use postgres_types::{ToSql, FromSql};
+use tokio_postgres::Client as DbClient;
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Job {
@@ -32,15 +32,15 @@ pub enum FrequencyUnit {
 }
 
 pub async fn insert_job(
-    db: &DbClient, 
+    db: &DbClient,
     name: &String,
     expected_time: &DateTime<FixedOffset>,
     frequency: &Option<i32>,
     frequency_unit: &Option<FrequencyUnit>,
-    metadata: &serde_json::Value
+    metadata: &serde_json::Value,
 ) -> Result<()> {
     tracing::trace!("insert_job(name={})", name);
-    
+
     db.execute(
         "INSERT INTO jobs (name, expected_time, frequency, frequency_unit, metadata) VALUES ($1, $2, $3, $4, $5) 
             ON CONFLICT (name, expected_time) DO UPDATE SET metadata = EXCLUDED.metadata",
@@ -54,20 +54,17 @@ pub async fn insert_job(
 
 pub async fn delete_job(db: &DbClient, id: &Uuid) -> Result<()> {
     tracing::trace!("delete_job(id={})", id);
-    
-    db.execute(
-        "DELETE FROM jobs WHERE id = $1",
-        &[&id],
-    )
-    .await
-    .context("Deleting job")?;
+
+    db.execute("DELETE FROM jobs WHERE id = $1", &[&id])
+        .await
+        .context("Deleting job")?;
 
     Ok(())
 }
 
 pub async fn update_job_error_message(db: &DbClient, id: &Uuid, message: &String) -> Result<()> {
     tracing::trace!("update_job_error_message(id={})", id);
-    
+
     db.execute(
         "UPDATE jobs SET error_message = $2 WHERE id = $1",
         &[&id, &message],
@@ -80,21 +77,18 @@ pub async fn update_job_error_message(db: &DbClient, id: &Uuid, message: &String
 
 pub async fn update_job_executed_at(db: &DbClient, id: &Uuid) -> Result<()> {
     tracing::trace!("update_job_executed_at(id={})", id);
-    
-    db.execute(
-        "UPDATE jobs SET executed_at = now() WHERE id = $1",
-        &[&id],
-    )
-    .await
-    .context("Updating job executed at")?;
+
+    db.execute("UPDATE jobs SET executed_at = now() WHERE id = $1", &[&id])
+        .await
+        .context("Updating job executed at")?;
 
     Ok(())
 }
 
 // Selects all jobs with:
-//  - expected_time in the past 
+//  - expected_time in the past
 //  - error_message is null or executed_at is at least 60 minutes ago (intended to make repeat executions rare enough)
-pub async fn get_jobs_to_execute(db: &DbClient) -> Result<Vec<Job>>  {
+pub async fn get_jobs_to_execute(db: &DbClient) -> Result<Vec<Job>> {
     let jobs = db
         .query(
             "
@@ -123,7 +117,7 @@ pub async fn get_jobs_to_execute(db: &DbClient) -> Result<Vec<Job>>  {
             frequency_unit,
             metadata,
             executed_at,
-            error_message
+            error_message,
         });
     }
 
