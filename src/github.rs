@@ -960,11 +960,6 @@ pub struct IssueSearchResult {
     pub items: Vec<Issue>,
 }
 
-#[derive(Debug, serde::Deserialize)]
-struct CommitSearchResult {
-    total_count: u32,
-}
-
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct Repository {
     pub full_name: String,
@@ -1534,33 +1529,24 @@ impl GithubClient {
     /// Returns whether or not the given GitHub login has made any commits to
     /// the given repo.
     pub async fn is_new_contributor(&self, repo: &Repository, author: &str) -> bool {
-        if repo.fork {
-            // GitHub always returns 0 results in forked repos, so this cannot
-            // work for them.
-            return false;
-        }
         let url = format!(
-            "{}/search/commits?q=repo:{}+author:{}",
+            "{}/repos/{}/commits?author={}",
             Repository::GITHUB_API_URL,
             repo.full_name,
             author,
         );
         let req = self.get(&url);
-        match self.json::<CommitSearchResult>(req).await {
-            Ok(res) => res.total_count == 0,
+        match self.json::<Vec<GithubCommit>>(req).await {
+            // Note: This only returns results for the default branch.
+            // That should be fine in most cases since I think it is rare for
+            // new users to make their first commit to a different branch.
+            Ok(res) => res.is_empty(),
             Err(e) => {
-                // 422 is returned for unknown user
-                if e.downcast_ref::<reqwest::Error>().map_or(false, |e| {
-                    e.status() == Some(StatusCode::UNPROCESSABLE_ENTITY)
-                }) {
-                    true
-                } else {
-                    log::warn!(
-                        "failed to search for user commits in {} for author {author}: {e}",
-                        repo.full_name
-                    );
-                    false
-                }
+                log::warn!(
+                    "failed to search for user commits in {} for author {author}: {e}",
+                    repo.full_name
+                );
+                false
             }
         }
     }
