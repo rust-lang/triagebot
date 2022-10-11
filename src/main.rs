@@ -243,15 +243,30 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     // spawning a background task that will run the scheduled jobs
     // every JOB_PROCESSING_CADENCE_IN_SECS
     task::spawn(async move {
-        let pool = db::ClientPool::new();
-
         loop {
-            db::run_scheduled_jobs(&*pool.get().await)
-                .await
-                .context("run database scheduled jobs")
-                .unwrap();
+            let res = task::spawn(async move {
+                let pool = db::ClientPool::new();
 
-            sleep(Duration::from_secs(JOB_PROCESSING_CADENCE_IN_SECS)).await;
+                loop {
+                    db::run_scheduled_jobs(&*pool.get().await)
+                        .await
+                        .context("run database scheduled jobs")
+                        .unwrap();
+
+                    sleep(Duration::from_secs(JOB_PROCESSING_CADENCE_IN_SECS)).await;
+                }
+            });
+
+            match res.await {
+                Err(err) if err.is_panic() => {
+                    /* handle panic in above task, re-launching */
+                    tracing::trace!("run_scheduled_jobs task died (error={})", err);
+                }
+                _ => {
+                    /* break in other case by default */
+                    break;
+                }
+            }
         }
     });
 
