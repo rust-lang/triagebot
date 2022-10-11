@@ -184,39 +184,34 @@ pub async fn run_migrations(client: &DbClient) -> anyhow::Result<()> {
 
 pub async fn run_scheduled_jobs(db: &DbClient) -> anyhow::Result<()> {
     let jobs = get_jobs_to_execute(&db).await.unwrap();
-    println!("jobs to execute: {:#?}", jobs);
     tracing::trace!("jobs to execute: {:#?}", jobs);
 
     for job in jobs.iter() {
         update_job_executed_at(&db, &job.id).await?;
 
+        if let Some(frequency) = job.frequency {
+            let duration = get_duration_from_cron(frequency, job.frequency_unit.as_ref().unwrap());
+            let new_scheduled_at = job.scheduled_at.checked_add_signed(duration).unwrap();
+
+            insert_job(
+                &db,
+                &job.name,
+                &new_scheduled_at,
+                &Some(frequency),
+                &job.frequency_unit,
+                &job.metadata,
+            )
+            .await?;
+            tracing::trace!("job succesfully reinserted (name={})", job.name);
+        }
+
         match handle_job(&job.name, &job.metadata).await {
             Ok(_) => {
-                println!("job succesfully executed (id={})", job.id);
                 tracing::trace!("job succesfully executed (id={})", job.id);
-
-                if let Some(frequency) = job.frequency {
-                    let duration =
-                        get_duration_from_cron(frequency, job.frequency_unit.as_ref().unwrap());
-                    let new_expected_time = job.expected_time.checked_add_signed(duration).unwrap();
-
-                    insert_job(
-                        &db,
-                        &job.name,
-                        &new_expected_time,
-                        &Some(frequency),
-                        &job.frequency_unit,
-                        &job.metadata,
-                    )
-                    .await?;
-                    println!("job succesfully reinserted (name={})", job.name);
-                    tracing::trace!("job succesfully reinserted (name={})", job.name);
-                }
 
                 delete_job(&db, &job.id).await?;
             }
             Err(e) => {
-                println!("job failed on execution (id={:?}, error={:?})", job.id, e);
                 tracing::trace!("job failed on execution (id={:?}, error={:?})", job.id, e);
 
                 update_job_error_message(&db, &job.id, &e.to_string()).await?;
@@ -271,7 +266,7 @@ CREATE TYPE frequency_unit AS ENUM ('days', 'hours', 'minutes', 'seconds');
 CREATE TABLE jobs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL,
-    expected_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    scheduled_at TIMESTAMP WITH TIME ZONE NOT NULL,
     frequency INTEGER,
     frequency_unit frequency_unit,
     metadata JSONB,
@@ -280,9 +275,9 @@ CREATE TABLE jobs (
 );
 ",
     "
-CREATE UNIQUE INDEX jobs_name_expected_time_unique_index 
+CREATE UNIQUE INDEX jobs_name_scheduled_at_unique_index 
     ON jobs (
-        name, expected_time
+        name, scheduled_at
     );
 ",
 ];

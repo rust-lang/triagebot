@@ -20,7 +20,7 @@
 //
 //    Job {
 //      name: "send_zulip_message",
-//      expected_time: "2022-09-30T11:30:00+10:00",
+//      scheduled_at: "2022-09-30T11:30:00+10:00",
 //      frequency: Some(7),
 //      frequency_unit: Some(FrequencyUnit::Days),
 //      metadata: metadata
@@ -35,10 +35,6 @@ pub async fn handle_job(name: &String, metadata: &serde_json::Value) -> anyhow::
 }
 
 fn default(name: &String, metadata: &serde_json::Value) -> anyhow::Result<()> {
-    println!(
-        "handle_job fell into default case: (name={:?}, metadata={:?})",
-        name, metadata
-    );
     tracing::trace!(
         "handle_job fell into default case: (name={:?}, metadata={:?})",
         name,
