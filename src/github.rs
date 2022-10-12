@@ -1560,9 +1560,9 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
         let mut args = queries::LeastRecentlyReviewedPullRequestsArguments {
             repository_owner,
             repository_name: repository_name.clone(),
-            // NOTE: this number of items per page sometimes causes a 502 HTTP error
+            // NOTE: items per page: increasing this to >20 causes 502 HTTP errors
             // (doesn't look like rate limiting)
-            first: Some(50),
+            first: Some(15),
             after: None,
         };
 
@@ -1580,9 +1580,12 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
             if let Some(errors) = data.errors {
                 anyhow::bail!("There were graphql errors. {:?}", errors);
             }
-            let repository = data
+
+            let _data = data
                 .data
-                .ok_or_else(|| anyhow::anyhow!("No data returned."))?
+                .ok_or_else(|| anyhow::anyhow!("No data returned."))?;
+
+            let repository = _data
                 .repository
                 .ok_or_else(|| anyhow::anyhow!("No repository."))?;
             prs.extend(repository.pull_requests.nodes.unwrap_or_default());
@@ -1591,6 +1594,12 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                 break;
             }
             args.after = page_info.end_cursor;
+
+            // show query cost: limit, cost, remaining, resetAt
+            let rate_limit = _data
+                .rate_limit
+                .ok_or_else(|| anyhow::anyhow!("No rate_limit."))?;
+            log::trace!("{:?}", rate_limit);
         }
 
         let mut prs: Vec<_> = prs
@@ -1612,8 +1621,9 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                     Some(labels)
                 })()
                 .unwrap_or_default();
-                if !labels.iter().any(|label| label == "T-compiler")
-                    || !labels.iter().any(|label| label == "S-waiting-on-review")
+
+                if !labels.contains(&"T-compiler".to_string())
+                    && !labels.contains(&"S-waiting-on-review".to_string())
                 {
                     log::debug!("Discarding #{}: {:?}", pr.number, labels);
                     return None;

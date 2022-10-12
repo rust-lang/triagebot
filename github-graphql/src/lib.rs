@@ -27,6 +27,17 @@ pub mod queries {
     pub struct LeastRecentlyReviewedPullRequests {
         #[arguments(owner = &args.repository_owner, name = &args.repository_name)]
         pub repository: Option<Repository>,
+        // rate limiting docs:
+        // https://docs.github.com/en/graphql/overview/resource-limitations
+        pub rate_limit: Option<RateLimit>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    pub struct RateLimit {
+        pub limit: i32,
+        pub cost: i32,
+        pub remaining: i32,
+        pub reset_at: DateTime,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
