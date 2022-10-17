@@ -31,6 +31,7 @@ mod glacier;
 mod major_change;
 mod mentions;
 mod milestone_prs;
+mod no_merges;
 mod nominate;
 mod note;
 mod notification;
@@ -158,6 +159,7 @@ issue_handlers! {
     autolabel,
     major_change,
     mentions,
+    no_merges,
     notify_zulip,
 }
 

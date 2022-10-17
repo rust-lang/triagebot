@@ -780,6 +780,33 @@ impl Issue {
         Ok(Some(String::from(String::from_utf8_lossy(&diff))))
     }
 
+    /// Returns the commits from this pull request (no commits are returned if this `Issue` is not
+    /// a pull request).
+    pub async fn commits(&self, client: &GithubClient) -> anyhow::Result<Vec<GithubCommit>> {
+        if !self.is_pr() {
+            return Ok(vec![]);
+        }
+
+        let mut commits = Vec::new();
+        let mut page = 1;
+        loop {
+            let req = client.get(&format!(
+                "{}/pulls/{}/commits?page={page}&per_page=100",
+                self.repository().url(),
+                self.number
+            ));
+
+            let new: Vec<_> = client.json(req).await?;
+            if new.is_empty() {
+                break;
+            }
+            commits.extend(new);
+
+            page += 1;
+        }
+        Ok(commits)
+    }
+
     pub async fn files(&self, client: &GithubClient) -> anyhow::Result<Vec<PullRequestFile>> {
         if !self.is_pr() {
             return Ok(vec![]);
