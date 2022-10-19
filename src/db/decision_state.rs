@@ -11,9 +11,8 @@ use tokio_postgres::Client as DbClient;
 pub struct DecisionState {
     issue_id: String,
     initiator: String,
-    team_members: Vec<String>,
     start_date: DateTime<FixedOffset>,
-    period_date: DateTime<FixedOffset>,
+    end_date: DateTime<FixedOffset>,
     current_statuses: HashMap<String, UserStatus>,
     status_history: HashMap<String, Vec<UserStatus>>,
     reversibility: Reversibility,
@@ -31,9 +30,8 @@ pub async fn insert_decision_state(
     db: &DbClient,
     issue_id: &String,
     initiator: &String,
-    team_members: &Vec<String>,
     start_date: &DateTime<FixedOffset>,
-    period_end_date: &DateTime<FixedOffset>,
+    end_date: &DateTime<FixedOffset>,
     current_statuses: &HashMap<String, UserStatus>,
     status_history: &HashMap<String, Vec<UserStatus>>,
     reversibility: &Reversibility,
@@ -42,9 +40,9 @@ pub async fn insert_decision_state(
     tracing::trace!("insert_decision_state(issue_id={})", issue_id);
 
     db.execute(
-        "INSERT INTO decision_state (issue_id, initiator, team_members, start_date, period_end_date, current_statuses, status_history, reversibility, resolution) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+        "INSERT INTO decision_state (issue_id, initiator, start_date, end_date, current_statuses, status_history, reversibility, resolution) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
             ON CONFLICT issue_id DO NOTHING",
-        &[&issue_id, &initiator, &team_members, &start_date, &period_end_date, &current_statuses, &status_history, &reversibility, &resolution],
+        &[&issue_id, &initiator, &start_date, &end_date, &current_statuses, &status_history, &reversibility, &resolution],
     )
     .await
     .context("Inserting decision state")?;

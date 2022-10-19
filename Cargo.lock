@@ -1224,8 +1224,10 @@ name = "parser"
 version = "0.1.0"
 dependencies = [
  "log",
+ "postgres-types",
  "pulldown-cmark",
  "regex",
+ "serde",
 ]
 
 [[package]]
@@ -1335,9 +1337,9 @@ checksum = "1df8c4ec4b0627e53bdf214615ad287367e482558cf84b109250b37464dc03ae"
 
 [[package]]
 name = "postgres-derive"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0c2c18e40b92144b05e6f3ae9d1ee931f0d1afa9410ac8b97486c6eaaf91201"
+checksum = "9e76c801e97c9cf696097369e517785b98056e98b21149384c812febfc5912f2"
 dependencies = [
  "proc-macro2",
  "quote",
