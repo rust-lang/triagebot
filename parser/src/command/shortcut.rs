@@ -36,6 +36,7 @@ impl ShortcutCommand {
         let mut shortcuts = HashMap::new();
         shortcuts.insert("ready", ShortcutCommand::Ready);
         shortcuts.insert("review", ShortcutCommand::Ready);
+        shortcuts.insert("reviewer", ShortcutCommand::Ready);
         shortcuts.insert("author", ShortcutCommand::Author);
         shortcuts.insert("blocked", ShortcutCommand::Blocked);
 
