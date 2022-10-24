@@ -20,6 +20,7 @@ pub mod github;
 pub mod handlers;
 pub mod http_client;
 pub mod interactions;
+pub mod jobs;
 pub mod notification_listing;
 pub mod payload;
 pub mod rfcbot;

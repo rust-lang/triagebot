@@ -1,30 +1,37 @@
 //! The `jobs` table provides a way to have scheduled jobs
 use anyhow::{Context as _, Result};
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Utc};
+use cron::Schedule;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::Client as DbClient;
 use uuid::Uuid;
+
+pub struct JobSchedule {
+    pub name: String,
+    pub schedule: Schedule,
+    pub metadata: serde_json::Value,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Job {
     pub id: Uuid,
     pub name: String,
-    pub scheduled_at: DateTime<FixedOffset>,
+    pub scheduled_at: DateTime<Utc>,
     pub metadata: serde_json::Value,
-    pub executed_at: Option<DateTime<FixedOffset>>,
+    pub executed_at: Option<DateTime<Utc>>,
     pub error_message: Option<String>,
 }
 
 pub async fn insert_job(
     db: &DbClient,
     name: &String,
-    scheduled_at: &DateTime<FixedOffset>,
+    scheduled_at: &DateTime<Utc>,
     metadata: &serde_json::Value,
 ) -> Result<()> {
     tracing::trace!("insert_job(name={})", name);
 
     db.execute(
-        "INSERT INTO jobs (name, scheduled_at, metadata) VALUES ($1, $2, $3, $4, $5) 
+        "INSERT INTO jobs (name, scheduled_at, metadata) VALUES ($1, $2, $3) 
             ON CONFLICT (name, scheduled_at) DO UPDATE SET metadata = EXCLUDED.metadata",
         &[&name, &scheduled_at, &metadata],
     )
@@ -67,6 +74,28 @@ pub async fn update_job_executed_at(db: &DbClient, id: &Uuid) -> Result<()> {
     Ok(())
 }
 
+pub async fn get_job_by_name_and_scheduled_at(
+    db: &DbClient,
+    name: &String,
+    scheduled_at: &DateTime<Utc>,
+) -> Result<Job> {
+    tracing::trace!(
+        "get_job_by_name_and_scheduled_at(name={}, scheduled_at={})",
+        name,
+        scheduled_at
+    );
+
+    let job = db
+        .query_one(
+            "SELECT * FROM jobs WHERE name = $1 AND scheduled_at = $2",
+            &[&name, &scheduled_at],
+        )
+        .await
+        .context("Select job by name and scheduled at")?;
+
+    serialize_job(&job)
+}
+
 // Selects all jobs with:
 //  - scheduled_at in the past
 //  - error_message is null or executed_at is at least 60 minutes ago (intended to make repeat executions rare enough)
@@ -82,22 +111,27 @@ pub async fn get_jobs_to_execute(db: &DbClient) -> Result<Vec<Job>> {
 
     let mut data = Vec::with_capacity(jobs.len());
     for job in jobs {
-        let id: Uuid = job.get(0);
-        let name: String = job.get(1);
-        let scheduled_at: DateTime<FixedOffset> = job.get(2);
-        let metadata: serde_json::Value = job.get(5);
-        let executed_at: Option<DateTime<FixedOffset>> = job.get(6);
-        let error_message: Option<String> = job.get(7);
-
-        data.push(Job {
-            id,
-            name,
-            scheduled_at,
-            metadata,
-            executed_at,
-            error_message,
-        });
+        let serialized_job = serialize_job(&job);
+        data.push(serialized_job.unwrap());
     }
 
     Ok(data)
+}
+
+fn serialize_job(row: &tokio_postgres::row::Row) -> Result<Job> {
+    let id: Uuid = row.try_get(0)?;
+    let name: String = row.try_get(1)?;
+    let scheduled_at: DateTime<Utc> = row.try_get(2)?;
+    let metadata: serde_json::Value = row.try_get(3)?;
+    let executed_at: Option<DateTime<Utc>> = row.try_get(4)?;
+    let error_message: Option<String> = row.try_get(5)?;
+
+    Ok(Job {
+        id,
+        name,
+        scheduled_at,
+        metadata,
+        executed_at,
+        error_message,
+    })
 }

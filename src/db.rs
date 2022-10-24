@@ -1,6 +1,7 @@
 use crate::db::jobs::*;
 use crate::handlers::jobs::handle_job;
 use anyhow::Context as _;
+use chrono::Utc;
 use native_tls::{Certificate, TlsConnector};
 use postgres_native_tls::MakeTlsConnector;
 use std::sync::{Arc, Mutex};
@@ -182,6 +183,21 @@ pub async fn run_migrations(client: &DbClient) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub async fn schedule_jobs(db: &DbClient, jobs: Vec<JobSchedule>) -> anyhow::Result<()> {
+    for job in jobs {
+        let mut upcoming = job.schedule.upcoming(Utc).take(1);
+
+        if let Some(scheduled_at) = upcoming.next() {
+            if let Err(_) = get_job_by_name_and_scheduled_at(&db, &job.name, &scheduled_at).await {
+                // mean there's no job already in the db with that name and scheduled_at
+                insert_job(&db, &job.name, &scheduled_at, &job.metadata).await?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn run_scheduled_jobs(db: &DbClient) -> anyhow::Result<()> {
     let jobs = get_jobs_to_execute(&db).await.unwrap();
     tracing::trace!("jobs to execute: {:#?}", jobs);
@@ -192,12 +208,10 @@ pub async fn run_scheduled_jobs(db: &DbClient) -> anyhow::Result<()> {
         match handle_job(&job.name, &job.metadata).await {
             Ok(_) => {
                 tracing::trace!("job succesfully executed (id={})", job.id);
-
                 delete_job(&db, &job.id).await?;
             }
             Err(e) => {
                 tracing::trace!("job failed on execution (id={:?}, error={:?})", job.id, e);
-
                 update_job_error_message(&db, &job.id, &e.to_string()).await?;
             }
         }

@@ -6,14 +6,13 @@ use futures::StreamExt;
 use hyper::{header, Body, Request, Response, Server, StatusCode};
 use reqwest::Client;
 use route_recognizer::Router;
-use std::{env, net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{task, time::sleep};
+use std::{env, net::SocketAddr, sync::Arc};
+use tokio::{task, time};
 use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
+use triagebot::jobs::{jobs, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS};
 use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
-
-const JOB_PROCESSING_CADENCE_IN_SECS: u64 = 60;
 
 async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
     if req == "/agenda/lang/triage" {
@@ -240,20 +239,49 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .await
         .context("database migrations")?;
 
+    // spawning a background task that will schedule the jobs
+    // every JOB_SCHEDULING_CADENCE_IN_SECS
+    task::spawn(async move {
+        loop {
+            let res = task::spawn(async move {
+                let pool = db::ClientPool::new();
+                let mut interval =
+                    time::interval(time::Duration::from_secs(JOB_SCHEDULING_CADENCE_IN_SECS));
+
+                loop {
+                    interval.tick().await;
+                    db::schedule_jobs(&*pool.get().await, jobs())
+                        .await
+                        .context("database schedule jobs")
+                        .unwrap();
+                }
+            });
+
+            match res.await {
+                Err(err) if err.is_panic() => {
+                    /* handle panic in above task, re-launching */
+                    tracing::trace!("schedule_jobs task died (error={})", err);
+                }
+                _ => unreachable!(),
+            }
+        }
+    });
+
     // spawning a background task that will run the scheduled jobs
     // every JOB_PROCESSING_CADENCE_IN_SECS
     task::spawn(async move {
         loop {
             let res = task::spawn(async move {
                 let pool = db::ClientPool::new();
+                let mut interval =
+                    time::interval(time::Duration::from_secs(JOB_PROCESSING_CADENCE_IN_SECS));
 
                 loop {
+                    interval.tick().await;
                     db::run_scheduled_jobs(&*pool.get().await)
                         .await
                         .context("run database scheduled jobs")
                         .unwrap();
-
-                    sleep(Duration::from_secs(JOB_PROCESSING_CADENCE_IN_SECS)).await;
                 }
             });
 
@@ -262,7 +290,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
                     /* handle panic in above task, re-launching */
                     tracing::trace!("run_scheduled_jobs task died (error={})", err);
                 }
-                _ => unreachable!()
+                _ => unreachable!(),
             }
         }
     });
