@@ -21,8 +21,6 @@
 //    Job {
 //      name: "send_zulip_message",
 //      scheduled_at: "2022-09-30T11:30:00+10:00",
-//      frequency: Some(7),
-//      frequency_unit: Some(FrequencyUnit::Days),
 //      metadata: metadata
 //    }
 //

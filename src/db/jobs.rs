@@ -1,7 +1,6 @@
 //! The `jobs` table provides a way to have scheduled jobs
 use anyhow::{Context as _, Result};
-use chrono::{DateTime, Duration, FixedOffset};
-use postgres_types::{FromSql, ToSql};
+use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use tokio_postgres::Client as DbClient;
 use uuid::Uuid;
@@ -11,40 +10,23 @@ pub struct Job {
     pub id: Uuid,
     pub name: String,
     pub scheduled_at: DateTime<FixedOffset>,
-    pub frequency: Option<i32>,
-    pub frequency_unit: Option<FrequencyUnit>,
     pub metadata: serde_json::Value,
     pub executed_at: Option<DateTime<FixedOffset>>,
     pub error_message: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, ToSql, FromSql)]
-#[postgres(name = "frequency_unit")]
-pub enum FrequencyUnit {
-    #[postgres(name = "days")]
-    Days,
-    #[postgres(name = "hours")]
-    Hours,
-    #[postgres(name = "minutes")]
-    Minutes,
-    #[postgres(name = "seconds")]
-    Seconds,
 }
 
 pub async fn insert_job(
     db: &DbClient,
     name: &String,
     scheduled_at: &DateTime<FixedOffset>,
-    frequency: &Option<i32>,
-    frequency_unit: &Option<FrequencyUnit>,
     metadata: &serde_json::Value,
 ) -> Result<()> {
     tracing::trace!("insert_job(name={})", name);
 
     db.execute(
-        "INSERT INTO jobs (name, scheduled_at, frequency, frequency_unit, metadata) VALUES ($1, $2, $3, $4, $5) 
+        "INSERT INTO jobs (name, scheduled_at, metadata) VALUES ($1, $2, $3, $4, $5) 
             ON CONFLICT (name, scheduled_at) DO UPDATE SET metadata = EXCLUDED.metadata",
-        &[&name, &scheduled_at, &frequency, &frequency_unit, &metadata],
+        &[&name, &scheduled_at, &metadata],
     )
     .await
     .context("Inserting job")?;
@@ -103,8 +85,6 @@ pub async fn get_jobs_to_execute(db: &DbClient) -> Result<Vec<Job>> {
         let id: Uuid = job.get(0);
         let name: String = job.get(1);
         let scheduled_at: DateTime<FixedOffset> = job.get(2);
-        let frequency: Option<i32> = job.get(3);
-        let frequency_unit: Option<FrequencyUnit> = job.get(4);
         let metadata: serde_json::Value = job.get(5);
         let executed_at: Option<DateTime<FixedOffset>> = job.get(6);
         let error_message: Option<String> = job.get(7);
@@ -113,8 +93,6 @@ pub async fn get_jobs_to_execute(db: &DbClient) -> Result<Vec<Job>> {
             id,
             name,
             scheduled_at,
-            frequency,
-            frequency_unit,
             metadata,
             executed_at,
             error_message,
@@ -122,13 +100,4 @@ pub async fn get_jobs_to_execute(db: &DbClient) -> Result<Vec<Job>> {
     }
 
     Ok(data)
-}
-
-pub fn get_duration_from_cron(cron_period: i32, cron_unit: &FrequencyUnit) -> Duration {
-    match cron_unit {
-        FrequencyUnit::Days => Duration::days(cron_period as i64),
-        FrequencyUnit::Hours => Duration::hours(cron_period as i64),
-        FrequencyUnit::Minutes => Duration::minutes(cron_period as i64),
-        FrequencyUnit::Seconds => Duration::seconds(cron_period as i64),
-    }
 }
