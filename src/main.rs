@@ -262,10 +262,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
                     /* handle panic in above task, re-launching */
                     tracing::trace!("run_scheduled_jobs task died (error={})", err);
                 }
-                _ => {
-                    /* break in other case by default */
-                    break;
-                }
+                _ => unreachable!()
             }
         }
     });
