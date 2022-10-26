@@ -35,10 +35,12 @@
 
 use crate::db::jobs::JobSchedule;
 
-// Cadence in seconds with which the jobs will be scheduled
+// How often new cron-based jobs will be placed in the queue.
+// This is the minimum period *between* a single cron task's executions.
 pub const JOB_SCHEDULING_CADENCE_IN_SECS: u64 = 1800;
 
-// Cadence in seconds with which the jobs will be processed
+// How often the database is inspected for jobs which need to execute.
+// This is the granularity at which events will occur.
 pub const JOB_PROCESSING_CADENCE_IN_SECS: u64 = 60;
 
 pub fn jobs() -> Vec<JobSchedule> {

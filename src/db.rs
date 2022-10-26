@@ -207,7 +207,7 @@ pub async fn run_scheduled_jobs(db: &DbClient) -> anyhow::Result<()> {
 
         match handle_job(&job.name, &job.metadata).await {
             Ok(_) => {
-                tracing::trace!("job succesfully executed (id={})", job.id);
+                tracing::trace!("job successfully executed (id={})", job.id);
                 delete_job(&db, &job.id).await?;
             }
             Err(e) => {

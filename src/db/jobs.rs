@@ -93,7 +93,7 @@ pub async fn get_job_by_name_and_scheduled_at(
         .await
         .context("Select job by name and scheduled at")?;
 
-    serialize_job(&job)
+    deserialize_job(&job)
 }
 
 // Selects all jobs with:
@@ -111,14 +111,14 @@ pub async fn get_jobs_to_execute(db: &DbClient) -> Result<Vec<Job>> {
 
     let mut data = Vec::with_capacity(jobs.len());
     for job in jobs {
-        let serialized_job = serialize_job(&job);
+        let serialized_job = deserialize_job(&job);
         data.push(serialized_job.unwrap());
     }
 
     Ok(data)
 }
 
-fn serialize_job(row: &tokio_postgres::row::Row) -> Result<Job> {
+fn deserialize_job(row: &tokio_postgres::row::Row) -> Result<Job> {
     let id: Uuid = row.try_get(0)?;
     let name: String = row.try_get(1)?;
     let scheduled_at: DateTime<Utc> = row.try_get(2)?;
