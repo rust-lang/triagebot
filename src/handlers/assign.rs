@@ -408,7 +408,7 @@ pub(super) async fn handle_command(
     // Don't handle commands in comments from the bot. Some of the comments it
     // posts contain commands to instruct the user, not things that the bot
     // should respond to.
-    if event.comment_from() == Some(ctx.username.as_str()) {
+    if event.user().login == ctx.username.as_str() {
         return Ok(());
     }
 
