@@ -1,3 +1,4 @@
+use anyhow::Context as Ctx;
 use parser::command::decision::{DecisionCommand, ParseError};
 use crate::{
     config::DecisionConfig,
@@ -46,8 +47,6 @@ pub(super) async fn handle_command(
         return Ok(());
     }
 
-    // return Ok(());
-
     match get_decision_state(issue.id) {
         Some(state) => {
             // let name = match disposition {
@@ -73,7 +72,7 @@ pub(super) async fn handle_command(
             //     status_history,
             //     ..state
             // })
-            Ok()
+            Ok();
         },
         None => {
             match resolution {
@@ -98,6 +97,20 @@ pub(super) async fn handle_command(
                         reversibility,
                         resolution,
                     );
+
+                    let comment = format!(
+                        "Wow, it looks like you want to merge this, {}.", event.user().login
+                    );
+                
+                    let comment = format!(
+                        "| Team member | State |\n|-------------|-------|\n| julmontesdeoca | merge |\n| mcass19 |  |");
+                
+                    issue
+                        .post_comment(&ctx.github, &comment)
+                        .await
+                        .context("merge vote comment")?;
+
+                    Ok();
                 }
             }
         }

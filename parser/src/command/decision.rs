@@ -8,7 +8,7 @@
 //! Command: `@bot merge`, `@bot hold`, `@bot restart`, `@bot dissent`, `@bot stabilize` or `@bot close`.
 //! ```
 
-use crate::token::{Tokenizer};
+use crate::token::{Token, Tokenizer};
 use crate::error::Error;
 use serde::{Deserialize, Serialize};
 use postgres_types::{FromSql, ToSql};
@@ -22,11 +22,14 @@ pub struct DecisionCommand {
 }
 
 impl DecisionCommand {
-    pub fn parse<'a>(_input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
+    pub fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
+        if let Some(Token::Word("merge")) = input.peek_token()? {
         Ok(Some(Self {
             resolution: Resolution::Merge,
             reversibility: Reversibility::Reversible
-        }))
+        })) } else {
+            Ok(None)
+        }
     }
 }
 
