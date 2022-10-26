@@ -1,6 +1,7 @@
 use crate::error::Error;
 use crate::ignore_block::IgnoreBlocks;
-use crate::token::{Token, Tokenizer};
+use crate::token::Tokenizer;
+use regex::Regex;
 
 pub mod assign;
 pub mod close;
@@ -12,10 +13,6 @@ pub mod prioritize;
 pub mod relabel;
 pub mod second;
 pub mod shortcut;
-
-pub fn find_command_start(input: &str, bot: &str) -> Option<usize> {
-    input.to_ascii_lowercase().find(&format!("@{}", bot))
-}
 
 #[derive(Debug, PartialEq)]
 pub enum Command<'a> {
@@ -36,9 +33,9 @@ pub struct Input<'a> {
     all: &'a str,
     parsed: usize,
     ignore: IgnoreBlocks,
-
-    // A list of possible bot names.
-    bot: Vec<&'a str>,
+    /// A pattern for finding the start of a command based on the name of the
+    /// configured bots.
+    bot_re: Regex,
 }
 
 fn parse_single_command<'a, T, F, M>(
@@ -63,25 +60,22 @@ where
 
 impl<'a> Input<'a> {
     pub fn new(input: &'a str, bot: Vec<&'a str>) -> Input<'a> {
+        let bots: Vec<_> = bot.iter().map(|bot| format!(r"(?:@{bot}\b)")).collect();
+        let bot_re = Regex::new(&format!(
+            r#"(?i)(?P<review>\br\?)|{bots}"#,
+            bots = bots.join("|")
+        ))
+        .unwrap();
         Input {
             all: input,
             parsed: 0,
             ignore: IgnoreBlocks::new(input),
-            bot,
+            bot_re,
         }
     }
 
     fn parse_command(&mut self) -> Option<Command<'a>> {
-        let mut tok = Tokenizer::new(&self.all[self.parsed..]);
-        let name_length = if let Ok(Some(Token::Word(bot_name))) = tok.next_token() {
-            assert!(self
-                .bot
-                .iter()
-                .any(|name| bot_name.eq_ignore_ascii_case(&format!("@{}", name))));
-            bot_name.len()
-        } else {
-            panic!("no bot name?")
-        };
+        let tok = Tokenizer::new(&self.all[self.parsed..]);
         log::info!("identified potential command");
 
         let mut success = vec![];
@@ -147,23 +141,27 @@ impl<'a> Input<'a> {
             );
         }
 
-        if self
-            .ignore
-            .overlaps_ignore((self.parsed)..(self.parsed + tok.position()))
-            .is_some()
-        {
-            log::info!("command overlaps ignored block; ignore: {:?}", self.ignore);
-            return None;
-        }
-
         let (mut tok, c) = success.pop()?;
         // if we errored out while parsing the command do not move the input forwards
-        self.parsed += if c.is_ok() {
-            tok.position()
-        } else {
-            name_length
-        };
+        if c.is_ok() {
+            self.parsed += tok.position();
+        }
         Some(c)
+    }
+
+    /// Parses command for `r?`
+    fn parse_review(&mut self) -> Option<Command<'a>> {
+        let tok = Tokenizer::new(&self.all[self.parsed..]);
+        match parse_single_command(assign::AssignCommand::parse_review, Command::Assign, &tok) {
+            Some((mut tok, command)) => {
+                self.parsed += tok.position();
+                Some(command)
+            }
+            None => {
+                log::warn!("expected r? parser to return something: {:?}", self.all);
+                None
+            }
+        }
     }
 }
 
@@ -172,16 +170,26 @@ impl<'a> Iterator for Input<'a> {
 
     fn next(&mut self) -> Option<Command<'a>> {
         loop {
-            let start = self
-                .bot
-                .iter()
-                .filter_map(|name| find_command_start(&self.all[self.parsed..], name))
-                .min()?;
-            self.parsed += start;
-            if let Some(command) = self.parse_command() {
+            let caps = self.bot_re.captures(&self.all[self.parsed..])?;
+            let m = caps.get(0).unwrap();
+            if self
+                .ignore
+                .overlaps_ignore((self.parsed + m.start())..(self.parsed + m.end()))
+                .is_some()
+            {
+                log::info!("command overlaps ignored block; ignore: {:?}", self.ignore);
+                self.parsed += m.end();
+                continue;
+            }
+
+            self.parsed += m.end();
+            if caps.name("review").is_some() {
+                if let Some(command) = self.parse_review() {
+                    return Some(command);
+                }
+            } else if let Some(command) = self.parse_command() {
                 return Some(command);
             }
-            self.parsed += self.bot.len() + 1;
         }
     }
 }
@@ -231,6 +239,20 @@ fn code_2() {
 }
 
 #[test]
+fn resumes_after_code() {
+    // Handles a command after an ignored block.
+    let input = "```
+@bot modify labels: +bug.
+```
+
+@bot claim
+    ";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert!(matches!(input.next(), Some(Command::Assign(Ok(_)))));
+    assert_eq!(input.next(), None);
+}
+
+#[test]
 fn edit_1() {
     let input_old = "@bot modify labels: +bug.";
     let mut input_old = Input::new(input_old, vec!["bot"]);
@@ -276,4 +298,52 @@ fn multiname() {
     );
     assert!(input.next().unwrap().is_ok());
     assert!(input.next().is_none());
+}
+
+#[test]
+fn review_commands() {
+    for (input, name) in [
+        ("r? @octocat", "octocat"),
+        ("r? octocat", "octocat"),
+        ("R? @octocat", "octocat"),
+        ("can I r? someone?", "someone"),
+        ("Please r? @octocat can you review?", "octocat"),
+        ("r? rust-lang/compiler", "rust-lang/compiler"),
+        ("r? @D--a--s-h", "D--a--s-h"),
+    ] {
+        let mut input = Input::new(input, vec!["bot"]);
+        assert_eq!(
+            input.next(),
+            Some(Command::Assign(Ok(assign::AssignCommand::ReviewName {
+                name: name.to_string()
+            })))
+        );
+        assert_eq!(input.next(), None);
+    }
+}
+
+#[test]
+fn review_errors() {
+    use std::error::Error;
+    for input in ["r?", "r? @", "r? @ user", "r?:user", "r?! @foo", "r?\nline"] {
+        let mut input = Input::new(input, vec!["bot"]);
+        let err = match input.next() {
+            Some(Command::Assign(Err(err))) => err,
+            c => panic!("unexpected {:?}", c),
+        };
+        assert_eq!(
+            err.source().unwrap().downcast_ref(),
+            Some(&assign::ParseError::NoUser)
+        );
+        assert_eq!(input.next(), None);
+    }
+}
+
+#[test]
+fn review_ignored() {
+    // Checks for things that shouldn't be detected.
+    for input in ["r", "reviewer? abc", "r foo"] {
+        let mut input = Input::new(input, vec!["bot"]);
+        assert_eq!(input.next(), None);
+    }
 }

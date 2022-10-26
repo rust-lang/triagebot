@@ -17,6 +17,7 @@ pub enum AssignCommand {
     Own,
     Release,
     User { username: String },
+    ReviewName { name: String },
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -76,43 +77,104 @@ impl AssignCommand {
             return Ok(None);
         }
     }
+
+    /// Parses the input for `r?` command.
+    pub fn parse_review<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
+        match input.next_token() {
+            Ok(Some(Token::Word(name))) => {
+                let name = name.strip_prefix('@').unwrap_or(name).to_string();
+                if name.is_empty() {
+                    return Err(input.error(ParseError::NoUser));
+                }
+                Ok(Some(AssignCommand::ReviewName { name }))
+            }
+            _ => Err(input.error(ParseError::NoUser)),
+        }
+    }
 }
 
 #[cfg(test)]
-fn parse<'a>(input: &'a str) -> Result<Option<AssignCommand>, Error<'a>> {
-    let mut toks = Tokenizer::new(input);
-    Ok(AssignCommand::parse(&mut toks)?)
-}
+mod tests {
+    use super::*;
 
-#[test]
-fn test_1() {
-    assert_eq!(parse("claim."), Ok(Some(AssignCommand::Own)),);
-}
+    fn parse<'a>(input: &'a str) -> Result<Option<AssignCommand>, Error<'a>> {
+        let mut toks = Tokenizer::new(input);
+        Ok(AssignCommand::parse(&mut toks)?)
+    }
 
-#[test]
-fn test_2() {
-    assert_eq!(parse("claim"), Ok(Some(AssignCommand::Own)),);
-}
+    #[test]
+    fn test_1() {
+        assert_eq!(parse("claim."), Ok(Some(AssignCommand::Own)),);
+    }
 
-#[test]
-fn test_3() {
-    assert_eq!(
-        parse("assign @user"),
-        Ok(Some(AssignCommand::User {
-            username: "user".to_owned()
-        })),
-    );
-}
+    #[test]
+    fn test_2() {
+        assert_eq!(parse("claim"), Ok(Some(AssignCommand::Own)),);
+    }
 
-#[test]
-fn test_4() {
-    use std::error::Error;
-    assert_eq!(
-        parse("assign @")
-            .unwrap_err()
-            .source()
-            .unwrap()
-            .downcast_ref(),
-        Some(&ParseError::MentionUser),
-    );
+    #[test]
+    fn test_3() {
+        assert_eq!(
+            parse("assign @user"),
+            Ok(Some(AssignCommand::User {
+                username: "user".to_owned()
+            })),
+        );
+    }
+
+    #[test]
+    fn test_4() {
+        use std::error::Error;
+        assert_eq!(
+            parse("assign @")
+                .unwrap_err()
+                .source()
+                .unwrap()
+                .downcast_ref(),
+            Some(&ParseError::MentionUser),
+        );
+    }
+
+    fn parse_review<'a>(input: &'a str) -> Result<Option<AssignCommand>, Error<'a>> {
+        let mut toks = Tokenizer::new(input);
+        Ok(AssignCommand::parse_review(&mut toks)?)
+    }
+
+    #[test]
+    fn review_names() {
+        for (input, name) in [
+            ("octocat", "octocat"),
+            ("@octocat", "octocat"),
+            ("rust-lang/compiler", "rust-lang/compiler"),
+            ("@rust-lang/cargo", "rust-lang/cargo"),
+            ("abc xyz", "abc"),
+            ("@user?", "user"),
+            ("@user.", "user"),
+            ("@user!", "user"),
+        ] {
+            assert_eq!(
+                parse_review(input),
+                Ok(Some(AssignCommand::ReviewName {
+                    name: name.to_string()
+                })),
+                "failed on {input}"
+            );
+        }
+    }
+
+    #[test]
+    fn review_names_errs() {
+        use std::error::Error;
+        for input in ["", "@", "@ user"] {
+            assert_eq!(
+                parse_review(input)
+                    .unwrap_err()
+                    .source()
+                    .unwrap()
+                    .downcast_ref(),
+                Some(&ParseError::NoUser),
+                "failed on {input}"
+            )
+        }
+    }
 }

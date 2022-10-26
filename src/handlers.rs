@@ -47,7 +47,7 @@ mod shortcut;
 pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo()).await;
     if let Err(e) = &config {
-        log::warn!("failed to load configuration: {e}");
+        log::warn!("configuration error {}: {e}", event.repo().full_name);
     }
     let mut errors = Vec::new();
 
@@ -156,6 +156,7 @@ macro_rules! issue_handlers {
 // This is for events that happen only on issues (e.g. label changes).
 // Each module in the list must contain the functions `parse_input` and `handle_input`.
 issue_handlers! {
+    assign,
     autolabel,
     major_change,
     mentions,
