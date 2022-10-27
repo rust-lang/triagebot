@@ -682,7 +682,9 @@ fn candidate_reviewers_from_names<'a>(
         }
 
         // Assume it is a user.
-        candidates.insert(group_or_user);
+        if filter(&group_or_user) {
+            candidates.insert(group_or_user);
+        }
     }
     Ok(candidates)
 }
