@@ -297,6 +297,15 @@ pub struct Issue {
     /// The head commit for a PR (the branch from the source repo).
     #[serde(default)]
     pub head: Option<CommitBase>,
+    /// Whether it is open or closed.
+    pub state: IssueState,
+}
+
+#[derive(Debug, serde::Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueState {
+    Open,
+    Closed,
 }
 
 /// Contains only the parts of `Issue` that are needed for turning the issue title into a Zulip
@@ -467,6 +476,10 @@ impl Issue {
         self.pull_request.is_some()
     }
 
+    pub fn is_open(&self) -> bool {
+        self.state == IssueState::Open
+    }
+
     pub async fn get_comment(&self, client: &GithubClient, id: usize) -> anyhow::Result<Comment> {
         let comment_url = format!("{}/issues/comments/{}", self.repository().url(), id);
         let comment = client.json(client.get(&comment_url)).await?;
@@ -611,7 +624,9 @@ impl Issue {
     }
 
     pub fn contain_assignee(&self, user: &str) -> bool {
-        self.assignees.iter().any(|a| a.login == user)
+        self.assignees
+            .iter()
+            .any(|a| a.login.to_lowercase() == user.to_lowercase())
     }
 
     pub async fn remove_assignees(
@@ -637,7 +652,7 @@ impl Issue {
                 .assignees
                 .iter()
                 .map(|u| u.login.as_str())
-                .filter(|&u| u != user)
+                .filter(|&u| u.to_lowercase() != user.to_lowercase())
                 .collect::<Vec<_>>(),
         };
 
@@ -677,7 +692,10 @@ impl Issue {
             .map_err(AssignmentError::Http)?;
         // Invalid assignees are silently ignored. We can just check if the user is now
         // contained in the assignees list.
-        let success = result.assignees.iter().any(|u| u.login.as_str() == user);
+        let success = result
+            .assignees
+            .iter()
+            .any(|u| u.login.as_str().to_lowercase() == user.to_lowercase());
 
         if success {
             Ok(())
@@ -973,6 +991,8 @@ pub struct IssueSearchResult {
 pub struct Repository {
     pub full_name: String,
     pub default_branch: String,
+    #[serde(default)]
+    pub fork: bool,
 }
 
 #[derive(Copy, Clone)]
@@ -1529,6 +1549,31 @@ impl GithubClient {
             Err(e) => {
                 log::error!("Failed to query commit list: {:?}", e);
                 Vec::new()
+            }
+        }
+    }
+
+    /// Returns whether or not the given GitHub login has made any commits to
+    /// the given repo.
+    pub async fn is_new_contributor(&self, repo: &Repository, author: &str) -> bool {
+        let url = format!(
+            "{}/repos/{}/commits?author={}",
+            Repository::GITHUB_API_URL,
+            repo.full_name,
+            author,
+        );
+        let req = self.get(&url);
+        match self.json::<Vec<GithubCommit>>(req).await {
+            // Note: This only returns results for the default branch.
+            // That should be fine in most cases since I think it is rare for
+            // new users to make their first commit to a different branch.
+            Ok(res) => res.is_empty(),
+            Err(e) => {
+                log::warn!(
+                    "failed to search for user commits in {} for author {author}: {e}",
+                    repo.full_name
+                );
+                false
             }
         }
     }
