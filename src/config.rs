@@ -119,6 +119,8 @@ pub(crate) struct MentionsPathConfig {
     pub(crate) message: Option<String>,
     #[serde(default)]
     pub(crate) cc: Vec<String>,
+    #[serde(default)]
+    pub(crate) exclude_labels: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]

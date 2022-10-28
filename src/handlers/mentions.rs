@@ -72,6 +72,29 @@ pub(super) async fn parse_input(
                 };
                 touches_relevant_files && pings_non_author
             })
+            .filter(|(_, MentionsPathConfig { exclude_labels, .. })| {
+                let exclude_patterns: Vec<glob::Pattern> = exclude_labels
+                    .iter()
+                    .filter_map(|label| match glob::Pattern::new(label) {
+                        Ok(exclude_glob) => Some(exclude_glob),
+                        Err(error) => {
+                            log::error!("Invalid glob pattern: {}", error);
+                            None
+                        }
+                    })
+                    .collect();
+
+                for label in event.issue.labels() {
+                    for pat in &exclude_patterns {
+                        if pat.matches(&label.name) {
+                            // If we hit an excluded label, ignore this mention and check the next
+                            return false;
+                        }
+                    }
+                }
+
+                true
+            })
             .map(|(key, _mention)| key.to_string())
             .collect();
         if !to_mention.is_empty() {
