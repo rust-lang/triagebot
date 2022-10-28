@@ -19,7 +19,7 @@
 
 use crate::{
     config::AssignConfig,
-    github::{self, Event, Issue, IssuesAction, Selection},
+    github::{self, Event, Issue, IssuesAction, Label, Selection},
     handlers::{Context, GithubClient, IssuesEvent},
     interactions::EditIssueBody,
 };
@@ -145,6 +145,31 @@ pub(super) async fn handle_input(
         };
         if let Some(assignee) = assignee {
             set_assignee(&event.issue, &ctx.github, &assignee).await;
+
+            if let Some(labels) = config.label.get(&assignee) {
+                match event
+                    .issue
+                    .add_labels(
+                        &ctx.github,
+                        labels.iter().cloned().map(|name| Label { name }).collect(),
+                    )
+                    .await
+                {
+                    Ok(()) => {}
+                    Err(e) => {
+                        use crate::github::UnknownLabels;
+                        if let Some(err @ UnknownLabels { .. }) = e.downcast_ref() {
+                            event
+                                .issue
+                                .post_comment(&ctx.github, &err.to_string())
+                                .await
+                                .context("failed to post missing label comment")?;
+                            return Ok(());
+                        }
+                        return Err(e);
+                    }
+                }
+            }
         }
 
         if let Some(welcome) = welcome {

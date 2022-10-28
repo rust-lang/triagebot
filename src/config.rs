@@ -90,6 +90,10 @@ pub(crate) struct AssignConfig {
     /// usernames, team names, or ad-hoc groups.
     #[serde(default)]
     pub(crate) owners: HashMap<String, Vec<String>>,
+    /// Labels to be added to the issue when a particular assignment is made.
+    /// Key is asignee, value is a vector of labels to be added.
+    #[serde(default)]
+    pub(crate) label: HashMap<String, Vec<String>>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
