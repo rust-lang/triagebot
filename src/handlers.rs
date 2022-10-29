@@ -28,6 +28,7 @@ mod autolabel;
 mod close;
 mod github_releases;
 mod glacier;
+pub mod jobs;
 mod major_change;
 mod mentions;
 mod milestone_prs;
