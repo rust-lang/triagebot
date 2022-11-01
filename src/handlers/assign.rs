@@ -185,6 +185,10 @@ fn find_assign_command(ctx: &Context, event: &IssuesEvent) -> Option<String> {
     })
 }
 
+fn is_self_assign(assignee: &str, pr_author: &str) -> bool {
+    assignee.to_lowercase() == pr_author.to_lowercase()
+}
+
 /// Returns a message if the PR is opened against the non-default branch.
 fn non_default_branch(event: &IssuesEvent) -> Option<String> {
     let target_branch = &event.issue.base.as_ref().unwrap().git_ref;
@@ -260,6 +264,9 @@ async fn determine_assignee(
 ) -> anyhow::Result<(Option<String>, bool)> {
     let teams = crate::team_data::teams(&ctx.github).await?;
     if let Some(name) = find_assign_command(ctx, event) {
+        if is_self_assign(&name, &event.issue.user.login) {
+            return Ok((Some(name.to_string()), true));
+        }
         // User included `r?` in the opening PR body.
         match find_reviewer_from_names(&teams, config, &event.issue, &[name]) {
             Ok(assignee) => return Ok((Some(assignee), true)),
@@ -448,12 +455,16 @@ pub(super) async fn handle_command(
                     // welcome message).
                     return Ok(());
                 }
-                let teams = crate::team_data::teams(&ctx.github).await?;
-                match find_reviewer_from_names(&teams, config, issue, &[name]) {
-                    Ok(assignee) => assignee,
-                    Err(e) => {
-                        issue.post_comment(&ctx.github, &e.to_string()).await?;
-                        return Ok(());
+                if is_self_assign(&name, &event.user().login) {
+                    name.to_string()
+                } else {
+                    let teams = crate::team_data::teams(&ctx.github).await?;
+                    match find_reviewer_from_names(&teams, config, issue, &[name]) {
+                        Ok(assignee) => assignee,
+                        Err(e) => {
+                            issue.post_comment(&ctx.github, &e.to_string()).await?;
+                            return Ok(());
+                        }
                     }
                 }
             }
