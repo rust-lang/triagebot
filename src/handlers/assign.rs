@@ -577,7 +577,7 @@ impl fmt::Display for FindReviewerError {
             FindReviewerError::NoReviewer { initial } => {
                 write!(
                     f,
-                    "No reviewers could be found from initial choice `{}`\n\
+                    "No reviewers could be found from initial request `{}`\n\
                      This repo may be misconfigured.\n\
                      Use r? to specify someone else to assign.",
                     initial.join(",")
