@@ -1,7 +1,7 @@
 use crate::config::{self, Config, ConfigurationError};
 use crate::github::{Event, GithubClient, IssueCommentAction, IssuesAction, IssuesEvent};
 use octocrab::Octocrab;
-use parser::command::{Command, Input};
+use parser::command::{assign::AssignCommand, Command, Input};
 use std::fmt;
 use std::sync::Arc;
 use tracing as log;
@@ -208,6 +208,15 @@ macro_rules! command_handlers {
             let config = match config {
                 Ok(config) => config,
                 Err(e @ ConfigurationError::Missing) => {
+                    // r? is conventionally used to mean "hey, can you review"
+                    // even if the repo doesn't have a triagebot.toml. In that
+                    // case, just ignore it.
+                    if commands
+                        .iter()
+                        .all(|cmd| matches!(cmd, Command::Assign(Ok(AssignCommand::ReviewName { .. }))))
+                    {
+                        return;
+                    }
                     return errors.push(HandlerError::Message(e.to_string()));
                 }
                 Err(e @ ConfigurationError::Toml(_)) => {
