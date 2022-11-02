@@ -8,15 +8,26 @@ fn test_from_names(
     config: toml::Value,
     issue: serde_json::Value,
     names: &[&str],
-    expected: &[&str],
+    expected: Result<&[&str], FindReviewerError>,
 ) {
     let (teams, config, issue) = convert_simplified(teams, config, issue);
     let names: Vec<_> = names.iter().map(|n| n.to_string()).collect();
-    let candidates = candidate_reviewers_from_names(&teams, &config, &issue, &names).unwrap();
-    let mut candidates: Vec<_> = candidates.into_iter().collect();
-    candidates.sort();
-    let expected: Vec<_> = expected.iter().map(|x| *x).collect();
-    assert_eq!(candidates, expected);
+    match (
+        candidate_reviewers_from_names(&teams, &config, &issue, &names),
+        expected,
+    ) {
+        (Ok(candidates), Ok(expected)) => {
+            let mut candidates: Vec<_> = candidates.into_iter().collect();
+            candidates.sort();
+            let expected: Vec<_> = expected.iter().map(|x| *x).collect();
+            assert_eq!(candidates, expected);
+        }
+        (Err(actual), Err(expected)) => {
+            assert_eq!(actual, expected)
+        }
+        (Ok(candidates), Err(_)) => panic!("expected Err, got Ok: {candidates:?}"),
+        (Err(e), Ok(_)) => panic!("expected Ok, got Err: {e}"),
+    }
 }
 
 /// Convert the simplified input in preparation for `candidate_reviewers_from_names`.
@@ -78,7 +89,15 @@ fn circular_groups() {
         other = ["compiler"]
     );
     let issue = generic_issue("octocat", "rust-lang/rust");
-    test_from_names(None, config, issue, &["compiler"], &[]);
+    test_from_names(
+        None,
+        config,
+        issue,
+        &["compiler"],
+        Err(FindReviewerError::NoReviewer {
+            initial: vec!["compiler".to_string()],
+        }),
+    );
 }
 
 #[test]
@@ -91,7 +110,7 @@ fn nested_groups() {
         c = ["a", "b"]
     );
     let issue = generic_issue("octocat", "rust-lang/rust");
-    test_from_names(None, config, issue, &["c"], &["nrc", "pnkfelix"]);
+    test_from_names(None, config, issue, &["c"], Ok(&["nrc", "pnkfelix"]));
 }
 
 #[test]
@@ -102,7 +121,16 @@ fn candidate_filtered_author_only_candidate() {
         compiler = ["nikomatsakis"]
     );
     let issue = generic_issue("nikomatsakis", "rust-lang/rust");
-    test_from_names(None, config, issue, &["compiler"], &[]);
+    test_from_names(
+        None,
+        config,
+        issue,
+        &["compiler"],
+        Err(FindReviewerError::AllReviewersFiltered {
+            initial: vec!["compiler".to_string()],
+            filtered: vec!["nikomatsakis".to_string()],
+        }),
+    );
 }
 
 #[test]
@@ -119,7 +147,7 @@ fn candidate_filtered_author() {
         config,
         issue,
         &["compiler"],
-        &["user1", "user3", "user4"],
+        Ok(&["user1", "user3", "user4"]),
     );
 }
 
@@ -135,7 +163,7 @@ fn candidate_filtered_assignee() {
         {"login": "user1", "id": 1},
         {"login": "user3", "id": 3},
     ]);
-    test_from_names(None, config, issue, &["compiler"], &["user4"]);
+    test_from_names(None, config, issue, &["compiler"], Ok(&["user4"]));
 }
 
 #[test]
@@ -155,7 +183,7 @@ fn groups_teams_users() {
         config,
         issue,
         &["team1", "group1", "user3"],
-        &["t-user1", "t-user2", "user1", "user3"],
+        Ok(&["t-user1", "t-user2", "user1", "user3"]),
     );
 }
 
@@ -173,14 +201,14 @@ fn group_team_user_precedence() {
         config.clone(),
         issue.clone(),
         &["compiler"],
-        &["user2"],
+        Ok(&["user2"]),
     );
     test_from_names(
         Some(teams.clone()),
         config.clone(),
         issue.clone(),
         &["rust-lang/compiler"],
-        &["user2"],
+        Ok(&["user2"]),
     );
 }
 
@@ -200,7 +228,7 @@ fn what_do_slashes_mean() {
         config.clone(),
         issue.clone(),
         &["foo/bar"],
-        &["foo-user"],
+        Ok(&["foo-user"]),
     );
     // Since this is rust-lang-nursery, it uses the rust-lang team, not the group.
     test_from_names(
@@ -208,14 +236,14 @@ fn what_do_slashes_mean() {
         config.clone(),
         issue.clone(),
         &["rust-lang/compiler"],
-        &["t-user1"],
+        Ok(&["t-user1"]),
     );
     test_from_names(
         Some(teams.clone()),
         config.clone(),
         issue.clone(),
         &["rust-lang-nursery/compiler"],
-        &["user2"],
+        Ok(&["user2"]),
     );
 }
 
@@ -227,11 +255,13 @@ fn invalid_org_doesnt_match() {
         compiler = ["user2"]
     );
     let issue = generic_issue("octocat", "rust-lang/rust");
-    let (teams, config, issue) = convert_simplified(Some(teams), config, issue);
-    let names = vec!["github/compiler".to_string()];
-    match candidate_reviewers_from_names(&teams, &config, &issue, &names) {
-        Ok(x) => panic!("expected err, got {x:?}"),
-        Err(FindReviewerError::TeamNotFound(_)) => {}
-        Err(e) => panic!("unexpected error {e:?}"),
-    }
+    test_from_names(
+        Some(teams),
+        config,
+        issue,
+        &["github/compiler"],
+        Err(FindReviewerError::TeamNotFound(
+            "github/compiler".to_string(),
+        )),
+    );
 }

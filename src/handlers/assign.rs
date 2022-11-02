@@ -289,8 +289,11 @@ async fn determine_assignee(
                     is there maybe a misconfigured group?",
                     event.issue.global_id()
                 ),
-                Err(FindReviewerError::NoReviewer(names)) => log::trace!(
-                    "no reviewer could be determined for PR {} with candidate name {names:?}",
+                Err(
+                    e @ FindReviewerError::NoReviewer { .. }
+                    | e @ FindReviewerError::AllReviewersFiltered { .. },
+                ) => log::trace!(
+                    "no reviewer could be determined for PR {}: {e}",
                     event.issue.global_id()
                 ),
             }
@@ -547,16 +550,25 @@ pub(super) async fn handle_command(
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 enum FindReviewerError {
     /// User specified something like `r? foo/bar` where that team name could
     /// not be found.
     TeamNotFound(String),
-    /// No reviewer could be found. The field is the list of candidate names
-    /// that were used to seed the selection. One example where this happens
-    /// is if the given name was for a team where the PR author is the only
-    /// member.
-    NoReviewer(Vec<String>),
+    /// No reviewer could be found.
+    ///
+    /// This could happen if there is a cyclical group or other misconfiguration.
+    /// `initial` is the initial list of candidate names.
+    NoReviewer { initial: Vec<String> },
+    /// All potential candidates were excluded. `initial` is the list of
+    /// candidate names that were used to seed the selection. `filtered` is
+    /// the users who were prevented from being assigned. One example where
+    /// this happens is if the given name was for a team where the PR author
+    /// is the only member.
+    AllReviewersFiltered {
+        initial: Vec<String>,
+        filtered: Vec<String>,
+    },
 }
 
 impl std::error::Error for FindReviewerError {}
@@ -564,15 +576,35 @@ impl std::error::Error for FindReviewerError {}
 impl fmt::Display for FindReviewerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            FindReviewerError::TeamNotFound(team) => write!(f, "Team or group `{team}` not found.\n\
-                \n\
-                rust-lang team names can be found at https://github.com/rust-lang/team/tree/master/teams.\n\
-                Reviewer group names can be found in `triagebot.toml` in this repo."),
-            FindReviewerError::NoReviewer(names) => write!(
-                f,
-                "Could not determine reviewer from `{}`.",
-                names.join(",")
-            ),
+            FindReviewerError::TeamNotFound(team) => {
+                write!(
+                    f,
+                    "Team or group `{team}` not found.\n\
+                    \n\
+                    rust-lang team names can be found at https://github.com/rust-lang/team/tree/master/teams.\n\
+                    Reviewer group names can be found in `triagebot.toml` in this repo."
+                )
+            }
+            FindReviewerError::NoReviewer { initial } => {
+                write!(
+                    f,
+                    "No reviewers could be found from initial request `{}`\n\
+                     This repo may be misconfigured.\n\
+                     Use r? to specify someone else to assign.",
+                    initial.join(",")
+                )
+            }
+            FindReviewerError::AllReviewersFiltered { initial, filtered } => {
+                write!(
+                    f,
+                    "Could not assign reviewer from: `{}`.\n\
+                     User(s) `{}` are either the PR author or are already assigned, \
+                     and there are no other candidates.\n\
+                     Use r? to specify someone else to assign.",
+                    initial.join(","),
+                    filtered.join(","),
+                )
+            }
         }
     }
 }
@@ -609,12 +641,11 @@ fn find_reviewer_from_names(
     //
     // These are all ideas for improving the selection here. However, I'm not
     // sure they are really worth the effort.
-    match candidates.into_iter().choose(&mut rand::thread_rng()) {
-        Some(candidate) => Ok(candidate.to_string()),
-        None => Err(FindReviewerError::NoReviewer(
-            names.iter().map(|n| n.to_string()).collect(),
-        )),
-    }
+    Ok(candidates
+        .into_iter()
+        .choose(&mut rand::thread_rng())
+        .expect("candidate_reviewers_from_names always returns at least one entry")
+        .to_string())
 }
 
 /// Returns a list of candidate usernames to choose as a reviewer.
@@ -635,16 +666,22 @@ fn candidate_reviewers_from_names<'a>(
     // below will pop from this and then append the expanded results of teams.
     // Usernames will be added to `candidates`.
     let mut group_expansion: Vec<&str> = names.iter().map(|n| n.as_str()).collect();
+    // Keep track of which users get filtered out for a better error message.
+    let mut filtered = Vec::new();
     let repo = issue.repository();
     let org_prefix = format!("{}/", repo.organization);
     // Don't allow groups or teams to include the current author or assignee.
-    let filter = |name: &&str| -> bool {
+    let mut filter = |name: &&str| -> bool {
         let name_lower = name.to_lowercase();
-        name_lower != issue.user.login.to_lowercase()
+        let ok = name_lower != issue.user.login.to_lowercase()
             && !issue
                 .assignees
                 .iter()
-                .any(|assignee| name_lower == assignee.login.to_lowercase())
+                .any(|assignee| name_lower == assignee.login.to_lowercase());
+        if !ok {
+            filtered.push(name.to_string());
+        }
+        ok
     };
 
     // Loop over groups to recursively expand them.
@@ -663,7 +700,7 @@ fn candidate_reviewers_from_names<'a>(
                     group_members
                         .iter()
                         .map(|member| member.as_str())
-                        .filter(filter),
+                        .filter(&mut filter),
                 );
             }
             continue;
@@ -683,7 +720,7 @@ fn candidate_reviewers_from_names<'a>(
                 team.members
                     .iter()
                     .map(|member| member.github.as_str())
-                    .filter(filter),
+                    .filter(&mut filter),
             );
             continue;
         }
@@ -697,5 +734,14 @@ fn candidate_reviewers_from_names<'a>(
             candidates.insert(group_or_user);
         }
     }
-    Ok(candidates)
+    if candidates.is_empty() {
+        let initial = names.iter().cloned().collect();
+        if filtered.is_empty() {
+            Err(FindReviewerError::NoReviewer { initial })
+        } else {
+            Err(FindReviewerError::AllReviewersFiltered { initial, filtered })
+        }
+    } else {
+        Ok(candidates)
+    }
 }
