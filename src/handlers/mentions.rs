@@ -43,7 +43,10 @@ pub(super) async fn parse_input(
     }
 
     // Don't ping on rollups or draft PRs.
-    if event.issue.title.starts_with("Rollup of") || event.issue.draft {
+    if event.issue.title.starts_with("Rollup of")
+        || event.issue.draft
+        || event.issue.title.contains("[beta] backport")
+    {
         return Ok(None);
     }
 
