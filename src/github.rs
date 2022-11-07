@@ -1314,9 +1314,7 @@ impl Repository {
             let commits = commit
                 .history
                 .nodes
-                .ok_or_else(|| anyhow::anyhow!("No history."))?
                 .into_iter()
-                .filter_map(|node| node)
                 // Don't include anything newer than `newest`
                 .skip_while(|node| {
                     if found_newest || node.oid.0 == newest {
@@ -1338,11 +1336,7 @@ impl Repository {
                 // Skip nodes that aren't the first parent
                 .filter(|node| {
                     let this_first_parent = node.parents.nodes
-                        .as_ref()
-                        // Grab the first parent
-                        .and_then(|nodes| nodes.first())
-                        // Strip away the useless Option
-                        .and_then(|parent_opt| parent_opt.as_ref())
+                        .first()
                         .map(|parent| parent.oid.0.clone());
 
                     match &next_first_parent {
@@ -1377,12 +1371,8 @@ impl Repository {
                 .filter_map(|node| {
                     // Determine if this is associated with a PR or not.
                     match node.associated_pull_requests
-                        // Strip away the useless Option
-                        .and_then(|pr| pr.nodes)
                         // Get the first PR (we only care about one)
-                        .and_then(|mut nodes| nodes.pop())
-                        // Strip away the useless Option
-                        .flatten() {
+                        .and_then(|mut pr| pr.nodes.pop()) {
                         Some(pr) => {
                             // Only include a PR once
                             if prs_seen.insert(pr.number) {
@@ -2008,7 +1998,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
         let repository_owner = repo.owner().to_owned();
         let repository_name = repo.name().to_owned();
 
-        let mut prs: Vec<Option<queries::PullRequest>> = vec![];
+        let mut prs: Vec<queries::PullRequest> = vec![];
 
         let mut args = queries::LeastRecentlyReviewedPullRequestsArguments {
             repository_owner,
@@ -2033,13 +2023,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                 .ok_or_else(|| anyhow::anyhow!("No data returned."))?
                 .repository
                 .ok_or_else(|| anyhow::anyhow!("No repository."))?;
-            prs.extend(
-                repository
-                    .pull_requests
-                    .nodes
-                    .unwrap_or_default()
-                    .into_iter(),
-            );
+            prs.extend(repository.pull_requests.nodes);
             let page_info = repository.pull_requests.page_info;
             if !page_info.has_next_page || page_info.end_cursor.is_none() {
                 break;
@@ -2049,23 +2033,17 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
 
         let mut prs: Vec<_> = prs
             .into_iter()
-            .filter_map(|pr| pr)
             .filter_map(|pr| {
                 if pr.is_draft {
                     return None;
                 }
-                let labels = pr.labels;
-                let labels = (|| -> Option<_> {
-                    let labels = labels?;
-                    let nodes = labels.nodes?;
-                    let labels = nodes
-                        .into_iter()
-                        .filter_map(|node| node)
-                        .map(|node| node.name)
-                        .collect::<Vec<_>>();
-                    Some(labels)
-                })()
-                .unwrap_or_default();
+                let labels = pr
+                    .labels
+                    .map(|l| l.nodes)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|node| node.name)
+                    .collect::<Vec<_>>();
                 if !labels.iter().any(|label| label == "T-compiler") {
                     return None;
                 }
@@ -2074,49 +2052,36 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                 let assignees: Vec<_> = pr
                     .assignees
                     .nodes
-                    .unwrap_or_default()
                     .into_iter()
-                    .filter_map(|user| user)
                     .map(|user| user.login)
                     .collect();
 
-                let latest_reviews = pr.latest_reviews;
-                let mut reviews = (|| -> Option<_> {
-                    let reviews = latest_reviews?;
-                    let nodes = reviews.nodes?;
-                    let reviews = nodes
-                        .into_iter()
-                        .filter_map(|node| node)
-                        .filter_map(|node| {
-                            let created_at = node.created_at;
-                            node.author.map(|author| (author, created_at))
-                        })
-                        .map(|(author, created_at)| (author.login, created_at))
-                        .collect::<Vec<_>>();
-                    Some(reviews)
-                })()
-                .unwrap_or_default();
+                let mut reviews = pr
+                    .latest_reviews
+                    .map(|connection| connection.nodes)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|node| {
+                        let created_at = node.created_at;
+                        node.author.map(|author| (author, created_at))
+                    })
+                    .map(|(author, created_at)| (author.login, created_at))
+                    .collect::<Vec<_>>();
+
                 reviews.sort_by_key(|r| r.1);
 
-                let comments = pr.comments;
-                let comments = (|| -> Option<_> {
-                    let nodes = comments.nodes?;
-                    let comments = nodes
-                        .into_iter()
-                        .filter_map(|node| node)
-                        .filter_map(|node| {
-                            let created_at = node.created_at;
-                            node.author.map(|author| (author, created_at))
-                        })
-                        .map(|(author, created_at)| (author.login, created_at))
-                        .collect::<Vec<_>>();
-                    Some(comments)
-                })()
-                .unwrap_or_default();
-                let mut comments: Vec<_> = comments
+                let mut comments = pr
+                    .comments
+                    .nodes
                     .into_iter()
+                    .filter_map(|node| {
+                        let created_at = node.created_at;
+                        node.author.map(|author| (author, created_at))
+                    })
+                    .map(|(author, created_at)| (author.login, created_at))
                     .filter(|comment| assignees.contains(&comment.0))
-                    .collect();
+                    .collect::<Vec<_>>();
+
                 comments.sort_by_key(|c| c.1);
 
                 let updated_at = std::cmp::max(

@@ -45,7 +45,8 @@ pub mod queries {
     pub struct PullRequestConnection {
         pub total_count: i32,
         pub page_info: PageInfo,
-        pub nodes: Option<Vec<Option<PullRequest>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<PullRequest>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -68,7 +69,8 @@ pub mod queries {
     #[derive(cynic::QueryFragment, Debug)]
     pub struct PullRequestReviewConnection {
         pub total_count: i32,
-        pub nodes: Option<Vec<Option<PullRequestReview>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<PullRequestReview>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -79,7 +81,8 @@ pub mod queries {
 
     #[derive(cynic::QueryFragment, Debug)]
     pub struct UserConnection {
-        pub nodes: Option<Vec<Option<User>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<User>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -95,7 +98,8 @@ pub mod queries {
 
     #[derive(cynic::QueryFragment, Debug)]
     pub struct LabelConnection {
-        pub nodes: Option<Vec<Option<Label>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<Label>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -106,7 +110,8 @@ pub mod queries {
     #[derive(cynic::QueryFragment, Debug)]
     pub struct IssueCommentConnection {
         pub total_count: i32,
-        pub nodes: Option<Vec<Option<IssueComment>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<IssueComment>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -209,7 +214,8 @@ pub mod docs_update_queries {
     pub struct CommitHistoryConnection {
         pub total_count: i32,
         pub page_info: PageInfo,
-        pub nodes: Option<Vec<Option<Commit2>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<Commit2>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -226,7 +232,8 @@ pub mod docs_update_queries {
 
     #[derive(cynic::QueryFragment, Debug)]
     pub struct PullRequestConnection {
-        pub nodes: Option<Vec<Option<PullRequest>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<PullRequest>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -237,7 +244,8 @@ pub mod docs_update_queries {
 
     #[derive(cynic::QueryFragment, Debug)]
     pub struct CommitConnection {
-        pub nodes: Option<Vec<Option<Commit3>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<Commit3>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
