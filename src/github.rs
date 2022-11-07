@@ -1282,9 +1282,11 @@ impl Repository {
         let mut next_first_parent = None;
         // Search for `oldest` within 3 pages (300 commits).
         for _ in 0..3 {
-            let query = RecentCommits::build(&args);
-            let response = client
-                .json(client.post(Repository::GITHUB_GRAPHQL_API_URL).json(&query))
+            let query = RecentCommits::build(args.clone());
+            let data = client
+                .json::<cynic::GraphQlResponse<RecentCommits>>(
+                    client.post(Repository::GITHUB_GRAPHQL_API_URL).json(&query),
+                )
                 .await
                 .with_context(|| {
                     format!(
@@ -1292,9 +1294,7 @@ impl Repository {
                         self.full_name
                     )
                 })?;
-            let data: cynic::GraphQlResponse<RecentCommits> = query
-                .decode_response(response)
-                .with_context(|| format!("failed to parse response for `RecentCommits`"))?;
+
             if let Some(errors) = data.errors {
                 anyhow::bail!("There were graphql errors. {:?}", errors);
             }
@@ -2016,16 +2016,15 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
             after: None,
         };
         loop {
-            let query = queries::LeastRecentlyReviewedPullRequests::build(&args);
+            let query = queries::LeastRecentlyReviewedPullRequests::build(args.clone());
             let req = client.post(Repository::GITHUB_GRAPHQL_API_URL);
             let req = req.json(&query);
 
             let (resp, req_dbg) = client._send_req(req).await?;
-            let response = resp.json().await.context(req_dbg)?;
-            let data: cynic::GraphQlResponse<queries::LeastRecentlyReviewedPullRequests> =
-                query.decode_response(response).with_context(|| {
-                    format!("failed to parse response for `LeastRecentlyReviewedPullRequests`")
-                })?;
+            let data = resp
+                .json::<cynic::GraphQlResponse<queries::LeastRecentlyReviewedPullRequests>>()
+                .await
+                .context(req_dbg)?;
             if let Some(errors) = data.errors {
                 anyhow::bail!("There were graphql errors. {:?}", errors);
             }
