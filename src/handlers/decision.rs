@@ -1,14 +1,15 @@
 use anyhow::Context as Ctx;
-use parser::command::decision::{DecisionCommand, ParseError};
 use crate::{
     config::DecisionConfig,
-    github::{self, Event},
+    github::{Event},
     handlers::Context,
     interactions::ErrorComment,
-    db::decision_state::*
+    db::issue_decision_state::*
 };
-use std::collections::HashMap;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, FixedOffset};
+use parser::command::decision::{DecisionCommand, Resolution::*, Reversibility::*};
+use std::collections::BTreeMap;
+use chrono::{DateTime, FixedOffset, Duration};
 
 // get state for issue_id from db
 // if no state (first call)
@@ -28,15 +29,18 @@ pub(super) async fn handle_command(
     event: &Event,
     cmd: DecisionCommand,
 ) -> anyhow::Result<()> {
+    let db = ctx.db.get().await;
+
     let DecisionCommand {
         resolution,
         reversibility
     } = cmd;
 
     let issue = event.issue().unwrap();
+    let user = event.user();
 
-    let is_team_member = event
-        .user()
+    let is_team_member = 
+        user
         .is_team_member(&ctx.github)
         .await
         .unwrap_or(false);
@@ -47,8 +51,8 @@ pub(super) async fn handle_command(
         return Ok(());
     }
 
-    match get_decision_state(issue.id) {
-        Some(state) => {
+    match get_issue_decision_state(&db, &issue.number).await {
+        Ok(_state) => {
             // let name = match disposition {
             //     Hold => "hold".into(),
             //     Custom(name) => name,
@@ -72,45 +76,49 @@ pub(super) async fn handle_command(
             //     status_history,
             //     ..state
             // })
-            Ok();
+            Ok(())
         },
-        None => {
+        _ => {
             match resolution {
-                Hold => Err(ParseError::InvalidFirstCommand),
+                Hold => Ok(()), // change me!
                 Merge => {
-                    let start_date = chrono::Utc::now().into();
-                    let end_date = start_date.checked_add_signed(Duration::days(10)).unwrap();
+                    let start_date: DateTime<FixedOffset> = chrono::Utc::now().into();
+                    let end_date: DateTime<FixedOffset> = start_date.checked_add_signed(Duration::days(10)).unwrap();
 
-                    let current_statuses = HashMap::new();
-                    let status_history = HashMap::new();
+                    let mut current: BTreeMap<String, UserStatus> = BTreeMap::new();
+                    current.insert("mcass19".to_string(), UserStatus{
+                        comment_id: "comment_id".to_string(),
+                        text: "something".to_string(),
+                        reversibility: Reversible,
+                        resolution: Merge,
+                    });
+                    let history: BTreeMap<String, Vec<UserStatus>> = BTreeMap::new();
 
-                    let team = github::get_team(&ctx.github, &"T-lang"); // change this to be configurable in toml?
+                    insert_issue_decision_state(
+                        &db,
+                        &issue.number,
+                        &user.login,
+                        &start_date,
+                        &end_date,
+                        &current,
+                        &history,
+                        &reversibility,
+                        &Merge,
+                    ).await?;
 
-                    insert_decision_state(
-                        db,
-                        issue.id,
-                        user.login,
-                        start_date,
-                        end_date,
-                        current_statuses,
-                        status_history,
-                        reversibility,
-                        resolution,
-                    );
-
-                    let comment = format!(
-                        "Wow, it looks like you want to merge this, {}.", event.user().login
-                    );
+                    // let team = github::get_team(&ctx.github, &"T-lang"); // change this to be configurable in toml?
                 
                     let comment = format!(
-                        "| Team member | State |\n|-------------|-------|\n| julmontesdeoca | merge |\n| mcass19 |  |");
+                        "Wow, it looks like you want to merge this, {}.\n| Team member | State |\n|-------------|-------|\n| julmontesdeoca | merge |\n| mcass19 |  |",
+                        user.login
+                    );
                 
                     issue
                         .post_comment(&ctx.github, &comment)
                         .await
                         .context("merge vote comment")?;
 
-                    Ok();
+                    Ok(())
                 }
             }
         }

@@ -38,7 +38,7 @@ pub enum ParseError {
     InvalidFirstCommand
 }
 
-#[derive(Serialize, Deserialize, Debug, ToSql, FromSql, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSql, FromSql, Eq, PartialEq)]
 #[postgres(name = "reversibility")]
 pub enum Reversibility {
     #[postgres(name = "reversible")]
@@ -47,7 +47,7 @@ pub enum Reversibility {
     Irreversible,
 }
 
-#[derive(Serialize, Deserialize, Debug, ToSql, FromSql, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSql, FromSql, Eq, PartialEq)]
 #[postgres(name = "resolution")]
 pub enum Resolution {
     #[postgres(name = "merge")]

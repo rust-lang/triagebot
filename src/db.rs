@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_postgres::Client as DbClient;
 
-pub mod decision_state;
+pub mod issue_decision_state;
 pub mod issue_data;
 pub mod jobs;
 pub mod notifications;
@@ -280,14 +280,13 @@ CREATE TYPE reversibility AS ENUM ('reversible', 'irreversible');
     "
 CREATE TYPE resolution AS ENUM ('hold', 'merge');
 ",
-    "CREATE TABLE decision_state (
+"CREATE TABLE issue_decision_state (
     issue_id BIGINT PRIMARY KEY,
     initiator TEXT NOT NULL,
-    team_members JSONB NOT NULL,
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    period_end_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    current_statuses JSONB NOT NULL,
-    status_history JSONB,
+    end_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    current JSONB NOT NULL,
+    history JSONB,
     reversibility reversibility NOT NULL DEFAULT 'reversible',
     resolution resolution NOT NULL DEFAULT 'merge'
 );",
