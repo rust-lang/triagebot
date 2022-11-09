@@ -1,11 +1,11 @@
-//! The issue decision state table provides a way to store 
+//! The issue decision state table provides a way to store
 //! the decision process state of each issue
 
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, FixedOffset};
-use std::collections::BTreeMap;
-use parser::command::decision::{Resolution, Reversibility};
 use anyhow::{Context as _, Result};
+use chrono::{DateTime, FixedOffset};
+use parser::command::decision::{Resolution, Reversibility};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use tokio_postgres::Client as DbClient;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -54,13 +54,13 @@ pub async fn insert_issue_decision_state(
 }
 
 pub async fn update_issue_decision_state(
-    db: &DbClient, 
+    db: &DbClient,
     issue_number: &u64,
     end_date: &DateTime<FixedOffset>,
     current: &BTreeMap<String, UserStatus>,
     history: &BTreeMap<String, Vec<UserStatus>>,
     reversibility: &Reversibility,
-    resolution: &Resolution
+    resolution: &Resolution,
 ) -> Result<()> {
     tracing::trace!("update_issue_decision_state(issue_id={})", issue_number);
     let issue_id = *issue_number as i64;
@@ -74,18 +74,21 @@ pub async fn update_issue_decision_state(
     Ok(())
 }
 
-pub async fn get_issue_decision_state(db: &DbClient, issue_number: &u64) -> Result<IssueDecisionState> {
+pub async fn get_issue_decision_state(
+    db: &DbClient,
+    issue_number: &u64,
+) -> Result<IssueDecisionState> {
     tracing::trace!("get_issue_decision_state(issue_id={})", issue_number);
     let issue_id = *issue_number as i64;
 
     let state = db
         .query_one(
             "SELECT * FROM issue_decision_state WHERE issue_id = $1",
-            &[&issue_id]
+            &[&issue_id],
         )
         .await
         .context("Getting decision state data")?;
-    
+
     deserialize_issue_decision_state(&state)
 }
 
@@ -95,7 +98,8 @@ fn deserialize_issue_decision_state(row: &tokio_postgres::row::Row) -> Result<Is
     let start_date: DateTime<FixedOffset> = row.try_get(2)?;
     let end_date: DateTime<FixedOffset> = row.try_get(3)?;
     let current: BTreeMap<String, UserStatus> = serde_json::from_value(row.try_get(4).unwrap())?;
-    let history: BTreeMap<String, Vec<UserStatus>> = serde_json::from_value(row.try_get(5).unwrap())?;
+    let history: BTreeMap<String, Vec<UserStatus>> =
+        serde_json::from_value(row.try_get(5).unwrap())?;
     let reversibility: Reversibility = row.try_get(6)?;
     let resolution: Resolution = row.try_get(7)?;
 

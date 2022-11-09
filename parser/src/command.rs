@@ -5,6 +5,7 @@ use regex::Regex;
 
 pub mod assign;
 pub mod close;
+pub mod decision;
 pub mod glacier;
 pub mod nominate;
 pub mod note;
@@ -13,7 +14,6 @@ pub mod prioritize;
 pub mod relabel;
 pub mod second;
 pub mod shortcut;
-pub mod decision;
 
 #[derive(Debug, PartialEq)]
 pub enum Command<'a> {
