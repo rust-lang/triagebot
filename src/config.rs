@@ -105,7 +105,9 @@ pub(crate) struct NoteConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub(crate) struct MentionsConfig {
+    pub(crate) bors_commit_message: Option<String>,
     #[serde(flatten)]
     pub(crate) paths: HashMap<String, MentionsPathConfig>,
 }
@@ -397,5 +399,47 @@ mod tests {
                 no_merges: None,
             }
         );
+    }
+
+    #[test]
+    fn mentions_config() {
+        let config = r#"
+        [mentions."some_other_path"]
+        message = "foo"
+        cc = ["@someone"]
+
+        [mentions]
+        bors-commit-message = "has bors commit"
+        "#;
+        let config = toml::from_str::<Config>(config).unwrap().mentions.unwrap();
+        assert!(config.paths.len() == 1);
+        assert_eq!(
+            config.bors_commit_message.as_deref(),
+            Some("has bors commit")
+        );
+
+        let config = r#"
+        [mentions]
+        bors-commit-message = "has bors commit"
+
+        [mentions."some_other_path"]
+        message = "foo"
+        cc = ["@someone"]
+        "#;
+        let config = toml::from_str::<Config>(config).unwrap().mentions.unwrap();
+        assert!(config.paths.len() == 1);
+        assert_eq!(
+            config.bors_commit_message.as_deref(),
+            Some("has bors commit")
+        );
+
+        let config = r#"
+        [mentions."some_other_path"]
+        message = "foo"
+        cc = ["@someone"]
+        "#;
+        let config = toml::from_str::<Config>(config).unwrap().mentions.unwrap();
+        assert!(config.paths.len() == 1);
+        assert_eq!(config.bors_commit_message, None);
     }
 }
