@@ -5,7 +5,8 @@
 // Further info could be find in src/jobs.rs
 
 pub async fn handle_job(name: &String, metadata: &serde_json::Value) -> anyhow::Result<()> {
-    match name {
+    match name.as_str() {
+        "docs_update" => super::docs_update::handle_job().await,
         _ => default(&name, &metadata),
     }
 }
