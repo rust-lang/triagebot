@@ -9,6 +9,11 @@ use reqwest::Client;
 use std::fmt::Write;
 use std::str::FromStr;
 
+/// This is the repository where the commits will be created.
+const WORK_REPO: &str = "rustbot/rust";
+/// This is the repository where the PR will be created.
+const DEST_REPO: &str = "rust-lang/rust";
+/// This is the branch in `WORK_REPO` to create the commits.
 const BRANCH_NAME: &str = "docs-update";
 
 const SUBMODULES: &[&str] = &[
@@ -56,16 +61,19 @@ pub async fn handle_job() -> Result<()> {
 
 async fn docs_update() -> Result<()> {
     let gh = GithubClient::new_with_default_token(Client::new());
-    let repo = gh.repository("rust-lang/rust").await?;
+    let work_repo = gh.repository(WORK_REPO).await?;
+    work_repo
+        .merge_upstream(&gh, &work_repo.default_branch)
+        .await?;
 
-    let updates = get_submodule_updates(&gh, &repo).await?;
+    let updates = get_submodule_updates(&gh, &work_repo).await?;
     if updates.is_empty() {
         tracing::trace!("no updates this week?");
         return Ok(());
     }
 
-    create_commit(&gh, &repo, &updates).await?;
-    create_pr(&gh, &repo, &updates).await?;
+    create_commit(&gh, &work_repo, &updates).await?;
+    create_pr(&gh, &updates).await?;
     Ok(())
 }
 
@@ -176,14 +184,17 @@ async fn create_commit(
     Ok(())
 }
 
-async fn create_pr(gh: &GithubClient, rust_repo: &Repository, updates: &[Update]) -> Result<()> {
+async fn create_pr(gh: &GithubClient, updates: &[Update]) -> Result<()> {
+    let dest_repo = gh.repository(DEST_REPO).await?;
     let mut body = String::new();
     for update in updates {
         write!(body, "{}\n", update.pr_body).unwrap();
     }
 
-    let pr = rust_repo
-        .new_pr(gh, TITLE, BRANCH_NAME, &rust_repo.default_branch, &body)
+    let username = WORK_REPO.split('/').next().unwrap();
+    let head = format!("{username}:{BRANCH_NAME}");
+    let pr = dest_repo
+        .new_pr(gh, TITLE, &head, &dest_repo.default_branch, &body)
         .await?;
     tracing::debug!("created PR {}", pr.html_url);
     Ok(())

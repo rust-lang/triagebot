@@ -1499,6 +1499,23 @@ impl Repository {
         issue.pull_request = Some(PullRequestDetails {});
         Ok(issue)
     }
+
+    /// Synchronize a branch (in a forked repository) by pulling in its upstream contents.
+    pub async fn merge_upstream(&self, client: &GithubClient, branch: &str) -> anyhow::Result<()> {
+        let url = format!("{}/merge-upstream", self.url());
+        client
+            ._send_req(client.post(&url).json(&serde_json::json!({
+                "branch": branch,
+            })))
+            .await
+            .with_context(|| {
+                format!(
+                    "{} failed to merge upstream branch {branch}",
+                    self.full_name
+                )
+            })?;
+        Ok(())
+    }
 }
 
 pub struct Query<'a> {
