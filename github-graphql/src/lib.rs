@@ -168,6 +168,45 @@ pub mod docs_update_queries {
         pub after: Option<String>,
     }
 
+    /// Query for fetching recent commits and their associated PRs.
+    ///
+    /// This query is built from:
+    ///
+    /// ```text
+    /// query RecentCommits($name: String!, $owner: String!, $branch: String!, $after: String) {
+    ///   repository(name: $name, owner: $owner) {
+    ///     ref(qualifiedName: $branch) {
+    ///       target {
+    ///         ... on Commit {
+    ///           history(first: 100, after: $after) {
+    ///             totalCount
+    ///             pageInfo {
+    ///               hasNextPage
+    ///               endCursor
+    ///             }
+    ///             nodes {
+    ///               oid
+    ///               parents(first: 1) {
+    ///                 nodes {
+    ///                   oid
+    ///                 }
+    ///               }
+    ///               committedDate
+    ///               messageHeadline
+    ///               associatedPullRequests(first: 1) {
+    ///                 nodes {
+    ///                   number
+    ///                   title
+    ///                 }
+    ///               }
+    ///             }
+    ///           }
+    ///         }
+    ///       }
+    ///     }
+    ///   }
+    /// }
+    /// ```
     #[derive(cynic::QueryFragment, Debug)]
     #[cynic(graphql_type = "Query", argument_struct = "RecentCommitsArguments")]
     pub struct RecentCommits {
@@ -184,13 +223,15 @@ pub mod docs_update_queries {
     }
 
     #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(argument_struct = "RecentCommitsArguments")]
     pub struct Ref {
         pub target: Option<GitObject>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(argument_struct = "RecentCommitsArguments")]
     pub struct Commit {
-        #[arguments(first = 100)]
+        #[arguments(first = 100, after = &args.after)]
         pub history: CommitHistoryConnection,
     }
 
@@ -236,6 +277,7 @@ pub mod docs_update_queries {
     }
 
     #[derive(cynic::InlineFragments, Debug)]
+    #[cynic(argument_struct = "RecentCommitsArguments")]
     pub enum GitObject {
         Commit(Commit),
         // These three variants are here just to pacify cynic. I don't know
