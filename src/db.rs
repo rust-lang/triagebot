@@ -211,7 +211,7 @@ pub async fn run_scheduled_jobs(db: &DbClient) -> anyhow::Result<()> {
                 delete_job(&db, &job.id).await?;
             }
             Err(e) => {
-                tracing::trace!("job failed on execution (id={:?}, error={:?})", job.id, e);
+                tracing::error!("job failed on execution (id={:?}, error={:?})", job.id, e);
                 update_job_error_message(&db, &job.id, &e.to_string()).await?;
             }
         }

@@ -6,7 +6,7 @@ use hyper::header::HeaderValue;
 use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::{
     fmt,
@@ -1007,6 +1007,10 @@ impl Repository {
     const GITHUB_API_URL: &'static str = "https://api.github.com";
     const GITHUB_GRAPHQL_API_URL: &'static str = "https://api.github.com/graphql";
 
+    fn url(&self) -> String {
+        format!("{}/repos/{}", Repository::GITHUB_API_URL, self.full_name)
+    }
+
     pub fn owner(&self) -> &str {
         self.full_name.split_once('/').unwrap().0
     }
@@ -1179,6 +1183,338 @@ impl Repository {
             ordering.per_page,
             ordering.page,
         )
+    }
+
+    /// Retrieves a git commit for the given SHA.
+    pub async fn git_commit(&self, client: &GithubClient, sha: &str) -> anyhow::Result<GitCommit> {
+        let url = format!("{}/git/commits/{sha}", self.url());
+        client
+            .json(client.get(&url))
+            .await
+            .with_context(|| format!("{} failed to get git commit {sha}", self.full_name))
+    }
+
+    /// Creates a new commit.
+    pub async fn create_commit(
+        &self,
+        client: &GithubClient,
+        message: &str,
+        parents: &[&str],
+        tree: &str,
+    ) -> anyhow::Result<GitCommit> {
+        let url = format!("{}/git/commits", self.url());
+        client
+            .json(client.post(&url).json(&serde_json::json!({
+                "message": message,
+                "parents": parents,
+                "tree": tree,
+            })))
+            .await
+            .with_context(|| format!("{} failed to create commit for tree {tree}", self.full_name))
+    }
+
+    /// Retrieves a git reference for the given refname.
+    pub async fn get_reference(
+        &self,
+        client: &GithubClient,
+        refname: &str,
+    ) -> anyhow::Result<GitReference> {
+        let url = format!("{}/git/ref/{}", self.url(), refname);
+        client
+            .json(client.get(&url))
+            .await
+            .with_context(|| format!("{} failed to get git reference {refname}", self.full_name))
+    }
+
+    /// Updates an existing git reference to a new SHA.
+    pub async fn update_reference(
+        &self,
+        client: &GithubClient,
+        refname: &str,
+        sha: &str,
+    ) -> anyhow::Result<()> {
+        let url = format!("{}/git/refs/{}", self.url(), refname);
+        client
+            ._send_req(client.patch(&url).json(&serde_json::json!({
+                "sha": sha,
+                "force": true,
+            })))
+            .await
+            .with_context(|| {
+                format!(
+                    "{} failed to update reference {refname} to {sha}",
+                    self.full_name
+                )
+            })?;
+        Ok(())
+    }
+
+    /// Returns a list of recent commits on the given branch.
+    ///
+    /// Returns results in the OID range `oldest` (exclusive) to `newest`
+    /// (inclusive).
+    pub async fn recent_commits(
+        &self,
+        client: &GithubClient,
+        branch: &str,
+        oldest: &str,
+        newest: &str,
+    ) -> anyhow::Result<Vec<RecentCommit>> {
+        // This is used to deduplicate the results (so that a PR with multiple
+        // commits will only show up once).
+        let mut prs_seen = HashSet::new();
+        let mut recent_commits = Vec::new(); // This is the final result.
+        use cynic::QueryBuilder;
+        use github_graphql::docs_update_queries::{
+            GitObject, RecentCommits, RecentCommitsArguments,
+        };
+
+        let mut args = RecentCommitsArguments {
+            branch: branch.to_string(),
+            name: self.name().to_string(),
+            owner: self.owner().to_string(),
+            after: None,
+        };
+        let mut found_newest = false;
+        let mut found_oldest = false;
+        // This simulates --first-parent. We only care about top-level commits.
+        // Unfortunately the GitHub API doesn't provide anything like that.
+        let mut next_first_parent = None;
+        // Search for `oldest` within 3 pages (300 commits).
+        for _ in 0..3 {
+            let query = RecentCommits::build(&args);
+            let response = client
+                .json(client.post(Repository::GITHUB_GRAPHQL_API_URL).json(&query))
+                .await
+                .with_context(|| {
+                    format!(
+                        "{} failed to get recent commits branch={branch}",
+                        self.full_name
+                    )
+                })?;
+            let data: cynic::GraphQlResponse<RecentCommits> = query
+                .decode_response(response)
+                .with_context(|| format!("failed to parse response for `RecentCommits`"))?;
+            if let Some(errors) = data.errors {
+                anyhow::bail!("There were graphql errors. {:?}", errors);
+            }
+            let target = data
+                .data
+                .ok_or_else(|| anyhow::anyhow!("No data returned."))?
+                .repository
+                .ok_or_else(|| anyhow::anyhow!("No repository."))?
+                .ref_
+                .ok_or_else(|| anyhow::anyhow!("No ref."))?
+                .target
+                .ok_or_else(|| anyhow::anyhow!("No target."))?;
+            let commit = match target {
+                GitObject::Commit(commit) => commit,
+                _ => anyhow::bail!("unexpected target type {target:?}"),
+            };
+            let commits = commit
+                .history
+                .nodes
+                .ok_or_else(|| anyhow::anyhow!("No history."))?
+                .into_iter()
+                .filter_map(|node| node)
+                // Don't include anything newer than `newest`
+                .skip_while(|node| {
+                    if found_newest || node.oid.0 == newest {
+                        found_newest = true;
+                        false
+                    } else {
+                        // This should only happen if there is a commit that arrives
+                        // between the time that `update_submodules` fetches the latest
+                        // ref, and this runs. This window should be a few seconds, so it
+                        // should be unlikely. This warning is here in case my assumptions
+                        // about how things work is not correct.
+                        tracing::warn!(
+                            "unexpected race with submodule history, newest oid={newest} skipping oid={}",
+                            node.oid.0
+                        );
+                        true
+                    }
+                })
+                // Skip nodes that aren't the first parent
+                .filter(|node| {
+                    let this_first_parent = node.parents.nodes
+                        .as_ref()
+                        // Grab the first parent
+                        .and_then(|nodes| nodes.first())
+                        // Strip away the useless Option
+                        .and_then(|parent_opt| parent_opt.as_ref())
+                        .map(|parent| parent.oid.0.clone());
+
+                    match &next_first_parent {
+                        Some(first_parent) => {
+                            if first_parent == &node.oid.0 {
+                                // Found the next first parent, include it and
+                                // set next_first_parent to look for this
+                                // commit's first parent.
+                                next_first_parent = this_first_parent;
+                                true
+                            } else {
+                                // Still looking for the next first parent.
+                                false
+                            }
+                        }
+                        None => {
+                            // First commit.
+                            next_first_parent = this_first_parent;
+                            true
+                        }
+                    }
+                })
+                // Stop once reached the `oldest` commit
+                .take_while(|node| {
+                    if node.oid.0 == oldest {
+                        found_oldest = true;
+                        false
+                    } else {
+                        true
+                    }
+                })
+                .filter_map(|node| {
+                    // Determine if this is associated with a PR or not.
+                    match node.associated_pull_requests
+                        // Strip away the useless Option
+                        .and_then(|pr| pr.nodes)
+                        // Get the first PR (we only care about one)
+                        .and_then(|mut nodes| nodes.pop())
+                        // Strip away the useless Option
+                        .flatten() {
+                        Some(pr) => {
+                            // Only include a PR once
+                            if prs_seen.insert(pr.number) {
+                                Some(RecentCommit {
+                                    pr_num: Some(pr.number),
+                                    title: pr.title,
+                                    oid: node.oid.0.clone(),
+                                    committed_date: node.committed_date,
+                                })
+                            } else {
+                                None
+                            }
+                        }
+                        None => {
+                            // This is an unassociated commit, possibly
+                            // created without a PR.
+                            Some(RecentCommit {
+                                pr_num: None,
+                                title: node.message_headline,
+                                oid: node.oid.0,
+                                committed_date: node.committed_date,
+                            })
+                        }
+                    }
+                });
+            recent_commits.extend(commits);
+            let page_info = commit.history.page_info;
+            if found_oldest || !page_info.has_next_page || page_info.end_cursor.is_none() {
+                break;
+            }
+            args.after = page_info.end_cursor;
+        }
+        if !found_oldest {
+            // This should probably do something more than log a warning, but
+            // I don't think it is too important at this time (the log message
+            // is only informational, and this should be unlikely to happen).
+            tracing::warn!(
+                "{} failed to find oldest commit sha={oldest} branch={branch}",
+                self.full_name
+            );
+        }
+        Ok(recent_commits)
+    }
+
+    /// Creates a new git tree based on another tree.
+    pub async fn update_tree(
+        &self,
+        client: &GithubClient,
+        base_tree: &str,
+        tree: &[GitTreeEntry],
+    ) -> anyhow::Result<GitTreeObject> {
+        let url = format!("{}/git/trees", self.url());
+        client
+            .json(client.post(&url).json(&serde_json::json!({
+                "base_tree": base_tree,
+                "tree": tree,
+            })))
+            .await
+            .with_context(|| {
+                format!(
+                    "{} failed to update tree with base {base_tree}",
+                    self.full_name
+                )
+            })
+    }
+
+    /// Returns information about the git submodule at the given path.
+    ///
+    /// `refname` is the ref to use for fetching information. If `None`, will
+    /// use the latest version on the default branch.
+    pub async fn submodule(
+        &self,
+        client: &GithubClient,
+        path: &str,
+        refname: Option<&str>,
+    ) -> anyhow::Result<Submodule> {
+        let mut url = format!("{}/contents/{}", self.url(), path);
+        if let Some(refname) = refname {
+            url.push_str("?ref=");
+            url.push_str(refname);
+        }
+        client.json(client.get(&url)).await.with_context(|| {
+            format!(
+                "{} failed to get submodule path={path} refname={refname:?}",
+                self.full_name
+            )
+        })
+    }
+
+    /// Creates a new PR.
+    pub async fn new_pr(
+        &self,
+        client: &GithubClient,
+        title: &str,
+        head: &str,
+        base: &str,
+        body: &str,
+    ) -> anyhow::Result<Issue> {
+        let url = format!("{}/pulls", self.url());
+        let mut issue: Issue = client
+            .json(client.post(&url).json(&serde_json::json!({
+                "title": title,
+                "head": head,
+                "base": base,
+                "body": body,
+            })))
+            .await
+            .with_context(|| {
+                format!(
+                    "{} failed to create a new PR head={head} base={base} title={title}",
+                    self.full_name
+                )
+            })?;
+        issue.pull_request = Some(PullRequestDetails {});
+        Ok(issue)
+    }
+
+    /// Synchronize a branch (in a forked repository) by pulling in its upstream contents.
+    pub async fn merge_upstream(&self, client: &GithubClient, branch: &str) -> anyhow::Result<()> {
+        let url = format!("{}/merge-upstream", self.url());
+        client
+            ._send_req(client.post(&url).json(&serde_json::json!({
+                "branch": branch,
+            })))
+            .await
+            .with_context(|| {
+                format!(
+                    "{} failed to merge upstream branch {branch}",
+                    self.full_name
+                )
+            })?;
+        Ok(())
     }
 }
 
@@ -1577,6 +1913,16 @@ impl GithubClient {
             }
         }
     }
+
+    /// Returns information about a repository.
+    ///
+    /// The `full_name` should be something like `rust-lang/rust`.
+    pub async fn repository(&self, full_name: &str) -> anyhow::Result<Repository> {
+        let req = self.get(&format!("{}/repos/{full_name}", Repository::GITHUB_API_URL));
+        self.json(req)
+            .await
+            .with_context(|| format!("{} failed to get repo", full_name))
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -1588,8 +1934,36 @@ pub struct GithubCommit {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct GitCommit {
+    pub sha: String,
     pub author: GitUser,
     pub message: String,
+    pub tree: GitCommitTree,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct GitCommitTree {
+    pub sha: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct GitTreeObject {
+    pub sha: String,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct GitTreeEntry {
+    pub path: String,
+    pub mode: String,
+    #[serde(rename = "type")]
+    pub object_type: String,
+    pub sha: String,
+}
+
+pub struct RecentCommit {
+    pub title: String,
+    pub pr_num: Option<i32>,
+    pub oid: String,
+    pub committed_date: DateTime<Utc>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -1780,6 +2154,51 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
             .collect();
 
         Ok(prs)
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct GitReference {
+    #[serde(rename = "ref")]
+    pub refname: String,
+    pub object: GitObject,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct GitObject {
+    #[serde(rename = "type")]
+    pub object_type: String,
+    pub sha: String,
+    pub url: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct Submodule {
+    pub name: String,
+    pub path: String,
+    pub sha: String,
+    pub submodule_git_url: String,
+}
+
+impl Submodule {
+    /// Returns the `Repository` this submodule points to.
+    ///
+    /// This assumes that the submodule is on GitHub.
+    pub async fn repository(&self, client: &GithubClient) -> anyhow::Result<Repository> {
+        let fullname = self
+            .submodule_git_url
+            .strip_prefix("https://github.com/")
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "only github submodules supported, got {}",
+                    self.submodule_git_url
+                )
+            })?
+            .strip_suffix(".git")
+            .ok_or_else(|| {
+                anyhow::anyhow!("expected .git suffix, got {}", self.submodule_git_url)
+            })?;
+        client.repository(fullname).await
     }
 }
 
