@@ -267,10 +267,25 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         }
     });
 
+    let client = Client::new();
+    let gh = github::GithubClient::new_with_default_token(client.clone());
+    let oc = octocrab::OctocrabBuilder::new()
+        .personal_token(github::default_token_from_env())
+        .build()
+        .expect("Failed to build octograb.");
+    let ctx = Arc::new(Context {
+        username: String::from("rustbot"),
+        db: pool,
+        github: gh,
+        octocrab: oc,
+    });
+
     // spawning a background task that will run the scheduled jobs
     // every JOB_PROCESSING_CADENCE_IN_SECS
+    let ctx2 = ctx.clone();
     task::spawn(async move {
         loop {
+            let ctx = ctx2.clone();
             let res = task::spawn(async move {
                 let pool = db::ClientPool::new();
                 let mut interval =
@@ -278,7 +293,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 
                 loop {
                     interval.tick().await;
-                    db::run_scheduled_jobs(&*pool.get().await)
+                    db::run_scheduled_jobs(&ctx, &*pool.get().await)
                         .await
                         .context("run database scheduled jobs")
                         .unwrap();
@@ -293,19 +308,6 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
                 _ => unreachable!(),
             }
         }
-    });
-
-    let client = Client::new();
-    let gh = github::GithubClient::new_with_default_token(client.clone());
-    let oc = octocrab::OctocrabBuilder::new()
-        .personal_token(github::default_token_from_env())
-        .build()
-        .expect("Failed to build octograb.");
-    let ctx = Arc::new(Context {
-        username: String::from("rustbot"),
-        db: pool,
-        github: gh,
-        octocrab: oc,
     });
 
     let agenda = tower::ServiceBuilder::new()

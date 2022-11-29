@@ -43,7 +43,7 @@ mod prioritize;
 mod relabel;
 mod review_submitted;
 mod rfc_helper;
-mod rustc_commits;
+pub mod rustc_commits;
 mod shortcut;
 
 pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
