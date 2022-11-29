@@ -1,5 +1,5 @@
-use crate::db::jobs::*;
 use crate::handlers::jobs::handle_job;
+use crate::{db::jobs::*, handlers::Context};
 use anyhow::Context as _;
 use chrono::Utc;
 use native_tls::{Certificate, TlsConnector};
@@ -198,14 +198,14 @@ pub async fn schedule_jobs(db: &DbClient, jobs: Vec<JobSchedule>) -> anyhow::Res
     Ok(())
 }
 
-pub async fn run_scheduled_jobs(db: &DbClient) -> anyhow::Result<()> {
+pub async fn run_scheduled_jobs(ctx: &Context, db: &DbClient) -> anyhow::Result<()> {
     let jobs = get_jobs_to_execute(&db).await.unwrap();
     tracing::trace!("jobs to execute: {:#?}", jobs);
 
     for job in jobs.iter() {
         update_job_executed_at(&db, &job.id).await?;
 
-        match handle_job(&job.name, &job.metadata).await {
+        match handle_job(&ctx, &job.name, &job.metadata).await {
             Ok(_) => {
                 tracing::trace!("job successfully executed (id={})", job.id);
                 delete_job(&db, &job.id).await?;

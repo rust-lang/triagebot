@@ -4,9 +4,19 @@
 
 // Further info could be find in src/jobs.rs
 
-pub async fn handle_job(name: &String, metadata: &serde_json::Value) -> anyhow::Result<()> {
+use super::Context;
+
+pub async fn handle_job(
+    ctx: &Context,
+    name: &String,
+    metadata: &serde_json::Value,
+) -> anyhow::Result<()> {
     match name.as_str() {
         "docs_update" => super::docs_update::handle_job().await,
+        "rustc_commits" => {
+            super::rustc_commits::synchronize_commits_inner(ctx, None).await;
+            Ok(())
+        }
         _ => default(&name, &metadata),
     }
 }

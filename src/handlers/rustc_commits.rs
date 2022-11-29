@@ -1,11 +1,14 @@
+use crate::db::jobs::JobSchedule;
 use crate::db::rustc_commits;
 use crate::db::rustc_commits::get_missing_commits;
 use crate::{
     github::{self, Event},
     handlers::Context,
 };
+use cron::Schedule;
 use std::collections::VecDeque;
 use std::convert::TryInto;
+use std::str::FromStr;
 use tracing as log;
 
 const BORS_GH_ID: i64 = 3372342;
@@ -80,16 +83,28 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
 /// Fetch commits that are not present in the database.
 async fn synchronize_commits(ctx: &Context, sha: &str, pr: u32) {
     log::trace!("synchronize_commits for sha={:?}, pr={}", sha, pr);
+    synchronize_commits_inner(ctx, Some((sha.to_owned(), pr))).await;
+}
+
+pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u32)>) {
     let db = ctx.db.get().await;
-    let mut pr = Some(pr);
 
     // List of roots to be resolved. Each root and its parents will be recursively resolved
     // until an existing commit is found.
     let mut to_be_resolved = VecDeque::new();
-    to_be_resolved.push_back(sha.to_string());
-    to_be_resolved.extend(get_missing_commits(&db).await);
+    if let Some((sha, pr)) = starter {
+        to_be_resolved.push_back((sha.to_string(), Some(pr)));
+    }
+    to_be_resolved.extend(
+        get_missing_commits(&db)
+            .await
+            .into_iter()
+            .map(|c| (c, None::<u32>)),
+    );
+    log::info!("synchronize_commits for {:?}", to_be_resolved);
 
-    while let Some(sha) = to_be_resolved.pop_front() {
+    let db = ctx.db.get().await;
+    while let Some((sha, mut pr)) = to_be_resolved.pop_front() {
         let mut gc = match ctx.github.rust_commit(&sha).await {
             Some(c) => c,
             None => {
@@ -130,11 +145,20 @@ async fn synchronize_commits(ctx: &Context, sha: &str, pr: u32) {
         match res {
             Ok(()) => {
                 if !rustc_commits::has_commit(&db, &parent_sha).await {
-                    to_be_resolved.push_back(parent_sha)
+                    to_be_resolved.push_back((parent_sha, None))
                 }
             }
             Err(e) => log::error!("Failed to record commit {:?}", e),
         }
+    }
+}
+
+pub fn job() -> JobSchedule {
+    JobSchedule {
+        name: "rustc_commits".to_string(),
+        // Every 30 minutes...
+        schedule: Schedule::from_str("* 0,30 * * * * *").unwrap(),
+        metadata: serde_json::Value::Null,
     }
 }
 
