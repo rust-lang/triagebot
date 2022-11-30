@@ -1928,8 +1928,15 @@ impl GithubClient {
 #[derive(Debug, serde::Deserialize)]
 pub struct GithubCommit {
     pub sha: String,
-    pub commit: GitCommit,
+    pub commit: GithubCommitCommitField,
     pub parents: Vec<Parent>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct GithubCommitCommitField {
+    pub author: GitUser,
+    pub message: String,
+    pub tree: GitCommitTree,
 }
 
 #[derive(Debug, serde::Deserialize)]
