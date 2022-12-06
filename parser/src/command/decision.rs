@@ -48,7 +48,7 @@ pub enum Reversibility {
     Irreversible,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, ToSql, FromSql, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, ToSql, FromSql, Eq, PartialEq)]
 #[postgres(name = "resolution")]
 pub enum Resolution {
     #[postgres(name = "merge")]

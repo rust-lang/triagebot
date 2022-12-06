@@ -1,23 +1,35 @@
+use crate::db::jobs::*;
 use crate::{
     config::DecisionConfig, db::issue_decision_state::*, github::Event, handlers::Context,
     interactions::ErrorComment,
 };
 use anyhow::Context as Ctx;
-use chrono::{DateTime, Duration, FixedOffset};
-use parser::command::decision::{DecisionCommand, Resolution::*, Reversibility::*};
+use chrono::{DateTime, Duration, Utc};
+use parser::command::decision::Resolution::{Hold, Merge};
+use parser::command::decision::*;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 // get state for issue_id from db
-// if no state (first call)
-    // initialize state
-    // schedule job if necessary
-    // send comment to github
-    // save state
-// if state
-    // apply logic to decide what to do
-    // schedule job if necessary
-    // send comment to github
-    // save state
+    // if no state (first call)
+        // initialize state
+        // schedule job if necessary
+        // send comment to github
+        // save state
+    // if state
+        // apply logic to decide what to do
+        // schedule job if necessary
+        // send comment to github
+        // save state
+
+pub const DECISION_PROCESS_JOB_NAME: &str = "decision_process_action";
+
+#[derive(Serialize, Deserialize)]
+pub struct DecisionProcessActionMetadata {
+    pub message: String,
+    pub get_issue_url: String,
+    pub status: Resolution,
+}
 
 pub(super) async fn handle_command(
     ctx: &Context,
@@ -77,8 +89,8 @@ pub(super) async fn handle_command(
             match resolution {
                 Hold => Ok(()), // change me!
                 Merge => {
-                    let start_date: DateTime<FixedOffset> = chrono::Utc::now().into();
-                    let end_date: DateTime<FixedOffset> =
+                    let start_date: DateTime<Utc> = chrono::Utc::now().into();
+                    let end_date: DateTime<Utc> =
                         start_date.checked_add_signed(Duration::days(10)).unwrap();
 
                     let mut current: BTreeMap<String, UserStatus> = BTreeMap::new();
@@ -87,7 +99,7 @@ pub(super) async fn handle_command(
                         UserStatus {
                             comment_id: "comment_id".to_string(),
                             text: "something".to_string(),
-                            reversibility: Reversible,
+                            reversibility: Reversibility::Reversible,
                             resolution: Merge,
                         },
                     );
@@ -103,6 +115,21 @@ pub(super) async fn handle_command(
                         &history,
                         &reversibility,
                         &Merge,
+                    )
+                    .await?;
+
+                    let metadata = serde_json::value::to_value(DecisionProcessActionMetadata {
+                        message: "some message".to_string(),
+                        get_issue_url: format!("{}/issues/{}", issue.repository().url(), issue.number),
+                        status: Merge,
+                    })
+                    .unwrap();
+
+                    insert_job(
+                        &db,
+                        &DECISION_PROCESS_JOB_NAME.to_string(),
+                        &end_date,
+                        &metadata,
                     )
                     .await?;
 

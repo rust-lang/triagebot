@@ -2,7 +2,7 @@
 //! the decision process state of each issue
 
 use anyhow::{Context as _, Result};
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Utc};
 use parser::command::decision::{Resolution, Reversibility};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -12,8 +12,8 @@ use tokio_postgres::Client as DbClient;
 pub struct IssueDecisionState {
     pub issue_id: i64,
     pub initiator: String,
-    pub start_date: DateTime<FixedOffset>,
-    pub end_date: DateTime<FixedOffset>,
+    pub start_date: DateTime<Utc>,
+    pub end_date: DateTime<Utc>,
     pub current: BTreeMap<String, UserStatus>,
     pub history: BTreeMap<String, Vec<UserStatus>>,
     pub reversibility: Reversibility,
@@ -32,8 +32,8 @@ pub async fn insert_issue_decision_state(
     db: &DbClient,
     issue_number: &u64,
     initiator: &String,
-    start_date: &DateTime<FixedOffset>,
-    end_date: &DateTime<FixedOffset>,
+    start_date: &DateTime<Utc>,
+    end_date: &DateTime<Utc>,
     current: &BTreeMap<String, UserStatus>,
     history: &BTreeMap<String, Vec<UserStatus>>,
     reversibility: &Reversibility,
@@ -56,7 +56,7 @@ pub async fn insert_issue_decision_state(
 pub async fn update_issue_decision_state(
     db: &DbClient,
     issue_number: &u64,
-    end_date: &DateTime<FixedOffset>,
+    end_date: &DateTime<Utc>,
     current: &BTreeMap<String, UserStatus>,
     history: &BTreeMap<String, Vec<UserStatus>>,
     reversibility: &Reversibility,
@@ -95,8 +95,8 @@ pub async fn get_issue_decision_state(
 fn deserialize_issue_decision_state(row: &tokio_postgres::row::Row) -> Result<IssueDecisionState> {
     let issue_id: i64 = row.try_get(0)?;
     let initiator: String = row.try_get(1)?;
-    let start_date: DateTime<FixedOffset> = row.try_get(2)?;
-    let end_date: DateTime<FixedOffset> = row.try_get(3)?;
+    let start_date: DateTime<Utc> = row.try_get(2)?;
+    let end_date: DateTime<Utc> = row.try_get(3)?;
     let current: BTreeMap<String, UserStatus> = serde_json::from_value(row.try_get(4).unwrap())?;
     let history: BTreeMap<String, Vec<UserStatus>> =
         serde_json::from_value(row.try_get(5).unwrap())?;
