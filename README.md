@@ -41,6 +41,19 @@ The general overview of what you will need to do:
    Or, you can use a service such as https://ngrok.com/ to access on your local dev machine via localhost.
    Installation is fairly simple, though requires setting up a (free) account.
    Run the command `ngrok http 8000` to forward to port 8000 on localhost.
+
+   > Note: GitHub has a webhook forwarding service available in beta.
+   > See [cli/gh-webhook](https://docs.github.com/en/developers/webhooks-and-events/webhooks/receiving-webhooks-with-the-github-cli) for more information.
+   > This is super easy to use, and doesn't require manually configuring webhook settings.
+   > The command to run looks something like:
+   >
+   > ```sh
+   > gh webhook forward --repo=ehuss/triagebot-test --events=* \
+   >     --url=http://127.0.0.1:8000/github-hook --secret somelongsekrit
+   > ```
+   >
+   > Where the value in `--secret` is the secret value you place in `GITHUB_WEBHOOK_SECRET` described below, and `--repo` is the repo you want to test against.
+
 4. Create a GitHub repo to run some tests on.
 5. Configure the webhook in your GitHub repo.
    I recommend at least skimming the [GitHub webhook documentation](https://docs.github.com/en/developers/webhooks-and-events/webhooks/about-webhooks) if you are not familiar with webhooks. In short:
@@ -66,6 +79,17 @@ The general overview of what you will need to do:
 7. Run `cargo run --bin triagebot`. This starts the http server listening on port 8000.
 8. Add a `triagebot.toml` file to the main branch of your GitHub repo with whichever services you want to try out.
 9. Try interacting with your repo, such as issuing `@rustbot` commands or interacting with PRs and issues (depending on which services you enabled in `triagebot.toml`). Watch the logs from the server to see what's going on.
+
+## Tests
+
+When possible, writing unittests is very helpful and one of the easiest ways to test.
+For more advanced testing, there is an integration test called `testsuite` which provides an end-to-end service for testing triagebot.
+There are two parts to it:
+
+* [`github_client`](tests/github_client/mod.rs) — Tests specifically targeting `GithubClient`.
+  This sets up an HTTP server that mimics api.github.com and verifies the client's behavior.
+* [`server_test`](tests/server_test/mod.rs) — This tests the `triagebot` server itself and its behavior when it receives a webhook.
+  This launches the `triagebot` server, sets up HTTP servers to intercept api.github.com requests, launches PostgreSQL in a sandbox, and then injects webhook events into the `triagebot` server and validates its response.
 
 ## License
 
