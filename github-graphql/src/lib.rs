@@ -11,7 +11,7 @@ pub mod queries {
 
     cynic::impl_scalar!(DateTime, schema::DateTime);
 
-    #[derive(cynic::FragmentArguments, Debug)]
+    #[derive(cynic::QueryVariables, Debug, Clone)]
     pub struct LeastRecentlyReviewedPullRequestsArguments {
         pub repository_owner: String,
         pub repository_name: String,
@@ -21,17 +21,23 @@ pub mod queries {
     #[derive(cynic::QueryFragment, Debug)]
     #[cynic(
         graphql_type = "Query",
-        argument_struct = "LeastRecentlyReviewedPullRequestsArguments"
+        variables = "LeastRecentlyReviewedPullRequestsArguments"
     )]
     pub struct LeastRecentlyReviewedPullRequests {
-        #[arguments(owner = &args.repository_owner, name = &args.repository_name)]
+        #[arguments(owner: $repository_owner, name: $repository_name)]
         pub repository: Option<Repository>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
-    #[cynic(argument_struct = "LeastRecentlyReviewedPullRequestsArguments")]
+    #[cynic(variables = "LeastRecentlyReviewedPullRequestsArguments")]
     pub struct Repository {
-        #[arguments(states = Some(vec![PullRequestState::Open]), first = 100, after = &args.after, labels = Some(vec!["S-waiting-on-review".to_string()]), order_by = IssueOrder { direction: OrderDirection::Asc, field: IssueOrderField::UpdatedAt })]
+        #[arguments(
+            states: "OPEN",
+            first: 100,
+            after: $after,
+            labels: ["S-waiting-on-review"],
+            orderBy: {direction: "ASC", field: "UPDATED_AT"}
+        )]
         pub pull_requests: PullRequestConnection,
     }
 
@@ -39,7 +45,8 @@ pub mod queries {
     pub struct PullRequestConnection {
         pub total_count: i32,
         pub page_info: PageInfo,
-        pub nodes: Option<Vec<Option<PullRequest>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<PullRequest>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -53,7 +60,7 @@ pub mod queries {
         pub is_draft: bool,
         #[arguments(first = 100)]
         pub assignees: UserConnection,
-        #[arguments(first = 100, order_by = IssueCommentOrder { direction: OrderDirection::Desc, field: IssueCommentOrderField::UpdatedAt })]
+        #[arguments(first = 100, orderBy: { direction: "DESC", field: "UPDATED_AT" })]
         pub comments: IssueCommentConnection,
         #[arguments(last = 20)]
         pub latest_reviews: Option<PullRequestReviewConnection>,
@@ -62,7 +69,8 @@ pub mod queries {
     #[derive(cynic::QueryFragment, Debug)]
     pub struct PullRequestReviewConnection {
         pub total_count: i32,
-        pub nodes: Option<Vec<Option<PullRequestReview>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<PullRequestReview>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -73,7 +81,8 @@ pub mod queries {
 
     #[derive(cynic::QueryFragment, Debug)]
     pub struct UserConnection {
-        pub nodes: Option<Vec<Option<User>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<User>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -89,7 +98,8 @@ pub mod queries {
 
     #[derive(cynic::QueryFragment, Debug)]
     pub struct LabelConnection {
-        pub nodes: Option<Vec<Option<Label>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<Label>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -100,7 +110,8 @@ pub mod queries {
     #[derive(cynic::QueryFragment, Debug)]
     pub struct IssueCommentConnection {
         pub total_count: i32,
-        pub nodes: Option<Vec<Option<IssueComment>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<IssueComment>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -109,49 +120,13 @@ pub mod queries {
         pub created_at: DateTime,
     }
 
-    #[derive(cynic::Enum, Clone, Copy, Debug)]
-    pub enum IssueCommentOrderField {
-        UpdatedAt,
-    }
-
-    #[derive(cynic::Enum, Clone, Copy, Debug)]
-    pub enum IssueOrderField {
-        Comments,
-        CreatedAt,
-        UpdatedAt,
-    }
-
-    #[derive(cynic::Enum, Clone, Copy, Debug)]
-    pub enum OrderDirection {
-        Asc,
-        Desc,
-    }
-
-    #[derive(cynic::Enum, Clone, Copy, Debug)]
-    pub enum PullRequestState {
-        Closed,
-        Merged,
-        Open,
-    }
-
-    #[derive(cynic::InputObject, Debug)]
-    pub struct IssueOrder {
-        pub direction: OrderDirection,
-        pub field: IssueOrderField,
-    }
-
-    #[derive(cynic::InputObject, Debug)]
-    pub struct IssueCommentOrder {
-        pub direction: OrderDirection,
-        pub field: IssueCommentOrderField,
-    }
-
     #[derive(cynic::QueryFragment, Debug)]
     pub struct Actor {
         pub login: String,
     }
 
     #[derive(cynic::Scalar, Debug, Clone)]
+    #[cynic(graphql_type = "URI")]
     pub struct Uri(pub String);
 }
 
@@ -160,7 +135,7 @@ pub mod docs_update_queries {
     use super::queries::{DateTime, PageInfo};
     use super::schema;
 
-    #[derive(cynic::FragmentArguments, Debug)]
+    #[derive(cynic::QueryVariables, Clone, Debug)]
     pub struct RecentCommitsArguments {
         pub branch: String,
         pub name: String,
@@ -208,30 +183,30 @@ pub mod docs_update_queries {
     /// }
     /// ```
     #[derive(cynic::QueryFragment, Debug)]
-    #[cynic(graphql_type = "Query", argument_struct = "RecentCommitsArguments")]
+    #[cynic(graphql_type = "Query", variables = "RecentCommitsArguments")]
     pub struct RecentCommits {
-        #[arguments(name = &args.name, owner = &args.owner)]
+        #[arguments(name: $name, owner: $owner)]
         pub repository: Option<Repository>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
-    #[cynic(argument_struct = "RecentCommitsArguments")]
+    #[cynic(variables = "RecentCommitsArguments")]
     pub struct Repository {
-        #[arguments(qualified_name = &args.branch)]
+        #[arguments(qualifiedName: $branch)]
         #[cynic(rename = "ref")]
         pub ref_: Option<Ref>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
-    #[cynic(argument_struct = "RecentCommitsArguments")]
+    #[cynic(variables = "RecentCommitsArguments")]
     pub struct Ref {
         pub target: Option<GitObject>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
-    #[cynic(argument_struct = "RecentCommitsArguments")]
+    #[cynic(variables = "RecentCommitsArguments")]
     pub struct Commit {
-        #[arguments(first = 100, after = &args.after)]
+        #[arguments(first: 100, after: $after)]
         pub history: CommitHistoryConnection,
     }
 
@@ -239,7 +214,8 @@ pub mod docs_update_queries {
     pub struct CommitHistoryConnection {
         pub total_count: i32,
         pub page_info: PageInfo,
-        pub nodes: Option<Vec<Option<Commit2>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<Commit2>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -256,7 +232,8 @@ pub mod docs_update_queries {
 
     #[derive(cynic::QueryFragment, Debug)]
     pub struct PullRequestConnection {
-        pub nodes: Option<Vec<Option<PullRequest>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<PullRequest>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -267,7 +244,8 @@ pub mod docs_update_queries {
 
     #[derive(cynic::QueryFragment, Debug)]
     pub struct CommitConnection {
-        pub nodes: Option<Vec<Option<Commit3>>>,
+        #[cynic(flatten)]
+        pub nodes: Vec<Commit3>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -277,33 +255,18 @@ pub mod docs_update_queries {
     }
 
     #[derive(cynic::InlineFragments, Debug)]
-    #[cynic(argument_struct = "RecentCommitsArguments")]
+    #[cynic(variables = "RecentCommitsArguments")]
     pub enum GitObject {
         Commit(Commit),
-        // These three variants are here just to pacify cynic. I don't know
-        // why it fails to compile without them.
-        Tree(Tree),
-        Tag(Tag),
-        Blob(Blob),
-    }
-
-    #[derive(cynic::QueryFragment, Debug)]
-    pub struct Tree {
-        pub id: cynic::Id,
-    }
-    #[derive(cynic::QueryFragment, Debug)]
-    pub struct Tag {
-        pub id: cynic::Id,
-    }
-    #[derive(cynic::QueryFragment, Debug)]
-    pub struct Blob {
-        pub id: cynic::Id,
+        #[cynic(fallback)]
+        Other,
     }
 
     #[derive(cynic::Scalar, Debug, Clone)]
     pub struct GitObjectID(pub String);
 }
 
+#[allow(non_snake_case, non_camel_case_types)]
 mod schema {
     cynic::use_schema!("src/github.graphql");
 }
