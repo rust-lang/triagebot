@@ -254,7 +254,7 @@ pub struct Issue {
     pub number: u64,
     #[serde(deserialize_with = "opt_string")]
     pub body: String,
-    created_at: chrono::DateTime<Utc>,
+    pub created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
     /// The SHA for a merge commit.
     ///

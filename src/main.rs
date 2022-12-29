@@ -219,6 +219,7 @@ async fn serve_req(
                 .unwrap());
         }
     };
+    maybe_record_test(&event, &payload);
 
     match triagebot::webhook(event, payload, &ctx).await {
         Ok(true) => Ok(Response::new(Body::from("processed request"))),
@@ -233,6 +234,70 @@ async fn serve_req(
     }
 }
 
+/// Webhook recording to help with writing server_test integration tests.
+fn maybe_record_test(event: &EventName, payload: &str) {
+    if std::env::var_os("TRIAGEBOT_TEST_RECORD").is_none() {
+        return;
+    }
+    let sequence_path = |name| {
+        let path = PathBuf::from(format!("{name}.json"));
+        if !path.exists() {
+            return path;
+        }
+        let mut index = 1;
+        loop {
+            let path = PathBuf::from(format!("{name}.{index}.json"));
+            if !path.exists() {
+                return path;
+            }
+            index += 1;
+        }
+    };
+    let payload_json: serde_json::Value = serde_json::from_str(payload).expect("valid json");
+    let name = match event {
+        EventName::PullRequest => {
+            let action = payload_json["action"].as_str().unwrap();
+            let number = payload_json["number"].as_u64().unwrap();
+            format!("pr{number}_{action}")
+        }
+        EventName::PullRequestReview => {
+            let action = payload_json["action"].as_str().unwrap();
+            let number = payload_json["pull_request"]["number"].as_u64().unwrap();
+            format!("pr{number}_review_{action}")
+        }
+        EventName::PullRequestReviewComment => {
+            let action = payload_json["action"].as_str().unwrap();
+            let number = payload_json["pull_request"]["number"].as_u64().unwrap();
+            format!("pr{number}_review_comment_{action}")
+        }
+        EventName::IssueComment => {
+            let action = payload_json["action"].as_str().unwrap();
+            let number = payload_json["issue"]["number"].as_u64().unwrap();
+            format!("issue{number}_comment_{action}")
+        }
+        EventName::Issue => {
+            let action = payload_json["action"].as_str().unwrap();
+            let number = payload_json["issue"]["number"].as_u64().unwrap();
+            format!("issue{number}_{action}")
+        }
+        EventName::Push => {
+            let after = payload_json["after"].as_str().unwrap();
+            format!("push_{after}")
+        }
+        EventName::Create => {
+            let ref_type = payload_json["ref_type"].as_str().unwrap();
+            let git_ref = payload_json["ref"].as_str().unwrap();
+            format!("create_{ref_type}_{git_ref}")
+        }
+        EventName::Other => {
+            return;
+        }
+    };
+    let path = sequence_path(name);
+    std::fs::write(&path, payload).unwrap();
+    log::info!("recorded JSON payload to {:?}", path);
+}
+
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     let pool = db::ClientPool::new();
     db::run_migrations(&*pool.get().await)
@@ -242,6 +307,9 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     // spawning a background task that will schedule the jobs
     // every JOB_SCHEDULING_CADENCE_IN_SECS
     task::spawn(async move {
+        if env::var_os("TRIAGEBOT_TEST_DISABLE_JOBS").is_some() {
+            return;
+        }
         loop {
             let res = task::spawn(async move {
                 let pool = db::ClientPool::new();
