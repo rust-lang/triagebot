@@ -1,0 +1,39 @@
+{
+  "sha": "109cccbe4f345c0f0785ce860788580c3e2a29f5",
+  "node_id": "C_kwDOAAsO6NoAKDEwOWNjY2JlNGYzNDVjMGYwNzg1Y2U4NjA3ODg1ODBjM2UyYTI5ZjU",
+  "url": "https://api.github.com/repos/rust-lang/rust/git/commits/109cccbe4f345c0f0785ce860788580c3e2a29f5",
+  "html_url": "https://github.com/rust-lang/rust/commit/109cccbe4f345c0f0785ce860788580c3e2a29f5",
+  "author": {
+    "name": "bors",
+    "email": "bors@rust-lang.org",
+    "date": "2022-12-13T07:10:53Z"
+  },
+  "committer": {
+    "name": "bors",
+    "email": "bors@rust-lang.org",
+    "date": "2022-12-13T07:10:53Z"
+  },
+  "tree": {
+    "sha": "e67d87c61892169977204cc2e3fd89b2a19e13bb",
+    "url": "https://api.github.com/repos/rust-lang/rust/git/trees/e67d87c61892169977204cc2e3fd89b2a19e13bb"
+  },
+  "message": "Auto merge of #105350 - compiler-errors:faster-binder-relate, r=oli-obk\n\nFast-path some binder relations\n\nA simpler approach than #104598\n\nFixes #104583\n\nr? types",
+  "parents": [
+    {
+      "sha": "71ec1457ee9868a838e4521a3510cdd416c0c295",
+      "url": "https://api.github.com/repos/rust-lang/rust/git/commits/71ec1457ee9868a838e4521a3510cdd416c0c295",
+      "html_url": "https://github.com/rust-lang/rust/commit/71ec1457ee9868a838e4521a3510cdd416c0c295"
+    },
+    {
+      "sha": "2025a96ee1a699722da73993995b6f0572374757",
+      "url": "https://api.github.com/repos/rust-lang/rust/git/commits/2025a96ee1a699722da73993995b6f0572374757",
+      "html_url": "https://github.com/rust-lang/rust/commit/2025a96ee1a699722da73993995b6f0572374757"
+    }
+  ],
+  "verification": {
+    "verified": false,
+    "reason": "unsigned",
+    "signature": null,
+    "payload": null
+  }
+}

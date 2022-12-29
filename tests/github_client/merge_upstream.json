@@ -1,0 +1,5 @@
+{
+  "message": "Successfully fetched and fast-forwarded from upstream rust-lang:master.",
+  "merge_type": "fast-forward",
+  "base_branch": "rust-lang:master"
+}

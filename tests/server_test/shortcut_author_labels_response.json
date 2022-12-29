@@ -1,0 +1,11 @@
+[
+  {
+    "id": 583436937,
+    "node_id": "MDU6TGFiZWw1ODM0MzY5Mzc=",
+    "url": "https://api.github.com/repos/rust-lang/rust/labels/S-waiting-on-author",
+    "name": "S-waiting-on-author",
+    "color": "d3dddd",
+    "default": false,
+    "description": "Status: This is awaiting some action (such as code changes or more information) from the author."
+  }
+]

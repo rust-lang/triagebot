@@ -1,0 +1,14 @@
+{
+  "all": {
+    "name": "all",
+    "kind": "team",
+    "subteam_of": null,
+    "members": [],
+    "alumni": [],
+    "github": {
+      "teams": []
+    },
+    "website_data": null,
+    "discord": []
+  }
+}

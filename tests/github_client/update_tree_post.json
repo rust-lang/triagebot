@@ -1,0 +1,225 @@
+{
+  "sha": "bef1883908d15f4c900cd8229c9331bacade900a",
+  "url": "https://api.github.com/repos/rust-lang/rust/git/trees/bef1883908d15f4c900cd8229c9331bacade900a",
+  "tree": [
+    {
+      "path": ".editorconfig",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ec6e107d547f0e6d7ff63e4866a641e3d2c4d1a5",
+      "size": 417,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/ec6e107d547f0e6d7ff63e4866a641e3d2c4d1a5"
+    },
+    {
+      "path": ".git-blame-ignore-revs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b40066d05d355ec05aef4c9c018aa56586bea2bd",
+      "size": 254,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/b40066d05d355ec05aef4c9c018aa56586bea2bd"
+    },
+    {
+      "path": ".gitattributes",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "51a670b5fbefdaf7904f1d304ea482b0543bc9a9",
+      "size": 464,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/51a670b5fbefdaf7904f1d304ea482b0543bc9a9"
+    },
+    {
+      "path": ".github",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "cf209b87c7c58924568a47a5e751ceb276d082ab",
+      "url": "https://api.github.com/repos/rust-lang/rust/git/trees/cf209b87c7c58924568a47a5e751ceb276d082ab"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "37972532b361429f281f8d52f34ea4d1ca621540",
+      "size": 1295,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/37972532b361429f281f8d52f34ea4d1ca621540"
+    },
+    {
+      "path": ".gitmodules",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c85049378061317bd6fe82f2fcc0a574a8318c89",
+      "size": 1365,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/c85049378061317bd6fe82f2fcc0a574a8318c89"
+    },
+    {
+      "path": ".mailmap",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f887d29096e038fe5eab11d838095fe916dfa97c",
+      "size": 28441,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/f887d29096e038fe5eab11d838095fe916dfa97c"
+    },
+    {
+      "path": ".reuse",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "60a2be0267d564a5c4f7e0c95949ebd1504587fa",
+      "url": "https://api.github.com/repos/rust-lang/rust/git/trees/60a2be0267d564a5c4f7e0c95949ebd1504587fa"
+    },
+    {
+      "path": "CODE_OF_CONDUCT.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e3708bc485399fd42b32c6a1c24491771afa1a04",
+      "size": 131,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/e3708bc485399fd42b32c6a1c24491771afa1a04"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "223fd0065bf4a0cd78ba6847a3ec694f3e0da5eb",
+      "size": 2415,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/223fd0065bf4a0cd78ba6847a3ec694f3e0da5eb"
+    },
+    {
+      "path": "COPYRIGHT",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "05993830a0fb4ab5d30336f75be3e5001e1fc770",
+      "size": 21109,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/05993830a0fb4ab5d30336f75be3e5001e1fc770"
+    },
+    {
+      "path": "Cargo.lock",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fb6140e74fea4bb65d291a6c50706e75908b1927",
+      "size": 125300,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/fb6140e74fea4bb65d291a6c50706e75908b1927"
+    },
+    {
+      "path": "Cargo.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "13a98eedde86704608ea81167f78ea3e3f5cae69",
+      "size": 4384,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/13a98eedde86704608ea81167f78ea3e3f5cae69"
+    },
+    {
+      "path": "LICENSE-APACHE",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d",
+      "size": 9723,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d"
+    },
+    {
+      "path": "LICENSE-MIT",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "31aa79387f27e730e33d871925e152e35e428031",
+      "size": 1023,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/31aa79387f27e730e33d871925e152e35e428031"
+    },
+    {
+      "path": "LICENSES",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "becd2a10deac1bb9b517a0f52f9bff18f5d0db52",
+      "url": "https://api.github.com/repos/rust-lang/rust/git/trees/becd2a10deac1bb9b517a0f52f9bff18f5d0db52"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "27e7145c5a99e4afadff029b4685473f0423ac5f",
+      "size": 10309,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/27e7145c5a99e4afadff029b4685473f0423ac5f"
+    },
+    {
+      "path": "RELEASES.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5c1990bb6c97bca9952a7bdefe4151cf24511a56",
+      "size": 613043,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/5c1990bb6c97bca9952a7bdefe4151cf24511a56"
+    },
+    {
+      "path": "compiler",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "fe2183ff56a0636f7e691d0d093ad3d87a182889",
+      "url": "https://api.github.com/repos/rust-lang/rust/git/trees/fe2183ff56a0636f7e691d0d093ad3d87a182889"
+    },
+    {
+      "path": "config.toml.example",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c94a27b12a3a73661f7295f57a79f152ba3b9c3c",
+      "size": 33518,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/c94a27b12a3a73661f7295f57a79f152ba3b9c3c"
+    },
+    {
+      "path": "configure",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "81e2001e4a583ef1f117a46593acd1705995ed85",
+      "size": 292,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/81e2001e4a583ef1f117a46593acd1705995ed85"
+    },
+    {
+      "path": "library",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "12b6faffadda6f643a2fbc83ebe031d8249e8f14",
+      "url": "https://api.github.com/repos/rust-lang/rust/git/trees/12b6faffadda6f643a2fbc83ebe031d8249e8f14"
+    },
+    {
+      "path": "rustfmt.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aa0d4888f082dadf7f889c8b18286f0a14dfe54b",
+      "size": 1307,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/aa0d4888f082dadf7f889c8b18286f0a14dfe54b"
+    },
+    {
+      "path": "src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ff6d21da0d87a39169805e8824754b2301cfb4e5",
+      "url": "https://api.github.com/repos/rust-lang/rust/git/trees/ff6d21da0d87a39169805e8824754b2301cfb4e5"
+    },
+    {
+      "path": "triagebot.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "985e065652d620b021cc1224a45fead4601336b2",
+      "size": 16334,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/985e065652d620b021cc1224a45fead4601336b2"
+    },
+    {
+      "path": "x",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "4309b82627c9c47917df4ef29c9ef8c4a3020544",
+      "size": 1161,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/4309b82627c9c47917df4ef29c9ef8c4a3020544"
+    },
+    {
+      "path": "x.ps1",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "81b98919f436cdad411ed6f3c8c55a4180382720",
+      "size": 1381,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/81b98919f436cdad411ed6f3c8c55a4180382720"
+    },
+    {
+      "path": "x.py",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "6df4033d55d7273bd064cedbddf4c959ee1dd301",
+      "size": 878,
+      "url": "https://api.github.com/repos/rust-lang/rust/git/blobs/6df4033d55d7273bd064cedbddf4c959ee1dd301"
+    }
+  ],
+  "truncated": false
+}

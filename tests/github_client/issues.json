@@ -1,0 +1,245 @@
+[
+  {
+    "url": "https://api.github.com/repos/rust-lang/rust/issues/105782",
+    "repository_url": "https://api.github.com/repos/rust-lang/rust",
+    "labels_url": "https://api.github.com/repos/rust-lang/rust/issues/105782/labels{/name}",
+    "comments_url": "https://api.github.com/repos/rust-lang/rust/issues/105782/comments",
+    "events_url": "https://api.github.com/repos/rust-lang/rust/issues/105782/events",
+    "html_url": "https://github.com/rust-lang/rust/issues/105782",
+    "id": 1500394507,
+    "node_id": "I_kwDOAAsO6M5ZbjQL",
+    "number": 105782,
+    "title": "specialization: default items completely drop candidates instead of ambiguity",
+    "user": {
+      "login": "lcnr",
+      "id": 29864074,
+      "node_id": "MDQ6VXNlcjI5ODY0MDc0",
+      "avatar_url": "https://avatars.githubusercontent.com/u/29864074?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/lcnr",
+      "html_url": "https://github.com/lcnr",
+      "followers_url": "https://api.github.com/users/lcnr/followers",
+      "following_url": "https://api.github.com/users/lcnr/following{/other_user}",
+      "gists_url": "https://api.github.com/users/lcnr/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/lcnr/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/lcnr/subscriptions",
+      "organizations_url": "https://api.github.com/users/lcnr/orgs",
+      "repos_url": "https://api.github.com/users/lcnr/repos",
+      "events_url": "https://api.github.com/users/lcnr/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/lcnr/received_events",
+      "type": "User",
+      "site_admin": false
+    },
+    "labels": [
+      {
+        "id": 13836860,
+        "node_id": "MDU6TGFiZWwxMzgzNjg2MA==",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/A-traits",
+        "name": "A-traits",
+        "color": "f7e101",
+        "default": false,
+        "description": "Area: Trait system"
+      },
+      {
+        "id": 267612997,
+        "node_id": "MDU6TGFiZWwyNjc2MTI5OTc=",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/I-unsound",
+        "name": "I-unsound",
+        "color": "e11d21",
+        "default": false,
+        "description": "Issue: A soundness hole (worst kind of bug), see: https://en.wikipedia.org/wiki/Soundness"
+      },
+      {
+        "id": 347795552,
+        "node_id": "MDU6TGFiZWwzNDc3OTU1NTI=",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/A-specialization",
+        "name": "A-specialization",
+        "color": "f7e101",
+        "default": false,
+        "description": "Area: Trait impl specialization"
+      },
+      {
+        "id": 650731663,
+        "node_id": "MDU6TGFiZWw2NTA3MzE2NjM=",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/C-bug",
+        "name": "C-bug",
+        "color": "f5f1fd",
+        "default": false,
+        "description": "Category: This is a bug."
+      },
+      {
+        "id": 1472563007,
+        "node_id": "MDU6TGFiZWwxNDcyNTYzMDA3",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/requires-nightly",
+        "name": "requires-nightly",
+        "color": "76dcde",
+        "default": false,
+        "description": "This issue requires a nightly compiler in some way."
+      },
+      {
+        "id": 1472579062,
+        "node_id": "MDU6TGFiZWwxNDcyNTc5MDYy",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/F-specialization",
+        "name": "F-specialization",
+        "color": "f9c0cc",
+        "default": false,
+        "description": "`#![feature(specialization)]`"
+      },
+      {
+        "id": 4917350639,
+        "node_id": "LA_kwDOAAsO6M8AAAABJRjQ7w",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/A-coherence",
+        "name": "A-coherence",
+        "color": "f7e101",
+        "default": false,
+        "description": "Area: Coherence"
+      }
+    ],
+    "state": "open",
+    "locked": false,
+    "assignee": null,
+    "assignees": [
+
+    ],
+    "milestone": null,
+    "comments": 0,
+    "created_at": "2022-12-16T15:11:15Z",
+    "updated_at": "2022-12-16T16:17:41Z",
+    "closed_at": null,
+    "author_association": "MEMBER",
+    "active_lock_reason": null,
+    "body": "which is unsound during coherence, as coherence requires completeness\r\n```rust\r\n#![feature(specialization)]\r\n\r\ntrait Default {\r\n   type Id;\r\n}\r\n\r\nimpl<T> Default for T {\r\n   default type Id = T;\r\n}\r\n\r\ntrait Overlap {\r\n   type Assoc;\r\n}\r\n\r\nimpl Overlap for u32 {\r\n   type Assoc = usize;\r\n}\r\n\r\nimpl Overlap for <u32 as Default>::Id {\r\n   type Assoc = Box<usize>;\r\n}\r\n```\r\n\r\nhttps://github.com/rust-lang/rust/blob/03770f0e2b60c02db8fcf52fed5fb36aac70cedc/compiler/rustc_trait_selection/src/traits/project.rs#L1526",
+    "reactions": {
+      "url": "https://api.github.com/repos/rust-lang/rust/issues/105782/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "timeline_url": "https://api.github.com/repos/rust-lang/rust/issues/105782/timeline",
+    "performed_via_github_app": null,
+    "state_reason": null
+  },
+  {
+    "url": "https://api.github.com/repos/rust-lang/rust/issues/105787",
+    "repository_url": "https://api.github.com/repos/rust-lang/rust",
+    "labels_url": "https://api.github.com/repos/rust-lang/rust/issues/105787/labels{/name}",
+    "comments_url": "https://api.github.com/repos/rust-lang/rust/issues/105787/comments",
+    "events_url": "https://api.github.com/repos/rust-lang/rust/issues/105787/events",
+    "html_url": "https://github.com/rust-lang/rust/issues/105787",
+    "id": 1500501670,
+    "node_id": "I_kwDOAAsO6M5Zb9am",
+    "number": 105787,
+    "title": "occurs check with projections results in error, not ambiguity",
+    "user": {
+      "login": "lcnr",
+      "id": 29864074,
+      "node_id": "MDQ6VXNlcjI5ODY0MDc0",
+      "avatar_url": "https://avatars.githubusercontent.com/u/29864074?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/lcnr",
+      "html_url": "https://github.com/lcnr",
+      "followers_url": "https://api.github.com/users/lcnr/followers",
+      "following_url": "https://api.github.com/users/lcnr/following{/other_user}",
+      "gists_url": "https://api.github.com/users/lcnr/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/lcnr/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/lcnr/subscriptions",
+      "organizations_url": "https://api.github.com/users/lcnr/orgs",
+      "repos_url": "https://api.github.com/users/lcnr/repos",
+      "events_url": "https://api.github.com/users/lcnr/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/lcnr/received_events",
+      "type": "User",
+      "site_admin": false
+    },
+    "labels": [
+      {
+        "id": 13836860,
+        "node_id": "MDU6TGFiZWwxMzgzNjg2MA==",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/A-traits",
+        "name": "A-traits",
+        "color": "f7e101",
+        "default": false,
+        "description": "Area: Trait system"
+      },
+      {
+        "id": 60344715,
+        "node_id": "MDU6TGFiZWw2MDM0NDcxNQ==",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/P-medium",
+        "name": "P-medium",
+        "color": "eb6420",
+        "default": false,
+        "description": "Medium priority"
+      },
+      {
+        "id": 267612997,
+        "node_id": "MDU6TGFiZWwyNjc2MTI5OTc=",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/I-unsound",
+        "name": "I-unsound",
+        "color": "e11d21",
+        "default": false,
+        "description": "Issue: A soundness hole (worst kind of bug), see: https://en.wikipedia.org/wiki/Soundness"
+      },
+      {
+        "id": 650731663,
+        "node_id": "MDU6TGFiZWw2NTA3MzE2NjM=",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/C-bug",
+        "name": "C-bug",
+        "color": "f5f1fd",
+        "default": false,
+        "description": "Category: This is a bug."
+      },
+      {
+        "id": 4172483496,
+        "node_id": "LA_kwDOAAsO6M74swuo",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/T-types",
+        "name": "T-types",
+        "color": "bfd4f2",
+        "default": false,
+        "description": "Relevant to the types team, which will review and decide on the PR/issue."
+      },
+      {
+        "id": 4917350639,
+        "node_id": "LA_kwDOAAsO6M8AAAABJRjQ7w",
+        "url": "https://api.github.com/repos/rust-lang/rust/labels/A-coherence",
+        "name": "A-coherence",
+        "color": "f7e101",
+        "default": false,
+        "description": "Area: Coherence"
+      }
+    ],
+    "state": "open",
+    "locked": false,
+    "assignee": null,
+    "assignees": [
+
+    ],
+    "milestone": null,
+    "comments": 1,
+    "created_at": "2022-12-16T16:16:11Z",
+    "updated_at": "2022-12-17T05:07:04Z",
+    "closed_at": null,
+    "author_association": "MEMBER",
+    "active_lock_reason": null,
+    "body": "```rust\r\n// Using the higher ranked projection hack to prevent us from replacing the projection\r\n// with an inference variable.\r\ntrait ToUnit<'a> {\r\n    type Unit;\r\n}\r\n\r\nstruct LocalTy;\r\nimpl<'a> ToUnit<'a> for *const LocalTy {\r\n    type Unit = ();\r\n}\r\n\r\nimpl<'a, T: Copy + ?Sized> ToUnit<'a> for *const T {\r\n    type Unit = ();\r\n}\r\n\r\ntrait Overlap<T> {\r\n    type Assoc;\r\n}\r\n\r\ntype Assoc<'a, T> = <*const T as ToUnit<'a>>::Unit;\r\n\r\nimpl<T> Overlap<T> for T {\r\n    type Assoc = usize;\r\n}\r\n\r\nimpl<T> Overlap<for<'a> fn(&'a (), Assoc<'a, T>)> for T\r\nwhere\r\n    for<'a> *const T: ToUnit<'a>,\r\n{\r\n    type Assoc = Box<usize>;\r\n}\r\n\r\nfn foo<T: Overlap<U>, U>(x: T::Assoc) -> T::Assoc {\r\n    x\r\n}\r\n\r\nfn main() {\r\n    foo::<for<'a> fn(&'a (), ()), for<'a> fn(&'a (), ())>(3usize);\r\n}\r\n```\r\n\r\n`for<'a> fn(&'a (), ())>: Overlap<for<'a> fn(&'a (), ())>>` can be satisfied using both impls, ignoring a deficiency of the current normalization routine which means that right now the second impl pretty much never applies.\r\n\r\nCurrently inference constraints from equating the self type are not used to normalize the trait argument so we fail when equating `()` with `Assoc<'a, for<'a> fn(&'a (), ())>` even those these two are the same type. This will change once deferred projection equality is implemented.\r\n\r\n## why this currently passes coherence\r\n\r\nCoherence does a pairwise check for all relevant impls. It starts by instantiating the impl parameters with inference vars and equating the impl headers. When we do that with `Overlap<T> for T` and `Overlap<for<'a> fn(&'a (), Assoc<'a, T>)> for T` we have:\r\n\r\n- `eq(?0: Overflap<?0>, ?1: Overlap<for<'a> fn(&'a (), <*const ?1 as ToUnit<'a>>::Unit)>)`\r\n    - `eq(?0, ?1)` constrains `?1` to be equal to `?0`\r\n    - `eq(?0, for<'a> fn(&'a (), <*const ?0 as ToUnit<'a>>::Unit)>)`: this now fails the occurs check\r\n\r\nThe occurs check is necessary to prevent ourselves from creating infinitely large types, e.g. `?0 = Vec<?0>`. But it does mean that coherence considers these two impls to be disjoint. Because the inference var only occurs inside of a projection, there's a way to equate these two types without resulting in an infinitely large type by normalizing the projection.",
+    "reactions": {
+      "url": "https://api.github.com/repos/rust-lang/rust/issues/105787/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "timeline_url": "https://api.github.com/repos/rust-lang/rust/issues/105787/timeline",
+    "performed_via_github_app": null,
+    "state_reason": null
+  }
+]

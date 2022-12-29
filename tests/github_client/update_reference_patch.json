@@ -1,0 +1,10 @@
+{
+  "ref": "refs/heads/docs-update",
+  "node_id": "MDM6UmVmMTE3NDY0NjI1OnJlZnMvaGVhZHMvZG9jcy11cGRhdGU=",
+  "url": "https://api.github.com/repos/rust-lang/rust/git/refs/heads/docs-update",
+  "object": {
+    "sha": "b7bc90fea3b441234a84b49fdafeb75815eebbab",
+    "type": "commit",
+    "url": "https://api.github.com/repos/rust-lang/rust/git/commits/b7bc90fea3b441234a84b49fdafeb75815eebbab"
+  }
+}
