@@ -36,7 +36,7 @@ serde_path_to_error = "0.1.2"
 octocrab = "0.9.1"
 comrak = "0.8.2"
 route-recognizer = "0.3.0"
-cynic = { version = "0.14" }
+cynic = { version = "2.0.0" }
 itertools = "0.10.2"
 tower = { version = "0.4.13", features = ["util", "limit", "buffer", "load-shed"] }
 github-graphql = { path = "github-graphql" }
