@@ -1896,7 +1896,7 @@ impl GithubClient {
             Ok(res) => res.is_empty(),
             Err(e) => {
                 log::warn!(
-                    "failed to search for user commits in {} for author {author}: {e}",
+                    "failed to search for user commits in {} for author {author}: {e:?}",
                     repo.full_name
                 );
                 false
