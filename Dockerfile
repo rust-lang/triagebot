@@ -18,12 +18,19 @@ RUN apt-get update -y && \
       pkg-config \
       git \
       cmake \
-      zlib1g-dev
+      zlib1g-dev \
+      postgresql
+
+# postgres does not allow running as root
+RUN groupadd -r builder && useradd -m -r -g builder builder
+USER builder
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- \
     --default-toolchain stable --profile minimal -y
 
-COPY . .
+COPY --chown=builder . /triagebot
+WORKDIR /triagebot
+
 RUN bash -c 'source $HOME/.cargo/env && cargo test --release --all'
 RUN bash -c 'source $HOME/.cargo/env && cargo build --release'
 
@@ -38,7 +45,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 
 RUN mkdir -p /opt/triagebot
 
-COPY --from=build /target/release/triagebot /usr/local/bin/
+COPY --from=build /triagebot/target/release/triagebot /usr/local/bin/
 COPY templates /opt/triagebot/templates
 WORKDIR /opt/triagebot
 ENV PORT=80
