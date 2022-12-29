@@ -4,8 +4,8 @@ use anyhow::Context as _;
 use futures::future::FutureExt;
 use futures::StreamExt;
 use hyper::{header, Body, Request, Response, Server, StatusCode};
-use reqwest::Client;
 use route_recognizer::Router;
+use std::path::PathBuf;
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::{task, time};
 use tower::{Service, ServiceExt};
@@ -267,8 +267,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         }
     });
 
-    let client = Client::new();
-    let gh = github::GithubClient::new_with_default_token(client.clone());
+    let gh = github::GithubClient::new_from_env();
     let oc = octocrab::OctocrabBuilder::new()
         .personal_token(github::default_token_from_env())
         .build()

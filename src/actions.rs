@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
 
@@ -87,7 +86,7 @@ pub fn to_human(d: DateTime<Utc>) -> String {
 #[async_trait]
 impl<'a> Action for Step<'a> {
     async fn call(&self) -> anyhow::Result<String> {
-        let gh = GithubClient::new_with_default_token(Client::new());
+        let gh = GithubClient::new_from_env();
 
         // retrieve all Rust compiler meetings
         // from today for 7 days
