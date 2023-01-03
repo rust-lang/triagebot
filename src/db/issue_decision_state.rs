@@ -14,7 +14,7 @@ pub struct IssueDecisionState {
     pub initiator: String,
     pub start_date: DateTime<Utc>,
     pub end_date: DateTime<Utc>,
-    pub current: BTreeMap<String, UserStatus>,
+    pub current: BTreeMap<String, Option<UserStatus>>,
     pub history: BTreeMap<String, Vec<UserStatus>>,
     pub reversibility: Reversibility,
     pub resolution: Resolution,
@@ -34,7 +34,7 @@ pub async fn insert_issue_decision_state(
     initiator: &String,
     start_date: &DateTime<Utc>,
     end_date: &DateTime<Utc>,
-    current: &BTreeMap<String, UserStatus>,
+    current: &BTreeMap<String, Option<UserStatus>>,
     history: &BTreeMap<String, Vec<UserStatus>>,
     reversibility: &Reversibility,
     resolution: &Resolution,
@@ -97,7 +97,8 @@ fn deserialize_issue_decision_state(row: &tokio_postgres::row::Row) -> Result<Is
     let initiator: String = row.try_get(1)?;
     let start_date: DateTime<Utc> = row.try_get(2)?;
     let end_date: DateTime<Utc> = row.try_get(3)?;
-    let current: BTreeMap<String, UserStatus> = serde_json::from_value(row.try_get(4).unwrap())?;
+    let current: BTreeMap<String, Option<UserStatus>> =
+        serde_json::from_value(row.try_get(4).unwrap())?;
     let history: BTreeMap<String, Vec<UserStatus>> =
         serde_json::from_value(row.try_get(5).unwrap())?;
     let reversibility: Reversibility = row.try_get(6)?;

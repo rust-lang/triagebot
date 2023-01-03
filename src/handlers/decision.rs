@@ -1,8 +1,10 @@
 use crate::db::jobs::*;
+use crate::github;
 use crate::{
     config::DecisionConfig, db::issue_decision_state::*, github::Event, handlers::Context,
     interactions::ErrorComment,
 };
+use anyhow::bail;
 use anyhow::Context as Ctx;
 use chrono::{DateTime, Duration, Utc};
 use parser::command::decision::Resolution::{Hold, Merge};
@@ -93,16 +95,26 @@ pub(super) async fn handle_command(
                     let end_date: DateTime<Utc> =
                         start_date.checked_add_signed(Duration::days(10)).unwrap();
 
-                    let mut current: BTreeMap<String, UserStatus> = BTreeMap::new();
+                    //TODO: change this to be configurable in toml / ask user to provide the team name
+                    // it should match the same team that we check for above when determining if the user is a member
+                    let team = github::get_team(&ctx.github, &"T-lang").await?.unwrap();
+
+                    let mut current: BTreeMap<String, Option<UserStatus>> = BTreeMap::new();
+
+                    for member in team.members {
+                        current.insert(member.name, None);
+                    }
+
                     current.insert(
-                        "mcass19".to_string(),
-                        UserStatus {
+                        user.login.clone(),
+                        Some(UserStatus {
                             comment_id: "comment_id".to_string(),
                             text: "something".to_string(),
                             reversibility: Reversibility::Reversible,
                             resolution: Merge,
-                        },
+                        }),
                     );
+
                     let history: BTreeMap<String, Vec<UserStatus>> = BTreeMap::new();
 
                     insert_issue_decision_state(
@@ -120,7 +132,11 @@ pub(super) async fn handle_command(
 
                     let metadata = serde_json::value::to_value(DecisionProcessActionMetadata {
                         message: "some message".to_string(),
-                        get_issue_url: format!("{}/issues/{}", issue.repository().url(), issue.number),
+                        get_issue_url: format!(
+                            "{}/issues/{}",
+                            issue.repository().url(),
+                            issue.number
+                        ),
                         status: Merge,
                     })
                     .unwrap();
@@ -133,12 +149,7 @@ pub(super) async fn handle_command(
                     )
                     .await?;
 
-                    // let team = github::get_team(&ctx.github, &"T-lang"); // change this to be configurable in toml?
-
-                    let comment = format!(
-                        "Wow, it looks like you want to merge this, {}.\n| Team member | State |\n|-------------|-------|\n| julmontesdeoca | merge |\n| mcass19 |  |",
-                        user.login
-                    );
+                    let comment = build_status_comment(&history, &current)?;
 
                     issue
                         .post_comment(&ctx.github, &comment)
@@ -149,6 +160,164 @@ pub(super) async fn handle_command(
                 }
             }
         }
+    }
+}
+
+fn build_status_comment(
+    history: &BTreeMap<String, Vec<UserStatus>>,
+    current: &BTreeMap<String, Option<UserStatus>>,
+) -> anyhow::Result<String> {
+    let mut comment = "| Team member | State |\n|-------------|-------|".to_owned();
+    for (user, statuses) in history {
+        let mut user_statuses = format!("\n| {} |", user);
+
+        // previous stasuses
+        for status in statuses {
+            let status_item = format!(" ~~{}~~ ", status.resolution);
+            user_statuses.push_str(&status_item);
+        }
+
+        // current status
+        let user_resolution = match current.get(user) {
+            Some(current_status) => {
+                if let Some(status) = current_status {
+                    format!("**{}**", status.resolution)
+                } else {
+                    "".to_string()
+                }
+            }
+            None => bail!("user {} not present in current statuses list", user),
+        };
+
+        let status_item = format!(" {} |", user_resolution);
+        user_statuses.push_str(&status_item);
+
+        comment.push_str(&user_statuses);
+    }
+
+    Ok(comment)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use factori::{create, factori};
+
+    factori!(UserStatus, {
+        default {
+            comment_id = "the-comment-id".to_string(),
+            text = "this is my argument for making this decision".to_string(),
+            reversibility = Reversibility::Reversible,
+            resolution = Resolution::Merge
+        }
+
+        mixin hold {
+            resolution = Resolution::Hold
+        }
+    });
+
+    #[test]
+    fn test_successfuly_build_comment() {
+        let mut history: BTreeMap<String, Vec<UserStatus>> = BTreeMap::new();
+        let mut current_statuses: BTreeMap<String, Option<UserStatus>> = BTreeMap::new();
+
+        // user 1
+        let mut user_1_statuses: Vec<UserStatus> = Vec::new();
+        user_1_statuses.push(create!(UserStatus));
+        user_1_statuses.push(create!(UserStatus, :hold));
+
+        history.insert("Niklaus".to_string(), user_1_statuses);
+
+        current_statuses.insert("Niklaus".to_string(), Some(create!(UserStatus)));
+
+        // user 2
+        let mut user_2_statuses: Vec<UserStatus> = Vec::new();
+        user_2_statuses.push(create!(UserStatus, :hold));
+        user_2_statuses.push(create!(UserStatus));
+
+        history.insert("Barbara".to_string(), user_2_statuses);
+
+        current_statuses.insert("Barbara".to_string(), Some(create!(UserStatus)));
+
+        let build_result = build_status_comment(&history, &current_statuses)
+            .expect("it shouldn't fail building the message");
+        let expected_comment = "| Team member | State |\n\
+        |-------------|-------|\n\
+        | Barbara | ~~hold~~  ~~merge~~  **merge** |\n\
+        | Niklaus | ~~merge~~  ~~hold~~  **merge** |"
+            .to_string();
+
+        assert_eq!(build_result, expected_comment);
+    }
+
+    #[test]
+    fn test_successfuly_build_comment_user_no_votes() {
+        let mut history: BTreeMap<String, Vec<UserStatus>> = BTreeMap::new();
+        let mut current_statuses: BTreeMap<String, Option<UserStatus>> = BTreeMap::new();
+
+        // user 1
+        let mut user_1_statuses: Vec<UserStatus> = Vec::new();
+        user_1_statuses.push(create!(UserStatus));
+        user_1_statuses.push(create!(UserStatus, :hold));
+
+        history.insert("Niklaus".to_string(), user_1_statuses);
+
+        current_statuses.insert("Niklaus".to_string(), Some(create!(UserStatus)));
+
+        // user 2
+        let mut user_2_statuses: Vec<UserStatus> = Vec::new();
+        user_2_statuses.push(create!(UserStatus, :hold));
+        user_2_statuses.push(create!(UserStatus));
+
+        history.insert("Barbara".to_string(), user_2_statuses);
+
+        current_statuses.insert("Barbara".to_string(), Some(create!(UserStatus)));
+
+        // user 3
+        history.insert("Tom".to_string(), Vec::new());
+
+        current_statuses.insert("Tom".to_string(), None);
+
+        let build_result = build_status_comment(&history, &current_statuses)
+            .expect("it shouldn't fail building the message");
+        let expected_comment = "| Team member | State |\n\
+        |-------------|-------|\n\
+        | Barbara | ~~hold~~  ~~merge~~  **merge** |\n\
+        | Niklaus | ~~merge~~  ~~hold~~  **merge** |\n\
+        | Tom |  |"
+            .to_string();
+
+        assert_eq!(build_result, expected_comment);
+    }
+
+    #[test]
+    fn test_build_comment_inconsistent_users() {
+        let mut history: BTreeMap<String, Vec<UserStatus>> = BTreeMap::new();
+        let mut current_statuses: BTreeMap<String, Option<UserStatus>> = BTreeMap::new();
+
+        // user 1
+        let mut user_1_statuses: Vec<UserStatus> = Vec::new();
+        user_1_statuses.push(create!(UserStatus));
+        user_1_statuses.push(create!(UserStatus, :hold));
+
+        history.insert("Niklaus".to_string(), user_1_statuses);
+
+        current_statuses.insert("Niklaus".to_string(), Some(create!(UserStatus)));
+
+        // user 2
+        let mut user_2_statuses: Vec<UserStatus> = Vec::new();
+        user_2_statuses.push(create!(UserStatus, :hold));
+        user_2_statuses.push(create!(UserStatus));
+
+        history.insert("Barbara".to_string(), user_2_statuses);
+
+        current_statuses.insert("Martin".to_string(), Some(create!(UserStatus)));
+
+        let build_result = build_status_comment(&history, &current_statuses);
+        assert_eq!(
+            format!("{}", build_result.unwrap_err()),
+            "user Barbara not present in current statuses list"
+        );
     }
 }
 

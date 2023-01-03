@@ -87,6 +87,16 @@ pub enum Resolution {
     #[postgres(name = "hold")]
     Hold,
 }
+
+impl fmt::Display for Resolution {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Resolution::Merge => write!(f, "merge"),
+            Resolution::Hold => write!(f, "hold"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
