@@ -28,24 +28,32 @@ impl DecisionCommand {
         let mut toks = input.clone();
 
         match toks.peek_token()? {
-            Some(Token::Word("merge")) => {
-                command_or_error(input, &mut toks, Self {
+            Some(Token::Word("merge")) => command_or_error(
+                input,
+                &mut toks,
+                Self {
                     resolution: Resolution::Merge,
                     reversibility: Reversibility::Reversible,
-                })
-            }
-            Some(Token::Word("hold")) => {
-                command_or_error(input, &mut toks, Self {
+                },
+            ),
+            Some(Token::Word("hold")) => command_or_error(
+                input,
+                &mut toks,
+                Self {
                     resolution: Resolution::Hold,
                     reversibility: Reversibility::Reversible,
-                })
-            }
+                },
+            ),
             _ => Ok(None),
         }
     }
 }
 
-fn command_or_error<'a>(input: &mut Tokenizer<'a>, toks: &mut Tokenizer<'a>, command: DecisionCommand) -> Result<Option<DecisionCommand>, Error<'a>> {
+fn command_or_error<'a>(
+    input: &mut Tokenizer<'a>,
+    toks: &mut Tokenizer<'a>,
+    command: DecisionCommand,
+) -> Result<Option<DecisionCommand>, Error<'a>> {
     toks.next_token()?;
     if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
         *input = toks.clone();
@@ -70,7 +78,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, ToSql, FromSql, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, ToSql, FromSql, Eq, PartialEq)]
 #[postgres(name = "reversibility")]
 pub enum Reversibility {
     #[postgres(name = "reversible")]

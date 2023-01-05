@@ -786,13 +786,13 @@ impl Issue {
         #[derive(serde::Serialize)]
         struct MergeIssue<'a> {
             commit_title: &'a str,
-            merge_method: &'a str
+            merge_method: &'a str,
         }
 
         client
             ._send_req(client.put(&merge_url).json(&MergeIssue {
                 commit_title: "Merged by the bot!",
-                merge_method: "merge"
+                merge_method: "merge",
             }))
             .await
             .context("failed to merge issue")?;
