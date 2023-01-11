@@ -362,6 +362,15 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         }),
                     },
                     QueryMap {
+                        name: "p_critical_t_types",
+                        kind: QueryKind::List,
+                        query: Arc::new(github::Query {
+                            filters: vec![("state", "open")],
+                            include_labels: vec!["T-types", "P-critical"],
+                            exclude_labels: vec![],
+                        }),
+                    },
+                    QueryMap {
                         name: "p_critical_t_rustdoc",
                         kind: QueryKind::List,
                         query: Arc::new(github::Query {
