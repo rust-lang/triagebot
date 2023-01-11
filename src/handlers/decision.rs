@@ -64,14 +64,15 @@ pub(super) async fn handle_command(
                 start_date.checked_add_signed(Duration::days(10)).unwrap();
 
             let mut current: BTreeMap<String, Option<UserStatus>> = BTreeMap::new();
-            let history: BTreeMap<String, Vec<UserStatus>> = BTreeMap::new();
+            let mut history: BTreeMap<String, Vec<UserStatus>> = BTreeMap::new();
 
             // TODO
             // change this to be entered by the user as part of the command
             // it should match the same team that we check for above when determining if the user is a member
             let team = github::get_team(&ctx.github, &"T-lang").await?.unwrap();
             for member in team.members {
-                current.insert(member.name, None);
+                current.insert(member.name.clone(), None);
+                history.insert(member.name.clone(), Vec::new());
             }
 
             current.insert(
@@ -128,25 +129,24 @@ fn build_status_comment(
     current: &BTreeMap<String, Option<UserStatus>>,
 ) -> anyhow::Result<String> {
     let mut comment = "| Team member | State |\n|-------------|-------|".to_owned();
-    for (user, statuses) in history {
+    for (user, status) in current {
         let mut user_statuses = format!("\n| {} |", user);
 
         // previous stasuses
-        for status in statuses {
-            let status_item = format!(" ~~{}~~ ", status.resolution);
-            user_statuses.push_str(&status_item);
+        match history.get(user) {
+            Some(statuses) => {
+                for status in statuses {
+                    let status_item = format!(" ~~{}~~ ", status.resolution);
+                    user_statuses.push_str(&status_item);
+                }
+            }
+            None => bail!("user {} not present in history statuses list", user),
         }
 
         // current status
-        let user_resolution = match current.get(user) {
-            Some(current_status) => {
-                if let Some(status) = current_status {
-                    format!("**{}**", status.resolution)
-                } else {
-                    "".to_string()
-                }
-            }
-            None => bail!("user {} not present in current statuses list", user),
+        let user_resolution = match status {
+            Some(status) => format!("**{}**", status.resolution),
+            _ => "".to_string(),
         };
 
         let status_item = format!(" {} |", user_resolution);
@@ -276,7 +276,40 @@ mod tests {
         let build_result = build_status_comment(&history, &current_statuses);
         assert_eq!(
             format!("{}", build_result.unwrap_err()),
-            "user Barbara not present in current statuses list"
+            "user Martin not present in history statuses list"
         );
+    }
+
+    #[test]
+    fn test_successfuly_build_comment_no_history() {
+        let mut history: BTreeMap<String, Vec<UserStatus>> = BTreeMap::new();
+        let mut current_statuses: BTreeMap<String, Option<UserStatus>> = BTreeMap::new();
+
+        // user 1
+        let mut user_1_statuses: Vec<UserStatus> = Vec::new();
+        user_1_statuses.push(create!(UserStatus));
+        user_1_statuses.push(create!(UserStatus, :hold));
+
+        current_statuses.insert("Niklaus".to_string(), Some(create!(UserStatus)));
+        history.insert("Niklaus".to_string(), Vec::new());
+
+        // user 2
+        let mut user_2_statuses: Vec<UserStatus> = Vec::new();
+        user_2_statuses.push(create!(UserStatus, :hold));
+        user_2_statuses.push(create!(UserStatus));
+
+        current_statuses.insert("Barbara".to_string(), Some(create!(UserStatus)));
+        history.insert("Barbara".to_string(), Vec::new());
+
+        let build_result = build_status_comment(&history, &current_statuses)
+            .expect("it shouldn't fail building the message");
+        let expected_comment = "| Team member | State |\n\
+        |-------------|-------|\n\
+        | Barbara | **merge** |\n\
+        | Niklaus | **merge** |\
+        "
+        .to_string();
+
+        assert_eq!(build_result, expected_comment);
     }
 }
