@@ -31,6 +31,7 @@ pub(super) async fn handle_command(
     let DecisionCommand {
         resolution,
         reversibility,
+        team: team_name,
     } = cmd;
 
     let issue = event.issue().unwrap();
@@ -59,67 +60,91 @@ pub(super) async fn handle_command(
             Ok(())
         }
         _ => {
-            let start_date: DateTime<Utc> = chrono::Utc::now().into();
-            let end_date: DateTime<Utc> =
-                start_date.checked_add_signed(Duration::days(10)).unwrap();
+            match team_name {
+                None => {
+                    let cmnt = ErrorComment::new(
+                        &issue,
+                        "In the first vote, is necessary to specify the team name that will be involved in the decision process.",
+                    );
+                    cmnt.post(&ctx.github).await?;
 
-            let mut current: BTreeMap<String, Option<UserStatus>> = BTreeMap::new();
-            let mut history: BTreeMap<String, Vec<UserStatus>> = BTreeMap::new();
+                    Ok(())
+                }
+                Some(team_name) => {
+                    match github::get_team(&ctx.github, &team_name).await {
+                        Ok(Some(team)) => {
+                            let start_date: DateTime<Utc> = chrono::Utc::now().into();
+                            let end_date: DateTime<Utc> =
+                                start_date.checked_add_signed(Duration::days(10)).unwrap();
 
-            // TODO
-            // change this to be entered by the user as part of the command
-            // it should match the same team that we check for above when determining if the user is a member
-            let team = github::get_team(&ctx.github, &"T-lang").await?.unwrap();
-            for member in team.members {
-                current.insert(member.name.clone(), None);
-                history.insert(member.name.clone(), Vec::new());
+                            let mut current: BTreeMap<String, Option<UserStatus>> = BTreeMap::new();
+                            let mut history: BTreeMap<String, Vec<UserStatus>> = BTreeMap::new();
+
+                            // Add team members to current and history
+                            for member in team.members {
+                                current.insert(member.github.clone(), None);
+                                history.insert(member.github.clone(), Vec::new());
+                            }
+
+                            // Add issue user to current and history
+                            current.insert(
+                                user.login.clone(),
+                                Some(UserStatus {
+                                    comment_id: event.html_url().unwrap().to_string(),
+                                    text: event.comment_body().unwrap().to_string(),
+                                    reversibility: reversibility,
+                                    resolution: resolution,
+                                }),
+                            );
+                            history.insert(user.login.clone(), Vec::new());
+
+                            // Initialize issue decision state
+                            insert_issue_decision_state(
+                                &db,
+                                &issue.number,
+                                &user.login,
+                                &start_date,
+                                &end_date,
+                                &current,
+                                &history,
+                                &reversibility,
+                                &resolution,
+                            )
+                            .await?;
+
+                            // TO DO -- Do not insert this job until we support more votes
+                            // let metadata = serde_json::value::to_value(DecisionProcessActionMetadata {
+                            //     message: "some message".to_string(),
+                            //     get_issue_url: format!("{}/issues/{}", issue.repository().url(), issue.number),
+                            //     status: resolution,
+                            // })
+                            // .unwrap();
+                            // insert_job(
+                            //     &db,
+                            //     &DECISION_PROCESS_JOB_NAME.to_string(),
+                            //     &end_date,
+                            //     &metadata,
+                            // )
+                            // .await?;
+
+                            let comment = build_status_comment(&history, &current)?;
+                            issue
+                                .post_comment(&ctx.github, &comment)
+                                .await
+                                .context("merge vote comment")?;
+
+                            Ok(())
+                        }
+                        _ => {
+                            let cmnt =
+                                ErrorComment::new(&issue, "Failed to resolve to a known team.");
+                            cmnt.post(&ctx.github).await?;
+
+                            Ok(())
+                        }
+                    }
+                }
             }
-
-            current.insert(
-                user.login.clone(),
-                Some(UserStatus {
-                    comment_id: "comment_id".to_string(),
-                    text: "something".to_string(),
-                    reversibility: reversibility,
-                    resolution: resolution,
-                }),
-            );
-
-            insert_issue_decision_state(
-                &db,
-                &issue.number,
-                &user.login,
-                &start_date,
-                &end_date,
-                &current,
-                &history,
-                &reversibility,
-                &resolution,
-            )
-            .await?;
-
-            // TO DO -- Do not insert this job until we support more votes
-            // let metadata = serde_json::value::to_value(DecisionProcessActionMetadata {
-            //     message: "some message".to_string(),
-            //     get_issue_url: format!("{}/issues/{}", issue.repository().url(), issue.number),
-            //     status: resolution,
-            // })
-            // .unwrap();
-            // insert_job(
-            //     &db,
-            //     &DECISION_PROCESS_JOB_NAME.to_string(),
-            //     &end_date,
-            //     &metadata,
-            // )
-            // .await?;
-
-            let comment = build_status_comment(&history, &current)?;
-            issue
-                .post_comment(&ctx.github, &comment)
-                .await
-                .context("merge vote comment")?;
-
-            Ok(())
         }
     }
 }

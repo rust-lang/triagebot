@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 pub struct DecisionCommand {
     pub resolution: Resolution,
     pub reversibility: Reversibility,
+    pub team: Option<String>,
 }
 
 impl DecisionCommand {
@@ -28,24 +29,49 @@ impl DecisionCommand {
         let mut toks = input.clone();
 
         match toks.peek_token()? {
-            Some(Token::Word("merge")) => command_or_error(
-                input,
-                &mut toks,
-                Self {
-                    resolution: Resolution::Merge,
-                    reversibility: Reversibility::Reversible,
-                },
-            ),
-            Some(Token::Word("hold")) => command_or_error(
-                input,
-                &mut toks,
-                Self {
-                    resolution: Resolution::Hold,
-                    reversibility: Reversibility::Reversible,
-                },
-            ),
+            Some(Token::Word("merge")) => {
+                toks.next_token()?;
+
+                let team: Option<String> = get_team(&mut toks)?;
+
+                command_or_error(
+                    input,
+                    &mut toks,
+                    Self {
+                        resolution: Resolution::Merge,
+                        reversibility: Reversibility::Reversible,
+                        team,
+                    },
+                )
+            }
+            Some(Token::Word("hold")) => {
+                toks.next_token()?;
+
+                let team: Option<String> = get_team(&mut toks)?;
+
+                command_or_error(
+                    input,
+                    &mut toks,
+                    Self {
+                        resolution: Resolution::Hold,
+                        reversibility: Reversibility::Reversible,
+                        team,
+                    },
+                )
+            }
             _ => Ok(None),
         }
+    }
+}
+
+fn get_team<'a>(toks: &mut Tokenizer<'a>) -> Result<Option<String>, Error<'a>> {
+    match toks.peek_token()? {
+        Some(Token::Word(team)) => {
+            toks.next_token()?;
+
+            Ok(Some(team.to_string()))
+        }
+        _ => Ok(None),
     }
 }
 
@@ -54,7 +80,6 @@ fn command_or_error<'a>(
     toks: &mut Tokenizer<'a>,
     command: DecisionCommand,
 ) -> Result<Option<DecisionCommand>, Error<'a>> {
-    toks.next_token()?;
     if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
         *input = toks.clone();
         Ok(Some(command))
@@ -120,7 +145,8 @@ mod tests {
             parse("merge"),
             Ok(Some(DecisionCommand {
                 resolution: Resolution::Merge,
-                reversibility: Reversibility::Reversible
+                reversibility: Reversibility::Reversible,
+                team: None
             })),
         );
     }
@@ -131,7 +157,8 @@ mod tests {
             parse("merge."),
             Ok(Some(DecisionCommand {
                 resolution: Resolution::Merge,
-                reversibility: Reversibility::Reversible
+                reversibility: Reversibility::Reversible,
+                team: None
             })),
         );
     }
@@ -142,7 +169,8 @@ mod tests {
             parse("hold"),
             Ok(Some(DecisionCommand {
                 resolution: Resolution::Hold,
-                reversibility: Reversibility::Reversible
+                reversibility: Reversibility::Reversible,
+                team: None
             })),
         );
     }
@@ -151,12 +179,36 @@ mod tests {
     fn test_expected_end() {
         use std::error::Error;
         assert_eq!(
-            parse("hold my beer")
+            parse("hold lang beer")
                 .unwrap_err()
                 .source()
                 .unwrap()
                 .downcast_ref(),
             Some(&ParseError::ExpectedEnd),
+        );
+    }
+
+    #[test]
+    fn test_correct_merge_with_team() {
+        assert_eq!(
+            parse("merge lang"),
+            Ok(Some(DecisionCommand {
+                resolution: Resolution::Merge,
+                reversibility: Reversibility::Reversible,
+                team: Some("lang".to_string())
+            })),
+        );
+    }
+
+    #[test]
+    fn test_correct_hold_with_team() {
+        assert_eq!(
+            parse("hold lang"),
+            Ok(Some(DecisionCommand {
+                resolution: Resolution::Hold,
+                reversibility: Reversibility::Reversible,
+                team: Some("lang".to_string())
+            })),
         );
     }
 }
