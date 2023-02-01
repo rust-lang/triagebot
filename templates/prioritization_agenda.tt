@@ -14,12 +14,15 @@ tags: weekly, rustc
 - Reminder: if you see a PR/issue that seems like there might be legal implications due to copyright/IP/etc, please let the Core team know (or at least message @_**pnkfelix** or @_**Wesley Wiser** so we can pass it along).
 
 ### Other WG meetings ([calendar link](https://calendar.google.com/calendar/embed?src=6u5rrtce6lrtv07pfi3damgjus%40group.calendar.google.com))
+
 {{-meetings::render(meetings=meetings_tcompiler, empty="No meetings scheduled for next week")}}
 
 ## MCPs/FCPs
 
 - New MCPs (take a look, see if you like them!)
 {{-issues::render(issues=mcp_new_not_seconded, indent="  ", empty="No new proposals this time.")}}
+- Old MCPs (stale MCP might be closed as per [MCP procedure](https://forge.rust-lang.org/compiler/mcp.html#when-should-major-change-proposals-be-closed))
+  - None at this time
 - Old MCPs (not seconded, take a look)
 {{-issues::render(issues=mcp_old_not_seconded, indent="  ", with_age=true, empty="No old proposals this time.")}}
 - Pending FCP requests (check your boxes!)
@@ -80,10 +83,13 @@ tags: weekly, rustc
 ### P-critical
 
 [T-compiler](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AP-critical+label%3AT-compiler)
-{{-issues::render(issues=p_critical_t_compiler, empty="No `P-critical` issues for `T-compiler` this time.")}}
+{{-issues::render(issues=p_critical_t_compiler, empty="No `P-critical` issues for `T-compiler` at this time.")}}
+
+[T-types](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AP-critical+label%3AT-types)
+{{-issues::render(issues=p_critical_t_types, empty="No `P-critical` issues for `T-types` at this time.")}}
 
 [T-rustdoc](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AP-critical+label%3AT-rustdoc)
-{{-issues::render(issues=p_critical_t_rustdoc, empty="No `P-critical` issues for `T-rustdoc` this time.")}}
+{{-issues::render(issues=p_critical_t_rustdoc, empty="No `P-critical` issues for `T-rustdoc` at this time.")}}
 
 ### P-high regressions
 
