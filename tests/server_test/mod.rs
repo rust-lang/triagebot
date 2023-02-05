@@ -5,38 +5,54 @@
 //! involve setting up HTTP servers, launching the `triagebot` process,
 //! injecting the webhook JSON object, and validating the result.
 //!
-//! The [`TestBuilder`] is used for configuring the test, and producing a
-//! [`ServerTestCtx`], which provides access to triagebot.
+//! The [`run_test`] function is used to set up the test and run it to
+//! completion using pre-recorded JSON data.
 //!
-//! See [`crate::github_client`] and [`TestBuilder`] for a discussion of how
-//! to set up API handlers.
+//! To write one of these tests, you'll need to use the recording function
+//! against the live GitHub site to fetch what the actual JSON objects should
+//! look like. To write a test, follow these steps:
 //!
-//! These tests require that PostgreSQL is installed and available in your
-//! PATH. The test sets up a little sandbox where a fresh PostgreSQL database
-//! is created and managed.
+//! 1. Prepare a test repo on GitHub for exercising whatever action you want
+//!    to test (for example, your personal fork of `rust-lang/rust). Get
+//!    everything ready, such as opening a PR or whatever you need for your
+//!    test.
 //!
-//! To get the webhook JSON data to inject with
-//! [`ServerTestCtx::send_webook`], I recommend recording it by first running
-//! the triagebot server against the real github.com site with the
-//! `TRIAGEBOT_TEST_RECORD` environment variable set. See the README.md file
-//! for how to set up and run triagebot against one of your own repositories.
+//! 2. Manually launch the triagebot server with the `TRIAGEBOT_TEST_RECORD`
+//!    environment variable set to the path of where you want to store the
+//!    recorded JSON. Use a separate directory for each test. It may look
+//!    something like:
 //!
-//! The recording will save `.json` files in the current directory of all the
-//! events received. You can then move and rename those files into the
-//! `tests/server_test` directory. You usually should modify the JSON to
-//! rename the repository to `rust-lang/rust`.
+//!    ```sh
+//!    TRIAGEBOT_TEST_RECORD=server_test/shortcut/author cargo run --bin triagebot
+//!    ```
 //!
-//! At the end of the test, you should call `ctx.events.assert_eq()` to
-//! validate that the correct HTTP actions were actually performed by
-//! triagebot. If you are uncertain about what to put in there, just start
-//! with an empty list, and the error will tell you what to add.
+//!    Look at `README.md` for instructions for running triagebot against the
+//!    live GitHub site. You'll need to have webhook forwarding and Postgres
+//!    running in the background.
+//!
+//!  3. Perform the action you want to test on GitHub. For example, post a
+//!     comment with `@rustbot ready` to test the "ready" command.
+//!
+//!  4. Stop the triagebot server (hit CTRL-C or whatever).
+//!
+//!  5. The JSON for the interaction should now be stored in the directory.
+//!     Peruse the JSON to make sure the expected actions are there.
+//!
+//!  6. Add a test to replay that action you just performed. All you need to
+//!     do is call something like `run_test("shortcut/ready");` with the path
+//!     to the JSON (relative to the `server_test` directory).
+//!
+//!  7. Run your test to make sure it works:
+//!
+//!     ```sh
+//!     cargo test --test testsuite -- server_test::shortcut::ready
+//!     ```
+//!
+//!     with the name of your test.
 
 mod shortcut;
 
-use super::common::{
-    Events, HttpServer, HttpServerHandle, Method, Method::*, Response, TestBuilder,
-};
-use std::collections::HashMap;
+use super::{HttpServer, HttpServerHandle};
 use std::io::Read;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -44,160 +60,171 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
+use triagebot::test_record::Activity;
 
+/// TCP port that the triagebot binary should listen on.
+///
+/// Increases by 1 for each test.
 static NEXT_TCP_PORT: AtomicU32 = AtomicU32::new(50000);
+/// Counter used to give each test a unique sandbox directory in the
+/// `target/tmp` directory.
 static TEST_COUNTER: AtomicU32 = AtomicU32::new(1);
-
+/// The webhook secret used to validate that the webhook events are coming
+/// from the expected source.
 const WEBHOOK_SECRET: &str = "secret";
 
 /// A context used for running a test.
 ///
 /// This is used for interacting with the triagebot process and handling API requests.
 struct ServerTestCtx {
+    /// The triagebot process handle.
     child: Child,
+    /// Stdout received from triagebot, used for debugging.
     stdout: Arc<Mutex<Vec<u8>>>,
+    /// Stderr received from triagebot, used for debugging.
     stderr: Arc<Mutex<Vec<u8>>>,
+    /// Directory for the temporary Postgres database.
     db_dir: PathBuf,
+    /// The address for sending webhooks into the triagebot binary.
     triagebot_addr: SocketAddr,
+    /// The handle to the mock server which simulates GitHub.
     #[allow(dead_code)] // held for drop
-    api_server: HttpServerHandle,
-    #[allow(dead_code)] // held for drop
-    raw_server: HttpServerHandle,
-    #[allow(dead_code)] // held for drop
-    teams_server: HttpServerHandle,
-    events: Events,
+    server: HttpServerHandle,
 }
 
-impl TestBuilder {
-    fn new() -> TestBuilder {
-        let tb = TestBuilder::default();
-        tb.api_handler(GET, "rate_limit", |_req| {
-            Response::new().body(include_bytes!("rate_limit.json"))
-        })
+/// The main entry point for a test.
+///
+/// Pass the name of the test as the first parameter.
+fn run_test(test_name: &str) {
+    crate::assert_single_record();
+    let activities = crate::load_activities("tests/server_test", test_name);
+    if !matches!(activities[0], Activity::Webhook { .. }) {
+        panic!("expected first activity to be a webhook event");
+    }
+    let ctx = build(activities);
+    // Wait for the server side to find a webhook. This will then send the
+    // webhook to the triagebot binary.
+    loop {
+        let activity = ctx
+            .server
+            .hook_recv
+            .recv_timeout(Duration::new(60, 0))
+            .unwrap();
+        match activity {
+            Activity::Webhook {
+                webhook_event,
+                payload,
+            } => {
+                eprintln!("sending webhook {webhook_event}");
+                let payload = serde_json::to_vec(&payload).unwrap();
+                ctx.send_webhook(&webhook_event, payload);
+            }
+            Activity::Error { message } => {
+                panic!("unexpected server error: {message}");
+            }
+            Activity::Finished => break,
+            a => panic!("unexpected activity {a:?}"),
+        }
+    }
+}
+
+fn build(activities: Vec<Activity>) -> ServerTestCtx {
+    // Set up a directory where this test can store all its stuff.
+    let tmp_dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("local");
+    let test_num = TEST_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let test_dir = tmp_dir.join(format!("t{test_num}"));
+    if test_dir.exists() {
+        std::fs::remove_dir_all(&test_dir).unwrap();
+    }
+    std::fs::create_dir_all(&test_dir).unwrap();
+
+    let db_dir = test_dir.join("db");
+    setup_postgres(&db_dir);
+
+    let server = HttpServer::new(activities);
+    // TODO: This is a poor way to choose a TCP port, as it could already
+    // be in use by something else.
+    let triagebot_port = NEXT_TCP_PORT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_triagebot"))
+        .env(
+            "GITHUB_API_TOKEN",
+            "ghp_123456789012345678901234567890123456",
+        )
+        .env("GITHUB_WEBHOOK_SECRET", WEBHOOK_SECRET)
+        .env(
+            "DATABASE_URL",
+            format!(
+                "postgres:///triagebot?user=triagebot&host={}",
+                db_dir.display()
+            ),
+        )
+        .env("PORT", triagebot_port.to_string())
+        .env("GITHUB_API_URL", format!("http://{}", server.addr))
+        .env(
+            "GITHUB_GRAPHQL_API_URL",
+            format!("http://{}/graphql", server.addr),
+        )
+        .env("GITHUB_RAW_URL", format!("http://{}", server.addr))
+        .env("TEAMS_API_URL", format!("http://{}/v1", server.addr))
+        // We don't want jobs randomly running while testing.
+        .env("TRIAGEBOT_TEST_DISABLE_JOBS", "1")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    // Spawn some threads to capture output which can be used for debugging.
+    let stdout = Arc::new(Mutex::new(Vec::new()));
+    let stderr = Arc::new(Mutex::new(Vec::new()));
+    let consumer = |mut source: Box<dyn Read + Send>, dest: Arc<Mutex<Vec<u8>>>| {
+        move || {
+            let mut dest = dest.lock().unwrap();
+            if let Err(e) = source.read_to_end(&mut dest) {
+                eprintln!("process reader failed: {e}");
+            };
+        }
+    };
+    thread::spawn(consumer(
+        Box::new(child.stdout.take().unwrap()),
+        stdout.clone(),
+    ));
+    thread::spawn(consumer(
+        Box::new(child.stderr.take().unwrap()),
+        stderr.clone(),
+    ));
+    let triagebot_addr = format!("127.0.0.1:{triagebot_port}").parse().unwrap();
+    // Wait for the triagebot process to start up.
+    for _ in 0..30 {
+        match std::net::TcpStream::connect(&triagebot_addr) {
+            Ok(_) => break,
+            Err(e) => match e.kind() {
+                std::io::ErrorKind::ConnectionRefused => {
+                    std::thread::sleep(std::time::Duration::new(1, 0))
+                }
+                _ => panic!("unexpected error testing triagebot connection: {e:?}"),
+            },
+        }
     }
 
-    fn build(mut self) -> ServerTestCtx {
-        // Set up a directory where this test can store all its stuff.
-        let tmp_dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("local");
-        let test_num = TEST_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        let test_dir = tmp_dir.join(format!("t{test_num}"));
-        if test_dir.exists() {
-            std::fs::remove_dir_all(&test_dir).unwrap();
-        }
-        std::fs::create_dir_all(&test_dir).unwrap();
-
-        let db_dir = test_dir.join("db");
-        setup_postgres(&db_dir);
-
-        if let Some(config) = self.config {
-            self.raw_handlers.insert(
-                (GET, "rust-lang/rust/master/triagebot.toml"),
-                Box::new(|_req| Response::new().body(config.as_bytes())),
-            );
-        }
-
-        let events = Events::new();
-        let api_server = HttpServer::new(self.api_handlers, events.clone());
-        let raw_server = HttpServer::new(self.raw_handlers, events.clone());
-
-        // Add users to the teams data here if you need them. At this time,
-        // GET teams.json is not included in Events since the notifications
-        // code always fetches the teams, even for `@rustbot` mentions (to
-        // determine if `rustbot` is a team member). That's not interesting,
-        // so it is excluded for now.
-        let mut teams_handlers = HashMap::new();
-        teams_handlers.insert(
-            (GET, "teams.json"),
-            Box::new(|_req| Response::new_from_path("tests/server_test/teams.json"))
-                as super::common::RequestCallback,
-        );
-        let teams_server = HttpServer::new(teams_handlers, Events::new());
-
-        // TODO: This is a poor way to choose a TCP port, as it could already
-        // be in use by something else.
-        let triagebot_port = NEXT_TCP_PORT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        let mut child = Command::new(env!("CARGO_BIN_EXE_triagebot"))
-            .env(
-                "GITHUB_API_TOKEN",
-                "ghp_123456789012345678901234567890123456",
-            )
-            .env("GITHUB_WEBHOOK_SECRET", WEBHOOK_SECRET)
-            .env(
-                "DATABASE_URL",
-                format!(
-                    "postgres:///triagebot?user=triagebot&host={}",
-                    db_dir.display()
-                ),
-            )
-            .env("PORT", triagebot_port.to_string())
-            .env("GITHUB_API_URL", format!("http://{}", api_server.addr))
-            .env(
-                "GITHUB_GRAPHQL_API_URL",
-                format!("http://{}/graphql", api_server.addr),
-            )
-            .env("GITHUB_RAW_URL", format!("http://{}", raw_server.addr))
-            .env("TEAMS_API_URL", format!("http://{}", teams_server.addr))
-            // We don't want jobs randomly running while testing.
-            .env("TRIAGEBOT_TEST_DISABLE_JOBS", "1")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .unwrap();
-        // Spawn some threads to capture output which can be used for debugging.
-        let stdout = Arc::new(Mutex::new(Vec::new()));
-        let stderr = Arc::new(Mutex::new(Vec::new()));
-        let consumer = |mut source: Box<dyn Read + Send>, dest: Arc<Mutex<Vec<u8>>>| {
-            move || {
-                let mut dest = dest.lock().unwrap();
-                if let Err(e) = source.read_to_end(&mut dest) {
-                    eprintln!("process reader failed: {e}");
-                };
-            }
-        };
-        thread::spawn(consumer(
-            Box::new(child.stdout.take().unwrap()),
-            stdout.clone(),
-        ));
-        thread::spawn(consumer(
-            Box::new(child.stderr.take().unwrap()),
-            stderr.clone(),
-        ));
-        let triagebot_addr = format!("127.0.0.1:{triagebot_port}").parse().unwrap();
-        // Wait for the triagebot process to start up.
-        for _ in 0..30 {
-            match std::net::TcpStream::connect(&triagebot_addr) {
-                Ok(_) => break,
-                Err(e) => match e.kind() {
-                    std::io::ErrorKind::ConnectionRefused => {
-                        std::thread::sleep(std::time::Duration::new(1, 0))
-                    }
-                    _ => panic!("unexpected error testing triagebot connection: {e:?}"),
-                },
-            }
-        }
-
-        ServerTestCtx {
-            child,
-            stdout,
-            stderr,
-            db_dir,
-            triagebot_addr,
-            api_server,
-            teams_server,
-            raw_server,
-            events,
-        }
+    ServerTestCtx {
+        child,
+        stdout,
+        stderr,
+        db_dir,
+        triagebot_addr,
+        server,
     }
 }
 
 impl ServerTestCtx {
-    fn send_webook(&self, json: &'static [u8]) {
-        let hmac = triagebot::payload::sign(WEBHOOK_SECRET, json);
+    /// Sends a webhook into the triagebot binary.
+    fn send_webhook(&self, event: &str, json: Vec<u8>) {
+        let hmac = triagebot::payload::sign(WEBHOOK_SECRET, &json);
         let sha1 = hex::encode(&hmac);
         let client = reqwest::blocking::Client::new();
         let response = client
             .post(format!("http://{}/github-hook", self.triagebot_addr))
-            .header("X-GitHub-Event", "issue_comment")
+            .header("X-GitHub-Event", event)
             .header("X-Hub-Signature", format!("sha1={sha1}"))
             .body(json)
             .send()
