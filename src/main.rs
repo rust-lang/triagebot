@@ -239,37 +239,6 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .await
         .context("database migrations")?;
 
-    // spawning a background task that will schedule the jobs
-    // every JOB_SCHEDULING_CADENCE_IN_SECS
-    task::spawn(async move {
-        if env::var_os("TRIAGEBOT_TEST_DISABLE_JOBS").is_some() {
-            return;
-        }
-        loop {
-            let res = task::spawn(async move {
-                let pool = db::ClientPool::new();
-                let mut interval =
-                    time::interval(time::Duration::from_secs(JOB_SCHEDULING_CADENCE_IN_SECS));
-
-                loop {
-                    interval.tick().await;
-                    db::schedule_jobs(&*pool.get().await, jobs())
-                        .await
-                        .context("database schedule jobs")
-                        .unwrap();
-                }
-            });
-
-            match res.await {
-                Err(err) if err.is_panic() => {
-                    /* handle panic in above task, re-launching */
-                    tracing::trace!("schedule_jobs task died (error={})", err);
-                }
-                _ => unreachable!(),
-            }
-        }
-    });
-
     let gh = github::GithubClient::new_from_env();
     let oc = octocrab::OctocrabBuilder::new()
         .personal_token(github::default_token_from_env())
@@ -282,35 +251,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         octocrab: oc,
     });
 
-    // spawning a background task that will run the scheduled jobs
-    // every JOB_PROCESSING_CADENCE_IN_SECS
-    let ctx2 = ctx.clone();
-    task::spawn(async move {
-        loop {
-            let ctx = ctx2.clone();
-            let res = task::spawn(async move {
-                let pool = db::ClientPool::new();
-                let mut interval =
-                    time::interval(time::Duration::from_secs(JOB_PROCESSING_CADENCE_IN_SECS));
-
-                loop {
-                    interval.tick().await;
-                    db::run_scheduled_jobs(&ctx, &*pool.get().await)
-                        .await
-                        .context("run database scheduled jobs")
-                        .unwrap();
-                }
-            });
-
-            match res.await {
-                Err(err) if err.is_panic() => {
-                    /* handle panic in above task, re-launching */
-                    tracing::trace!("run_scheduled_jobs task died (error={})", err);
-                }
-                _ => unreachable!(),
-            }
-        }
-    });
+    if !is_scheduled_jobs_disabled() {
+        spawn_job_scheduler();
+        spawn_job_runner(ctx.clone());
+    }
 
     let agenda = tower::ServiceBuilder::new()
         .buffer(10)
@@ -351,6 +295,85 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 
     serve_future.await?;
     Ok(())
+}
+
+/// Spawns a background tokio task which runs continuously to queue up jobs
+/// to be run by the job runner.
+///
+/// The scheduler wakes up every `JOB_SCHEDULING_CADENCE_IN_SECS` seconds to
+/// check if there are any jobs ready to run. Jobs get inserted into the the
+/// database which acts as a queue.
+fn spawn_job_scheduler() {
+    task::spawn(async move {
+        loop {
+            let res = task::spawn(async move {
+                let pool = db::ClientPool::new();
+                let mut interval =
+                    time::interval(time::Duration::from_secs(JOB_SCHEDULING_CADENCE_IN_SECS));
+
+                loop {
+                    interval.tick().await;
+                    db::schedule_jobs(&*pool.get().await, jobs())
+                        .await
+                        .context("database schedule jobs")
+                        .unwrap();
+                }
+            });
+
+            match res.await {
+                Err(err) if err.is_panic() => {
+                    /* handle panic in above task, re-launching */
+                    tracing::trace!("schedule_jobs task died (error={})", err);
+                }
+                _ => unreachable!(),
+            }
+        }
+    });
+}
+
+/// Spawns a background tokio task which runs continuously to run scheduled
+/// jobs.
+///
+/// The runner wakes up every `JOB_PROCESSING_CADENCE_IN_SECS` seconds to
+/// check if any jobs have been put into the queue by the scheduler. They
+/// will get popped off the queue and run if any are found.
+fn spawn_job_runner(ctx: Arc<Context>) {
+    task::spawn(async move {
+        loop {
+            let ctx = ctx.clone();
+            let res = task::spawn(async move {
+                let pool = db::ClientPool::new();
+                let mut interval =
+                    time::interval(time::Duration::from_secs(JOB_PROCESSING_CADENCE_IN_SECS));
+
+                loop {
+                    interval.tick().await;
+                    db::run_scheduled_jobs(&ctx, &*pool.get().await)
+                        .await
+                        .context("run database scheduled jobs")
+                        .unwrap();
+                }
+            });
+
+            match res.await {
+                Err(err) if err.is_panic() => {
+                    /* handle panic in above task, re-launching */
+                    tracing::trace!("run_scheduled_jobs task died (error={})", err);
+                }
+                _ => unreachable!(),
+            }
+        }
+    });
+}
+
+/// Determines whether or not background scheduled jobs should be disabled for
+/// the purpose of testing.
+///
+/// This helps avoid having random jobs run while testing other things.
+fn is_scheduled_jobs_disabled() -> bool {
+    // TRIAGEBOT_TEST_DISABLE_JOBS is set automatically by the test runner,
+    // and shouldn't be needed to be set manually.
+    env::var_os("TRIAGEBOT_TEST_DISABLE_JOBS").is_some() || triagebot::test_record::is_recording()
 }
 
 #[tokio::main(flavor = "current_thread")]

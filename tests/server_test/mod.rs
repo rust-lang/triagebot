@@ -49,6 +49,13 @@
 //!     ```
 //!
 //!     with the name of your test.
+//!
+//! ## Scheduled Jobs
+//!
+//! Scheduled jobs get automatically disabled when recording or running tests
+//! (via the `TRIAGEBOT_TEST_DISABLE_JOBS` environment variable). If you want
+//! to write a test for a scheduled job, you'll need to set up a mechanism to
+//! manually trigger the job (which could be useful outside of testing).
 
 mod shortcut;
 
