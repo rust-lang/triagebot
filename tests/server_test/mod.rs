@@ -61,19 +61,15 @@ mod shortcut;
 
 use super::{HttpServer, HttpServerHandle};
 use std::io::Read;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::AtomicU32;
+use std::sync::atomic::{AtomicU16, AtomicU32};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use triagebot::test_record::Activity;
 
-/// TCP port that the triagebot binary should listen on.
-///
-/// Increases by 1 for each test.
-static NEXT_TCP_PORT: AtomicU32 = AtomicU32::new(50000);
 /// Counter used to give each test a unique sandbox directory in the
 /// `target/tmp` directory.
 static TEST_COUNTER: AtomicU32 = AtomicU32::new(1);
@@ -150,9 +146,7 @@ fn build(activities: Vec<Activity>) -> ServerTestCtx {
     setup_postgres(&db_dir);
 
     let server = HttpServer::new(activities);
-    // TODO: This is a poor way to choose a TCP port, as it could already
-    // be in use by something else.
-    let triagebot_port = NEXT_TCP_PORT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let triagebot_port = next_triagebot_port();
     let mut child = Command::new(env!("CARGO_BIN_EXE_triagebot"))
         .env(
             "GITHUB_API_TOKEN",
@@ -374,4 +368,25 @@ fn find_postgres() -> PathBuf {
         are located on your system.\n\
         Or, add them to your PATH."
     );
+}
+
+/// Returns a free port for the next triagebot process to use.
+fn next_triagebot_port() -> u16 {
+    static NEXT_TCP_PORT: AtomicU16 = AtomicU16::new(50000);
+    loop {
+        // This depends on SO_REUSEADDR being set.
+        //
+        // This is inherently racey, as the port may become unavailable
+        // in-between the time it is checked here and triagebot actually binds
+        // to it.
+        //
+        // TODO: This may not work on Windows, may need investigation/fixing.
+        let triagebot_port = NEXT_TCP_PORT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if triagebot_port == 0 {
+            panic!("can't find port to listen on");
+        }
+        if TcpListener::bind(format!("127.0.0.1:{triagebot_port}")).is_ok() {
+            return triagebot_port;
+        }
+    }
 }
