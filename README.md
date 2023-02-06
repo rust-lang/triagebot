@@ -91,6 +91,10 @@ There are two parts to it:
 * [`server_test`](tests/server_test/mod.rs) — This tests the `triagebot` server itself and its behavior when it receives a webhook.
   This launches the `triagebot` server, sets up HTTP servers to intercept api.github.com requests, launches PostgreSQL in a sandbox, and then injects webhook events into the `triagebot` server and validates its response.
 
+The real GitHub API responses are recorded in JSON files that the tests can later replay to verify the behavior of triagebot.
+These recordings are enabled with the `TRIAGEBOT_TEST_RECORD` environment variable.
+See the documentation in `github_client` and `server_test` for the steps for setting up recording to write a test.
+
 ## License
 
 Triagebot is distributed under the terms of both the MIT license and the
