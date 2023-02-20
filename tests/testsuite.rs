@@ -1,10 +1,11 @@
 //! Triagebot integration testsuite.
 //!
-//! There are two types of tests here:
+//! There are three types of tests here:
 //!
 //! * `github_client` — This tests the behavior `GithubClient`.
 //! * `server_test` — This launches the `triagebot` executable, injects
 //!   webhook events into it, and validates the behavior.
+//! * `db` — This directly tests the database API.
 //!
 //! See the individual modules for an introduction to writing these tests.
 //!
@@ -12,6 +13,7 @@
 //! requests that would normally go to external sites like
 //! https://api.github.com.
 
+mod db;
 mod github_client;
 mod server_test;
 
@@ -19,11 +21,41 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 use std::net::{SocketAddr, TcpListener};
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc;
+use std::sync::Mutex;
 use triagebot::test_record::{self, Activity};
 use url::Url;
+
+pub fn test_dir() -> PathBuf {
+    thread_local! {
+        static TEST_ID: Mutex<Option<u32>> = Mutex::new(None);
+    }
+    static NEXT_ID: AtomicU32 = AtomicU32::new(0);
+    let path_from_id = |id| {
+        let tmp_dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("testsuite");
+        tmp_dir.join(format!("t{id}"))
+    };
+
+    let this_id = TEST_ID.with(|n| {
+        let mut v = n.lock().unwrap();
+        match *v {
+            None => {
+                let test_id = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let test_dir = path_from_id(test_id);
+                if test_dir.exists() {
+                    std::fs::remove_dir_all(&test_dir).unwrap();
+                }
+                std::fs::create_dir_all(&test_dir).unwrap();
+                *v = Some(test_id);
+                test_id
+            }
+            Some(id) => id,
+        }
+    });
+    path_from_id(this_id)
+}
 
 /// A request received on the HTTP server.
 #[derive(Clone, Debug)]

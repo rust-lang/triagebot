@@ -1,6 +1,5 @@
 use crate::db::jobs::JobSchedule;
-use crate::db::rustc_commits;
-use crate::db::rustc_commits::get_missing_commits;
+use crate::db::Commit;
 use crate::{
     github::{self, Event},
     handlers::Context,
@@ -87,7 +86,7 @@ async fn synchronize_commits(ctx: &Context, sha: &str, pr: u32) {
 }
 
 pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u32)>) {
-    let db = ctx.db.get().await;
+    let mut connection = ctx.db.connection().await;
 
     // List of roots to be resolved. Each root and its parents will be recursively resolved
     // until an existing commit is found.
@@ -96,14 +95,15 @@ pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u
         to_be_resolved.push_back((sha.to_string(), Some(pr)));
     }
     to_be_resolved.extend(
-        get_missing_commits(&db)
+        connection
+            .get_missing_commits()
             .await
+            .unwrap()
             .into_iter()
             .map(|c| (c, None::<u32>)),
     );
     log::info!("synchronize_commits for {:?}", to_be_resolved);
 
-    let db = ctx.db.get().await;
     while let Some((sha, mut pr)) = to_be_resolved.pop_front() {
         let mut gc = match ctx.github.rust_commit(&sha).await {
             Some(c) => c,
@@ -132,19 +132,17 @@ pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u
             }
         };
 
-        let res = rustc_commits::record_commit(
-            &db,
-            rustc_commits::Commit {
+        let res = connection
+            .record_commit(&Commit {
                 sha: gc.sha,
                 parent_sha: parent_sha.clone(),
                 time: gc.commit.author.date,
                 pr: Some(pr),
-            },
-        )
-        .await;
+            })
+            .await;
         match res {
             Ok(()) => {
-                if !rustc_commits::has_commit(&db, &parent_sha).await {
+                if !connection.has_commit(&parent_sha).await.unwrap() {
                     to_be_resolved.push_back((parent_sha, None))
                 }
             }

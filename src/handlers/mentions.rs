@@ -90,9 +90,11 @@ pub(super) async fn handle_input(
     event: &IssuesEvent,
     input: MentionsInput,
 ) -> anyhow::Result<()> {
-    let mut client = ctx.db.get().await;
+    let mut connection = ctx.db.connection().await;
+    let repo = event.issue.repository().to_string();
+    let issue_number = event.issue.number as i32;
     let mut state: IssueData<'_, MentionState> =
-        IssueData::load(&mut client, &event.issue, MENTIONS_KEY).await?;
+        IssueData::load(&mut *connection, repo, issue_number, MENTIONS_KEY).await?;
     // Build the message to post to the issue.
     let mut result = String::new();
     for to_mention in &input.paths {

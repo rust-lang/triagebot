@@ -279,7 +279,7 @@ command_handlers! {
 
 pub struct Context {
     pub github: GithubClient,
-    pub db: crate::db::ClientPool,
+    pub db: crate::db::Pool,
     pub username: String,
     pub octocrab: Octocrab,
 }

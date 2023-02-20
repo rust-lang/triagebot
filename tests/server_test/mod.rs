@@ -27,8 +27,8 @@
 //!    ```
 //!
 //!    Look at `README.md` for instructions for running triagebot against the
-//!    live GitHub site. You'll need to have webhook forwarding and Postgres
-//!    running in the background.
+//!    live GitHub site. You'll need to have webhook forwarding running in the
+//!    background.
 //!
 //!  3. Perform the action you want to test on GitHub. For example, post a
 //!     comment with `@rustbot ready` to test the "ready" command.
@@ -50,6 +50,13 @@
 //!
 //!     with the name of your test.
 //!
+//! ## Databases
+//!
+//! By default, the server tests will use Postgres if it is installed. If it
+//! doesn't appear to be installed, then it will use SQLite instead. If you
+//! want to force it to use SQLite, you can set the
+//! TRIAGEBOT_TEST_FORCE_SQLITE environment variable.
+//!
 //! ## Scheduled Jobs
 //!
 //! Scheduled jobs get automatically disabled when recording or running tests
@@ -63,17 +70,14 @@ mod shortcut;
 use super::{HttpServer, HttpServerHandle};
 use std::io::Read;
 use std::net::{SocketAddr, TcpListener};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicU16, AtomicU32};
+use std::sync::atomic::AtomicU16;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use triagebot::test_record::Activity;
 
-/// Counter used to give each test a unique sandbox directory in the
-/// `target/tmp` directory.
-static TEST_COUNTER: AtomicU32 = AtomicU32::new(1);
 /// The webhook secret used to validate that the webhook events are coming
 /// from the expected source.
 const WEBHOOK_SECRET: &str = "secret";
@@ -89,7 +93,9 @@ struct ServerTestCtx {
     /// Stderr received from triagebot, used for debugging.
     stderr: Arc<Mutex<Vec<u8>>>,
     /// Directory for the temporary Postgres database.
-    db_dir: PathBuf,
+    ///
+    /// `None` if using sqlite.
+    db_dir: Option<PathBuf>,
     /// The address for sending webhooks into the triagebot binary.
     triagebot_addr: SocketAddr,
     /// The handle to the mock server which simulates GitHub.
@@ -134,17 +140,25 @@ fn run_test(test_name: &str) {
 }
 
 fn build(activities: Vec<Activity>) -> ServerTestCtx {
-    // Set up a directory where this test can store all its stuff.
-    let tmp_dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("local");
-    let test_num = TEST_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    let test_dir = tmp_dir.join(format!("t{test_num}"));
-    if test_dir.exists() {
-        std::fs::remove_dir_all(&test_dir).unwrap();
-    }
-    std::fs::create_dir_all(&test_dir).unwrap();
-
-    let db_dir = test_dir.join("db");
-    setup_postgres(&db_dir);
+    let db_sqlite = || {
+        crate::test_dir()
+            .join("triagebot.sqlite3")
+            .to_str()
+            .unwrap()
+            .to_string()
+    };
+    let (db_dir, database_url) = if std::env::var_os("TRIAGEBOT_TEST_FORCE_SQLITE").is_some() {
+        (None, db_sqlite())
+    } else {
+        match crate::db::setup_postgres() {
+            Some(db_dir) => {
+                let database_url = crate::db::postgres_database_url(&db_dir);
+                (Some(db_dir), database_url)
+            }
+            None if std::env::var_os("CI").is_some() => panic!("expected postgres in CI"),
+            None => (None, db_sqlite()),
+        }
+    };
 
     let server = HttpServer::new(activities);
     let triagebot_port = next_triagebot_port();
@@ -154,13 +168,7 @@ fn build(activities: Vec<Activity>) -> ServerTestCtx {
             "ghp_123456789012345678901234567890123456",
         )
         .env("GITHUB_WEBHOOK_SECRET", WEBHOOK_SECRET)
-        .env(
-            "DATABASE_URL",
-            format!(
-                "postgres:///triagebot?user=triagebot&host={}",
-                db_dir.display()
-            ),
-        )
+        .env("DATABASE_URL", database_url)
         .env("PORT", triagebot_port.to_string())
         .env("GITHUB_API_URL", format!("http://{}", server.addr))
         .env(
@@ -240,29 +248,9 @@ impl ServerTestCtx {
 
 impl Drop for ServerTestCtx {
     fn drop(&mut self) {
-        // Shut down postgres.
-        let pg_dir = find_postgres();
-        match Command::new(pg_dir.join("pg_ctl"))
-            .args(&["-D", self.db_dir.to_str().unwrap(), "stop"])
-            .output()
-        {
-            Ok(output) => {
-                if !output.status.success() {
-                    eprintln!(
-                        "failed to stop postgres:\n\
-                        ---stdout\n\
-                        {}\n\
-                        ---stderr\n\
-                        {}\n\
-                        ",
-                        std::str::from_utf8(&output.stdout).unwrap(),
-                        std::str::from_utf8(&output.stderr).unwrap()
-                    );
-                }
-            }
-            Err(e) => eprintln!("could not run pg_ctl to stop: {e}"),
+        if let Some(db_dir) = &self.db_dir {
+            crate::db::stop_postgres(db_dir);
         }
-
         // Shut down triagebot.
         let _ = self.child.kill();
         // Display triagebot's output for debugging.
@@ -277,98 +265,6 @@ impl Drop for ServerTestCtx {
             }
         }
     }
-}
-
-fn run_command(command: &Path, args: &[&str], cwd: &Path) {
-    eprintln!("running {command:?}: {args:?}");
-    let output = Command::new(command)
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .unwrap_or_else(|e| panic!("`{command:?}` failed to run: {e}"));
-    if !output.status.success() {
-        panic!(
-            "{command:?} failed:\n\
-            ---stdout\n\
-            {}\n\
-            ---stderr\n\
-            {}\n\
-            ",
-            std::str::from_utf8(&output.stdout).unwrap(),
-            std::str::from_utf8(&output.stderr).unwrap()
-        );
-    }
-}
-
-fn setup_postgres(db_dir: &Path) {
-    std::fs::create_dir(&db_dir).unwrap();
-    let db_dir_str = db_dir.to_str().unwrap();
-    let pg_dir = find_postgres();
-    run_command(
-        &pg_dir.join("initdb"),
-        &["--auth=trust", "--username=triagebot", "-D", db_dir_str],
-        db_dir,
-    );
-    run_command(
-        &pg_dir.join("pg_ctl"),
-        &[
-            // -h '' tells it to not listen on TCP
-            // -k tells it where to place the unix-domain socket
-            "-o",
-            &format!("-h '' -k {db_dir_str}"),
-            // -D is the data dir where everything is stored
-            "-D",
-            db_dir_str,
-            // -l enables logging to a file instead of stdout
-            "-l",
-            db_dir.join("postgres.log").to_str().unwrap(),
-            "start",
-        ],
-        db_dir,
-    );
-    run_command(
-        &pg_dir.join("createdb"),
-        &["--user", "triagebot", "-h", db_dir_str, "triagebot"],
-        db_dir,
-    );
-}
-
-/// Finds the root for PostgreSQL commands.
-///
-/// For various reasons, some Linux distros hide some postgres commands and
-/// don't put them on PATH, making them difficult to access.
-fn find_postgres() -> PathBuf {
-    // Check if on PATH first.
-    if let Ok(o) = Command::new("initdb").arg("-V").output() {
-        if o.status.success() {
-            return PathBuf::new();
-        }
-    }
-    if let Ok(dirs) = std::fs::read_dir("/usr/lib/postgresql") {
-        let mut versions: Vec<_> = dirs
-            .filter_map(|entry| {
-                let entry = entry.unwrap();
-                // Versions are generally of the form 9.3 or 14, but this
-                // might be broken if other forms are used.
-                if let Ok(n) = entry.file_name().to_str().unwrap().parse::<f32>() {
-                    Some((n, entry.path()))
-                } else {
-                    None
-                }
-            })
-            .collect();
-        if !versions.is_empty() {
-            versions.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-            return versions.last().unwrap().1.join("bin");
-        }
-    }
-    panic!(
-        "Could not find PostgreSQL binaries.\n\
-        Make sure to install PostgreSQL.\n\
-        If PostgreSQL is installed, update this function to match where they \
-        are located on your system.\n\
-        Or, add them to your PATH."
-    );
 }
 
 /// Returns a free port for the next triagebot process to use.

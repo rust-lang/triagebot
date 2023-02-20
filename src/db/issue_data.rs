@@ -8,17 +8,15 @@
 //! Note that this uses crude locking, so try to keep the duration between
 //! loading and saving to a minimum.
 
-use crate::github::Issue;
-use anyhow::{Context, Result};
+use crate::db;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use tokio_postgres::types::Json;
-use tokio_postgres::{Client as DbClient, Transaction};
 
 pub struct IssueData<'db, T>
 where
     T: for<'a> Deserialize<'a> + Serialize + Default + std::fmt::Debug + Sync,
 {
-    transaction: Transaction<'db>,
+    transaction: Box<dyn db::Transaction + 'db>,
     repo: String,
     issue_number: i32,
     key: String,
@@ -30,27 +28,18 @@ where
     T: for<'a> Deserialize<'a> + Serialize + Default + std::fmt::Debug + Sync,
 {
     pub async fn load(
-        db: &'db mut DbClient,
-        issue: &Issue,
+        connection: &'db mut dyn db::Connection,
+        repo: String,
+        issue_number: i32,
         key: &str,
     ) -> Result<IssueData<'db, T>> {
-        let repo = issue.repository().to_string();
-        let issue_number = issue.number as i32;
-        let transaction = db.transaction().await?;
-        transaction
-            .execute("LOCK TABLE issue_data", &[])
-            .await
-            .context("locking issue data")?;
-        let data = transaction
-            .query_opt(
-                "SELECT data FROM issue_data WHERE \
-                 repo = $1 AND issue_number = $2 AND key = $3",
-                &[&repo, &issue_number, &key],
-            )
-            .await
-            .context("selecting issue data")?
-            .map(|row| row.get::<usize, Json<T>>(0).0)
-            .unwrap_or_default();
+        let (transaction, raw) = connection
+            .lock_and_load_issue_data(&repo, issue_number, key)
+            .await?;
+        let data = match raw {
+            Some(raw) => T::deserialize(raw)?,
+            None => T::default(),
+        };
         Ok(IssueData {
             transaction,
             repo,
@@ -60,20 +49,13 @@ where
         })
     }
 
-    pub async fn save(self) -> Result<()> {
+    pub async fn save(mut self) -> Result<()> {
+        let raw_data = serde_json::to_value(self.data)?;
         self.transaction
-            .execute(
-                "INSERT INTO issue_data (repo, issue_number, key, data) \
-                 VALUES ($1, $2, $3, $4) \
-                 ON CONFLICT (repo, issue_number, key) DO UPDATE SET data=EXCLUDED.data",
-                &[&self.repo, &self.issue_number, &self.key, &Json(&self.data)],
-            )
-            .await
-            .context("inserting issue data")?;
-        self.transaction
-            .commit()
-            .await
-            .context("committing issue data")?;
+            .conn()
+            .save_issue_data(&self.repo, self.issue_number, &self.key, &raw_data)
+            .await?;
+        self.transaction.commit().await?;
         Ok(())
     }
 }
