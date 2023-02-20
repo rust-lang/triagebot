@@ -1,0 +1,25 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/repos/rust-lang/rust/contents/src/doc/reference",
+  "query": null,
+  "request_body": "",
+  "response_code": 200,
+  "response_body": {
+    "_links": {
+      "git": "https://api.github.com/repos/rust-lang/reference/git/trees/22882fb3f7b4d69fdc0d1731e8b9cfcb6910537d",
+      "html": "https://github.com/rust-lang/reference/tree/22882fb3f7b4d69fdc0d1731e8b9cfcb6910537d",
+      "self": "https://api.github.com/repos/rust-lang/rust/contents/src/doc/reference?ref=master"
+    },
+    "download_url": null,
+    "git_url": "https://api.github.com/repos/rust-lang/reference/git/trees/22882fb3f7b4d69fdc0d1731e8b9cfcb6910537d",
+    "html_url": "https://github.com/rust-lang/reference/tree/22882fb3f7b4d69fdc0d1731e8b9cfcb6910537d",
+    "name": "reference",
+    "path": "src/doc/reference",
+    "sha": "22882fb3f7b4d69fdc0d1731e8b9cfcb6910537d",
+    "size": 0,
+    "submodule_git_url": "https://github.com/rust-lang/reference.git",
+    "type": "submodule",
+    "url": "https://api.github.com/repos/rust-lang/rust/contents/src/doc/reference?ref=master"
+  }
+}

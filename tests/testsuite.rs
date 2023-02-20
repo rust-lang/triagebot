@@ -139,7 +139,7 @@ pub fn load_activities(test_dir: &str, test_name: &str) -> Vec<Activity> {
         .map(|path| {
             let contents = std::fs::read_to_string(path).unwrap();
             let mut activity = serde_json::from_str(&contents).unwrap();
-            if let Activity::ApiRequest {
+            if let Activity::Request {
                 path,
                 response_body,
                 ..
@@ -282,7 +282,7 @@ impl HttpServer {
             Activity::Webhook { .. } => {
                 panic!("unexpected webhook")
             }
-            Activity::ApiRequest {
+            Activity::Request {
                 method,
                 path,
                 query,
@@ -315,38 +315,16 @@ impl HttpServer {
                         String::from_utf8_lossy(&request.body)
                     ));
                 }
-                let body = serde_json::to_vec(response_body).unwrap();
+                let body = match response_body {
+                    // We overload the meaning of a string to be a raw string.
+                    // I don't think GitHub's API ever returns a string as a response.
+                    serde_json::Value::String(s) => s.as_bytes().to_vec(),
+                    _ => serde_json::to_vec(response_body).unwrap(),
+                };
                 return Response {
                     code: *response_code,
                     headers: Vec::new(),
                     body,
-                };
-            }
-            Activity::RawRequest {
-                path,
-                query,
-                response_code,
-                response_body,
-            } => {
-                if path != &request.path {
-                    return self.report_err(&format!(
-                        "expected next request to be {path},\n\
-                        got {} {}",
-                        request.method, request.path
-                    ));
-                }
-                if query != &request.query {
-                    return self.report_err(&format!(
-                        "query string does not match\n\
-                        expected: {query:?}\n\
-                        got: {:?}\n",
-                        request.query
-                    ));
-                }
-                return Response {
-                    code: *response_code,
-                    headers: Vec::new(),
-                    body: response_body.as_bytes().to_vec(),
                 };
             }
             Activity::Error { .. } | Activity::Finished => {

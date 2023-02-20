@@ -1,0 +1,2530 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/repos/rust-lang/rust/commits",
+  "query": "author=bors",
+  "request_body": "",
+  "response_code": 200,
+  "response_body": [
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/7f97aeaf73047268299ab55288b3dd886130be47/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-05T11:10:11Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-05T11:10:11Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107679 - est31:less_import_overhead, r=compiler-errors\n\nLess import overhead for errors\n\nThis removes huge (3+ lines) import lists found in files that had their error reporting migrated. These lists are bad for developer workflows as adding, removing, or editing a single error's name might cause a chain reaction that bloats the git diff. As the error struct names are long, the likelihood of such chain reactions is high.\n\nFollows the suggestion by `@Nilstrieb` in the [zulip thread](https://rust-lang.zulipchat.com/#narrow/stream/147480-t-compiler.2Fwg-diagnostics/topic/massive.20use.20statements) to replace the `use errors::{FooErr, BarErr};` with `use errors;` and then changing to `errors::FooErr` on the usage sites.\n\nI have used sed to do most of the changes, i.e. something like:\n\n```\nsed -i -E 's/(create_err|create_feature_err|emit_err|create_note|emit_fatal|emit_warning)\\(([[:alnum:]]+|[A-Z][[:alnum:]:]*)( \\{|\\))/\\1(errors::\\2\\3/' path/to/file.rs\n```\n\n& then I manually fixed the errors that occured. Most manual changes were required in `compiler/rustc_parse/src/parser/expr.rs`.\n\nr? `@compiler-errors`",
+        "tree": {
+          "sha": "28ef3869cb8034a8ab5e4ad389c139ec7dbd6df1",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/28ef3869cb8034a8ab5e4ad389c139ec7dbd6df1"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/7f97aeaf73047268299ab55288b3dd886130be47",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/7f97aeaf73047268299ab55288b3dd886130be47",
+      "node_id": "C_kwDOAAsO6NoAKDdmOTdhZWFmNzMwNDcyNjgyOTlhYjU1Mjg4YjNkZDg4NjEzMGJlNDc",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/2a6ff729233c62d1d991da5ed4d01aa29e59d637",
+          "sha": "2a6ff729233c62d1d991da5ed4d01aa29e59d637",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/2a6ff729233c62d1d991da5ed4d01aa29e59d637"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/580cc89e9c36a89d3cc13a352c96f874eaa76581",
+          "sha": "580cc89e9c36a89d3cc13a352c96f874eaa76581",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/580cc89e9c36a89d3cc13a352c96f874eaa76581"
+        }
+      ],
+      "sha": "7f97aeaf73047268299ab55288b3dd886130be47",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/7f97aeaf73047268299ab55288b3dd886130be47"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/2a6ff729233c62d1d991da5ed4d01aa29e59d637/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-05T07:36:37Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-05T07:36:37Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107434 - BoxyUwU:nll_const_equate, r=compiler-errors\n\nemit `ConstEquate` in `TypeRelating<D>`\n\nemitting `ConstEquate` during mir typeck is useful since it can help catch bugs in hir typeck incase our impl of `ConstEquate` is wrong.\n\ndoing this did actually catch a bug, when relating `Expr::Call` we `==` the types of all the argument consts which spuriously returns false if the type contains const projections/aliases which causes us to fall through to the `expected_found` error arm.\nGenerally its an ICE if the `Const`'s `Ty`s arent equal but `ConstKind::Expr` is kind of special since they are sort of like const items that are `const CALL<F: const Fn(...), const N: F>` though we dont actually explicitly represent the `F` type param explicitly in `Expr::Call` so I just made us relate the `Const`'s ty field to avoid getting ICEs from the tests I added and the following existing test:\n```rust\n// tests/ui/const-generics/generic_const_exprs/different-fn.rs\n#![feature(generic_const_exprs)]\n#![allow(incomplete_features)]\n\nuse std::mem::size_of;\nuse std::marker::PhantomData;\n\nstruct Foo<T>(PhantomData<T>);\n\nfn test<T>() -> [u8; size_of::<T>()] {\n    [0; size_of::<Foo<T>>()]\n    //~^ ERROR unconstrained generic constant\n    //~| ERROR mismatched types\n}\n\nfn main() {\n    test::<u32>();\n}\n```\nwhich has us relate two `ConstKind::Value` one for the fn item of `size_of::<Foo<T>>` and one for the fn item of `size_of::<T>()`, these only differ by their `Ty` and if we don't relate the `Ty` we'll end up getting an ICE from the checks that ensure the `ty` fields always match.\n\nIn theory `Expr::UnOp` has the same problem so I added a call to `relate` for the ty's, although I was unable to create a repro test.",
+        "tree": {
+          "sha": "2304fe8c3bff131573b1cd5e6de1b3fb1c0ce7ad",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/2304fe8c3bff131573b1cd5e6de1b3fb1c0ce7ad"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/2a6ff729233c62d1d991da5ed4d01aa29e59d637",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/2a6ff729233c62d1d991da5ed4d01aa29e59d637",
+      "node_id": "C_kwDOAAsO6NoAKDJhNmZmNzI5MjMzYzYyZDFkOTkxZGE1ZWQ0ZDAxYWEyOWU1OWQ2Mzc",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/50d3ba5bcbf5c7e13d4ce068d3339710701dd603",
+          "sha": "50d3ba5bcbf5c7e13d4ce068d3339710701dd603",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/50d3ba5bcbf5c7e13d4ce068d3339710701dd603"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/d85d906f8c44dd98bf6bc0e4b753aa241839c323",
+          "sha": "d85d906f8c44dd98bf6bc0e4b753aa241839c323",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/d85d906f8c44dd98bf6bc0e4b753aa241839c323"
+        }
+      ],
+      "sha": "2a6ff729233c62d1d991da5ed4d01aa29e59d637",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/2a6ff729233c62d1d991da5ed4d01aa29e59d637"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/50d3ba5bcbf5c7e13d4ce068d3339710701dd603/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-04T21:07:10Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-04T21:07:10Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107672 - matthiaskrgr:rollup-7e6dbuk, r=matthiaskrgr\n\nRollup of 3 pull requests\n\nSuccessful merges:\n\n - #107116 (consolidate bootstrap docs)\n - #107646 (Provide structured suggestion for binding needing type on E0594)\n - #107661 (Remove Esteban from review queues for a while)\n\nFailed merges:\n\nr? `@ghost`\n`@rustbot` modify labels: rollup",
+        "tree": {
+          "sha": "932463b8bde694e38b6ed2bd27d772fc2ce0255f",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/932463b8bde694e38b6ed2bd27d772fc2ce0255f"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/50d3ba5bcbf5c7e13d4ce068d3339710701dd603",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/50d3ba5bcbf5c7e13d4ce068d3339710701dd603",
+      "node_id": "C_kwDOAAsO6NoAKDUwZDNiYTViY2JmNWM3ZTEzZDRjZTA2OGQzMzM5NzEwNzAxZGQ2MDM",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/3de7d7fb22a579a3d59ddb1c959d1b3da224aafa",
+          "sha": "3de7d7fb22a579a3d59ddb1c959d1b3da224aafa",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/3de7d7fb22a579a3d59ddb1c959d1b3da224aafa"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/47fc625a921aed430c08d6015246e65362256343",
+          "sha": "47fc625a921aed430c08d6015246e65362256343",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/47fc625a921aed430c08d6015246e65362256343"
+        }
+      ],
+      "sha": "50d3ba5bcbf5c7e13d4ce068d3339710701dd603",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/50d3ba5bcbf5c7e13d4ce068d3339710701dd603"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/3de7d7fb22a579a3d59ddb1c959d1b3da224aafa/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-04T18:11:02Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-04T18:11:02Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107549 - Zoxc:rustc-shared, r=jyn514\n\nMove code in `rustc_driver` out to a new `rustc_driver_impl` crate to allow pipelining\n\nThat adds a `rustc_shared` library which contains all the rustc library crates in a single dylib. It takes over this role from `rustc_driver`. This is done so that `rustc_driver` can be compiled in parallel with other crates. `rustc_shared` is intentionally left empty so it only does linking.\n\nAn alternative could be to move the code currently in `rustc_driver` into a new crate to avoid changing the name of the distributed library.",
+        "tree": {
+          "sha": "0d3e9447ea00657b717fbba42f6a854bc0b95355",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/0d3e9447ea00657b717fbba42f6a854bc0b95355"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/3de7d7fb22a579a3d59ddb1c959d1b3da224aafa",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/3de7d7fb22a579a3d59ddb1c959d1b3da224aafa",
+      "node_id": "C_kwDOAAsO6NoAKDNkZTdkN2ZiMjJhNTc5YTNkNTlkZGIxYzk1OWQxYjNkYTIyNGFhZmE",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/9dee4e4c42d23b0c5afd6d8fed025181f70fbe12",
+          "sha": "9dee4e4c42d23b0c5afd6d8fed025181f70fbe12",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/9dee4e4c42d23b0c5afd6d8fed025181f70fbe12"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/2b8f8922ee5852f97e92082b209c0f4d940a6edb",
+          "sha": "2b8f8922ee5852f97e92082b209c0f4d940a6edb",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/2b8f8922ee5852f97e92082b209c0f4d940a6edb"
+        }
+      ],
+      "sha": "3de7d7fb22a579a3d59ddb1c959d1b3da224aafa",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/3de7d7fb22a579a3d59ddb1c959d1b3da224aafa"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/9dee4e4c42d23b0c5afd6d8fed025181f70fbe12/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-04T15:17:32Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-04T15:17:32Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107267 - cjgillot:keep-aggregate, r=oli-obk\n\nDo not deaggregate MIR\n\nThis turns out to simplify a lot of things.\nI haven't checked the consequences for miri yet.\n\ncc `@JakobDegen`\nr? `@oli-obk`",
+        "tree": {
+          "sha": "9e854d084f562af0f8369eca144ad1fb044b248f",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/9e854d084f562af0f8369eca144ad1fb044b248f"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/9dee4e4c42d23b0c5afd6d8fed025181f70fbe12",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/9dee4e4c42d23b0c5afd6d8fed025181f70fbe12",
+      "node_id": "C_kwDOAAsO6NoAKDlkZWU0ZTRjNDJkMjNiMGM1YWZkNmQ4ZmVkMDI1MTgxZjcwZmJlMTI",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/4aa6afa7f8a418a7dae5dbe4c95371d4f3bcc0e1",
+          "sha": "4aa6afa7f8a418a7dae5dbe4c95371d4f3bcc0e1",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/4aa6afa7f8a418a7dae5dbe4c95371d4f3bcc0e1"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/5c39ba20279e338e2cd421bc799d4a5d3397c3b9",
+          "sha": "5c39ba20279e338e2cd421bc799d4a5d3397c3b9",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/5c39ba20279e338e2cd421bc799d4a5d3397c3b9"
+        }
+      ],
+      "sha": "9dee4e4c42d23b0c5afd6d8fed025181f70fbe12",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/9dee4e4c42d23b0c5afd6d8fed025181f70fbe12"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/4aa6afa7f8a418a7dae5dbe4c95371d4f3bcc0e1/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-04T11:22:31Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-04T11:22:31Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107618 - chriswailes:linker-arg, r=albertlarsan68\n\nAdd a linker argument back to boostrap.py\n\nIn https://github.com/rust-lang/rust/pull/101783 I accidentally removed a load-bearing linker argument.  This PR adds it back in.\n\nr? jyn514",
+        "tree": {
+          "sha": "eac1bf39849eae33d4bb2b9bdb80304e8a03dd48",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/eac1bf39849eae33d4bb2b9bdb80304e8a03dd48"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/4aa6afa7f8a418a7dae5dbe4c95371d4f3bcc0e1",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/4aa6afa7f8a418a7dae5dbe4c95371d4f3bcc0e1",
+      "node_id": "C_kwDOAAsO6NoAKDRhYTZhZmE3ZjhhNDE4YTdkYWU1ZGJlNGM5NTM3MWQ0ZjNiY2MwZTE",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/91eb6f9acfcfde6832d547959ad2d95b1ac0b5dc",
+          "sha": "91eb6f9acfcfde6832d547959ad2d95b1ac0b5dc",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/91eb6f9acfcfde6832d547959ad2d95b1ac0b5dc"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/134a5aea52641715dd1ea1e4ad0e6a5693fbedc6",
+          "sha": "134a5aea52641715dd1ea1e4ad0e6a5693fbedc6",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/134a5aea52641715dd1ea1e4ad0e6a5693fbedc6"
+        }
+      ],
+      "sha": "4aa6afa7f8a418a7dae5dbe4c95371d4f3bcc0e1",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/4aa6afa7f8a418a7dae5dbe4c95371d4f3bcc0e1"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/91eb6f9acfcfde6832d547959ad2d95b1ac0b5dc/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-04T03:41:57Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-04T03:41:57Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107591 - krasimirgg:llvm-17-pgoopts, r=cuviper\n\nllvm-wrapper: adapt for LLVM API changes\n\nAdapts the wrapper for https://github.com/llvm/llvm-project/commit/516e301752560311d2cd8c2b549493eb0f98d01b, where the constructor of PGOOptions gained a new FileSystem argument. Adapted to use the real file system, similarly to the changes inside of LLVM:\nhttps://github.com/llvm/llvm-project/commit/516e301752560311d2cd8c2b549493eb0f98d01b#diff-f409934ba27ad86494f3012324e9a3995b56e0743609ded7a387ba62bbf5edb0R236\n\nFound via our experimental Rust + LLVM at HEAD bot: https://buildkite.com/llvm-project/rust-llvm-integrate-prototype/builds/16853#01860e2e-5eba-4f07-8359-0325913ff410/219-517",
+        "tree": {
+          "sha": "eac1bf39849eae33d4bb2b9bdb80304e8a03dd48",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/eac1bf39849eae33d4bb2b9bdb80304e8a03dd48"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/91eb6f9acfcfde6832d547959ad2d95b1ac0b5dc",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/91eb6f9acfcfde6832d547959ad2d95b1ac0b5dc",
+      "node_id": "C_kwDOAAsO6NoAKDkxZWI2ZjlhY2ZjZmRlNjgzMmQ1NDc5NTlhZDJkOTViMWFjMGI1ZGM",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/886b2c3e005b153b3c8263f48193e0df7de0f5b3",
+          "sha": "886b2c3e005b153b3c8263f48193e0df7de0f5b3",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/886b2c3e005b153b3c8263f48193e0df7de0f5b3"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/4614e5b5bf1331907bf3baf70cf0eb705f2959e9",
+          "sha": "4614e5b5bf1331907bf3baf70cf0eb705f2959e9",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/4614e5b5bf1331907bf3baf70cf0eb705f2959e9"
+        }
+      ],
+      "sha": "91eb6f9acfcfde6832d547959ad2d95b1ac0b5dc",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/91eb6f9acfcfde6832d547959ad2d95b1ac0b5dc"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/886b2c3e005b153b3c8263f48193e0df7de0f5b3/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-03T22:37:53Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-03T22:37:53Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107650 - compiler-errors:rollup-4pntchf, r=compiler-errors\n\nRollup of 8 pull requests\n\nSuccessful merges:\n\n - #106887 (Make const/fn return params more suggestable)\n - #107519 (Add type alias for raw OS errors)\n - #107551 ( Replace `ConstFnMutClosure` with const closures )\n - #107595 (Retry opening proc-macro DLLs a few times on Windows.)\n - #107615 (Replace nbsp in all rustdoc code blocks)\n - #107621 (Intern external constraints in new solver)\n - #107631 (loudly tell people when they change `Cargo.lock`)\n - #107632 (Clarifying that .map() returns None if None.)\n\nFailed merges:\n\nr? `@ghost`\n`@rustbot` modify labels: rollup",
+        "tree": {
+          "sha": "4bd560ab45691d951ce6a3b70229091e093a69b7",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/4bd560ab45691d951ce6a3b70229091e093a69b7"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/886b2c3e005b153b3c8263f48193e0df7de0f5b3",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/886b2c3e005b153b3c8263f48193e0df7de0f5b3",
+      "node_id": "C_kwDOAAsO6NoAKDg4NmIyYzNlMDA1YjE1M2IzYzgyNjNmNDgxOTNlMGRmN2RlMGY1YjM",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/658fad6c5506f41c35b64fb1a22ceb0992697ff3",
+          "sha": "658fad6c5506f41c35b64fb1a22ceb0992697ff3",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/658fad6c5506f41c35b64fb1a22ceb0992697ff3"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/13bd75f425f084d63817336db5ca433bc0655786",
+          "sha": "13bd75f425f084d63817336db5ca433bc0655786",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/13bd75f425f084d63817336db5ca433bc0655786"
+        }
+      ],
+      "sha": "886b2c3e005b153b3c8263f48193e0df7de0f5b3",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/886b2c3e005b153b3c8263f48193e0df7de0f5b3"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/658fad6c5506f41c35b64fb1a22ceb0992697ff3/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-03T17:53:49Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-03T17:53:49Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107642 - Dylan-DPC:rollup-edcqhm5, r=Dylan-DPC\n\nRollup of 6 pull requests\n\nSuccessful merges:\n\n - #107082 (Autotrait bounds on dyn-safe trait methods)\n - #107427 (Add candidates for DiscriminantKind builtin)\n - #107539 (Emit warnings on unused parens in index expressions)\n - #107544 (Improve `TokenCursor`.)\n - #107585 (Don't cause a cycle when formatting query description that references a FnDef)\n - #107633 (Fix suggestion for coercing Option<&String> to Option<&str>)\n\nFailed merges:\n\nr? `@ghost`\n`@rustbot` modify labels: rollup",
+        "tree": {
+          "sha": "d9beffb3e496848ea5acbe6d9caf2d102f473eab",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/d9beffb3e496848ea5acbe6d9caf2d102f473eab"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/658fad6c5506f41c35b64fb1a22ceb0992697ff3",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/658fad6c5506f41c35b64fb1a22ceb0992697ff3",
+      "node_id": "C_kwDOAAsO6NoAKDY1OGZhZDZjNTUwNmY0MWMzNWI2NGZiMWEyMmNlYjA5OTI2OTdmZjM",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/9545094994f1ab45cab5799d5b45980871a9e97b",
+          "sha": "9545094994f1ab45cab5799d5b45980871a9e97b",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/9545094994f1ab45cab5799d5b45980871a9e97b"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/c9270272df5bd7254b6ce1c7b69d41c75e443406",
+          "sha": "c9270272df5bd7254b6ce1c7b69d41c75e443406",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/c9270272df5bd7254b6ce1c7b69d41c75e443406"
+        }
+      ],
+      "sha": "658fad6c5506f41c35b64fb1a22ceb0992697ff3",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/658fad6c5506f41c35b64fb1a22ceb0992697ff3"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/9545094994f1ab45cab5799d5b45980871a9e97b/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-03T14:22:42Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-03T14:22:42Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107599 - clubby789:debug-less-ref, r=nnethercote\n\nDon't generate unecessary `&&self.field` in deriving Debug\n\nSince unsized fields may only be the last one in a struct, we only need to generate a double reference (`&&self.field`) for the  final one.\n\ncc `@nnethercote`",
+        "tree": {
+          "sha": "f20e2d08b8836fe5498948b0863680019083975c",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/f20e2d08b8836fe5498948b0863680019083975c"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/9545094994f1ab45cab5799d5b45980871a9e97b",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/9545094994f1ab45cab5799d5b45980871a9e97b",
+      "node_id": "C_kwDOAAsO6NoAKDk1NDUwOTQ5OTRmMWFiNDVjYWI1Nzk5ZDViNDU5ODA4NzFhOWU5N2I",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/a94b9fd0ace1336a3dd93f51f1c0db6ca0fd7f92",
+          "sha": "a94b9fd0ace1336a3dd93f51f1c0db6ca0fd7f92",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/a94b9fd0ace1336a3dd93f51f1c0db6ca0fd7f92"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/d8651aae22d3b2251045647e7313fea37381362a",
+          "sha": "d8651aae22d3b2251045647e7313fea37381362a",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/d8651aae22d3b2251045647e7313fea37381362a"
+        }
+      ],
+      "sha": "9545094994f1ab45cab5799d5b45980871a9e97b",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/9545094994f1ab45cab5799d5b45980871a9e97b"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/a94b9fd0ace1336a3dd93f51f1c0db6ca0fd7f92/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-03T11:19:03Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-03T11:19:03Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107569 - petrochenkov:optattr, r=nnethercote\n\nast: Optimize list and value extraction primitives for attributes\n\nIt's not necessary to convert the whole attribute into a meta item to extract something specific.",
+        "tree": {
+          "sha": "a2064cce0219090bcdba2de58a84a62b78fc0270",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/a2064cce0219090bcdba2de58a84a62b78fc0270"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/a94b9fd0ace1336a3dd93f51f1c0db6ca0fd7f92",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/a94b9fd0ace1336a3dd93f51f1c0db6ca0fd7f92",
+      "node_id": "C_kwDOAAsO6NoAKGE5NGI5ZmQwYWNlMTMzNmEzZGQ5M2Y1MWYxYzBkYjZjYTBmZDdmOTI",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/7c46fb2111936ad21a8e3aa41e9128752357f5d8",
+          "sha": "7c46fb2111936ad21a8e3aa41e9128752357f5d8",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/7c46fb2111936ad21a8e3aa41e9128752357f5d8"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/a9c8a5c0255d056f78f1347c431fd88bc727febb",
+          "sha": "a9c8a5c0255d056f78f1347c431fd88bc727febb",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/a9c8a5c0255d056f78f1347c431fd88bc727febb"
+        }
+      ],
+      "sha": "a94b9fd0ace1336a3dd93f51f1c0db6ca0fd7f92",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/a94b9fd0ace1336a3dd93f51f1c0db6ca0fd7f92"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/7c46fb2111936ad21a8e3aa41e9128752357f5d8/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-03T08:07:47Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-03T08:07:47Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107625 - matthiaskrgr:rollup-xr9oldy, r=matthiaskrgr\n\nRollup of 6 pull requests\n\nSuccessful merges:\n\n - #106575 (Suggest `move` in nested closure when appropriate)\n - #106805 (Suggest `{var:?}` when finding `{?:var}` in inline format strings)\n - #107500 (Add tests to assert current behavior of large future sizes)\n - #107598 (Fix benchmarks in library/core with black_box)\n - #107602 (Parse and recover from type ascription in patterns)\n - #107608 (Use triple rather than arch for fuchsia test-runner)\n\nFailed merges:\n\nr? `@ghost`\n`@rustbot` modify labels: rollup",
+        "tree": {
+          "sha": "d3bdac647485a029e043f15ab0b46529058a437c",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/d3bdac647485a029e043f15ab0b46529058a437c"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/7c46fb2111936ad21a8e3aa41e9128752357f5d8",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/7c46fb2111936ad21a8e3aa41e9128752357f5d8",
+      "node_id": "C_kwDOAAsO6NoAKDdjNDZmYjIxMTE5MzZhZDIxYThlM2FhNDFlOTEyODc1MjM1N2Y1ZDg",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/5d32458343f34bd8de6d96cbaab2a9cf879dd1b8",
+          "sha": "5d32458343f34bd8de6d96cbaab2a9cf879dd1b8",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/5d32458343f34bd8de6d96cbaab2a9cf879dd1b8"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/b6e8ebf33b0203ab16bbb26eb95a6654ee00ac8e",
+          "sha": "b6e8ebf33b0203ab16bbb26eb95a6654ee00ac8e",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/b6e8ebf33b0203ab16bbb26eb95a6654ee00ac8e"
+        }
+      ],
+      "sha": "7c46fb2111936ad21a8e3aa41e9128752357f5d8",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/7c46fb2111936ad21a8e3aa41e9128752357f5d8"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/5d32458343f34bd8de6d96cbaab2a9cf879dd1b8/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-03T04:49:50Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-03T04:49:50Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107543 - ehuss:protocol-sparse, r=jyn514\n\nEnable Cargo's sparse protocol in CI\n\nThis enables the sparse protocol in CI in order to exercise and dogfood it. This is intended test the production server in a real-world situation.\n\nCloses #107342",
+        "tree": {
+          "sha": "9c2f45b42f042b5f78bfd1b8c491958f83dd1351",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/9c2f45b42f042b5f78bfd1b8c491958f83dd1351"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/5d32458343f34bd8de6d96cbaab2a9cf879dd1b8",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/5d32458343f34bd8de6d96cbaab2a9cf879dd1b8",
+      "node_id": "C_kwDOAAsO6NoAKDVkMzI0NTgzNDNmMzRiZDhkZTZkOTZjYmFhYjJhOWNmODc5ZGQxYjg",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/f02439dea78e5c2df42198c7a03e2db6002ff263",
+          "sha": "f02439dea78e5c2df42198c7a03e2db6002ff263",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/f02439dea78e5c2df42198c7a03e2db6002ff263"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/5e90940a4b742e7f1e86f21c26b56e99a8733458",
+          "sha": "5e90940a4b742e7f1e86f21c26b56e99a8733458",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/5e90940a4b742e7f1e86f21c26b56e99a8733458"
+        }
+      ],
+      "sha": "5d32458343f34bd8de6d96cbaab2a9cf879dd1b8",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/5d32458343f34bd8de6d96cbaab2a9cf879dd1b8"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/f02439dea78e5c2df42198c7a03e2db6002ff263/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-03T01:19:04Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-03T01:19:04Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107241 - clubby789:bootstrap-lto-off, r=simulacrum\n\nAdd `rust.lto=off` to bootstrap and set as compiler/library default\n\nCloses #107202\n\nThe issue mentions `embed-bitcode=on`, but here https://github.com/rust-lang/rust/blob/c8e6a9e8b6251bbc8276cb78cabe1998deecbed7/src/bootstrap/compile.rs#L379-L381\nit appears that this is always set for std stage 1+, so I'm unsure if changes are needed here.\n\n`@rustbot` label +A-bootstrap",
+        "tree": {
+          "sha": "ba934c044e040c794ecaf64c5d0ddea604210a5c",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/ba934c044e040c794ecaf64c5d0ddea604210a5c"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/f02439dea78e5c2df42198c7a03e2db6002ff263",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/f02439dea78e5c2df42198c7a03e2db6002ff263",
+      "node_id": "C_kwDOAAsO6NoAKGYwMjQzOWRlYTc4ZTVjMmRmNDIxOThjN2EwM2UyZGI2MDAyZmYyNjM",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/6c991b07403a3234dd1ec0ac973b8ef97055e605",
+          "sha": "6c991b07403a3234dd1ec0ac973b8ef97055e605",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/6c991b07403a3234dd1ec0ac973b8ef97055e605"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/2adf26fc72f354aabd65da176eb9f8806b0d2ef2",
+          "sha": "2adf26fc72f354aabd65da176eb9f8806b0d2ef2",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/2adf26fc72f354aabd65da176eb9f8806b0d2ef2"
+        }
+      ],
+      "sha": "f02439dea78e5c2df42198c7a03e2db6002ff263",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/f02439dea78e5c2df42198c7a03e2db6002ff263"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/6c991b07403a3234dd1ec0ac973b8ef97055e605/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-02T21:14:44Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-02T21:14:44Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107000 - GuillaumeGomez:fix-items-in-doc-hidden-block, r=notriddle,petrochenkov\n\nFix handling of items inside a `doc(hidden)` block\n\nFixes #106373.\n\ncc `@aDotInTheVoid`\nr? `@notriddle`",
+        "tree": {
+          "sha": "e9fd955533d898249d8602ae2e2cc9b6040b264b",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/e9fd955533d898249d8602ae2e2cc9b6040b264b"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/6c991b07403a3234dd1ec0ac973b8ef97055e605",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/6c991b07403a3234dd1ec0ac973b8ef97055e605",
+      "node_id": "C_kwDOAAsO6NoAKDZjOTkxYjA3NDAzYTMyMzRkZDFlYzBhYzk3M2I4ZWY5NzA1NWU2MDU",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/f3126500f25114ba4e0ac3e76694dd45a22de56d",
+          "sha": "f3126500f25114ba4e0ac3e76694dd45a22de56d",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/f3126500f25114ba4e0ac3e76694dd45a22de56d"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/ea844187b27fbcff521bcbcbe6615d51d0196fa2",
+          "sha": "ea844187b27fbcff521bcbcbe6615d51d0196fa2",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/ea844187b27fbcff521bcbcbe6615d51d0196fa2"
+        }
+      ],
+      "sha": "6c991b07403a3234dd1ec0ac973b8ef97055e605",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/6c991b07403a3234dd1ec0ac973b8ef97055e605"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/f3126500f25114ba4e0ac3e76694dd45a22de56d/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-02T17:56:53Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-02T17:56:53Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107601 - matthiaskrgr:rollup-07zaafe, r=matthiaskrgr\n\nRollup of 7 pull requests\n\nSuccessful merges:\n\n - #106919 (Recover `_` as `..` in field pattern)\n - #107493 (Improve diagnostic for missing space in range pattern)\n - #107515 (Improve pretty-printing of `HirIdValidator` errors)\n - #107524 (Remove both StorageLive and StorageDead in CopyProp.)\n - #107532 (Erase regions before doing uninhabited check in borrowck)\n - #107559 (Rename `rust_2015` → `is_rust_2015`)\n - #107577 (Reinstate the `hir-stats.rs` tests on stage 1.)\n\nFailed merges:\n\nr? `@ghost`\n`@rustbot` modify labels: rollup",
+        "tree": {
+          "sha": "ab016ef14231c6193f6a9d086fca0cda4a159f9a",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/ab016ef14231c6193f6a9d086fca0cda4a159f9a"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/f3126500f25114ba4e0ac3e76694dd45a22de56d",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/f3126500f25114ba4e0ac3e76694dd45a22de56d",
+      "node_id": "C_kwDOAAsO6NoAKGYzMTI2NTAwZjI1MTE0YmE0ZTBhYzNlNzY2OTRkZDQ1YTIyZGU1NmQ",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/97872b792c9dd6a9bc5c3f4e62a0bd5958b09cdc",
+          "sha": "97872b792c9dd6a9bc5c3f4e62a0bd5958b09cdc",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/97872b792c9dd6a9bc5c3f4e62a0bd5958b09cdc"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/08181eabfeb468e22e5ce179492979d57d0cdf85",
+          "sha": "08181eabfeb468e22e5ce179492979d57d0cdf85",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/08181eabfeb468e22e5ce179492979d57d0cdf85"
+        }
+      ],
+      "sha": "f3126500f25114ba4e0ac3e76694dd45a22de56d",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/f3126500f25114ba4e0ac3e76694dd45a22de56d"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/97872b792c9dd6a9bc5c3f4e62a0bd5958b09cdc/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-02T12:01:17Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-02T12:01:17Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107478 - compiler-errors:anon-enum-tys-are-ambiguous, r=estebank\n\nRevert \"Teach parser to understand fake anonymous enum syntax\" and related commits\n\nanonymous enum types are currently ambiguous in positions like:\n\n* `|` operator: `a as fn() -> B | C`\n* closure args: `|_: as fn() -> A | B`\n\nI first tried to thread around `RecoverAnonEnum` into all these positions, but the resulting complexity in the compiler is IMO not worth it, or at least worth a bit more thinking time. In the mean time, let's revert this syntax for now, so we can go back to the drawing board.\n\nFixes #107461\n\ncc: `@estebank` `@cjgillot` #106960\n\n---\n### Squashed revert commits:\n\nRevert \"review comment: Remove AST AnonTy\"\n\nThis reverts commit 020cca8d36cb678e3ddc2ead41364be314d19e93.\n\nRevert \"Ensure macros are not affected\"\n\nThis reverts commit 12d18e403139eeeeb339e8611b2bed4910864edb.\n\nRevert \"Emit fewer errors on patterns with possible type ascription\"\n\nThis reverts commit c847a01a3b1f620c4fdb98c75805033e768975d1.\n\nRevert \"Teach parser to understand fake anonymous enum syntax\"\n\nThis reverts commit 2d824206655bfb26cb5eed43490ee396542b153e.",
+        "tree": {
+          "sha": "ac382c6f916b98074fe5ce756d3778d5d3f0d407",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/ac382c6f916b98074fe5ce756d3778d5d3f0d407"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/97872b792c9dd6a9bc5c3f4e62a0bd5958b09cdc",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/97872b792c9dd6a9bc5c3f4e62a0bd5958b09cdc",
+      "node_id": "C_kwDOAAsO6NoAKDk3ODcyYjc5MmM5ZGQ2YTliYzVjM2Y0ZTYyYTBiZDU5NThiMDljZGM",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/a9985cf172e7cb8ab5c58ce2818752c3572754fc",
+          "sha": "a9985cf172e7cb8ab5c58ce2818752c3572754fc",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/a9985cf172e7cb8ab5c58ce2818752c3572754fc"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/39db65c526ae3b97f0ee90642242c8c07865707e",
+          "sha": "39db65c526ae3b97f0ee90642242c8c07865707e",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/39db65c526ae3b97f0ee90642242c8c07865707e"
+        }
+      ],
+      "sha": "97872b792c9dd6a9bc5c3f4e62a0bd5958b09cdc",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/97872b792c9dd6a9bc5c3f4e62a0bd5958b09cdc"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/a9985cf172e7cb8ab5c58ce2818752c3572754fc/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-02T09:05:18Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-02T09:05:18Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107584 - matthiaskrgr:rollup-vav4ljz, r=matthiaskrgr\n\nRollup of 5 pull requests\n\nSuccessful merges:\n\n - #107201 (Remove confusing 'while checking' note from opaque future type mismatches)\n - #107312 (Add Style Guide rules for let-else statements)\n - #107488 (Fix syntax in `-Zunpretty-expanded` output for derived `PartialEq`.)\n - #107531 (Inline CSS background images directly into the CSS)\n - #107576 (Add proc-macro boilerplate to crt-static test)\n\nFailed merges:\n\nr? `@ghost`\n`@rustbot` modify labels: rollup",
+        "tree": {
+          "sha": "dbb937247db20bbd75be7bde50d74213d674dbde",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/dbb937247db20bbd75be7bde50d74213d674dbde"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/a9985cf172e7cb8ab5c58ce2818752c3572754fc",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/a9985cf172e7cb8ab5c58ce2818752c3572754fc",
+      "node_id": "C_kwDOAAsO6NoAKGE5OTg1Y2YxNzJlN2NiOGFiNWM1OGNlMjgxODc1MmMzNTcyNzU0ZmM",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/821b2a8e39588fedda894d10b9b3abd7293f0383",
+          "sha": "821b2a8e39588fedda894d10b9b3abd7293f0383",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/821b2a8e39588fedda894d10b9b3abd7293f0383"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/643fc97fd3b3f4f34eb2d66af1deac9218835527",
+          "sha": "643fc97fd3b3f4f34eb2d66af1deac9218835527",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/643fc97fd3b3f4f34eb2d66af1deac9218835527"
+        }
+      ],
+      "sha": "a9985cf172e7cb8ab5c58ce2818752c3572754fc",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/a9985cf172e7cb8ab5c58ce2818752c3572754fc"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/821b2a8e39588fedda894d10b9b3abd7293f0383/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-02T05:26:09Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-02T05:26:09Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #106925 - imWildCat:imWildCat/remove-hardcoded-ios-macbi-target-version, r=wesleywiser\n\nRemove hardcoded iOS version of clang target for Mac Catalyst\n\n## Background\n\nFrom `clang` 13.x, `-target x86_64-apple-ios13.0-macabi` fails while linking:\n\n```\n  = note: clang: error: invalid version number in '-target x86_64-apple-ios13.0-macabi'\n```\n\n<details>\n<summary>Verbose output</summary>\n\n```\nerror: linking with `cc` failed: exit status: 1\n  |\n  = note: LC_ALL=\"C\" PATH=\"[removed]\" VSLANG=\"1033\" ZERO_AR_DATE=\"1\" \"cc\" \"-Wl,-exported_symbols_list,/var/folders/p8/qpmzbsdn07g5gxykwfxxw7y40000gn/T/rustci8tkvp/list\" \"-target\" \"x86_64-apple-ios13.0-macabi\" \"/var/folders/p8/qpmzbsdn07g5gxykwfxxw7y40000gn/T/rustci8tkvp/symbols.o\" \"/path/to/my/[project]/[user]/target/x86_64-apple-ios-macabi/release/deps/[user].[user].a2ccc648-cgu.0.rcgu.o\" \"-L\" \"/path/to/my/[project]/[user]/target/x86_64-apple-ios-macabi/release/deps\" \"-L\" \"/path/to/my/[project]/[user]/target/release/deps\" \"-L\" \"/path/to/my/[project]/[user]/target/x86_64-apple-ios-macabi/release/build/blake3-74e6ba91506ce712/out\" \"-L\" \"/path/to/my/[project]/[user]/target/x86_64-apple-ios-macabi/release/build/blake3-74e6ba91506ce712/out\" \"-L\" \"/Users/[user]/.rustup/toolchains/nightly-aarch64-apple-darwin/lib/rustlib/x86_64-apple-ios-macabi/lib\" \"/var/folders/p8/qpmzbsdn07g5gxykwfxxw7y40000gn/T/rustci8tkvp/libblake3-343c1616c8f62c66.rlib\" \"/path/to/my/[project]/[user]/target/x86_64-apple-ios-macabi/release/deps/libcompiler_builtins-15d4f20b641cf9ef.rlib\" \"-framework\" \"Security\" \"-framework\" \"CoreFoundation\" \"-framework\" \"Security\" \"-liconv\" \"-lSystem\" \"-lobjc\" \"-framework\" \"Security\" \"-framework\" \"Foundation\" \"-lc\" \"-lm\" \"-isysroot\" \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.1.sdk\" \"-Wl,-syslibroot\" \"/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.1.sdk\" \"-L\" \"/Users/[user]/.rustup/toolchains/nightly-aarch64-apple-darwin/lib/rustlib/x86_64-apple-ios-macabi/lib\" \"-o\" \"/path/to/my/[project]/[user]/target/x86_64-apple-ios-macabi/release/deps/lib[user].dylib\" \"-Wl,-dead_strip\" \"-dynamiclib\" \"-Wl,-dylib\" \"-nodefaultlibs\"\n  = note: clang: error: invalid version number in '-target x86_64-apple-ios13.0-macabi'\n\nwarning: `[user]` (lib) generated 6 warnings\nerror: could not compile `[user]` due to previous error; 6 warnings emitted\n```\n</details>\n\n### Minimal example\n\nC code:\n\n```c\n#include <stdio.h>\nvoid main() {\n    int a = 1;\n    int b = 2;\n    int c = a + b;\n    printf(\"%d\", c);\n}\n```\n\n`clang` command sample:\n\n```\n➜  202301 clang -target x86_64-apple-ios13.0-macabi main.c\nclang: error: invalid version number in '-target x86_64-apple-ios13.0-macabi'\n➜  202301 clang -target x86_64-apple-ios14.0-macabi main.c\nmain.c:2:1: warning: return type of 'main' is not 'int' [-Wmain-return-type]\nvoid main() {\n^\nmain.c:2:1: note: change return type to 'int'\nvoid main() {\n^~~~\nint\n1 warning generated.\n➜  202301 clang -target x86_64-apple-ios15.0-macabi main.c\nmain.c:2:1: warning: return type of 'main' is not 'int' [-Wmain-return-type]\nvoid main() {\n^\nmain.c:2:1: note: change return type to 'int'\nvoid main() {\n^~~~\nint\n1 warning generated.\n➜  202301 clang -target x86_64-apple-ios-macabi main.c\nmain.c:2:1: warning: return type of 'main' is not 'int' [-Wmain-return-type]\nvoid main() {\n^\nmain.c:2:1: note: change return type to 'int'\nvoid main() {\n^~~~\nint\n1 warning generated.\n\n➜  202301 clang --version\nApple clang version 14.0.0 (clang-1400.0.29.202)\nTarget: arm64-apple-darwin22.2.0\nThread model: posix\nInstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n```\n\nThis PR is a simplified version of #96392, inspired by https://github.com/rust-lang/cc-rs/pull/727",
+        "tree": {
+          "sha": "0f1eba14a5ae3fa1c9c700ec5d1b07c0dab8b554",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/0f1eba14a5ae3fa1c9c700ec5d1b07c0dab8b554"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/821b2a8e39588fedda894d10b9b3abd7293f0383",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/821b2a8e39588fedda894d10b9b3abd7293f0383",
+      "node_id": "C_kwDOAAsO6NoAKDgyMWIyYThlMzk1ODhmZWRkYTg5NGQxMGI5YjNhYmQ3MjkzZjAzODM",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/131f0c6df6777800aa884963bdba0739299cd31f",
+          "sha": "131f0c6df6777800aa884963bdba0739299cd31f",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/131f0c6df6777800aa884963bdba0739299cd31f"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/5209d6f5fdac2054666a15c64f78450d6cb99717",
+          "sha": "5209d6f5fdac2054666a15c64f78450d6cb99717",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/5209d6f5fdac2054666a15c64f78450d6cb99717"
+        }
+      ],
+      "sha": "821b2a8e39588fedda894d10b9b3abd7293f0383",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/821b2a8e39588fedda894d10b9b3abd7293f0383"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/131f0c6df6777800aa884963bdba0739299cd31f/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-02T02:23:31Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-02T02:23:31Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #105670 - Xiretza:rustc_parse-diagnostics-4, r=davidtwco\n\nrustc_parse: diagnostics migration, v4\n\nThis is all the `rustc_parse` migrations I have in store right now; unfortunately life is pretty busy right now, so I won't be able to do much more in the near future.\n\ncc #100717\n\nr? `@davidtwco`",
+        "tree": {
+          "sha": "44543518d5568584010021497a2e187328bf9b06",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/44543518d5568584010021497a2e187328bf9b06"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/131f0c6df6777800aa884963bdba0739299cd31f",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/131f0c6df6777800aa884963bdba0739299cd31f",
+      "node_id": "C_kwDOAAsO6NoAKDEzMWYwYzZkZjY3Nzc4MDBhYTg4NDk2M2JkYmEwNzM5Mjk5Y2QzMWY",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/8789e5392975203137765d7818fb23ad125782b3",
+          "sha": "8789e5392975203137765d7818fb23ad125782b3",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/8789e5392975203137765d7818fb23ad125782b3"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/0d0d36991599d230d4781432391608f9821765fa",
+          "sha": "0d0d36991599d230d4781432391608f9821765fa",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/0d0d36991599d230d4781432391608f9821765fa"
+        }
+      ],
+      "sha": "131f0c6df6777800aa884963bdba0739299cd31f",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/131f0c6df6777800aa884963bdba0739299cd31f"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/8789e5392975203137765d7818fb23ad125782b3/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-01T22:45:27Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-01T22:45:27Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107574 - compiler-errors:back-to-old-mac-builders-pls, r=pietroalbini\n\nRevert \"switch to the macos-12-xl builder\"\n\nThis reverts commit fcbae989ae790d5b9a0a23ceba242d0b0d4e6c5b.\n\nThis should fix the bors failures in https://rust-lang.zulipchat.com/#narrow/stream/242791-t-infra/topic/Every.20rust-lang.2Frust.20PR.20is.20failing.20bors",
+        "tree": {
+          "sha": "68f1f608bda41a90ec8a74295dbc3deb7e6c783c",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/68f1f608bda41a90ec8a74295dbc3deb7e6c783c"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/8789e5392975203137765d7818fb23ad125782b3",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/8789e5392975203137765d7818fb23ad125782b3",
+      "node_id": "C_kwDOAAsO6NoAKDg3ODllNTM5Mjk3NTIwMzEzNzc2NWQ3ODE4ZmIyM2FkMTI1NzgyYjM",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/11d96b59307b1702fffe871bfc2d0145d070881e",
+          "sha": "11d96b59307b1702fffe871bfc2d0145d070881e",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/11d96b59307b1702fffe871bfc2d0145d070881e"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/e63ec2e1402eaff949e5c53b8f6062b152010fcc",
+          "sha": "e63ec2e1402eaff949e5c53b8f6062b152010fcc",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/e63ec2e1402eaff949e5c53b8f6062b152010fcc"
+        }
+      ],
+      "sha": "8789e5392975203137765d7818fb23ad125782b3",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/8789e5392975203137765d7818fb23ad125782b3"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/11d96b59307b1702fffe871bfc2d0145d070881e/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-01T11:37:24Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-01T11:37:24Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107257 - inquisitivecrystal:ffi-attr, r=davidtwco\n\nStrengthen validation of FFI attributes\n\nPreviously, `codegen_attrs` validated the attributes `#[ffi_pure]`, `#[ffi_const]`, and `#[ffi_returns_twice]` to make sure that they were only used on foreign functions. However, this validation was insufficient in two ways:\n\n1. `codegen_attrs` only sees items for which code must be generated, so it was unable to raise errors when the attribute was incorrectly applied to macros and the like.\n2. the validation code only checked that the item with the attr was foreign, but not that it was a foreign function, allowing these attributes to be applied to foreign statics as well.\n\nThis PR moves the validation to `check_attr`, which sees all items. It additionally changes the validation to ensure that the attribute's target is `Target::ForeignFunction`, only allowing the attributes on foreign functions and not foreign statics. Because these attributes are unstable, there is no risk for backwards compatibility. The changes also ending up making the code much easier to read.\n\nThis PR is best reviewed commit by commit. Additionally, I was considering moving the tests to the `attribute` subdirectory, to get them out of the general UI directory. I could do that as part of this PR or a follow-up, as the reviewer prefers.\n\nCC: #58328, #58329",
+        "tree": {
+          "sha": "af26139253d2807f229208f8301714afc803c306",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/af26139253d2807f229208f8301714afc803c306"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/11d96b59307b1702fffe871bfc2d0145d070881e",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/11d96b59307b1702fffe871bfc2d0145d070881e",
+      "node_id": "C_kwDOAAsO6NoAKDExZDk2YjU5MzA3YjE3MDJmZmZlODcxYmZjMmQwMTQ1ZDA3MDg4MWU",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/3b639486c17e9144a9176382ecb2a0b801263935",
+          "sha": "3b639486c17e9144a9176382ecb2a0b801263935",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/3b639486c17e9144a9176382ecb2a0b801263935"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/bc23e9aa4c78066043be246a47627746341480dd",
+          "sha": "bc23e9aa4c78066043be246a47627746341480dd",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/bc23e9aa4c78066043be246a47627746341480dd"
+        }
+      ],
+      "sha": "11d96b59307b1702fffe871bfc2d0145d070881e",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/11d96b59307b1702fffe871bfc2d0145d070881e"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/3b639486c17e9144a9176382ecb2a0b801263935/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-01T07:47:29Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-01T07:47:29Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107546 - matthiaskrgr:rollup-9rgf2gx, r=matthiaskrgr\n\nRollup of 6 pull requests\n\nSuccessful merges:\n\n - #107389 (Fixing confusion between mod and remainder)\n - #107442 (improve panic message for slice windows and chunks)\n - #107470 (Small bootstrap improvements)\n - #107487 (Make the \"extra if in let...else block\" hint a suggestion)\n - #107499 (Do not depend on Generator trait when deducing closure signature)\n - #107533 (Extend `-Z print-type-sizes` to distinguish generator upvars+locals from \"normal\" fields.)\n\nFailed merges:\n\nr? `@ghost`\n`@rustbot` modify labels: rollup",
+        "tree": {
+          "sha": "7a062a4c43bf11d1fa11b1efdfd496d8a6f40d78",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/7a062a4c43bf11d1fa11b1efdfd496d8a6f40d78"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/3b639486c17e9144a9176382ecb2a0b801263935",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/3b639486c17e9144a9176382ecb2a0b801263935",
+      "node_id": "C_kwDOAAsO6NoAKDNiNjM5NDg2YzE3ZTkxNDRhOTE3NjM4MmVjYjJhMGI4MDEyNjM5MzU",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/0d32c8f2ce10710b6560dcb75f32f79c378410d0",
+          "sha": "0d32c8f2ce10710b6560dcb75f32f79c378410d0",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/0d32c8f2ce10710b6560dcb75f32f79c378410d0"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/f41f154dfbe2aa943e35a21c0e2a8de002443424",
+          "sha": "f41f154dfbe2aa943e35a21c0e2a8de002443424",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/f41f154dfbe2aa943e35a21c0e2a8de002443424"
+        }
+      ],
+      "sha": "3b639486c17e9144a9176382ecb2a0b801263935",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/3b639486c17e9144a9176382ecb2a0b801263935"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/0d32c8f2ce10710b6560dcb75f32f79c378410d0/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-01T04:53:29Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-01T04:53:29Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107541 - weihanglo:update-cargo, r=weihanglo\n\nUpdate cargo\n\n18 commits in 3c5af6bed9a1a243a693e8e22ee2486bd5b82a6c..e84a7928d93a31f284b497c214a2ece69b4d7719 2023-01-24 15:48:15 +0000 to 2023-01-31 22:18:09 +0000\n\n- chore: Add autolabel for `Command-*` labels (rust-lang/cargo#11664)\n- Update cross test instructions for aarch64-apple-darwin (rust-lang/cargo#11663)\n- Make cargo install report needed features (rust-lang/cargo#11647)\n- docs(contrib): Remove out-of-date process step (rust-lang/cargo#11662)\n- Do not error for `auth-required: true` without `-Z sparse-registry` (rust-lang/cargo#11661)\n- Warn on commits to non-default branches. (rust-lang/cargo#11655)\n- Avoid saving the same future_incompat warning multiple times (rust-lang/cargo#11648)\n- Mention current default value in `publish.timeout` docs (rust-lang/cargo#11652)\n- Make cargo aware of dwp files. (rust-lang/cargo#11572)\n- Reduce target info rustc query calls (rust-lang/cargo#11633)\n- Bump to 0.70.0; update changelog (rust-lang/cargo#11640)\n- Enable sparse protocol in CI (rust-lang/cargo#11632)\n- Fix split-debuginfo support detection (rust-lang/cargo#11347)\n- refactor(toml): Move `TomlWorkspaceDependency` out of `TomlDependency` (rust-lang/cargo#11565)\n- book: describe how the current resolver sometimes duplicates deps (rust-lang/cargo#11604)\n- `cargo add` check `[dependencies]` order without considering the dotted item (rust-lang/cargo#11612)\n- Link CoC to  www.rust-lang.org/conduct.html (rust-lang/cargo#11622)\n- Add more labels to triagebot (rust-lang/cargo#11621)\n\nr? `@ghost`",
+        "tree": {
+          "sha": "9e08bab8c2e9b024e7ce120ed0c1fa7bbea9c463",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/9e08bab8c2e9b024e7ce120ed0c1fa7bbea9c463"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/0d32c8f2ce10710b6560dcb75f32f79c378410d0",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/0d32c8f2ce10710b6560dcb75f32f79c378410d0",
+      "node_id": "C_kwDOAAsO6NoAKDBkMzJjOGYyY2UxMDcxMGI2NTYwZGNiNzVmMzJmNzljMzc4NDEwZDA",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/ad8e1dc2863f63c35ef3ceef3064d0851a1d2582",
+          "sha": "ad8e1dc2863f63c35ef3ceef3064d0851a1d2582",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/ad8e1dc2863f63c35ef3ceef3064d0851a1d2582"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/bb2af4f28ca89b5088db433645f9e61f03c9ac2c",
+          "sha": "bb2af4f28ca89b5088db433645f9e61f03c9ac2c",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/bb2af4f28ca89b5088db433645f9e61f03c9ac2c"
+        }
+      ],
+      "sha": "0d32c8f2ce10710b6560dcb75f32f79c378410d0",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/0d32c8f2ce10710b6560dcb75f32f79c378410d0"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/ad8e1dc2863f63c35ef3ceef3064d0851a1d2582/comments",
+      "commit": {
+        "author": {
+          "date": "2023-02-01T01:15:02Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-02-01T01:15:02Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107536 - GuillaumeGomez:rollup-xv7dx2h, r=GuillaumeGomez\n\nRollup of 12 pull requests\n\nSuccessful merges:\n\n - #106898 (Include both md and yaml ICE ticket templates)\n - #107331 (Clean up eslint annotations and remove unused JS function)\n - #107348 (small refactor to new projection code)\n - #107354 (rustdoc: update Source Serif 4 from 4.004 to 4.005)\n - #107412 (avoid needless checks)\n - #107467 (Improve enum checks)\n - #107486 (Track bound types like bound regions)\n - #107491 (rustdoc: remove unused CSS from `.setting-check`)\n - #107508 (`Edition` micro refactor)\n - #107525 (PointeeInfo is advisory only)\n - #107527 (rustdoc: stop making unstable items transparent)\n - #107535 (Replace unwrap with ? in TcpListener doc)\n\nFailed merges:\n\nr? `@ghost`\n`@rustbot` modify labels: rollup",
+        "tree": {
+          "sha": "64d8db18dc8c8e118fd859c74061a34efbcae9d4",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/64d8db18dc8c8e118fd859c74061a34efbcae9d4"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/ad8e1dc2863f63c35ef3ceef3064d0851a1d2582",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/ad8e1dc2863f63c35ef3ceef3064d0851a1d2582",
+      "node_id": "C_kwDOAAsO6NoAKGFkOGUxZGMyODYzZjYzYzM1ZWYzY2VlZjMwNjRkMDg1MWExZDI1ODI",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/5b6ed253c42a69b93e7447fb0874a89ab6bc1cfb",
+          "sha": "5b6ed253c42a69b93e7447fb0874a89ab6bc1cfb",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/5b6ed253c42a69b93e7447fb0874a89ab6bc1cfb"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/adc3f8a44b943463577a5f8870da8fd18b749351",
+          "sha": "adc3f8a44b943463577a5f8870da8fd18b749351",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/adc3f8a44b943463577a5f8870da8fd18b749351"
+        }
+      ],
+      "sha": "ad8e1dc2863f63c35ef3ceef3064d0851a1d2582",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/ad8e1dc2863f63c35ef3ceef3064d0851a1d2582"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/5b6ed253c42a69b93e7447fb0874a89ab6bc1cfb/comments",
+      "commit": {
+        "author": {
+          "date": "2023-01-31T22:34:26Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-01-31T22:34:26Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #102513 - RalfJung:no-more-unaligned-reference, r=cjgillot,scottmcm\n\nmake unaligned_reference a hard error\n\nThe `unaligned_references` lint has been warn-by-default since Rust 1.53 (https://github.com/rust-lang/rust/pull/82525) and deny-by-default with mention in cargo future-incompat reports since Rust 1.62 (https://github.com/rust-lang/rust/pull/95372). Current nightly will become Rust 1.66, so (unless major surprises show up with crater) I think it is time we make this a hard error, and close this old soundness gap in the language.\n\nEDIT: Turns out this will only land for Rust 1.67, so there is another 6 weeks of time here for crates to adjust.\n\nFixes https://github.com/rust-lang/rust/issues/82523.",
+        "tree": {
+          "sha": "ba7e23c105713658431c3101d22977d8282e397f",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/ba7e23c105713658431c3101d22977d8282e397f"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/5b6ed253c42a69b93e7447fb0874a89ab6bc1cfb",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/5b6ed253c42a69b93e7447fb0874a89ab6bc1cfb",
+      "node_id": "C_kwDOAAsO6NoAKDViNmVkMjUzYzQyYTY5YjkzZTc0NDdmYjA4NzRhODlhYjZiYzFjZmI",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/dc1d9d50fba2f6a1ccab8748a0050cde38253f60",
+          "sha": "dc1d9d50fba2f6a1ccab8748a0050cde38253f60",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/dc1d9d50fba2f6a1ccab8748a0050cde38253f60"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/dfc4a7b2d02528f246e455f587605cce224bb99c",
+          "sha": "dfc4a7b2d02528f246e455f587605cce224bb99c",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/dfc4a7b2d02528f246e455f587605cce224bb99c"
+        }
+      ],
+      "sha": "5b6ed253c42a69b93e7447fb0874a89ab6bc1cfb",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/5b6ed253c42a69b93e7447fb0874a89ab6bc1cfb"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/dc1d9d50fba2f6a1ccab8748a0050cde38253f60/comments",
+      "commit": {
+        "author": {
+          "date": "2023-01-31T19:24:29Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-01-31T19:24:29Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107297 - Mark-Simulacrum:bump-bootstrap, r=pietroalbini\n\nBump bootstrap compiler to 1.68\n\nThis also changes our stage0.json to include the rustc component for the rustfmt pinned nightly toolchain, which is currently necessary due to rustfmt dynamically linking to that toolchain's librustc_driver and libstd.\n\nr? `@pietroalbini`",
+        "tree": {
+          "sha": "1497db582bb148e212d04fb4acc229d85aff2617",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/1497db582bb148e212d04fb4acc229d85aff2617"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/dc1d9d50fba2f6a1ccab8748a0050cde38253f60",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/dc1d9d50fba2f6a1ccab8748a0050cde38253f60",
+      "node_id": "C_kwDOAAsO6NoAKGRjMWQ5ZDUwZmJhMmY2YTFjY2FiODc0OGEwMDUwY2RlMzgyNTNmNjA",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/f361413cbf44ce2f144df59fc440cd484af4a56e",
+          "sha": "f361413cbf44ce2f144df59fc440cd484af4a56e",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/f361413cbf44ce2f144df59fc440cd484af4a56e"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/652f79e83543eab07c33840748cf5df37b42ac66",
+          "sha": "652f79e83543eab07c33840748cf5df37b42ac66",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/652f79e83543eab07c33840748cf5df37b42ac66"
+        }
+      ],
+      "sha": "dc1d9d50fba2f6a1ccab8748a0050cde38253f60",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/dc1d9d50fba2f6a1ccab8748a0050cde38253f60"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/f361413cbf44ce2f144df59fc440cd484af4a56e/comments",
+      "commit": {
+        "author": {
+          "date": "2023-01-31T13:53:40Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-01-31T13:53:40Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #106399 - estebank:type-err-span-label, r=nagisa\n\nModify primary span label for E0308\n\nLooking at the reactions to https://hachyderm.io/`@ekuber/109622160673605438,` a lot of people seem to have trouble understanding the current output, where the primary span label on type errors talks about the specific types that diverged, but these can be deeply nested type parameters. Because of that we could see \"expected i32, found u32\" in the label while the note said \"expected Vec<i32>, found Vec<u32>\". This understandably confuses people. I believe that once people learn to read these errors it starts to make more sense, but this PR changes the output to be more in line with what people might expect, without sacrificing terseness.\n\nFix #68220.",
+        "tree": {
+          "sha": "cecf91d94ee20df2d6bec7c88796b90fa34f9887",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/cecf91d94ee20df2d6bec7c88796b90fa34f9887"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/f361413cbf44ce2f144df59fc440cd484af4a56e",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/f361413cbf44ce2f144df59fc440cd484af4a56e",
+      "node_id": "C_kwDOAAsO6NoAKGYzNjE0MTNjYmY0NGNlMmYxNDRkZjU5ZmM0NDBjZDQ4NGFmNGE1NmU",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/a64ef7d07d0411315be85a646586cb85eeb9c136",
+          "sha": "a64ef7d07d0411315be85a646586cb85eeb9c136",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/a64ef7d07d0411315be85a646586cb85eeb9c136"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/449dfc64f0792f2320ef68bc08f238281199f53d",
+          "sha": "449dfc64f0792f2320ef68bc08f238281199f53d",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/449dfc64f0792f2320ef68bc08f238281199f53d"
+        }
+      ],
+      "sha": "f361413cbf44ce2f144df59fc440cd484af4a56e",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/f361413cbf44ce2f144df59fc440cd484af4a56e"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/a64ef7d07d0411315be85a646586cb85eeb9c136/comments",
+      "commit": {
+        "author": {
+          "date": "2023-01-31T10:20:58Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-01-31T10:20:58Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #100754 - davidtwco:translation-incremental, r=compiler-errors\n\nincremental: migrate diagnostics\n\n- Apply the diagnostic migration lints to more functions on `Session`, namely: `span_warn`, `span_warn_with_code`, `warn` `note_without_error`, `span_note_without_error`, `struct_note_without_error`.\n- Add impls of `IntoDiagnosticArg` for `std::io::Error`, `std::path::Path` and `std::path::PathBuf`.\n- Migrate the `rustc_incremental` crate's diagnostics to translatable diagnostic structs.\n\nr? `@compiler-errors`\ncc #100717",
+        "tree": {
+          "sha": "e4b006e2f97095541ee5ff8b1beab16675e5eb86",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/e4b006e2f97095541ee5ff8b1beab16675e5eb86"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/a64ef7d07d0411315be85a646586cb85eeb9c136",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/a64ef7d07d0411315be85a646586cb85eeb9c136",
+      "node_id": "C_kwDOAAsO6NoAKGE2NGVmN2QwN2QwNDExMzE1YmU4NWE2NDY1ODZjYjg1ZWViOWMxMzY",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/7c4a9a971ca6962533bed01ffbd0c1f6b5250abc",
+          "sha": "7c4a9a971ca6962533bed01ffbd0c1f6b5250abc",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/7c4a9a971ca6962533bed01ffbd0c1f6b5250abc"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/2ff46641a92c27a32db3e0dc94ae86295e6c3277",
+          "sha": "2ff46641a92c27a32db3e0dc94ae86295e6c3277",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/2ff46641a92c27a32db3e0dc94ae86295e6c3277"
+        }
+      ],
+      "sha": "a64ef7d07d0411315be85a646586cb85eeb9c136",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/a64ef7d07d0411315be85a646586cb85eeb9c136"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/7c4a9a971ca6962533bed01ffbd0c1f6b5250abc/comments",
+      "commit": {
+        "author": {
+          "date": "2023-01-31T06:25:30Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-01-31T06:25:30Z",
+          "email": "bors@rust-lang.org",
+          "name": "bors"
+        },
+        "message": "Auto merge of #107498 - JohnTitor:rollup-2i6g4uk, r=JohnTitor\n\nRollup of 8 pull requests\n\nSuccessful merges:\n\n - #107245 (Implement unsizing in the new trait solver)\n - #107445 (Remove `GenFuture` from core)\n - #107473 (Update books)\n - #107476 (rustdoc: remove unnecessary wrapper `div.item-decl` from HTML)\n - #107477 (Migrate last part of CSS themes to CSS variables)\n - #107479 (Use `ObligationCtxt::new_in_snapshot` in `satisfied_from_param_env`)\n - #107482 (rustdoc: remove meta keywords from HTML)\n - #107494 (fix link in std::path::Path::display())\n\nFailed merges:\n\nr? `@ghost`\n`@rustbot` modify labels: rollup",
+        "tree": {
+          "sha": "904e6bf143781822be126e176f256545da3767dd",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/904e6bf143781822be126e176f256545da3767dd"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/7c4a9a971ca6962533bed01ffbd0c1f6b5250abc",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+        "events_url": "https://api.github.com/users/bors/events{/privacy}",
+        "followers_url": "https://api.github.com/users/bors/followers",
+        "following_url": "https://api.github.com/users/bors/following{/other_user}",
+        "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/bors",
+        "id": 3372342,
+        "login": "bors",
+        "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+        "organizations_url": "https://api.github.com/users/bors/orgs",
+        "received_events_url": "https://api.github.com/users/bors/received_events",
+        "repos_url": "https://api.github.com/users/bors/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/bors"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/7c4a9a971ca6962533bed01ffbd0c1f6b5250abc",
+      "node_id": "C_kwDOAAsO6NoAKDdjNGE5YTk3MWNhNjk2MjUzM2JlZDAxZmZiZDBjMWY2YjUyNTBhYmM",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/dc3e59cb3fe05ebd752d3a2269f501c00327be22",
+          "sha": "dc3e59cb3fe05ebd752d3a2269f501c00327be22",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/dc3e59cb3fe05ebd752d3a2269f501c00327be22"
+        },
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/150340bafdcd48becbe612a0d4d5631efe23621c",
+          "sha": "150340bafdcd48becbe612a0d4d5631efe23621c",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/150340bafdcd48becbe612a0d4d5631efe23621c"
+        }
+      ],
+      "sha": "7c4a9a971ca6962533bed01ffbd0c1f6b5250abc",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/7c4a9a971ca6962533bed01ffbd0c1f6b5250abc"
+    }
+  ]
+}

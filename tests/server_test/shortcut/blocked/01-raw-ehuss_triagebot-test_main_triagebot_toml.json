@@ -1,7 +1,0 @@
-{
-  "kind": "RawRequest",
-  "path": "/ehuss/triagebot-test/main/triagebot.toml",
-  "query": null,
-  "response_code": 200,
-  "response_body": "[shortcut]\n[relabel]\nallow-unauthenticated = [\"*\"]\n\n[mentions.'README.md']\ncc = [\"@ehuss\"]\n\n[mentions.'example1']\n\n[mentions.'example2']\nmessage = \"This is a message.\"\n\n[autolabel.\"bar\"]\ntrigger_labels = [\"foo\"]\n\n[autolabel.\"foo\"]\nnew_pr = true\n\n[assign]\nwarn_non_default_branch = true\ncontributing_url = \"https://rustc-dev-guide.rust-lang.org/contributing.html\"\n\n[assign.adhoc_groups]\n\"group1\" = [\"@ehuss\"]\n\"group2\" = [\"group1\", \"@octocat\"]\n\"group3\" = [\"@EHUSS\"]\ngroup4 = [\"@grashgal\"]\nrecursive1a = [\"recursive1b\"]\nrecursive1b = [\"recursive1a\"]\n\nrecursive2a = [\"recursive2b\"]\nrecursive2b = [\"recursive2a\", \"octocat\"]\nfallback = [\"ehuss\"]\n\n[assign.owners]\n# \"**\" = [\"@ehuss\"]\n# \"README.md\" = [\"@octocat\"]\n\"/foo\" = [\"@ghost\"]\n\"/bar\" = [\"group2\"]\n\"/only\" = [\"group1\"]\n\"/grash\" = [\"grashgal\"]\n\"/octo\" = [\"octocat\"]\n\"/ehuss\" = [\"@ehuss\"]\n"
-}

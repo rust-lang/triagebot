@@ -1,0 +1,2380 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/repos/rust-lang/rust/commits",
+  "query": "author=brson",
+  "request_body": "",
+  "response_code": 200,
+  "response_body": [
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/356848c9b9a3bd8226bbabd08611b1e519acc9c7/comments",
+      "commit": {
+        "author": {
+          "date": "2020-05-07T02:42:12Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2020-05-07T02:42:12Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Add two more TiKV bugs to trophy case",
+        "tree": {
+          "sha": "d1aae96f10ecb490d6caebc63de18f34885cb73d",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/d1aae96f10ecb490d6caebc63de18f34885cb73d"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/356848c9b9a3bd8226bbabd08611b1e519acc9c7",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/356848c9b9a3bd8226bbabd08611b1e519acc9c7",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjM1Njg0OGM5YjlhM2JkODIyNmJiYWJkMDg2MTFiMWU1MTlhY2M5Yzc=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/308458a4ab210da24c8fd481d0f930e50f512886",
+          "sha": "308458a4ab210da24c8fd481d0f930e50f512886",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/308458a4ab210da24c8fd481d0f930e50f512886"
+        }
+      ],
+      "sha": "356848c9b9a3bd8226bbabd08611b1e519acc9c7",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/356848c9b9a3bd8226bbabd08611b1e519acc9c7"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/5e25dfaef83d1a2855cc4e4a1aecca77ba0dc47a/comments",
+      "commit": {
+        "author": {
+          "date": "2020-05-01T21:34:16Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2020-05-01T21:34:16Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Add another tikv stacked borrowing error to trophy case",
+        "tree": {
+          "sha": "bbf63e95c9e9eac80d7f92875061c05352759cac",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/bbf63e95c9e9eac80d7f92875061c05352759cac"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/5e25dfaef83d1a2855cc4e4a1aecca77ba0dc47a",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/5e25dfaef83d1a2855cc4e4a1aecca77ba0dc47a",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjVlMjVkZmFlZjgzZDFhMjg1NWNjNGU0YTFhZWNjYTc3YmEwZGM0N2E=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/d606172f32a4ca6c6ce73147760ee0ca1ed439b9",
+          "sha": "d606172f32a4ca6c6ce73147760ee0ca1ed439b9",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/d606172f32a4ca6c6ce73147760ee0ca1ed439b9"
+        }
+      ],
+      "sha": "5e25dfaef83d1a2855cc4e4a1aecca77ba0dc47a",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/5e25dfaef83d1a2855cc4e4a1aecca77ba0dc47a"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/488f3801e2a22afb093d03cf176169d91212374c/comments",
+      "commit": {
+        "author": {
+          "date": "2020-04-30T00:03:43Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2020-04-30T00:03:43Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Add servo_arc to trophy case",
+        "tree": {
+          "sha": "bb1cf8cc877de4c14875aed208aca50321759c7f",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/bb1cf8cc877de4c14875aed208aca50321759c7f"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/488f3801e2a22afb093d03cf176169d91212374c",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/488f3801e2a22afb093d03cf176169d91212374c",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjQ4OGYzODAxZTJhMjJhZmIwOTNkMDNjZjE3NjE2OWQ5MTIxMjM3NGM=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/dc91c172a469b51cf038d97e361458cd09b13fbd",
+          "sha": "dc91c172a469b51cf038d97e361458cd09b13fbd",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/dc91c172a469b51cf038d97e361458cd09b13fbd"
+        }
+      ],
+      "sha": "488f3801e2a22afb093d03cf176169d91212374c",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/488f3801e2a22afb093d03cf176169d91212374c"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/f84aa4a424221a8b3739f6232fec8f419d176fba/comments",
+      "commit": {
+        "author": {
+          "date": "2020-04-23T08:46:36Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2020-04-23T08:46:36Z",
+          "email": "noreply@github.com",
+          "name": "GitHub"
+        },
+        "message": "Update README.md\n\nCo-Authored-By: Ralf Jung <post@ralfj.de>",
+        "tree": {
+          "sha": "9ad87c344ce2232649af262bad2e4b10d7b5cddc",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/9ad87c344ce2232649af262bad2e4b10d7b5cddc"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/f84aa4a424221a8b3739f6232fec8f419d176fba",
+        "verification": {
+          "payload": "tree 9ad87c344ce2232649af262bad2e4b10d7b5cddc\nparent 5b60f0df2afba76fb6bd4cc3ae0c85ea2cfd484c\nauthor Brian Anderson <andersrb@gmail.com> 1587631596 -0600\ncommitter GitHub <noreply@github.com> 1587631596 -0600\n\nUpdate README.md\n\nCo-Authored-By: Ralf Jung <post@ralfj.de>",
+          "reason": "valid",
+          "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsBcBAABCAAQBQJeoVXsCRBK7hj4Ov3rIwAAdHIIAEronL6vj95tRmI+HCoqJLnv\nV4gQKYjvo5MQCrh7l/XmrYnLpwtHp40KBdE429LYyKCIG8wVXyC8BvWh9/2kMmC2\ne2XwoNUPnl5lCwprpEKGKPoCGKgctj57EAyF81PQ0Vtpo3krm6YGHsEUagw8h9VC\nTB23Rajqj43eesqjj0V5iuTYOlePHJmGo6NVrOIFJ8Xj3OquJQ0JQRF5xN6esvaa\nAuQDHHlCPuM4bzTqvL+Z0HsCkA+Y6mCS+5eK2vpiYzIoxuSytA98YPaMbCZIDWl3\nK6G/kvhCHqeKhZk0jhL1rdOKsxlASq+q8o0/l/hq8Jo+dDSaV6YL00aIa+5J7K4=\n=Es7I\n-----END PGP SIGNATURE-----\n",
+          "verified": true
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+        "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+        "followers_url": "https://api.github.com/users/web-flow/followers",
+        "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+        "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/web-flow",
+        "id": 19864447,
+        "login": "web-flow",
+        "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+        "organizations_url": "https://api.github.com/users/web-flow/orgs",
+        "received_events_url": "https://api.github.com/users/web-flow/received_events",
+        "repos_url": "https://api.github.com/users/web-flow/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/web-flow"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/f84aa4a424221a8b3739f6232fec8f419d176fba",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmY4NGFhNGE0MjQyMjFhOGIzNzM5ZjYyMzJmZWM4ZjQxOWQxNzZmYmE=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/5b60f0df2afba76fb6bd4cc3ae0c85ea2cfd484c",
+          "sha": "5b60f0df2afba76fb6bd4cc3ae0c85ea2cfd484c",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/5b60f0df2afba76fb6bd4cc3ae0c85ea2cfd484c"
+        }
+      ],
+      "sha": "f84aa4a424221a8b3739f6232fec8f419d176fba",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/f84aa4a424221a8b3739f6232fec8f419d176fba"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/5b60f0df2afba76fb6bd4cc3ae0c85ea2cfd484c/comments",
+      "commit": {
+        "author": {
+          "date": "2020-04-23T02:37:58Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2020-04-23T02:37:58Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Add ryu and tikv to trophy case",
+        "tree": {
+          "sha": "2ddce8338ebb8ede25e8f06e8cc61a6f4273477a",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/2ddce8338ebb8ede25e8f06e8cc61a6f4273477a"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/5b60f0df2afba76fb6bd4cc3ae0c85ea2cfd484c",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/5b60f0df2afba76fb6bd4cc3ae0c85ea2cfd484c",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjViNjBmMGRmMmFmYmE3NmZiNmJkNGNjM2FlMGM4NWVhMmNmZDQ4NGM=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/26baf87e4300386910f9db7545edf784dbec88f0",
+          "sha": "26baf87e4300386910f9db7545edf784dbec88f0",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/26baf87e4300386910f9db7545edf784dbec88f0"
+        }
+      ],
+      "sha": "5b60f0df2afba76fb6bd4cc3ae0c85ea2cfd484c",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/5b60f0df2afba76fb6bd4cc3ae0c85ea2cfd484c"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/8251e12950159c5802dd3995b14be7cf4fa99acd/comments",
+      "commit": {
+        "author": {
+          "date": "2020-02-07T05:59:43Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2020-02-07T06:08:24Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Don't use the word 'unwrap' to describe core unwrapping functions\n\nIt's tautological, and Rust-specific Jargon.\n\nThis changes various Option/Result methods to consistently describe unwrapping\nbehavior using the words \"return\", \"contain\", \"consume\".\n\nIt also renames the closure argument of `Return::unwrap_or_else` to `default` to\nbe consistent with `Option`.",
+        "tree": {
+          "sha": "177c908c8430b6db3de38d8245f90f52b3a8bcb4",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/177c908c8430b6db3de38d8245f90f52b3a8bcb4"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/8251e12950159c5802dd3995b14be7cf4fa99acd",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/8251e12950159c5802dd3995b14be7cf4fa99acd",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjgyNTFlMTI5NTAxNTljNTgwMmRkMzk5NWIxNGJlN2NmNGZhOTlhY2Q=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/db9b578b71190540cfd84f16f5d310d6ce4cb659",
+          "sha": "db9b578b71190540cfd84f16f5d310d6ce4cb659",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/db9b578b71190540cfd84f16f5d310d6ce4cb659"
+        }
+      ],
+      "sha": "8251e12950159c5802dd3995b14be7cf4fa99acd",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/8251e12950159c5802dd3995b14be7cf4fa99acd"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/db9b578b71190540cfd84f16f5d310d6ce4cb659/comments",
+      "commit": {
+        "author": {
+          "date": "2020-02-05T08:31:12Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2020-02-05T08:31:12Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Reorder declarations of Result::expect_err/unwrap_err to match Option",
+        "tree": {
+          "sha": "0671d8d006f16ecda7e1fc9c3fe896e8365262db",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/0671d8d006f16ecda7e1fc9c3fe896e8365262db"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/db9b578b71190540cfd84f16f5d310d6ce4cb659",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/db9b578b71190540cfd84f16f5d310d6ce4cb659",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmRiOWI1NzhiNzExOTA1NDBjZmQ4NGYxNmY1ZDMxMGQ2Y2U0Y2I2NTk=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/c00d8aa5179ef38f7d83067a8d010bcc26fa0cc3",
+          "sha": "c00d8aa5179ef38f7d83067a8d010bcc26fa0cc3",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/c00d8aa5179ef38f7d83067a8d010bcc26fa0cc3"
+        }
+      ],
+      "sha": "db9b578b71190540cfd84f16f5d310d6ce4cb659",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/db9b578b71190540cfd84f16f5d310d6ce4cb659"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/c00d8aa5179ef38f7d83067a8d010bcc26fa0cc3/comments",
+      "commit": {
+        "author": {
+          "date": "2020-02-05T08:28:13Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2020-02-05T08:28:13Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Reorder declarations of Result::export/unwrap to match Option",
+        "tree": {
+          "sha": "cc6b233e2980bfef35e4e80ce89bc17bbeab7a7e",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/cc6b233e2980bfef35e4e80ce89bc17bbeab7a7e"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/c00d8aa5179ef38f7d83067a8d010bcc26fa0cc3",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/c00d8aa5179ef38f7d83067a8d010bcc26fa0cc3",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmMwMGQ4YWE1MTc5ZWYzOGY3ZDgzMDY3YThkMDEwYmNjMjZmYTBjYzM=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/002287d25f6ef9718dbabd3e23c00b5ebcfb51c1",
+          "sha": "002287d25f6ef9718dbabd3e23c00b5ebcfb51c1",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/002287d25f6ef9718dbabd3e23c00b5ebcfb51c1"
+        }
+      ],
+      "sha": "c00d8aa5179ef38f7d83067a8d010bcc26fa0cc3",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/c00d8aa5179ef38f7d83067a8d010bcc26fa0cc3"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/c03077b23accd0a5b074e298538bb0557b0be9da/comments",
+      "commit": {
+        "author": {
+          "date": "2019-08-07T21:51:49Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2019-08-07T21:51:49Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Use consistent capitalization in -C/-Z help",
+        "tree": {
+          "sha": "69694ee015d20794275fc866d70895236f2029eb",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/69694ee015d20794275fc866d70895236f2029eb"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/c03077b23accd0a5b074e298538bb0557b0be9da",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/c03077b23accd0a5b074e298538bb0557b0be9da",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmMwMzA3N2IyM2FjY2QwYTViMDc0ZTI5ODUzOGJiMDU1N2IwYmU5ZGE=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/ad7c55e1fc55d9af4787b285cec1c64e3480ae84",
+          "sha": "ad7c55e1fc55d9af4787b285cec1c64e3480ae84",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/ad7c55e1fc55d9af4787b285cec1c64e3480ae84"
+        }
+      ],
+      "sha": "c03077b23accd0a5b074e298538bb0557b0be9da",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/c03077b23accd0a5b074e298538bb0557b0be9da"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/f4d6362518432ff7a26339cdef83e29e4ae6e7d1/comments",
+      "commit": {
+        "author": {
+          "date": "2018-08-21T06:09:15Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2018-08-21T06:09:15Z",
+          "email": "andersrb@gmail.com",
+          "name": "Brian Anderson"
+        },
+        "message": "librustc_lint: In recursion warning, change 'recurring' to 'recursing'",
+        "tree": {
+          "sha": "3fd3bd7b20a49529d6d4c50ca821e4019c700d39",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/3fd3bd7b20a49529d6d4c50ca821e4019c700d39"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/f4d6362518432ff7a26339cdef83e29e4ae6e7d1",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/f4d6362518432ff7a26339cdef83e29e4ae6e7d1",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmY0ZDYzNjI1MTg0MzJmZjdhMjYzMzljZGVmODNlMjllNGFlNmU3ZDE=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/bfc3b20663e1abfff0499332f9168f60c3269c33",
+          "sha": "bfc3b20663e1abfff0499332f9168f60c3269c33",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/bfc3b20663e1abfff0499332f9168f60c3269c33"
+        }
+      ],
+      "sha": "f4d6362518432ff7a26339cdef83e29e4ae6e7d1",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/f4d6362518432ff7a26339cdef83e29e4ae6e7d1"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/e8689c7de71f822dca891099a94c9377c36e46b2/comments",
+      "commit": {
+        "author": {
+          "date": "2017-06-06T02:07:43Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-06-06T21:51:17Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Fix setting PATH during linkage on windows-gnu",
+        "tree": {
+          "sha": "1164ef1f9278df4e473b272970386e8d391cb4ee",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/1164ef1f9278df4e473b272970386e8d391cb4ee"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/e8689c7de71f822dca891099a94c9377c36e46b2",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/e8689c7de71f822dca891099a94c9377c36e46b2",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmU4Njg5YzdkZTcxZjgyMmRjYTg5MTA5OWE5NGM5Mzc3YzM2ZTQ2YjI=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/d015610db7b7d30f3c92d3272ce166397a81349e",
+          "sha": "d015610db7b7d30f3c92d3272ce166397a81349e",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/d015610db7b7d30f3c92d3272ce166397a81349e"
+        }
+      ],
+      "sha": "e8689c7de71f822dca891099a94c9377c36e46b2",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/e8689c7de71f822dca891099a94c9377c36e46b2"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/da100fe0bb7ba77dbcc346018068dbfdba053f6b/comments",
+      "commit": {
+        "author": {
+          "date": "2017-05-24T02:02:23Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-06-01T20:41:38Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Support VS 2017\n\nFixes #38584",
+        "tree": {
+          "sha": "6bd4b44d0ffb24e29ff297a3b9cca73cc884cb51",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/6bd4b44d0ffb24e29ff297a3b9cca73cc884cb51"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/da100fe0bb7ba77dbcc346018068dbfdba053f6b",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/da100fe0bb7ba77dbcc346018068dbfdba053f6b",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmRhMTAwZmUwYmI3YmE3N2RiY2MzNDYwMTgwNjhkYmZkYmEwNTNmNmI=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/f89d8d184490ecb3cf91f7b6bb7296d649f931ba",
+          "sha": "f89d8d184490ecb3cf91f7b6bb7296d649f931ba",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/f89d8d184490ecb3cf91f7b6bb7296d649f931ba"
+        }
+      ],
+      "sha": "da100fe0bb7ba77dbcc346018068dbfdba053f6b",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/da100fe0bb7ba77dbcc346018068dbfdba053f6b"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/435e1cec9e63ee9651a0c082b050b5c49da96c10/comments",
+      "commit": {
+        "author": {
+          "date": "2017-05-25T18:48:21Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-05-25T18:48:21Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Remove stray lockfile",
+        "tree": {
+          "sha": "0c885694a05cad6de8608274cd77c94dee3952c2",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/0c885694a05cad6de8608274cd77c94dee3952c2"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/435e1cec9e63ee9651a0c082b050b5c49da96c10",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/435e1cec9e63ee9651a0c082b050b5c49da96c10",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjQzNWUxY2VjOWU2M2VlOTY1MWEwYzA4MmIwNTBiNWM0OWRhOTZjMTA=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/deb90c33ccee849821de5f3a8e26d8d9a2e774e5",
+          "sha": "deb90c33ccee849821de5f3a8e26d8d9a2e774e5",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/deb90c33ccee849821de5f3a8e26d8d9a2e774e5"
+        }
+      ],
+      "sha": "435e1cec9e63ee9651a0c082b050b5c49da96c10",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/435e1cec9e63ee9651a0c082b050b5c49da96c10"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/084b67f56a66b440657e6aa66227e971790a87a4/comments",
+      "commit": {
+        "author": {
+          "date": "2017-05-11T19:19:21Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-05-11T19:19:21Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Annotate the license exceptions",
+        "tree": {
+          "sha": "76d18318db67774b1e0c2721551d6f0c7fcd2560",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/76d18318db67774b1e0c2721551d6f0c7fcd2560"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/084b67f56a66b440657e6aa66227e971790a87a4",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/084b67f56a66b440657e6aa66227e971790a87a4",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjA4NGI2N2Y1NmE2NmI0NDA2NTdlNmFhNjYyMjdlOTcxNzkwYTg3YTQ=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/2cc3358e4f1c4a79685745a461a1be1ce784b88a",
+          "sha": "2cc3358e4f1c4a79685745a461a1be1ce784b88a",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/2cc3358e4f1c4a79685745a461a1be1ce784b88a"
+        }
+      ],
+      "sha": "084b67f56a66b440657e6aa66227e971790a87a4",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/084b67f56a66b440657e6aa66227e971790a87a4"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/f59931dc176aafcf6f05dff27f7015c0a61d73d4/comments",
+      "commit": {
+        "author": {
+          "date": "2017-05-05T07:03:30Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-05-05T07:03:30Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Update rust-installer to fix rust-lang-nursery/rustup.rs#1092",
+        "tree": {
+          "sha": "88641f2c3492ab244128891348b44f348a676d7c",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/88641f2c3492ab244128891348b44f348a676d7c"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/f59931dc176aafcf6f05dff27f7015c0a61d73d4",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/f59931dc176aafcf6f05dff27f7015c0a61d73d4",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmY1OTkzMWRjMTc2YWFmY2Y2ZjA1ZGZmMjdmNzAxNWMwYTYxZDczZDQ=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/a6ab049ed1db09f693df7d33046b3980f56751c1",
+          "sha": "a6ab049ed1db09f693df7d33046b3980f56751c1",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/a6ab049ed1db09f693df7d33046b3980f56751c1"
+        }
+      ],
+      "sha": "f59931dc176aafcf6f05dff27f7015c0a61d73d4",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/f59931dc176aafcf6f05dff27f7015c0a61d73d4"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/8e97693b2cbcaeb745643ee1b37058e8dde2efa1/comments",
+      "commit": {
+        "author": {
+          "date": "2017-04-25T17:43:33Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-04-27T16:18:26Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Update release notes for 1.17",
+        "tree": {
+          "sha": "9ad9c28b58e06b74e7e2dcbb3523ed27c26ace3d",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/9ad9c28b58e06b74e7e2dcbb3523ed27c26ace3d"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/8e97693b2cbcaeb745643ee1b37058e8dde2efa1",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/8e97693b2cbcaeb745643ee1b37058e8dde2efa1",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjhlOTc2OTNiMmNiY2FlYjc0NTY0M2VlMWIzNzA1OGU4ZGRlMmVmYTE=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/c7e724a148fbc1ca46508d953302b697ff35af16",
+          "sha": "c7e724a148fbc1ca46508d953302b697ff35af16",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/c7e724a148fbc1ca46508d953302b697ff35af16"
+        }
+      ],
+      "sha": "8e97693b2cbcaeb745643ee1b37058e8dde2efa1",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/8e97693b2cbcaeb745643ee1b37058e8dde2efa1"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/1c3f34dba6a8219822a48f3db7e6f50ff04e0f78/comments",
+      "commit": {
+        "author": {
+          "date": "2017-04-10T20:50:42Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-04-10T20:50:57Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Convert HashMap to BTree in build-manifest",
+        "tree": {
+          "sha": "8ff2ed16984f9b49e9d2992aac18be2942d9a18e",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/8ff2ed16984f9b49e9d2992aac18be2942d9a18e"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/1c3f34dba6a8219822a48f3db7e6f50ff04e0f78",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/1c3f34dba6a8219822a48f3db7e6f50ff04e0f78",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjFjM2YzNGRiYTZhODIxOTgyMmE0OGYzZGI3ZTZmNTBmZjA0ZTBmNzg=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/8493dd6d6e8f5e1280ae3dc05135a7e2897c36ac",
+          "sha": "8493dd6d6e8f5e1280ae3dc05135a7e2897c36ac",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/8493dd6d6e8f5e1280ae3dc05135a7e2897c36ac"
+        }
+      ],
+      "sha": "1c3f34dba6a8219822a48f3db7e6f50ff04e0f78",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/1c3f34dba6a8219822a48f3db7e6f50ff04e0f78"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/3554ff32db74b431dfb356cc4533514544c67bf9/comments",
+      "commit": {
+        "author": {
+          "date": "2017-03-14T19:31:20Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-03-14T19:31:20Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Make docs required again",
+        "tree": {
+          "sha": "ed29487b87eb2d44d699ca6ebeb603d887c720dc",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/ed29487b87eb2d44d699ca6ebeb603d887c720dc"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/3554ff32db74b431dfb356cc4533514544c67bf9",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/3554ff32db74b431dfb356cc4533514544c67bf9",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjM1NTRmZjMyZGI3NGI0MzFkZmIzNTZjYzQ1MzM1MTQ1NDRjNjdiZjk=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/6f10e2f63de720468e2b4bfcb275e4b90b1f9870",
+          "sha": "6f10e2f63de720468e2b4bfcb275e4b90b1f9870",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/6f10e2f63de720468e2b4bfcb275e4b90b1f9870"
+        }
+      ],
+      "sha": "3554ff32db74b431dfb356cc4533514544c67bf9",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/3554ff32db74b431dfb356cc4533514544c67bf9"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/23c09eaa770c0bdc40dc744a4086dbe7976b4662/comments",
+      "commit": {
+        "author": {
+          "date": "2017-02-15T02:52:28Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-03-09T21:35:44Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Release notes for 1.16",
+        "tree": {
+          "sha": "a4408577cec6dbbecdf49571ba69413814dd5675",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/a4408577cec6dbbecdf49571ba69413814dd5675"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/23c09eaa770c0bdc40dc744a4086dbe7976b4662",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/23c09eaa770c0bdc40dc744a4086dbe7976b4662",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjIzYzA5ZWFhNzcwYzBiZGM0MGRjNzQ0YTQwODZkYmU3OTc2YjQ2NjI=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/3087a1f39eaeac9d76c8b159dcc64de515bb2b83",
+          "sha": "3087a1f39eaeac9d76c8b159dcc64de515bb2b83",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/3087a1f39eaeac9d76c8b159dcc64de515bb2b83"
+        }
+      ],
+      "sha": "23c09eaa770c0bdc40dc744a4086dbe7976b4662",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/23c09eaa770c0bdc40dc744a4086dbe7976b4662"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/e77f8568f67b6dc265a620f7506a6f931c3a002e/comments",
+      "commit": {
+        "author": {
+          "date": "2017-02-14T04:10:52Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-02-15T23:03:39Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Add a test that -fPIC is applied",
+        "tree": {
+          "sha": "e13aba6b336b11221975e21d64784370e87a5a89",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/e13aba6b336b11221975e21d64784370e87a5a89"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/e77f8568f67b6dc265a620f7506a6f931c3a002e",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/e77f8568f67b6dc265a620f7506a6f931c3a002e",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmU3N2Y4NTY4ZjY3YjZkYzI2NWE2MjBmNzUwNmE2ZjkzMWMzYTAwMmU=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/c781fc4a6a8af287f7abe141f035a638bc0165c3",
+          "sha": "c781fc4a6a8af287f7abe141f035a638bc0165c3",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/c781fc4a6a8af287f7abe141f035a638bc0165c3"
+        }
+      ],
+      "sha": "e77f8568f67b6dc265a620f7506a6f931c3a002e",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/e77f8568f67b6dc265a620f7506a6f931c3a002e"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/e491f399147aaf09f631878d009396fc5400ddfd/comments",
+      "commit": {
+        "author": {
+          "date": "2017-02-10T00:30:02Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-02-10T00:30:02Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Update 1.15.1 relnotes",
+        "tree": {
+          "sha": "d4b0ee97fddb111aa74498380dedcaffbb4948ed",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/d4b0ee97fddb111aa74498380dedcaffbb4948ed"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/e491f399147aaf09f631878d009396fc5400ddfd",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/e491f399147aaf09f631878d009396fc5400ddfd",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmU0OTFmMzk5MTQ3YWFmMDlmNjMxODc4ZDAwOTM5NmZjNTQwMGRkZmQ=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/405327635419e22a956dfe8f7caf4817c8ae5e93",
+          "sha": "405327635419e22a956dfe8f7caf4817c8ae5e93",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/405327635419e22a956dfe8f7caf4817c8ae5e93"
+        }
+      ],
+      "sha": "e491f399147aaf09f631878d009396fc5400ddfd",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/e491f399147aaf09f631878d009396fc5400ddfd"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/7916e00f2bc343baa665f380084f0b0d8792afa4/comments",
+      "commit": {
+        "author": {
+          "date": "2017-02-07T19:48:16Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-02-07T19:48:16Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Bump stable release date",
+        "tree": {
+          "sha": "4dfbcc8f3e8a7c2b8d51814647c72a6d03b53508",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/4dfbcc8f3e8a7c2b8d51814647c72a6d03b53508"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/7916e00f2bc343baa665f380084f0b0d8792afa4",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/7916e00f2bc343baa665f380084f0b0d8792afa4",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjc5MTZlMDBmMmJjMzQzYmFhNjY1ZjM4MDA4NGYwYjBkODc5MmFmYTQ=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/c49d10207a7e105525fb3bd71c18fde6fc2f5aed",
+          "sha": "c49d10207a7e105525fb3bd71c18fde6fc2f5aed",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/c49d10207a7e105525fb3bd71c18fde6fc2f5aed"
+        }
+      ],
+      "sha": "7916e00f2bc343baa665f380084f0b0d8792afa4",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/7916e00f2bc343baa665f380084f0b0d8792afa4"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/d650cf5c383aeed222e835009c28901c236820e1/comments",
+      "commit": {
+        "author": {
+          "date": "2017-02-04T01:12:38Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-02-04T01:12:39Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Update relnotes for 1.15.1\n\nI already checked this into stable, but it needs to be on master/beta too.",
+        "tree": {
+          "sha": "6407e6098a1f482d20c90d1f47751a46b833e6bb",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/6407e6098a1f482d20c90d1f47751a46b833e6bb"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/d650cf5c383aeed222e835009c28901c236820e1",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/d650cf5c383aeed222e835009c28901c236820e1",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmQ2NTBjZjVjMzgzYWVlZDIyMmU4MzUwMDljMjg5MDFjMjM2ODIwZTE=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/86d9ed6c82c6745fec46b9ecf2fa91be7924dd16",
+          "sha": "86d9ed6c82c6745fec46b9ecf2fa91be7924dd16",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/86d9ed6c82c6745fec46b9ecf2fa91be7924dd16"
+        }
+      ],
+      "sha": "d650cf5c383aeed222e835009c28901c236820e1",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/d650cf5c383aeed222e835009c28901c236820e1"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/a2735c02493d816835a19249dd258e0c678530d0/comments",
+      "commit": {
+        "author": {
+          "date": "2016-10-09T17:30:11Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-01-26T22:11:29Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "rustc: Remove all \"consider using an explicit lifetime parameter\" suggestions\n\nThese give so many incorrect suggestions that having them is\ndetrimental to the user experience. The compiler should not be\nsuggesting changes to the code that are wrong - it is infuriating: not\nonly is the compiler telling you that _you don't understand_ borrowing,\n_the compiler itself_ appears to not understand borrowing. It does not\ninspire confidence.",
+        "tree": {
+          "sha": "44f0eafe3efebf0ea9ce162a107194d7b7548f5d",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/44f0eafe3efebf0ea9ce162a107194d7b7548f5d"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/a2735c02493d816835a19249dd258e0c678530d0",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/a2735c02493d816835a19249dd258e0c678530d0",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmEyNzM1YzAyNDkzZDgxNjgzNWExOTI0OWRkMjU4ZTBjNjc4NTMwZDA=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/8430042a49bbd49bbb4fbc54f457feb5fb614f56",
+          "sha": "8430042a49bbd49bbb4fbc54f457feb5fb614f56",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/8430042a49bbd49bbb4fbc54f457feb5fb614f56"
+        }
+      ],
+      "sha": "a2735c02493d816835a19249dd258e0c678530d0",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/a2735c02493d816835a19249dd258e0c678530d0"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/a0a4af139dcac3c1629e5853d72df27616a00d2a/comments",
+      "commit": {
+        "author": {
+          "date": "2017-01-10T00:44:02Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2017-01-17T22:20:26Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "1.15 release notes",
+        "tree": {
+          "sha": "b11a6723da574a502e4ba4155f1589057fcb3bc1",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/b11a6723da574a502e4ba4155f1589057fcb3bc1"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/a0a4af139dcac3c1629e5853d72df27616a00d2a",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/a0a4af139dcac3c1629e5853d72df27616a00d2a",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOmEwYTRhZjEzOWRjYWMzYzE2MjllNTg1M2Q3MmRmMjc2MTZhMDBkMmE=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/bd8e9b0c828bce489eb948853a6cf86b69b26799",
+          "sha": "bd8e9b0c828bce489eb948853a6cf86b69b26799",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/bd8e9b0c828bce489eb948853a6cf86b69b26799"
+        }
+      ],
+      "sha": "a0a4af139dcac3c1629e5853d72df27616a00d2a",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/a0a4af139dcac3c1629e5853d72df27616a00d2a"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/6207e80d2cc8a870f1b13249dda31a93b7697ffa/comments",
+      "commit": {
+        "author": {
+          "date": "2016-12-20T22:40:46Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2016-12-29T16:47:20Z",
+          "email": "alex@alexcrichton.com",
+          "name": "Alex Crichton"
+        },
+        "message": "Bump bootstrap compiler",
+        "tree": {
+          "sha": "9686e0fd8f28bc23af286968b54f63240fc43052",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/9686e0fd8f28bc23af286968b54f63240fc43052"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/6207e80d2cc8a870f1b13249dda31a93b7697ffa",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/64996?v=4",
+        "events_url": "https://api.github.com/users/alexcrichton/events{/privacy}",
+        "followers_url": "https://api.github.com/users/alexcrichton/followers",
+        "following_url": "https://api.github.com/users/alexcrichton/following{/other_user}",
+        "gists_url": "https://api.github.com/users/alexcrichton/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/alexcrichton",
+        "id": 64996,
+        "login": "alexcrichton",
+        "node_id": "MDQ6VXNlcjY0OTk2",
+        "organizations_url": "https://api.github.com/users/alexcrichton/orgs",
+        "received_events_url": "https://api.github.com/users/alexcrichton/received_events",
+        "repos_url": "https://api.github.com/users/alexcrichton/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/alexcrichton/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/alexcrichton/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/alexcrichton"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/6207e80d2cc8a870f1b13249dda31a93b7697ffa",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjYyMDdlODBkMmNjOGE4NzBmMWIxMzI0OWRkYTMxYTkzYjc2OTdmZmE=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/3f957ebeff8932637002574c9eae75a702b202b7",
+          "sha": "3f957ebeff8932637002574c9eae75a702b202b7",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/3f957ebeff8932637002574c9eae75a702b202b7"
+        }
+      ],
+      "sha": "6207e80d2cc8a870f1b13249dda31a93b7697ffa",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/6207e80d2cc8a870f1b13249dda31a93b7697ffa"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/31bda236bd7573482614f86998536ce3b2ba98f5/comments",
+      "commit": {
+        "author": {
+          "date": "2016-12-25T02:09:10Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2016-12-25T02:09:10Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Emscripten targets are Unix targets",
+        "tree": {
+          "sha": "9610edec75d482dff11bc275ed241ea5f8cdd77b",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/9610edec75d482dff11bc275ed241ea5f8cdd77b"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/31bda236bd7573482614f86998536ce3b2ba98f5",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/31bda236bd7573482614f86998536ce3b2ba98f5",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjMxYmRhMjM2YmQ3NTczNDgyNjE0Zjg2OTk4NTM2Y2UzYjJiYTk4ZjU=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/e60aa62ffe7462d48cb44ab33f2551b466745e83",
+          "sha": "e60aa62ffe7462d48cb44ab33f2551b466745e83",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/e60aa62ffe7462d48cb44ab33f2551b466745e83"
+        }
+      ],
+      "sha": "31bda236bd7573482614f86998536ce3b2ba98f5",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/31bda236bd7573482614f86998536ce3b2ba98f5"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/7d428b71dec973d6f53e16d18af7e2751321aafe/comments",
+      "commit": {
+        "author": {
+          "date": "2016-12-22T22:00:21Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2016-12-22T22:33:42Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Delete the llvm submodule lockfile when configuring on the bots\n\nThis should fix the periodic error that .git/modules/src/llvm/index.lock\nexists on the mac slaves.",
+        "tree": {
+          "sha": "870e68eaeb33025b7ec08d6b696ecb22b730489b",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/870e68eaeb33025b7ec08d6b696ecb22b730489b"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/7d428b71dec973d6f53e16d18af7e2751321aafe",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/7d428b71dec973d6f53e16d18af7e2751321aafe",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjdkNDI4YjcxZGVjOTczZDZmNTNlMTZkMThhZjdlMjc1MTMyMWFhZmU=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/17d873c2db77d029b8fe26d57b676e5797e99441",
+          "sha": "17d873c2db77d029b8fe26d57b676e5797e99441",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/17d873c2db77d029b8fe26d57b676e5797e99441"
+        }
+      ],
+      "sha": "7d428b71dec973d6f53e16d18af7e2751321aafe",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/7d428b71dec973d6f53e16d18af7e2751321aafe"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/2dc2f5fafb17c5bb406ef2187332ebaf2dd8d35d/comments",
+      "commit": {
+        "author": {
+          "date": "2016-12-19T21:57:43Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2016-12-19T21:57:43Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Bump version to 1.16",
+        "tree": {
+          "sha": "f5ec406d7921b5bf601a07093987208daaf03a5f",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/f5ec406d7921b5bf601a07093987208daaf03a5f"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/2dc2f5fafb17c5bb406ef2187332ebaf2dd8d35d",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/2dc2f5fafb17c5bb406ef2187332ebaf2dd8d35d",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjJkYzJmNWZhZmIxN2M1YmI0MDZlZjIxODczMzJlYmFmMmRkOGQzNWQ=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/3f9823d5f53230e83b707b4876b5bb271a4c22ef",
+          "sha": "3f9823d5f53230e83b707b4876b5bb271a4c22ef",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/3f9823d5f53230e83b707b4876b5bb271a4c22ef"
+        }
+      ],
+      "sha": "2dc2f5fafb17c5bb406ef2187332ebaf2dd8d35d",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/2dc2f5fafb17c5bb406ef2187332ebaf2dd8d35d"
+    },
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/2afadaadc99118b169d2c3aec01e9814409b37fa/comments",
+      "commit": {
+        "author": {
+          "date": "2016-12-17T22:59:39Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2016-12-17T23:02:35Z",
+          "email": "banderson@mozilla.com",
+          "name": "Brian Anderson"
+        },
+        "message": "Edits. More platform support",
+        "tree": {
+          "sha": "4133357897c81c40ab8faf4882851ef78161b9e2",
+          "url": "https://api.github.com/repos/rust-lang/rust/git/trees/4133357897c81c40ab8faf4882851ef78161b9e2"
+        },
+        "url": "https://api.github.com/repos/rust-lang/rust/git/commits/2afadaadc99118b169d2c3aec01e9814409b37fa",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/147214?v=4",
+        "events_url": "https://api.github.com/users/brson/events{/privacy}",
+        "followers_url": "https://api.github.com/users/brson/followers",
+        "following_url": "https://api.github.com/users/brson/following{/other_user}",
+        "gists_url": "https://api.github.com/users/brson/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/brson",
+        "id": 147214,
+        "login": "brson",
+        "node_id": "MDQ6VXNlcjE0NzIxNA==",
+        "organizations_url": "https://api.github.com/users/brson/orgs",
+        "received_events_url": "https://api.github.com/users/brson/received_events",
+        "repos_url": "https://api.github.com/users/brson/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/brson/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/brson/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/brson"
+      },
+      "html_url": "https://github.com/rust-lang/rust/commit/2afadaadc99118b169d2c3aec01e9814409b37fa",
+      "node_id": "MDY6Q29tbWl0NzI0NzEyOjJhZmFkYWFkYzk5MTE4YjE2OWQyYzNhZWMwMWU5ODE0NDA5YjM3ZmE=",
+      "parents": [
+        {
+          "html_url": "https://github.com/rust-lang/rust/commit/09a9859c0004a3a442ad46b517110568df3e0c35",
+          "sha": "09a9859c0004a3a442ad46b517110568df3e0c35",
+          "url": "https://api.github.com/repos/rust-lang/rust/commits/09a9859c0004a3a442ad46b517110568df3e0c35"
+        }
+      ],
+      "sha": "2afadaadc99118b169d2c3aec01e9814409b37fa",
+      "url": "https://api.github.com/repos/rust-lang/rust/commits/2afadaadc99118b169d2c3aec01e9814409b37fa"
+    }
+  ]
+}

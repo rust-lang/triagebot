@@ -27,21 +27,20 @@ pub enum Activity {
         webhook_event: String,
         payload: serde_json::Value,
     },
-    /// An outgoing request to api.github.com, and its response.
-    ApiRequest {
+    /// An outgoing request to api.github.com or raw.githubusercontent.com, and its response.
+    Request {
         method: String,
         path: String,
         query: Option<String>,
         request_body: String,
         response_code: u16,
+        /// The body of the response.
+        ///
+        /// For non-JSON requests, it is encoded as a `Value::String` under
+        /// the assumption that GitHub never returns a JSON string for a
+        /// response. This is done so that the JSON bodies can be formatted
+        /// nicely in the `.json` bodies to make inspecting them easier.
         response_body: serde_json::Value,
-    },
-    /// An outgoing request to raw.githubusercontent.com, and its response.
-    RawRequest {
-        path: String,
-        query: Option<String>,
-        response_code: u16,
-        response_body: String,
     },
     /// Sent by the mock HTTP server to the test framework when it detects
     /// something is wrong.
@@ -54,10 +53,8 @@ pub enum Activity {
 /// Information about an HTTP request that is captured before sending.
 ///
 /// This is needed to avoid messing with cloning the Request.
+#[derive(Debug)]
 pub struct RequestInfo {
-    /// If this is `true`, then it is for raw.githubusercontent.com.
-    /// If `false`, then it is for api.github.com.
-    is_raw: bool,
     method: String,
     path: String,
     query: Option<String>,
@@ -175,9 +172,7 @@ pub fn capture_request(req: &Request) -> Option<RequestInfo> {
         .and_then(|body| body.as_bytes())
         .map(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
         .unwrap_or_default();
-    let is_raw = url.host_str().unwrap().contains("raw");
     let info = RequestInfo {
-        is_raw,
         method: req.method().to_string(),
         path: url.path().to_string(),
         query: url.query().map(|q| q.to_string()),
@@ -194,51 +189,32 @@ pub fn record_request(info: Option<RequestInfo>, status: StatusCode, body: &[u8]
     let Some(info) = info else { return };
     let Some(record_dir) = record_dir() else { return };
     let response_code = status.as_u16();
-    let mut name = info.path.replace(['/', '.'], "_");
-    if name.starts_with('_') {
-        name.remove(0);
+    let mut munged_path = info.path.replace(['/', '.'], "_");
+    if munged_path.starts_with('_') {
+        munged_path.remove(0);
     }
-    let (kind, activity) = if info.is_raw {
-        (
-            "raw",
-            Activity::RawRequest {
-                path: info.path,
-                query: info.query,
-                response_code,
-                response_body: String::from_utf8_lossy(body).to_string(),
-            },
-        )
+    let name = format!("{}-{}", info.method, munged_path);
+    // This is a hack to reduce the amount of data stored in the test
+    // directory. This file gets requested many times, and it is very
+    // large.
+    let response_body = if info.path == "/v1/teams.json" {
+        serde_json::json!(null)
     } else {
-        let json_body = if info.path == "/v1/teams.json" {
-            // This is a hack to reduce the amount of data stored in the test
-            // directory. This file gets requested many times, and it is very
-            // large.
-            serde_json::json!({})
-        } else {
-            match serde_json::from_slice(body) {
-                Ok(json) => json,
-                Err(e) => {
-                    error!("failed to record API response for {}: {e:?}", info.path);
-                    return;
-                }
-            }
-        };
-        name.insert(0, '-');
-        name.insert_str(0, &info.method);
-        (
-            "api",
-            Activity::ApiRequest {
-                method: info.method,
-                path: info.path,
-                query: info.query,
-                request_body: info.body,
-                response_code,
-                response_body: json_body,
-            },
-        )
+        match serde_json::from_slice(body) {
+            Ok(json) => json,
+            Err(_) => serde_json::Value::String(String::from_utf8_lossy(body).to_string()),
+        }
+    };
+    let activity = Activity::Request {
+        method: info.method,
+        path: info.path,
+        query: info.query,
+        request_body: info.body,
+        response_code,
+        response_body,
     };
 
-    let filename = format!("{:02}-{kind}-{name}.json", next_sequence());
+    let filename = format!("{:02}-{name}.json", next_sequence());
     save_activity(&record_dir.join(filename), &activity);
 }
 

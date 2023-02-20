@@ -1,0 +1,42 @@
+{
+  "kind": "Request",
+  "method": "POST",
+  "path": "/repos/ehuss/rust/git/commits",
+  "query": null,
+  "request_body": "{\"message\":\"test reference commit\",\"parents\":[\"319b88c463fe6f51bb6badbbd3bb97252a60f3a5\"],\"tree\":\"45aae523b087e418f2778d4557489de38fede6a3\"}",
+  "response_code": 201,
+  "response_body": {
+    "author": {
+      "date": "2023-02-05T19:08:57Z",
+      "email": "eric@huss.org",
+      "name": "Eric Huss"
+    },
+    "committer": {
+      "date": "2023-02-05T19:08:57Z",
+      "email": "eric@huss.org",
+      "name": "Eric Huss"
+    },
+    "html_url": "https://github.com/ehuss/rust/commit/88a426017fa4635ba42203c3b1d1c19f6a028184",
+    "message": "test reference commit",
+    "node_id": "C_kwDOBwBeMdoAKDg4YTQyNjAxN2ZhNDYzNWJhNDIyMDNjM2IxZDFjMTlmNmEwMjgxODQ",
+    "parents": [
+      {
+        "html_url": "https://github.com/ehuss/rust/commit/319b88c463fe6f51bb6badbbd3bb97252a60f3a5",
+        "sha": "319b88c463fe6f51bb6badbbd3bb97252a60f3a5",
+        "url": "https://api.github.com/repos/ehuss/rust/git/commits/319b88c463fe6f51bb6badbbd3bb97252a60f3a5"
+      }
+    ],
+    "sha": "88a426017fa4635ba42203c3b1d1c19f6a028184",
+    "tree": {
+      "sha": "45aae523b087e418f2778d4557489de38fede6a3",
+      "url": "https://api.github.com/repos/ehuss/rust/git/trees/45aae523b087e418f2778d4557489de38fede6a3"
+    },
+    "url": "https://api.github.com/repos/ehuss/rust/git/commits/88a426017fa4635ba42203c3b1d1c19f6a028184",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false
+    }
+  }
+}
