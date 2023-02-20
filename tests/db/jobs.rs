@@ -1,4 +1,5 @@
 use super::run_test;
+use crate::assert_datetime_approx_equal;
 use serde_json::json;
 
 #[test]
@@ -22,13 +23,13 @@ fn jobs() {
         let jobs = connection.get_jobs_to_execute().await.unwrap();
         assert_eq!(jobs.len(), 2);
         assert_eq!(jobs[0].name, "sample_job1");
-        assert_eq!(jobs[0].scheduled_at, past);
+        assert_datetime_approx_equal(&jobs[0].scheduled_at, &past);
         assert_eq!(jobs[0].metadata, json! {{"foo": 123}});
         assert_eq!(jobs[0].executed_at, None);
         assert_eq!(jobs[0].error_message, None);
 
         assert_eq!(jobs[1].name, "sample_job2");
-        assert_eq!(jobs[1].scheduled_at, past);
+        assert_datetime_approx_equal(&jobs[1].scheduled_at, &past);
         assert_eq!(jobs[1].metadata, json! {{}});
         assert_eq!(jobs[1].executed_at, None);
         assert_eq!(jobs[1].error_message, None);

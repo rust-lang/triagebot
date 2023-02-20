@@ -17,6 +17,7 @@ mod db;
 mod github_client;
 mod server_test;
 
+use chrono::DateTime;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
@@ -377,5 +378,21 @@ impl HttpServer {
             headers: Vec::new(),
             body: Vec::from(message.as_bytes()),
         }
+    }
+}
+
+/// Helper for comparing datetimes.
+///
+/// This helps ignore sub-second differences (which can happen when
+/// round-tripping through a database).
+pub fn assert_datetime_approx_equal<T, U>(a: &DateTime<T>, b: &DateTime<U>)
+where
+    T: chrono::TimeZone,
+    U: chrono::TimeZone,
+    <T as chrono::TimeZone>::Offset: std::fmt::Display,
+    <U as chrono::TimeZone>::Offset: std::fmt::Display,
+{
+    if a.timestamp() != b.timestamp() {
+        panic!("datetime differs {a} != {b}");
     }
 }

@@ -1,4 +1,5 @@
 use super::run_test;
+use crate::assert_datetime_approx_equal;
 use triagebot::db::Commit;
 
 #[test]
@@ -72,7 +73,7 @@ fn rustc_commits() {
             commits[0].parent_sha,
             "73f40197ecabf77ed59028af61739404eb60dd2e"
         );
-        assert_eq!(commits[0].time, now);
+        assert_datetime_approx_equal(&commits[0].time, &now);
         assert_eq!(commits[0].pr, Some(108228));
 
         assert_eq!(commits[1].sha, "73f40197ecabf77ed59028af61739404eb60dd2e");
@@ -80,7 +81,7 @@ fn rustc_commits() {
             commits[1].parent_sha,
             "fcdbd1c07f0b6c8e7d8bbd727c6ca69a1af8c7e9"
         );
-        assert_eq!(commits[1].time, now3);
+        assert_datetime_approx_equal(&commits[1].time, &now3);
         assert_eq!(commits[1].pr, Some(107772));
     });
 }

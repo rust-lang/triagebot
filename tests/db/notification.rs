@@ -1,4 +1,5 @@
 use super::run_test;
+use crate::assert_datetime_approx_equal;
 use std::num::NonZeroUsize;
 use triagebot::db::notifications::{Identifier, Notification};
 
@@ -63,7 +64,7 @@ fn notification() {
             notifications[0].short_description.as_deref(),
             Some("Comment on some issue")
         );
-        assert_eq!(notifications[0].time, now);
+        assert_datetime_approx_equal(&notifications[0].time, &now);
         assert_eq!(notifications[0].metadata, None);
 
         assert_eq!(
@@ -78,7 +79,7 @@ fn notification() {
             notifications[1].short_description.as_deref(),
             Some("Comment on some issue")
         );
-        assert_eq!(notifications[1].time, now);
+        assert_datetime_approx_equal(&notifications[1].time, &now);
         assert_eq!(notifications[1].metadata, None);
 
         let notifications = connection.get_notifications("weihanglo").await.unwrap();
@@ -95,7 +96,7 @@ fn notification() {
             notifications[0].short_description.as_deref(),
             Some("Comment on some issue")
         );
-        assert_eq!(notifications[0].time, now);
+        assert_datetime_approx_equal(&notifications[0].time, &now);
         assert_eq!(notifications[0].metadata, None);
 
         let notifications = connection.get_notifications("octocat").await.unwrap();
