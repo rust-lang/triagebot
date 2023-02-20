@@ -12,7 +12,7 @@ use std::io::BufWriter;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 /// A representation of the recording of activity of triagebot.
 ///
@@ -89,18 +89,14 @@ fn next_sequence() -> u32 {
 /// `TRIAGEBOT_TEST_RECORD` environment variable is set.
 pub fn init() -> Result<()> {
     let Some(record_dir) = record_dir() else { return Ok(()) };
+    if record_dir.exists() && record_dir.read_dir()?.next().is_some() {
+        panic!(
+            "{record_dir:?} already exists.\n\
+            Delete the directory before recording if you wish to re-record that test."
+        );
+    }
     fs::create_dir_all(&record_dir)
         .with_context(|| format!("failed to create recording directory {record_dir:?}"))?;
-    // Clear any old recording data.
-    for entry in fs::read_dir(&record_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().and_then(|p| p.to_str()) == Some("json") {
-            warn!("deleting old recording at {path:?}");
-            fs::remove_file(&path)
-                .with_context(|| format!("failed to remove old recording {path:?}"))?;
-        }
-    }
     Ok(())
 }
 
