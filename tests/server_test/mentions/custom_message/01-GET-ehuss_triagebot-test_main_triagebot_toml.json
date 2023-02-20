@@ -1,0 +1,9 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/ehuss/triagebot-test/main/triagebot.toml",
+  "query": null,
+  "request_body": "",
+  "response_code": 200,
+  "response_body": "[mentions.'foo/example1']\ncc = [\"@grashgal\", \"@ehuss\"]\n\n[mentions.'foo/example2']\ncc = [\"@grashgal\", \"@ehuss\"]\nmessage = \"a custom message\"\n"
+}

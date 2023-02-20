@@ -57,6 +57,7 @@
 //! to write a test for a scheduled job, you'll need to set up a mechanism to
 //! manually trigger the job (which could be useful outside of testing).
 
+mod mentions;
 mod shortcut;
 
 use super::{HttpServer, HttpServerHandle};

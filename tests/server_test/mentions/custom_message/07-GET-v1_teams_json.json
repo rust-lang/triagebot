@@ -1,0 +1,9 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/v1/teams.json",
+  "query": null,
+  "request_body": "",
+  "response_code": 200,
+  "response_body": null
+}

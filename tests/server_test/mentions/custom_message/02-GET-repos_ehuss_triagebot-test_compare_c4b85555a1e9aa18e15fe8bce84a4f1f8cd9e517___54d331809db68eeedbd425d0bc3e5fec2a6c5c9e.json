@@ -1,0 +1,9 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/repos/ehuss/triagebot-test/compare/c4b85555a1e9aa18e15fe8bce84a4f1f8cd9e517...54d331809db68eeedbd425d0bc3e5fec2a6c5c9e",
+  "query": null,
+  "request_body": "",
+  "response_code": 200,
+  "response_body": "diff --git a/foo/example2/README.md b/foo/example2/README.md\nnew file mode 100644\nindex 0000000..4dca9fb\n--- /dev/null\n+++ b/foo/example2/README.md\n@@ -0,0 +1,2 @@\n+# Example2\n+\n"
+}
