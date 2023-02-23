@@ -37,17 +37,6 @@ pub(super) async fn handle_command(
     let issue = event.issue().unwrap();
     let user = event.user();
 
-    let is_team_member = user.is_team_member(&ctx.github).await.unwrap_or(false);
-
-    if !is_team_member {
-        let cmnt = ErrorComment::new(
-            &issue,
-            "Only team members can be part of the decision process.",
-        );
-        cmnt.post(&ctx.github).await?;
-        return Ok(());
-    }
-
     match get_issue_decision_state(&db, &issue.number).await {
         Ok(_state) => {
             // TO DO
@@ -60,6 +49,17 @@ pub(super) async fn handle_command(
             Ok(())
         }
         _ => {
+            let is_team_member = user.is_team_member(&ctx.github).await.unwrap_or(false);
+            if !is_team_member {
+                let cmnt = ErrorComment::new(
+                    &issue,
+                    "Only team members can be part of the decision process.",
+                );
+                cmnt.post(&ctx.github).await?;
+
+                return Ok(());
+            }
+
             match team_name {
                 None => {
                     let cmnt = ErrorComment::new(
@@ -155,7 +155,7 @@ fn build_status_comment(
 ) -> anyhow::Result<String> {
     let mut comment = "| Team member | State |\n|-------------|-------|".to_owned();
     for (user, status) in current {
-        let mut user_statuses = format!("\n| {} |", user);
+        let mut user_statuses = format!("\n| @{} |", user);
 
         // previous stasuses
         match history.get(user) {
@@ -228,8 +228,8 @@ mod tests {
             .expect("it shouldn't fail building the message");
         let expected_comment = "| Team member | State |\n\
         |-------------|-------|\n\
-        | Barbara | ~~hold~~  ~~merge~~  **merge** |\n\
-        | Niklaus | ~~merge~~  ~~hold~~  **merge** |"
+        | @Barbara | ~~hold~~  ~~merge~~  **merge** |\n\
+        | @Niklaus | ~~merge~~  ~~hold~~  **merge** |"
             .to_string();
 
         assert_eq!(build_result, expected_comment);
@@ -267,9 +267,9 @@ mod tests {
             .expect("it shouldn't fail building the message");
         let expected_comment = "| Team member | State |\n\
         |-------------|-------|\n\
-        | Barbara | ~~hold~~  ~~merge~~  **merge** |\n\
-        | Niklaus | ~~merge~~  ~~hold~~  **merge** |\n\
-        | Tom |  |"
+        | @Barbara | ~~hold~~  ~~merge~~  **merge** |\n\
+        | @Niklaus | ~~merge~~  ~~hold~~  **merge** |\n\
+        | @Tom |  |"
             .to_string();
 
         assert_eq!(build_result, expected_comment);
@@ -330,8 +330,8 @@ mod tests {
             .expect("it shouldn't fail building the message");
         let expected_comment = "| Team member | State |\n\
         |-------------|-------|\n\
-        | Barbara | **merge** |\n\
-        | Niklaus | **merge** |\
+        | @Barbara | **merge** |\n\
+        | @Niklaus | **merge** |\
         "
         .to_string();
 
