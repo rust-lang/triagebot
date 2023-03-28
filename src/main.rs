@@ -4,7 +4,6 @@ use anyhow::Context as _;
 use futures::future::FutureExt;
 use futures::StreamExt;
 use hyper::{header, Body, Request, Response, Server, StatusCode};
-use reqwest::Client;
 use route_recognizer::Router;
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::{task, time};
@@ -83,7 +82,8 @@ async fn serve_req(
             .unwrap());
     }
     if req.uri.path() == "/bors-commit-list" {
-        let res = db::rustc_commits::get_commits_with_artifacts(&*ctx.db.get().await).await;
+        let mut connection = ctx.db.connection().await;
+        let res = connection.get_commits_with_artifacts().await;
         let res = match res {
             Ok(r) => r,
             Err(e) => {
@@ -103,10 +103,11 @@ async fn serve_req(
         if let Some(query) = req.uri.query() {
             let user = url::form_urlencoded::parse(query.as_bytes()).find(|(k, _)| k == "user");
             if let Some((_, name)) = user {
+                let mut connection = ctx.db.connection().await;
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
                     .body(Body::from(
-                        notification_listing::render(&ctx.db.get().await, &*name).await,
+                        notification_listing::render(&mut *connection, &*name).await,
                     ))
                     .unwrap());
             }
@@ -219,6 +220,7 @@ async fn serve_req(
                 .unwrap());
         }
     };
+    triagebot::test_record::record_event(&event, &payload);
 
     match triagebot::webhook(event, payload, &ctx).await {
         Ok(true) => Ok(Response::new(Body::from("processed request"))),
@@ -234,41 +236,9 @@ async fn serve_req(
 }
 
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
-    let pool = db::ClientPool::new();
-    db::run_migrations(&*pool.get().await)
-        .await
-        .context("database migrations")?;
+    let pool = db::Pool::new_from_env();
 
-    // spawning a background task that will schedule the jobs
-    // every JOB_SCHEDULING_CADENCE_IN_SECS
-    task::spawn(async move {
-        loop {
-            let res = task::spawn(async move {
-                let pool = db::ClientPool::new();
-                let mut interval =
-                    time::interval(time::Duration::from_secs(JOB_SCHEDULING_CADENCE_IN_SECS));
-
-                loop {
-                    interval.tick().await;
-                    db::schedule_jobs(&*pool.get().await, jobs())
-                        .await
-                        .context("database schedule jobs")
-                        .unwrap();
-                }
-            });
-
-            match res.await {
-                Err(err) if err.is_panic() => {
-                    /* handle panic in above task, re-launching */
-                    tracing::trace!("schedule_jobs task died (error={})", err);
-                }
-                _ => unreachable!(),
-            }
-        }
-    });
-
-    let client = Client::new();
-    let gh = github::GithubClient::new_with_default_token(client.clone());
+    let gh = github::GithubClient::new_from_env();
     let oc = octocrab::OctocrabBuilder::new()
         .personal_token(github::default_token_from_env())
         .build()
@@ -280,35 +250,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         octocrab: oc,
     });
 
-    // spawning a background task that will run the scheduled jobs
-    // every JOB_PROCESSING_CADENCE_IN_SECS
-    let ctx2 = ctx.clone();
-    task::spawn(async move {
-        loop {
-            let ctx = ctx2.clone();
-            let res = task::spawn(async move {
-                let pool = db::ClientPool::new();
-                let mut interval =
-                    time::interval(time::Duration::from_secs(JOB_PROCESSING_CADENCE_IN_SECS));
-
-                loop {
-                    interval.tick().await;
-                    db::run_scheduled_jobs(&ctx, &*pool.get().await)
-                        .await
-                        .context("run database scheduled jobs")
-                        .unwrap();
-                }
-            });
-
-            match res.await {
-                Err(err) if err.is_panic() => {
-                    /* handle panic in above task, re-launching */
-                    tracing::trace!("run_scheduled_jobs task died (error={})", err);
-                }
-                _ => unreachable!(),
-            }
-        }
-    });
+    if !is_scheduled_jobs_disabled() {
+        spawn_job_scheduler();
+        spawn_job_runner(ctx.clone());
+    }
 
     let agenda = tower::ServiceBuilder::new()
         .buffer(10)
@@ -351,6 +296,89 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Spawns a background tokio task which runs continuously to queue up jobs
+/// to be run by the job runner.
+///
+/// The scheduler wakes up every `JOB_SCHEDULING_CADENCE_IN_SECS` seconds to
+/// check if there are any jobs ready to run. Jobs get inserted into the the
+/// database which acts as a queue.
+fn spawn_job_scheduler() {
+    task::spawn(async move {
+        loop {
+            let res = task::spawn(async move {
+                let pool = db::Pool::new_from_env();
+                let mut interval =
+                    time::interval(time::Duration::from_secs(JOB_SCHEDULING_CADENCE_IN_SECS));
+
+                loop {
+                    interval.tick().await;
+                    let mut connection = pool.connection().await;
+                    db::jobs::schedule_jobs(&mut *connection, jobs())
+                        .await
+                        .context("database schedule jobs")
+                        .unwrap();
+                }
+            });
+
+            match res.await {
+                Err(err) if err.is_panic() => {
+                    /* handle panic in above task, re-launching */
+                    tracing::error!("schedule_jobs task died (error={})", err);
+                    tokio::time::sleep(std::time::Duration::new(5, 0)).await;
+                }
+                _ => unreachable!(),
+            }
+        }
+    });
+}
+
+/// Spawns a background tokio task which runs continuously to run scheduled
+/// jobs.
+///
+/// The runner wakes up every `JOB_PROCESSING_CADENCE_IN_SECS` seconds to
+/// check if any jobs have been put into the queue by the scheduler. They
+/// will get popped off the queue and run if any are found.
+fn spawn_job_runner(ctx: Arc<Context>) {
+    task::spawn(async move {
+        loop {
+            let ctx = ctx.clone();
+            let res = task::spawn(async move {
+                let pool = db::Pool::new_from_env();
+                let mut interval =
+                    time::interval(time::Duration::from_secs(JOB_PROCESSING_CADENCE_IN_SECS));
+
+                loop {
+                    interval.tick().await;
+                    let mut connection = pool.connection().await;
+                    db::jobs::run_scheduled_jobs(&ctx, &mut *connection)
+                        .await
+                        .context("run database scheduled jobs")
+                        .unwrap();
+                }
+            });
+
+            match res.await {
+                Err(err) if err.is_panic() => {
+                    /* handle panic in above task, re-launching */
+                    tracing::error!("run_scheduled_jobs task died (error={})", err);
+                    tokio::time::sleep(std::time::Duration::new(5, 0)).await;
+                }
+                _ => unreachable!(),
+            }
+        }
+    });
+}
+
+/// Determines whether or not background scheduled jobs should be disabled for
+/// the purpose of testing.
+///
+/// This helps avoid having random jobs run while testing other things.
+fn is_scheduled_jobs_disabled() -> bool {
+    // TRIAGEBOT_TEST_DISABLE_JOBS is set automatically by the test runner,
+    // and shouldn't be needed to be set manually.
+    env::var_os("TRIAGEBOT_TEST_DISABLE_JOBS").is_some() || triagebot::test_record::is_recording()
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     dotenv::dotenv().ok();
@@ -359,6 +387,7 @@ async fn main() {
         .with_ansi(std::env::var_os("DISABLE_COLOR").is_none())
         .try_init()
         .unwrap();
+    triagebot::test_record::init().unwrap();
 
     let port = env::var("PORT")
         .ok()

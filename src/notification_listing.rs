@@ -1,7 +1,5 @@
-use crate::db::notifications::get_notifications;
-
-pub async fn render(db: &crate::db::PooledClient, user: &str) -> String {
-    let notifications = match get_notifications(db, user).await {
+pub async fn render(connection: &mut dyn crate::db::Connection, user: &str) -> String {
+    let notifications = match connection.get_notifications(user).await {
         Ok(n) => n,
         Err(e) => {
             return format!("{:?}", e.context("getting notifications"));

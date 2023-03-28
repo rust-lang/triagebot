@@ -300,10 +300,13 @@ impl fmt::Display for ConfigurationError {
                  Add a `triagebot.toml` in the root of the default branch to enable it."
             ),
             ConfigurationError::Toml(e) => {
-                write!(f, "Malformed `triagebot.toml` in default branch.\n{}", e)
+                write!(f, "Malformed `triagebot.toml` in default branch.\n{e}")
             }
-            ConfigurationError::Http(_) => {
-                write!(f, "Failed to query configuration for this repository.")
+            ConfigurationError::Http(e) => {
+                write!(
+                    f,
+                    "Failed to query configuration for this repository.\n{e:?}"
+                )
             }
         }
     }

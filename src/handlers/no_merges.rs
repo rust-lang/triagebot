@@ -77,9 +77,11 @@ pub(super) async fn handle_input(
     event: &IssuesEvent,
     input: NoMergesInput,
 ) -> anyhow::Result<()> {
-    let mut client = ctx.db.get().await;
-    let mut state: IssueData<'_, NoMergesState> =
-        IssueData::load(&mut client, &event.issue, NO_MERGES_KEY).await?;
+    let mut connection = ctx.db.connection().await;
+    let repo = event.issue.repository().to_string();
+    let issue_number = event.issue.number as i32;
+    let mut state: IssueData<NoMergesState> =
+        IssueData::load(&mut *connection, repo, issue_number, NO_MERGES_KEY).await?;
 
     let since_last_posted = if state.data.mentioned_merge_commits.is_empty() {
         ""

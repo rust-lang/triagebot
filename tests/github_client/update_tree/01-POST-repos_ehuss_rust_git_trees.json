@@ -1,0 +1,240 @@
+{
+  "kind": "Request",
+  "method": "POST",
+  "path": "/repos/ehuss/rust/git/trees",
+  "query": null,
+  "request_body": "{\"base_tree\":\"6ebac807802fa2458d2f47c2c12fb1e62944e764\",\"tree\":[{\"mode\":\"160000\",\"path\":\"src/doc/reference\",\"sha\":\"b9ccb0960e5e98154020d4c02a09cc3901bc2500\",\"type\":\"commit\"}]}",
+  "response_code": 201,
+  "response_body": {
+    "sha": "45aae523b087e418f2778d4557489de38fede6a3",
+    "tree": [
+      {
+        "mode": "100644",
+        "path": ".editorconfig",
+        "sha": "ec6e107d547f0e6d7ff63e4866a641e3d2c4d1a5",
+        "size": 417,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/ec6e107d547f0e6d7ff63e4866a641e3d2c4d1a5"
+      },
+      {
+        "mode": "100644",
+        "path": ".git-blame-ignore-revs",
+        "sha": "d20f19e60e86033722853348908ff38b73898ac4",
+        "size": 369,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/d20f19e60e86033722853348908ff38b73898ac4"
+      },
+      {
+        "mode": "100644",
+        "path": ".gitattributes",
+        "sha": "51a670b5fbefdaf7904f1d304ea482b0543bc9a9",
+        "size": 464,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/51a670b5fbefdaf7904f1d304ea482b0543bc9a9"
+      },
+      {
+        "mode": "040000",
+        "path": ".github",
+        "sha": "5664fb0635551f559db94dda7e7f5cd87d3dfc8e",
+        "type": "tree",
+        "url": "https://api.github.com/repos/ehuss/rust/git/trees/5664fb0635551f559db94dda7e7f5cd87d3dfc8e"
+      },
+      {
+        "mode": "100644",
+        "path": ".gitignore",
+        "sha": "e5ca3e503130f63c8fb35475b0658dd4316a31b5",
+        "size": 1289,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/e5ca3e503130f63c8fb35475b0658dd4316a31b5"
+      },
+      {
+        "mode": "100644",
+        "path": ".gitmodules",
+        "sha": "4011a6fa6b95b3e0104a4f99ab5c912790d7a333",
+        "size": 1365,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/4011a6fa6b95b3e0104a4f99ab5c912790d7a333"
+      },
+      {
+        "mode": "100644",
+        "path": ".mailmap",
+        "sha": "8ed692989ccbf73baf3dbe06012380237c5b3a56",
+        "size": 29527,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/8ed692989ccbf73baf3dbe06012380237c5b3a56"
+      },
+      {
+        "mode": "040000",
+        "path": ".reuse",
+        "sha": "60a2be0267d564a5c4f7e0c95949ebd1504587fa",
+        "type": "tree",
+        "url": "https://api.github.com/repos/ehuss/rust/git/trees/60a2be0267d564a5c4f7e0c95949ebd1504587fa"
+      },
+      {
+        "mode": "100644",
+        "path": "CODE_OF_CONDUCT.md",
+        "sha": "e3708bc485399fd42b32c6a1c24491771afa1a04",
+        "size": 131,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/e3708bc485399fd42b32c6a1c24491771afa1a04"
+      },
+      {
+        "mode": "100644",
+        "path": "CONTRIBUTING.md",
+        "sha": "d732075fb2d07fb84f1873ac7221f64f52a47947",
+        "size": 2448,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/d732075fb2d07fb84f1873ac7221f64f52a47947"
+      },
+      {
+        "mode": "100644",
+        "path": "COPYRIGHT",
+        "sha": "05993830a0fb4ab5d30336f75be3e5001e1fc770",
+        "size": 21109,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/05993830a0fb4ab5d30336f75be3e5001e1fc770"
+      },
+      {
+        "mode": "100644",
+        "path": "Cargo.lock",
+        "sha": "705210e44b24c5f67e39747bfacbae2ce1deceb6",
+        "size": 139425,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/705210e44b24c5f67e39747bfacbae2ce1deceb6"
+      },
+      {
+        "mode": "100644",
+        "path": "Cargo.toml",
+        "sha": "15cbb2659c9b335ea3f1bb9b77af86f3b74bd8fc",
+        "size": 4562,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/15cbb2659c9b335ea3f1bb9b77af86f3b74bd8fc"
+      },
+      {
+        "mode": "100644",
+        "path": "LICENSE-APACHE",
+        "sha": "1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d",
+        "size": 9723,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d"
+      },
+      {
+        "mode": "100644",
+        "path": "LICENSE-MIT",
+        "sha": "31aa79387f27e730e33d871925e152e35e428031",
+        "size": 1023,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/31aa79387f27e730e33d871925e152e35e428031"
+      },
+      {
+        "mode": "040000",
+        "path": "LICENSES",
+        "sha": "5024f3351b8c6791ba50e5454a0fc1c33f220bf6",
+        "type": "tree",
+        "url": "https://api.github.com/repos/ehuss/rust/git/trees/5024f3351b8c6791ba50e5454a0fc1c33f220bf6"
+      },
+      {
+        "mode": "100644",
+        "path": "README.md",
+        "sha": "0eb7c4b266a9f3a529e1b3c555ac2bf1dee974c1",
+        "size": 10251,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/0eb7c4b266a9f3a529e1b3c555ac2bf1dee974c1"
+      },
+      {
+        "mode": "100644",
+        "path": "RELEASES.md",
+        "sha": "a63d4e8a043c606e4384eb5b7f6d6bc581802de9",
+        "size": 624629,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/a63d4e8a043c606e4384eb5b7f6d6bc581802de9"
+      },
+      {
+        "mode": "040000",
+        "path": "compiler",
+        "sha": "620c4ab1d299192130aeb719e70bc1cab7ca0677",
+        "type": "tree",
+        "url": "https://api.github.com/repos/ehuss/rust/git/trees/620c4ab1d299192130aeb719e70bc1cab7ca0677"
+      },
+      {
+        "mode": "100644",
+        "path": "config.toml.example",
+        "sha": "df4478bb0cb85ac75cfb31fbc78349d30fcfa96b",
+        "size": 34209,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/df4478bb0cb85ac75cfb31fbc78349d30fcfa96b"
+      },
+      {
+        "mode": "100755",
+        "path": "configure",
+        "sha": "81e2001e4a583ef1f117a46593acd1705995ed85",
+        "size": 292,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/81e2001e4a583ef1f117a46593acd1705995ed85"
+      },
+      {
+        "mode": "040000",
+        "path": "library",
+        "sha": "808258f2e74d534960aee1599688512f14eb279c",
+        "type": "tree",
+        "url": "https://api.github.com/repos/ehuss/rust/git/trees/808258f2e74d534960aee1599688512f14eb279c"
+      },
+      {
+        "mode": "100644",
+        "path": "rustfmt.toml",
+        "sha": "828d492a3d19c892b53168bbe8f280641f6b28bd",
+        "size": 1304,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/828d492a3d19c892b53168bbe8f280641f6b28bd"
+      },
+      {
+        "mode": "040000",
+        "path": "src",
+        "sha": "06a6ef9fe702a0a7616d3602f9d09ffbe5c4b775",
+        "type": "tree",
+        "url": "https://api.github.com/repos/ehuss/rust/git/trees/06a6ef9fe702a0a7616d3602f9d09ffbe5c4b775"
+      },
+      {
+        "mode": "040000",
+        "path": "tests",
+        "sha": "77bbb489e5cdde6860d3bb4e705009908153cd5a",
+        "type": "tree",
+        "url": "https://api.github.com/repos/ehuss/rust/git/trees/77bbb489e5cdde6860d3bb4e705009908153cd5a"
+      },
+      {
+        "mode": "100644",
+        "path": "triagebot.toml",
+        "sha": "62a99b704388fc857d527e61f96b5cf407c43a24",
+        "size": 18061,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/62a99b704388fc857d527e61f96b5cf407c43a24"
+      },
+      {
+        "mode": "100755",
+        "path": "x",
+        "sha": "4309b82627c9c47917df4ef29c9ef8c4a3020544",
+        "size": 1161,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/4309b82627c9c47917df4ef29c9ef8c4a3020544"
+      },
+      {
+        "mode": "100755",
+        "path": "x.ps1",
+        "sha": "f324a4676c8e99d5f338eaa0c11020db0f4b5e0b",
+        "size": 1442,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/f324a4676c8e99d5f338eaa0c11020db0f4b5e0b"
+      },
+      {
+        "mode": "100755",
+        "path": "x.py",
+        "sha": "5dee953a31899ff46fe3f459de48d8249ce2a4b2",
+        "size": 948,
+        "type": "blob",
+        "url": "https://api.github.com/repos/ehuss/rust/git/blobs/5dee953a31899ff46fe3f459de48d8249ce2a4b2"
+      }
+    ],
+    "truncated": false,
+    "url": "https://api.github.com/repos/ehuss/rust/git/trees/45aae523b087e418f2778d4557489de38fede6a3"
+  }
+}

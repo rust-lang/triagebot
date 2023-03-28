@@ -4,8 +4,8 @@
 //!
 //! Parsing is done in the `parser::command::ping` module.
 
-use crate::db::notifications;
 use crate::{
+    db::notifications::Notification,
     github::{self, Event},
     handlers::Context,
 };
@@ -93,33 +93,32 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             }
         };
 
-        let client = ctx.db.get().await;
+        let mut connection = ctx.db.connection().await;
         for user in users {
             if !users_notified.insert(user.id.unwrap()) {
                 // Skip users already associated with this event.
                 continue;
             }
 
-            if let Err(err) = notifications::record_username(&client, user.id.unwrap(), user.login)
+            if let Err(err) = connection
+                .record_username(user.id.unwrap(), user.login)
                 .await
                 .context("failed to record username")
             {
                 log::error!("record username: {:?}", err);
             }
 
-            if let Err(err) = notifications::record_ping(
-                &client,
-                &notifications::Notification {
+            if let Err(err) = connection
+                .record_ping(&Notification {
                     user_id: user.id.unwrap(),
                     origin_url: event.html_url().unwrap().to_owned(),
                     origin_html: body.to_owned(),
                     time: event.time().unwrap(),
                     short_description: Some(short_description.clone()),
                     team_name: team_name.clone(),
-                },
-            )
-            .await
-            .context("failed to record ping")
+                })
+                .await
+                .context("failed to record ping")
             {
                 log::error!("record ping: {:?}", err);
             }

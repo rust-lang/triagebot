@@ -1,5 +1,4 @@
-use crate::db::notifications::add_metadata;
-use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
+use crate::db::notifications::{Identifier, Notification};
 use crate::github::{self, GithubClient};
 use crate::handlers::Context;
 use anyhow::Context as _;
@@ -548,8 +547,8 @@ async fn acknowledge(
     } else {
         Identifier::Url(filter)
     };
-    let mut db = ctx.db.get().await;
-    match delete_ping(&mut *db, gh_id, ident).await {
+    let mut connection = ctx.db.connection().await;
+    match connection.delete_ping(gh_id, ident).await {
         Ok(deleted) => {
             let resp = if deleted.is_empty() {
                 format!(
@@ -603,18 +602,17 @@ async fn add_notification(
         assert_eq!(description.pop(), Some(' ')); // pop trailing space
         Some(description)
     };
-    match record_ping(
-        &*ctx.db.get().await,
-        &notifications::Notification {
+    let mut connection = ctx.db.connection().await;
+    match connection
+        .record_ping(&Notification {
             user_id: gh_id,
             origin_url: url.to_owned(),
             origin_html: String::new(),
             short_description: description,
             time: chrono::Utc::now().into(),
             team_name: None,
-        },
-    )
-    .await
+        })
+        .await
     {
         Ok(()) => Ok(serde_json::to_string(&Response {
             content: "Created!",
@@ -652,8 +650,11 @@ async fn add_meta_notification(
         assert_eq!(description.pop(), Some(' ')); // pop trailing space
         Some(description)
     };
-    let mut db = ctx.db.get().await;
-    match add_metadata(&mut db, gh_id, idx, description.as_deref()).await {
+    let mut connection = ctx.db.connection().await;
+    match connection
+        .add_metadata(gh_id, idx, description.as_deref())
+        .await
+    {
         Ok(()) => Ok(serde_json::to_string(&Response {
             content: "Added metadata!",
         })
@@ -688,7 +689,8 @@ async fn move_notification(
         .context("to index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
-    match move_indices(&mut *ctx.db.get().await, gh_id, from, to).await {
+    let mut connection = ctx.db.connection().await;
+    match connection.move_indices(gh_id, from, to).await {
         Ok(()) => Ok(serde_json::to_string(&Response {
             // to 1-base indices
             content: &format!("Moved {} to {}.", from + 1, to + 1),
