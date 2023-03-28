@@ -168,7 +168,8 @@ async fn create_commit(
             path: update.path.clone(),
             mode: "160000".to_string(),
             object_type: "commit".to_string(),
-            sha: update.new_hash.clone(),
+            sha: Some(Some(update.new_hash.clone())),
+            content: None,
         })
         .collect();
     let new_tree = rust_repo

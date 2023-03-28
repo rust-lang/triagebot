@@ -17,6 +17,7 @@
 //! 2. Run just a single test with recording enabled:
 //!
 //!    ```sh
+//!    TODO
 //!    TRIAGEBOT_TEST_RECORD=github_client/TEST_NAME_HERE cargo test \
 //!        --test testsuite -- --exact github_client::TEST_NAME_HERE
 //!    ```
@@ -226,7 +227,8 @@ fn update_tree() {
             path: "src/doc/reference".to_string(),
             mode: "160000".to_string(),
             object_type: "commit".to_string(),
-            sha: "b9ccb0960e5e98154020d4c02a09cc3901bc2500".to_string(),
+            sha: Some(Some("b9ccb0960e5e98154020d4c02a09cc3901bc2500".to_string())),
+            content: None,
         }];
         let tree = repo
             .update_tree(&gh, "6ebac807802fa2458d2f47c2c12fb1e62944e764", &entries)

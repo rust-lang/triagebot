@@ -11,7 +11,7 @@ use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::{
-    fmt,
+    fmt::{self, Write},
     time::{Duration, SystemTime},
 };
 use tracing as log;
@@ -45,7 +45,7 @@ impl GithubClient {
             .with_context(|| format!("failed to read response body {req_dbg}"))?;
         test_record::record_request(test_capture_info, status, &body);
         if let Some(e) = maybe_err {
-            return Err(e.into());
+            return Err(anyhow::Error::new(e)).with_context(|| format!("response: {}", String::from_utf8_lossy(&body)));
         }
 
         Ok((body, req_dbg))
@@ -482,6 +482,12 @@ impl Issue {
 
     pub async fn get_comment(&self, client: &GithubClient, id: usize) -> anyhow::Result<Comment> {
         let comment_url = format!("{}/issues/comments/{}", self.repository().url(client), id);
+        let comment = client.json(client.get(&comment_url)).await?;
+        Ok(comment)
+    }
+
+    pub async fn get_comments(&self, client: &GithubClient) -> anyhow::Result<Vec<Comment>> {
+        let comment_url = format!("{}/issues/{}/comments", self.repository().url(client), self.number);
         let comment = client.json(client.get(&comment_url)).await?;
         Ok(comment)
     }
@@ -1223,6 +1229,24 @@ impl Repository {
             .with_context(|| format!("{} failed to create commit for tree {tree}", self.full_name))
     }
 
+    /// TODO: encoding should be either "utf-8" or "base64".
+    pub async fn create_blob(
+        &self,
+        client: &GithubClient,
+        content: &str,
+        encoding: &str,
+    ) -> anyhow::Result<String> {
+        let url = format!("{}/git/blobs", self.url(client));
+        let resp: serde_json::Value = client
+            .json(client.post(&url).json(&serde_json::json!({
+                "content": content,
+                "encoding": encoding,
+            })))
+            .await
+            .with_context(|| format!("{} failed to create blob", self.full_name))?;
+        Ok(resp["sha"].as_str().unwrap().to_string())
+    }
+
     /// Retrieves a git reference for the given refname.
     pub async fn get_reference(
         &self,
@@ -1236,16 +1260,32 @@ impl Repository {
             .with_context(|| format!("{} failed to get git reference {refname}", self.full_name))
     }
 
+    pub async fn create_reference(
+        &self,
+        client: &GithubClient,
+        refname: &str,
+        sha: &str,
+    ) -> anyhow::Result<GitReference> {
+        let url = format!("{}/git/refs", self.url(client));
+        client
+            .json(client.post(&url).json(&serde_json::json!({
+                "ref": format!("refs/{refname}"),
+                "sha": sha,
+            })))
+            .await
+            .with_context(|| format!("{} failed to create reference", self.full_name))
+    }
+
     /// Updates an existing git reference to a new SHA.
     pub async fn update_reference(
         &self,
         client: &GithubClient,
         refname: &str,
         sha: &str,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<GitReference> {
         let url = format!("{}/git/refs/{}", self.url(client), refname);
         client
-            .send_req(client.patch(&url).json(&serde_json::json!({
+            .json(client.patch(&url).json(&serde_json::json!({
                 "sha": sha,
                 "force": true,
             })))
@@ -1255,8 +1295,26 @@ impl Repository {
                     "{} failed to update reference {refname} to {sha}",
                     self.full_name
                 )
-            })?;
-        Ok(())
+            })
+    }
+
+    pub async fn create_or_update_reference(
+        &self,
+        client: &GithubClient,
+        refname: &str,
+        sha: &str,
+    ) -> anyhow::Result<GitReference> {
+        if let Err(e) = self.get_reference(client, refname).await {
+            if e.downcast_ref::<reqwest::Error>()
+                .map_or(false, |e| e.status() == Some(StatusCode::NOT_FOUND))
+            {
+                return self.create_reference(client, refname, sha).await;
+            } else {
+                return Err(e);
+            }
+        } else {
+            return self.update_reference(client, refname, sha).await;
+        }
     }
 
     /// Returns a list of recent commits on the given branch.
@@ -1500,6 +1558,43 @@ impl Repository {
         Ok(issue)
     }
 
+    pub async fn get_prs(&self, client: &GithubClient,
+        state: &str,
+        head: Option<&str>,
+        base: Option<&str>,
+        sort: Option<&str>,
+        direction: Option<&str>,
+    )-> anyhow::Result<Vec<Issue>> {
+        let mut url = format!("{}/pulls?state={state}", self.url(client));
+        if let Some(head) = head {
+            write!(url, "&head={head}&base={}", base.expect("base must be set if head is set")).unwrap();
+        }
+        if let Some(sort) = sort {
+            write!(url, "&sort={sort}").unwrap();
+        }
+        if let Some(direction) = direction {
+            write!(url, "&direction={direction}").unwrap();
+        }
+        let mut issues: Vec<Issue> = client
+            .json(client.get(&url))
+            .await
+            .with_context(|| format!("{} failed to get prs", self.full_name))?;
+        for issue in &mut issues {
+            issue.pull_request = Some(PullRequestDetails {});
+        }
+        Ok(issues)
+    }
+
+    pub async fn get_pr(&self, client: &GithubClient, pull_number: u64) -> anyhow::Result<Issue> {
+        let url = format!("{}/pulls/{pull_number}", self.url(client));
+        let mut issue: Issue = client
+            .json(client.get(&url))
+            .await
+            .with_context(|| format!("{} failed to get pr {pull_number}", self.full_name))?;
+        issue.pull_request = Some(PullRequestDetails {});
+        Ok(issue)
+    }
+
     /// Synchronize a branch (in a forked repository) by pulling in its upstream contents.
     pub async fn merge_upstream(&self, client: &GithubClient, branch: &str) -> anyhow::Result<()> {
         let url = format!("{}/merge-upstream", self.url(client));
@@ -1514,6 +1609,42 @@ impl Repository {
                     self.full_name
                 )
             })?;
+        Ok(())
+    }
+
+    pub async fn has_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<bool> {
+        // TODO merge with IssueRepository
+        let url = format!("{}/labels/{}", self.url(client), label);
+        match client.send_req(client.get(&url)).await {
+            Ok(_) => Ok(true),
+            Err(e) => {
+                if e.downcast_ref::<reqwest::Error>()
+                    .map_or(false, |e| e.status() == Some(StatusCode::NOT_FOUND))
+                {
+                    Ok(false)
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    pub async fn create_label(
+        &self,
+        client: &GithubClient,
+        name: &str,
+        color: &str,
+        description: &str,
+    ) -> anyhow::Result<()> {
+        let url = format!("{}/labels", self.url(client));
+        client
+            .send_req(client.post(&url).json(&serde_json::json!({
+                "name": name,
+                "color": color,
+                "description": description,
+            })))
+            .await
+            .with_context(|| format!("{} failed to create label {name}", self.full_name))?;
         Ok(())
     }
 }
@@ -1974,7 +2105,13 @@ pub struct GitTreeEntry {
     pub mode: String,
     #[serde(rename = "type")]
     pub object_type: String,
-    pub sha: String,
+    /// `sha` and `contents` are mutually exclusive.
+    ///
+    /// Set `sha` to `Some(None)` to delete a file.
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub sha: Option<Option<String>>,
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub content: Option<String>,
 }
 
 pub struct RecentCommit {

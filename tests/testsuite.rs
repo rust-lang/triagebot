@@ -145,10 +145,10 @@ pub fn assert_single_record() {
 }
 
 /// Loads all JSON [`Activity`] blobs from a directory.
-pub fn load_activities(test_dir: &str, test_name: &str) -> Vec<Activity> {
+pub fn load_activities(test_dir: &str, test_path: &str) -> Vec<Activity> {
     let mut activity_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     activity_path.push(test_dir);
-    activity_path.push(test_name);
+    activity_path.push(test_path);
     let mut activity_paths: Vec<_> = std::fs::read_dir(&activity_path)
         .map_err(|e| {
             format!(

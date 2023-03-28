@@ -1,0 +1,9 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/repos/ehuss/triagebot-test/compare/bed2000c844b1552d9e39ef628071314a64160ad...0012b38544df09f2c18af8c92192366ee06913b0",
+  "query": null,
+  "request_body": "",
+  "response_code": 200,
+  "response_body": "diff --git a/foo/example1 b/foo/example1\nnew file mode 100644\nindex 0000000..679aa53\n--- /dev/null\n+++ b/foo/example1\n@@ -0,0 +1 @@\n+sample text\n\\ No newline at end of file\n"
+}

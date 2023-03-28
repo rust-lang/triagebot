@@ -61,7 +61,7 @@ pub struct RequestInfo {
     body: String,
 }
 
-/// Returns whether or not TRIAGEBOT_TEST_RECORD has been set to enable
+/// Returns whether or not TRIAGEBOT_TEST_RECORD_DIR has been set to enable
 /// recording.
 pub fn is_recording() -> bool {
     record_dir().is_some()
@@ -71,11 +71,15 @@ pub fn is_recording() -> bool {
 ///
 /// Returns `None` if recording is disabled.
 fn record_dir() -> Option<PathBuf> {
-    let Some(test_record) = std::env::var_os("TRIAGEBOT_TEST_RECORD") else { return None };
+    let test_record = std::env::var("TRIAGEBOT_TEST_RECORD_DIR").ok()?;
     let mut record_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     record_dir.push("tests");
     record_dir.push(test_record);
     Some(record_dir)
+}
+
+pub fn record_live_repo() -> Option<String> {
+    std::env::var("TRIAGEBOT_TEST_LIVE_REPO").ok()
 }
 
 fn next_sequence() -> u32 {
@@ -86,7 +90,7 @@ fn next_sequence() -> u32 {
 /// Initializes the test recording system.
 ///
 /// This sets up the directory where JSON files are stored if the
-/// `TRIAGEBOT_TEST_RECORD` environment variable is set.
+/// `TRIAGEBOT_TEST_RECORD_DIR` environment variable is set.
 pub fn init() -> Result<()> {
     let Some(record_dir) = record_dir() else { return Ok(()) };
     fs::create_dir_all(&record_dir)
@@ -106,7 +110,7 @@ pub fn init() -> Result<()> {
 
 /// Records a webhook event for the test framework.
 ///
-/// The recording is only saved if the `TRIAGEBOT_TEST_RECORD` environment
+/// The recording is only saved if the `TRIAGEBOT_TEST_RECORD_DIR` environment
 /// variable is set.
 pub fn record_event(event: &EventName, payload: &str) {
     let Some(record_dir) = record_dir() else { return };
@@ -183,7 +187,7 @@ pub fn capture_request(req: &Request) -> Option<RequestInfo> {
 
 /// Records an HTTP request and response for the test framework.
 ///
-/// The recording is only saved if the `TRIAGEBOT_TEST_RECORD` environment
+/// The recording is only saved if the `TRIAGEBOT_TEST_RECORD_DIR` environment
 /// variable is set.
 pub fn record_request(info: Option<RequestInfo>, status: StatusCode, body: &[u8]) {
     let Some(info) = info else { return };
