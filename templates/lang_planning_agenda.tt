@@ -23,6 +23,8 @@ tags: planning-meeting
 
 {{-issues::render(issues=proposed_meetings, indent="", empty="None.")}}
 
+Please update these in https://github.com/orgs/rust-lang/projects/31/views/7.
+
 ## Active initiatives
 
 {{-issues_heading::render(issues=active_initiatives)}}
