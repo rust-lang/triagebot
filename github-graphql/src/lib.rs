@@ -270,3 +270,92 @@ pub mod docs_update_queries {
 mod schema {
     cynic::use_schema!("src/github.graphql");
 }
+
+#[cynic::schema_for_derives(file = "src/github.graphql", module = "schema")]
+pub mod project_items_by_status {
+    use super::queries::{PageInfo, Uri};
+    use super::schema;
+
+    #[derive(cynic::QueryVariables, Debug, Clone)]
+    pub struct Arguments {
+        pub project_number: i32,
+        pub after: Option<String>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(variables = "Arguments")]
+    pub struct Query {
+        #[arguments(login: "rust-lang")]
+        pub organization: Option<Organization>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(variables = "Arguments")]
+    pub struct Organization {
+        #[arguments(number: $project_number)]
+        pub project_v2: Option<ProjectV2>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(variables = "Arguments")]
+    pub struct ProjectV2 {
+        #[arguments(first: 100, after: $after)]
+        pub items: ProjectV2ItemConnection,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    pub struct ProjectV2ItemConnection {
+        pub nodes: Option<Vec<Option<ProjectV2Item>>>,
+        pub page_info: PageInfo,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    pub struct ProjectV2Item {
+        pub content: Option<ProjectV2ItemContent>,
+        #[arguments(name = "Status")]
+        pub field_value_by_name: Option<ProjectV2ItemFieldValue>,
+    }
+
+    impl ProjectV2Item {
+        pub fn status(&self) -> &Option<ProjectV2ItemFieldValue> {
+            &self.field_value_by_name
+        }
+    }
+
+    #[derive(cynic::InlineFragments, Debug)]
+    pub enum ProjectV2ItemContent {
+        Issue(Issue),
+
+        #[cynic(fallback)]
+        Other,
+    }
+
+    #[derive(cynic::InlineFragments, Debug)]
+    pub enum ProjectV2ItemFieldValue {
+        ProjectV2ItemFieldSingleSelectValue(ProjectV2ItemFieldSingleSelectValue),
+
+        #[cynic(fallback)]
+        Other,
+    }
+
+    impl ProjectV2ItemFieldValue {
+        pub fn as_str(&self) -> Option<&str> {
+            Some(match self {
+                Self::ProjectV2ItemFieldSingleSelectValue(val) => val.name.as_deref()?,
+                _ => return None,
+            })
+        }
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    pub struct Issue {
+        pub title: String,
+        pub url: Uri,
+        pub number: i32,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    pub struct ProjectV2ItemFieldSingleSelectValue {
+        pub name: Option<String>,
+    }
+}
