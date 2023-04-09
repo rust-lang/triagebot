@@ -587,11 +587,7 @@ pub fn lang_planning<'a>() -> Box<dyn Action + Send + Sync> {
                     QueryMap {
                         name: "proposed_meetings",
                         kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open"), ("is", "issue")],
-                            include_labels: vec!["meeting-proposal"],
-                            exclude_labels: vec!["meeting-scheduled"],
-                        }),
+                        query: Arc::new(github::ProposedDesignMeetings),
                     },
                 ],
             },
