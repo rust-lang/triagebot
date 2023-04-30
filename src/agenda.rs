@@ -527,6 +527,15 @@ pub fn lang<'a>() -> Box<dyn Action + Send + Sync> {
                         }),
                     },
                     QueryMap {
+                        name: "waiting_on_lang_team",
+                        kind: QueryKind::List,
+                        query: Arc::new(github::Query {
+                            filters: vec![("state", "open")],
+                            include_labels: vec!["S-waiting-on-team", "T-lang"],
+                            exclude_labels: vec![],
+                        }),
+                    },
+                    QueryMap {
                         name: "proposed_fcp",
                         kind: QueryKind::List,
                         query: Arc::new(github::Query {
