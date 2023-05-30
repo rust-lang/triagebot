@@ -34,7 +34,7 @@ postgres-native-tls = "0.5.0"
 native-tls = "0.2"
 serde_path_to_error = "0.1.2"
 octocrab = "0.9.1"
-comrak = "0.8.2"
+comrak = { version = "0.8.2", default-features = false }
 route-recognizer = "0.3.0"
 cynic = { version = "2.0.0" }
 itertools = "0.10.2"

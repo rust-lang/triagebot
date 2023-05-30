@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::{future::BoxFuture, FutureExt};
@@ -2146,6 +2146,98 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
             .collect();
 
         Ok(prs)
+    }
+}
+
+async fn project_items_by_status(
+    client: &GithubClient,
+    status_filter: impl Fn(Option<&str>) -> bool,
+) -> anyhow::Result<Vec<github_graphql::project_items_by_status::ProjectV2ItemContent>> {
+    use cynic::QueryBuilder;
+    use github_graphql::project_items_by_status;
+
+    const DESIGN_MEETING_PROJECT: i32 = 31;
+    let mut args = project_items_by_status::Arguments {
+        project_number: DESIGN_MEETING_PROJECT,
+        after: None,
+    };
+
+    let mut all_items = vec![];
+    loop {
+        let query = project_items_by_status::Query::build(args.clone());
+        let req = client.post(Repository::GITHUB_GRAPHQL_API_URL);
+        let req = req.json(&query);
+
+        let (resp, req_dbg) = client._send_req(req).await?;
+        let data = resp
+            .json::<cynic::GraphQlResponse<project_items_by_status::Query>>()
+            .await
+            .context(req_dbg)?;
+        if let Some(errors) = data.errors {
+            anyhow::bail!("There were graphql errors. {:?}", errors);
+        }
+        let items = data
+            .data
+            .ok_or_else(|| anyhow!("No data returned."))?
+            .organization
+            .ok_or_else(|| anyhow!("Organization not found."))?
+            .project_v2
+            .ok_or_else(|| anyhow!("Project not found."))?
+            .items;
+        let filtered = items
+            .nodes
+            .ok_or_else(|| anyhow!("Malformed response."))?
+            .into_iter()
+            .flatten()
+            .filter(|item| {
+                status_filter(
+                    item.field_value_by_name
+                        .as_ref()
+                        .and_then(|status| status.as_str()),
+                )
+            })
+            .flat_map(|item| item.content);
+        all_items.extend(filtered);
+
+        let page_info = items.page_info;
+        if !page_info.has_next_page || page_info.end_cursor.is_none() {
+            break;
+        }
+        args.after = page_info.end_cursor;
+    }
+
+    Ok(all_items)
+}
+
+pub struct ProposedDesignMeetings;
+#[async_trait]
+impl IssuesQuery for ProposedDesignMeetings {
+    async fn query<'a>(
+        &'a self,
+        _repo: &'a Repository,
+        _include_fcp_details: bool,
+        client: &'a GithubClient,
+    ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
+        use github_graphql::project_items_by_status::ProjectV2ItemContent;
+
+        let items =
+            project_items_by_status(client, |status| status == Some("Needs triage")).await?;
+        Ok(items
+            .into_iter()
+            .flat_map(|item| match item {
+                ProjectV2ItemContent::Issue(issue) => Some(crate::actions::IssueDecorator {
+                    assignees: String::new(),
+                    number: issue.number.try_into().unwrap(),
+                    fcp_details: None,
+                    html_url: issue.url.0,
+                    title: issue.title,
+                    repo_name: String::new(),
+                    labels: String::new(),
+                    updated_at_hts: String::new(),
+                }),
+                _ => None,
+            })
+            .collect())
     }
 }
 

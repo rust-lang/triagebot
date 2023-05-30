@@ -362,6 +362,15 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         }),
                     },
                     QueryMap {
+                        name: "p_critical_t_types",
+                        kind: QueryKind::List,
+                        query: Arc::new(github::Query {
+                            filters: vec![("state", "open")],
+                            include_labels: vec!["T-types", "P-critical"],
+                            exclude_labels: vec![],
+                        }),
+                    },
+                    QueryMap {
                         name: "p_critical_t_rustdoc",
                         kind: QueryKind::List,
                         query: Arc::new(github::Query {
@@ -518,6 +527,15 @@ pub fn lang<'a>() -> Box<dyn Action + Send + Sync> {
                         }),
                     },
                     QueryMap {
+                        name: "waiting_on_lang_team",
+                        kind: QueryKind::List,
+                        query: Arc::new(github::Query {
+                            filters: vec![("state", "open")],
+                            include_labels: vec!["S-waiting-on-team", "T-lang"],
+                            exclude_labels: vec![],
+                        }),
+                    },
+                    QueryMap {
                         name: "proposed_fcp",
                         kind: QueryKind::List,
                         query: Arc::new(github::Query {
@@ -578,11 +596,7 @@ pub fn lang_planning<'a>() -> Box<dyn Action + Send + Sync> {
                     QueryMap {
                         name: "proposed_meetings",
                         kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open"), ("is", "issue")],
-                            include_labels: vec!["meeting-proposal"],
-                            exclude_labels: vec!["meeting-scheduled"],
-                        }),
+                        query: Arc::new(github::ProposedDesignMeetings),
                     },
                 ],
             },

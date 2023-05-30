@@ -41,8 +41,14 @@ mod tests {
 const NEW_USER_WELCOME_MESSAGE: &str = "Thanks for the pull request, and welcome! \
 The Rust team is excited to review your changes, and you should hear from {who} soon.";
 
-const CONTRIBUTION_MESSAGE: &str = "\
-Please see [the contribution instructions]({contributing_url}) for more information.";
+const CONTRIBUTION_MESSAGE: &str = "Please see [the contribution \
+instructions]({contributing_url}) for more information. Namely, in order to ensure the \
+minimum review times lag, PR authors and assigned reviewers should ensure that the review \
+label (`S-waiting-on-review` and `S-waiting-on-author`) stays updated, invoking these commands \
+when appropriate:
+
+- `@rustbot author`: the review is finished, PR author should check the comments and take action accordingly
+- `@rustbot review`: the author is ready for a review, this PR will be queued again in the reviewer's queue";
 
 const WELCOME_WITH_REVIEWER: &str = "@{assignee} (or someone else)";
 
