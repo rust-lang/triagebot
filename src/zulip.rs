@@ -232,21 +232,36 @@ struct ZulipMessage {
     display_recipient: String, // ex. "t-compiler/major changes"
 }
 
-async fn get_zulip_msg(ctx: &Context, msg_id: Option<u64>) -> anyhow::Result<ZulipReply> {
+// TODO: figure out additional params to link to the exact message in a Zulip topic
+async fn get_zulip_msg(
+    ctx: &Context,
+    topic: Option<String>,
+    msg_id: Option<u64>,
+) -> anyhow::Result<ZulipReply> {
     let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
     let zulip_user = env::var("ZULIP_USER").expect("ZULIP_USER");
+    let mut url = format!(
+        "{}/api/v1/messages?apply_markdown=false&num_before=0&num_after=1&anchor=oldest",
+        ZULIP_HOST
+    );
 
-    let mut url = format!("{}/api/v1/messages?apply_markdown=false", ZULIP_HOST);
-
-    // TODO: Either pick a specific message of a Zulip topic or the first one
+    // Either return a specific message or the first one (the oldest) of a topic
     if msg_id.is_some() {
         url = format!(
-            "{}&num_before=0&num_after=0&anchor={}",
+            "{}&narrow=[{{\"operand\":\"{}\", \"operator\":\"id\"}}]",
             url,
             msg_id.unwrap()
         )
+    } else if topic.is_some() {
+        url = format!(
+            "{}&narrow=[{{\"operand\":\"{}\", \"operator\":\"topic\"}}]",
+            url,
+            topic.unwrap()
+        )
     } else {
-        url = format!("{}&num_before=1&num_after=1&anchor=oldest", url)
+        return Err(anyhow::Error::msg(
+            "Zulip message ID and topic cannot be both empty",
+        ));
     }
 
     let zulip_resp = ctx
@@ -269,8 +284,8 @@ async fn add_comment_to_issue(
     mut words: impl Iterator<Item = &str> + std::fmt::Debug,
     ty: CommentType,
 ) -> anyhow::Result<String> {
-    // retrieve the original Zulip topic and rebuild the complete URL to it
-    let zulip_msg = get_zulip_msg(ctx, None).await?;
+    // retrieve the original Zulip topic and rebuild the complete URL
+    let zulip_msg = get_zulip_msg(ctx, message.subject.clone(), None).await?;
 
     if zulip_msg.messages.is_empty() {
         return Ok(serde_json::to_string(&Response {
