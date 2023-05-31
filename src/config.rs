@@ -163,6 +163,8 @@ pub(crate) struct AutolabelLabelConfig {
     pub(crate) trigger_files: Vec<String>,
     #[serde(default)]
     pub(crate) new_pr: bool,
+    #[serde(default)]
+    pub(crate) first_contrib: bool,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -321,6 +323,9 @@ mod tests {
                 "C-*"
             ]
 
+			[autolabel."new-contributor"]
+			first_contrib = true
+
             [assign]
 
             [note]
@@ -389,7 +394,18 @@ mod tests {
                 major_change: None,
                 glacier: None,
                 close: None,
-                autolabel: None,
+                autolabel: Some(AutolabelConfig {
+                    labels: HashMap::from([(
+                        "new-contributor".to_owned(),
+                        AutolabelLabelConfig {
+                            first_contrib: true,
+                            trigger_labels: Vec::new(),
+                            exclude_labels: Vec::new(),
+                            trigger_files: Vec::new(),
+                            new_pr: false
+                        }
+                    )])
+                }),
                 notify_zulip: None,
                 github_releases: None,
                 review_submitted: None,

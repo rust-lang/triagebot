@@ -72,6 +72,15 @@ pub(super) async fn parse_input(
                     autolabels.push(Label {
                         name: label.to_owned(),
                     });
+                } else if cfg.first_contrib // If we didn't had this 'else', we could push the same label 2 times
+                    && ctx
+                        .github
+                        .is_new_contributor(&event.repository, &event.issue.user.login)
+                        .await
+                {
+                    autolabels.push(Label {
+                        name: label.to_owned(),
+                    })
                 }
             }
             if !autolabels.is_empty() {
