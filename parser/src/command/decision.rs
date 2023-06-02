@@ -1,11 +1,17 @@
 //! The decision process command parser.
 //!
-//! This can parse arbitrary input, giving the user to be assigned.
+//! This can parse arbitrary input, giving the command with which we would like
+//! to vote that will potentially change the issue in its resolution,
+//! reversibility and/or more.
+//!
+//! In the first one, we must also assign a valid team to the issue decision process.
 //!
 //! The grammar is as follows:
 //!
 //! ```text
-//! Command: `@bot merge`, `@bot hold`, `@bot restart`, `@bot dissent`, `@bot stabilize` or `@bot close`.
+//! Command: `@bot merge`, `@bot hold`, `@bot close`
+//!
+//! First comment: `@bot merge lang`, `@bot hold lang`
 //! ```
 
 use std::fmt;

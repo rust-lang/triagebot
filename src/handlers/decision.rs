@@ -161,7 +161,8 @@ fn build_status_comment(
         match history.get(user) {
             Some(statuses) => {
                 for status in statuses {
-                    let status_item = format!(" ~~{}~~ ", status.resolution);
+                    let status_item =
+                        format!(" [~~{}~~]({}) ", status.resolution, status.comment_id);
                     user_statuses.push_str(&status_item);
                 }
             }
@@ -170,7 +171,7 @@ fn build_status_comment(
 
         // current status
         let user_resolution = match status {
-            Some(status) => format!("**{}**", status.resolution),
+            Some(status) => format!("[**{}**]({})", status.resolution, status.comment_id),
             _ => "".to_string(),
         };
 
@@ -190,13 +191,14 @@ mod tests {
 
     factori!(UserStatus, {
         default {
-            comment_id = "the-comment-id".to_string(),
+            comment_id = "https://some-comment-id-for-merge.com".to_string(),
             text = "this is my argument for making this decision".to_string(),
             reversibility = Reversibility::Reversible,
             resolution = Resolution::Merge
         }
 
         mixin hold {
+            comment_id = "https://some-comment-id-for-hold.com".to_string(),
             resolution = Resolution::Hold
         }
     });
@@ -228,8 +230,8 @@ mod tests {
             .expect("it shouldn't fail building the message");
         let expected_comment = "| Team member | State |\n\
         |-------------|-------|\n\
-        | @Barbara | ~~hold~~  ~~merge~~  **merge** |\n\
-        | @Niklaus | ~~merge~~  ~~hold~~  **merge** |"
+        | @Barbara | [~~hold~~](https://some-comment-id-for-hold.com)  [~~merge~~](https://some-comment-id-for-merge.com)  [**merge**](https://some-comment-id-for-merge.com) |\n\
+        | @Niklaus | [~~merge~~](https://some-comment-id-for-merge.com)  [~~hold~~](https://some-comment-id-for-hold.com)  [**merge**](https://some-comment-id-for-merge.com) |"
             .to_string();
 
         assert_eq!(build_result, expected_comment);
@@ -267,8 +269,8 @@ mod tests {
             .expect("it shouldn't fail building the message");
         let expected_comment = "| Team member | State |\n\
         |-------------|-------|\n\
-        | @Barbara | ~~hold~~  ~~merge~~  **merge** |\n\
-        | @Niklaus | ~~merge~~  ~~hold~~  **merge** |\n\
+        | @Barbara | [~~hold~~](https://some-comment-id-for-hold.com)  [~~merge~~](https://some-comment-id-for-merge.com)  [**merge**](https://some-comment-id-for-merge.com) |\n\
+        | @Niklaus | [~~merge~~](https://some-comment-id-for-merge.com)  [~~hold~~](https://some-comment-id-for-hold.com)  [**merge**](https://some-comment-id-for-merge.com) |\n\
         | @Tom |  |"
             .to_string();
 
@@ -330,8 +332,8 @@ mod tests {
             .expect("it shouldn't fail building the message");
         let expected_comment = "| Team member | State |\n\
         |-------------|-------|\n\
-        | @Barbara | **merge** |\n\
-        | @Niklaus | **merge** |\
+        | @Barbara | [**merge**](https://some-comment-id-for-merge.com) |\n\
+        | @Niklaus | [**merge**](https://some-comment-id-for-merge.com) |\
         "
         .to_string();
 
