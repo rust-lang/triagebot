@@ -779,27 +779,6 @@ impl Issue {
         Ok(())
     }
 
-    pub async fn merge(&self, client: &GithubClient) -> anyhow::Result<()> {
-        let merge_url = format!("{}/pulls/{}/merge", self.repository().url(), self.number);
-
-        // change defaults by reading from somewhere, maybe in .toml?
-        #[derive(serde::Serialize)]
-        struct MergeIssue<'a> {
-            commit_title: &'a str,
-            merge_method: &'a str,
-        }
-
-        client
-            ._send_req(client.put(&merge_url).json(&MergeIssue {
-                commit_title: "Merged by the bot!",
-                merge_method: "merge",
-            }))
-            .await
-            .context("failed to merge issue")?;
-
-        Ok(())
-    }
-
     /// Returns the diff in this event, for Open and Synchronize events for now.
     pub async fn diff(&self, client: &GithubClient) -> anyhow::Result<Option<String>> {
         let (before, after) = if let (Some(base), Some(head)) = (&self.base, &self.head) {

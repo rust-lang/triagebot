@@ -4,10 +4,13 @@
 
 // Further info could be find in src/jobs.rs
 use super::Context;
+use crate::db::issue_decision_state::get_issue_decision_state;
 use crate::github::*;
 use crate::handlers::decision::{DecisionProcessActionMetadata, DECISION_PROCESS_JOB_NAME};
+use crate::interactions::PingComment;
 use parser::command::decision::Resolution::{Hold, Merge};
 use reqwest::Client;
+use tokio_postgres::Client as DbClient;
 use tracing as log;
 
 pub async fn handle_job(
@@ -22,7 +25,8 @@ pub async fn handle_job(
             Ok(())
         }
         matched_name if *matched_name == DECISION_PROCESS_JOB_NAME.to_string() => {
-            decision_process_handler(&metadata).await
+            let db = ctx.db.get().await;
+            decision_process_handler(&db, &metadata).await
         }
         _ => default(&name, &metadata),
     }
@@ -38,7 +42,10 @@ fn default(name: &String, metadata: &serde_json::Value) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn decision_process_handler(metadata: &serde_json::Value) -> anyhow::Result<()> {
+async fn decision_process_handler(
+    db: &DbClient,
+    metadata: &serde_json::Value,
+) -> anyhow::Result<()> {
     tracing::trace!(
         "handle_job fell into decision process case: (metadata={:?})",
         metadata
@@ -50,7 +57,22 @@ async fn decision_process_handler(metadata: &serde_json::Value) -> anyhow::Resul
 
     match gh_client.json::<Issue>(request).await {
         Ok(issue) => match metadata.status {
-            Merge => issue.merge(&gh_client).await?,
+            Merge => {
+                let users: Vec<String> = get_issue_decision_state(&db, &issue.number)
+                    .await
+                    .unwrap()
+                    .current
+                    .into_keys()
+                    .collect();
+                let users_ref: Vec<&str> = users.iter().map(|x| x.as_ref()).collect();
+
+                let cmnt = PingComment::new(
+                    &issue,
+                    &users_ref,
+                    "The final comment period has resolved, with a decision to **merge**. Ping involved once again.",
+                );
+                cmnt.post(&gh_client).await?;
+            }
             Hold => issue.close(&gh_client).await?,
         },
         Err(e) => log::error!(
