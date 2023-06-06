@@ -2169,9 +2169,30 @@ async fn project_items_by_status(
     Ok(all_items)
 }
 
-pub struct ProposedDesignMeetings;
+pub enum DesignMeetingStatus {
+    Proposed,
+    Scheduled,
+    Done,
+    Empty,
+}
+
+impl DesignMeetingStatus {
+    fn query_str(&self) -> Option<&str> {
+        match self {
+            DesignMeetingStatus::Proposed => Some("Needs triage"),
+            DesignMeetingStatus::Scheduled => Some("Scheduled"),
+            DesignMeetingStatus::Done => Some("Done"),
+            DesignMeetingStatus::Empty => None,
+        }
+    }
+}
+
+pub struct DesignMeetings {
+    pub with_status: DesignMeetingStatus,
+}
+
 #[async_trait]
-impl IssuesQuery for ProposedDesignMeetings {
+impl IssuesQuery for DesignMeetings {
     async fn query<'a>(
         &'a self,
         _repo: &'a Repository,
@@ -2181,7 +2202,8 @@ impl IssuesQuery for ProposedDesignMeetings {
         use github_graphql::project_items_by_status::ProjectV2ItemContent;
 
         let items =
-            project_items_by_status(client, |status| status == Some("Needs triage")).await?;
+            project_items_by_status(client, |status| status == self.with_status.query_str())
+                .await?;
         Ok(items
             .into_iter()
             .flat_map(|item| match item {
