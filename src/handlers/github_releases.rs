@@ -132,7 +132,7 @@ async fn load_changelog(
         .await?
         .ok_or_else(|| anyhow::Error::msg("missing file"))?;
 
-    Ok(String::from_utf8(resp)?)
+    Ok(String::from_utf8(resp.to_vec())?)
 }
 
 async fn load_paginated<T, R, F>(ctx: &Context, url: &str, key: F) -> anyhow::Result<HashMap<R, T>>

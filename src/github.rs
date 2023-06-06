@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
+use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::{future::BoxFuture, FutureExt};
 use hyper::header::HeaderValue;
@@ -21,9 +22,9 @@ pub struct User {
 }
 
 impl GithubClient {
-    async fn _send_req(&self, req: RequestBuilder) -> anyhow::Result<(Response, String)> {
+    async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<(Bytes, String)> {
         const MAX_ATTEMPTS: usize = 2;
-        log::debug!("_send_req with {:?}", req);
+        log::debug!("send_req with {:?}", req);
         let req_dbg = format!("{:?}", req);
         let req = req
             .build()
@@ -33,10 +34,17 @@ impl GithubClient {
         if let Some(sleep) = Self::needs_retry(&resp).await {
             resp = self.retry(req, sleep, MAX_ATTEMPTS).await?;
         }
+        let maybe_err = resp.error_for_status_ref().err();
+        let body = resp
+            .bytes()
+            .await
+            .with_context(|| format!("failed to read response body {req_dbg}"))?;
+        if let Some(e) = maybe_err {
+            return Err(anyhow::Error::new(e))
+                .with_context(|| format!("response: {}", String::from_utf8_lossy(&body)));
+        }
 
-        resp.error_for_status_ref()?;
-
-        Ok((resp, req_dbg))
+        Ok((body, req_dbg))
     }
 
     async fn needs_retry(resp: &Response) -> Option<Duration> {
@@ -151,27 +159,12 @@ impl GithubClient {
         .boxed()
     }
 
-    async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<Vec<u8>> {
-        let (mut resp, req_dbg) = self._send_req(req).await?;
-
-        let mut body = Vec::new();
-        while let Some(chunk) = resp.chunk().await.transpose() {
-            let chunk = chunk
-                .context("reading stream failed")
-                .map_err(anyhow::Error::from)
-                .context(req_dbg.clone())?;
-            body.extend_from_slice(&chunk);
-        }
-
-        Ok(body)
-    }
-
     pub async fn json<T>(&self, req: RequestBuilder) -> anyhow::Result<T>
     where
         T: serde::de::DeserializeOwned,
     {
-        let (resp, req_dbg) = self._send_req(req).await?;
-        Ok(resp.json().await.context(req_dbg)?)
+        let (body, _req_dbg) = self.send_req(req).await?;
+        Ok(serde_json::from_slice(&body)?)
     }
 }
 
@@ -412,8 +405,8 @@ impl IssueRepository {
     async fn has_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<bool> {
         #[allow(clippy::redundant_pattern_matching)]
         let url = format!("{}/labels/{}", self.url(), label);
-        match client._send_req(client.get(&url)).await {
-            Ok((_, _)) => Ok(true),
+        match client.send_req(client.get(&url)).await {
+            Ok(_) => Ok(true),
             Err(e) => {
                 if e.downcast_ref::<reqwest::Error>()
                     .map_or(false, |e| e.status() == Some(StatusCode::NOT_FOUND))
@@ -493,7 +486,7 @@ impl Issue {
             body: &'a str,
         }
         client
-            ._send_req(client.patch(&edit_url).json(&ChangedIssue { body }))
+            .send_req(client.patch(&edit_url).json(&ChangedIssue { body }))
             .await
             .context("failed to edit issue body")?;
         Ok(())
@@ -511,7 +504,7 @@ impl Issue {
             body: &'a str,
         }
         client
-            ._send_req(
+            .send_req(
                 client
                     .patch(&comment_url)
                     .json(&NewComment { body: new_body }),
@@ -527,7 +520,7 @@ impl Issue {
             body: &'a str,
         }
         client
-            ._send_req(client.post(&self.comments_url).json(&PostComment { body }))
+            .send_req(client.post(&self.comments_url).json(&PostComment { body }))
             .await
             .context("failed to post comment")?;
         Ok(())
@@ -553,7 +546,7 @@ impl Issue {
         }
 
         client
-            ._send_req(client.delete(&url))
+            .send_req(client.delete(&url))
             .await
             .context("failed to delete label")?;
 
@@ -610,7 +603,7 @@ impl Issue {
         }
 
         client
-            ._send_req(client.post(&url).json(&LabelsReq {
+            .send_req(client.post(&url).json(&LabelsReq {
                 labels: known_labels,
             }))
             .await
@@ -661,7 +654,7 @@ impl Issue {
             assignees: &'a [&'a str],
         }
         client
-            ._send_req(client.delete(&url).json(&AssigneeReq {
+            .send_req(client.delete(&url).json(&AssigneeReq {
                 assignees: &assignees[..],
             }))
             .await
@@ -754,7 +747,7 @@ impl Issue {
         }
         let url = format!("{}/issues/{}", self.repository().url(), self.number);
         client
-            ._send_req(client.patch(&url).json(&SetMilestone {
+            .send_req(client.patch(&url).json(&SetMilestone {
                 milestone: milestone_no,
             }))
             .await
@@ -769,7 +762,7 @@ impl Issue {
             state: &'a str,
         }
         client
-            ._send_req(
+            .send_req(
                 client
                     .patch(&edit_url)
                     .json(&CloseIssue { state: "closed" }),
@@ -794,8 +787,9 @@ impl Issue {
             after
         ));
         req = req.header("Accept", "application/vnd.github.v3.diff");
-        let diff = client.send_req(req).await?;
-        Ok(Some(String::from(String::from_utf8_lossy(&diff))))
+        let (diff, _) = client.send_req(req).await?;
+        let body = String::from_utf8_lossy(&diff).to_string();
+        Ok(Some(body))
     }
 
     /// Returns the commits from this pull request (no commits are returned if this `Issue` is not
@@ -1235,7 +1229,7 @@ impl Repository {
     ) -> anyhow::Result<()> {
         let url = format!("{}/git/refs/{}", self.url(), refname);
         client
-            ._send_req(client.patch(&url).json(&serde_json::json!({
+            .json(client.patch(&url).json(&serde_json::json!({
                 "sha": sha,
                 "force": true,
             })))
@@ -1494,7 +1488,7 @@ impl Repository {
     pub async fn merge_upstream(&self, client: &GithubClient, branch: &str) -> anyhow::Result<()> {
         let url = format!("{}/merge-upstream", self.url());
         client
-            ._send_req(client.post(&url).json(&serde_json::json!({
+            .send_req(client.post(&url).json(&serde_json::json!({
                 "branch": branch,
             })))
             .await
@@ -1783,7 +1777,7 @@ impl GithubClient {
         repo: &str,
         branch: &str,
         path: &str,
-    ) -> anyhow::Result<Option<Vec<u8>>> {
+    ) -> anyhow::Result<Option<Bytes>> {
         let url = format!(
             "https://raw.githubusercontent.com/{}/{}/{}",
             repo, branch, path
@@ -1793,20 +1787,14 @@ impl GithubClient {
         let req = req
             .build()
             .with_context(|| format!("failed to build request {:?}", req_dbg))?;
-        let mut resp = self.client.execute(req).await.context(req_dbg.clone())?;
+        let resp = self.client.execute(req).await.context(req_dbg.clone())?;
         let status = resp.status();
+        let body = resp
+            .bytes()
+            .await
+            .with_context(|| format!("failed to read response body {req_dbg}"))?;
         match status {
-            StatusCode::OK => {
-                let mut buf = Vec::with_capacity(resp.content_length().unwrap_or(4) as usize);
-                while let Some(chunk) = resp.chunk().await.transpose() {
-                    let chunk = chunk
-                        .context("reading stream failed")
-                        .map_err(anyhow::Error::from)
-                        .context(req_dbg.clone())?;
-                    buf.extend_from_slice(&chunk);
-                }
-                Ok(Some(buf))
-            }
+            StatusCode::OK => Ok(Some(body)),
             StatusCode::NOT_FOUND => Ok(None),
             status => anyhow::bail!("failed to GET {}: {}", url, status),
         }
@@ -2010,11 +1998,8 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
             let req = client.post(Repository::GITHUB_GRAPHQL_API_URL);
             let req = req.json(&query);
 
-            let (resp, req_dbg) = client._send_req(req).await?;
-            let data = resp
-                .json::<cynic::GraphQlResponse<queries::LeastRecentlyReviewedPullRequests>>()
-                .await
-                .context(req_dbg)?;
+            let data: cynic::GraphQlResponse<queries::LeastRecentlyReviewedPullRequests> =
+                client.json(req).await?;
             if let Some(errors) = data.errors {
                 anyhow::bail!("There were graphql errors. {:?}", errors);
             }
@@ -2147,11 +2132,7 @@ async fn project_items_by_status(
         let req = client.post(Repository::GITHUB_GRAPHQL_API_URL);
         let req = req.json(&query);
 
-        let (resp, req_dbg) = client._send_req(req).await?;
-        let data = resp
-            .json::<cynic::GraphQlResponse<project_items_by_status::Query>>()
-            .await
-            .context(req_dbg)?;
+        let data: cynic::GraphQlResponse<project_items_by_status::Query> = client.json(req).await?;
         if let Some(errors) = data.errors {
             anyhow::bail!("There were graphql errors. {:?}", errors);
         }
