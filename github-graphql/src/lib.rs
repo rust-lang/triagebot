@@ -7,8 +7,10 @@
 pub mod queries {
     use super::schema;
 
+    pub type Date = chrono::NaiveDate;
     pub type DateTime = chrono::DateTime<chrono::Utc>;
 
+    cynic::impl_scalar!(Date, schema::Date);
     cynic::impl_scalar!(DateTime, schema::DateTime);
 
     #[derive(cynic::QueryVariables, Debug, Clone)]
@@ -272,8 +274,8 @@ mod schema {
 }
 
 #[cynic::schema_for_derives(file = "src/github.graphql", module = "schema")]
-pub mod project_items_by_status {
-    use super::queries::{PageInfo, Uri};
+pub mod project_items {
+    use super::queries::{Date, PageInfo, Uri};
     use super::schema;
 
     #[derive(cynic::QueryVariables, Debug, Clone)]
@@ -312,13 +314,25 @@ pub mod project_items_by_status {
     #[derive(cynic::QueryFragment, Debug)]
     pub struct ProjectV2Item {
         pub content: Option<ProjectV2ItemContent>,
+
+        // Currently we hard code the field names we care about here.
+        #[cynic(rename = "fieldValueByName")]
         #[arguments(name = "Status")]
-        pub field_value_by_name: Option<ProjectV2ItemFieldValue>,
+        pub status: Option<ProjectV2ItemFieldValue>,
+        #[cynic(rename = "fieldValueByName")]
+        #[arguments(name = "Date")]
+        pub date: Option<ProjectV2ItemFieldValue>,
     }
 
     impl ProjectV2Item {
-        pub fn status(&self) -> &Option<ProjectV2ItemFieldValue> {
-            &self.field_value_by_name
+        pub fn status(&self) -> Option<&str> {
+            let Some(ref status) = self.status else { return None };
+            status.as_str()
+        }
+
+        pub fn date(&self) -> Option<Date> {
+            let Some(ref date) = self.date else { return None };
+            date.as_date()
         }
     }
 
@@ -333,6 +347,7 @@ pub mod project_items_by_status {
     #[derive(cynic::InlineFragments, Debug)]
     pub enum ProjectV2ItemFieldValue {
         ProjectV2ItemFieldSingleSelectValue(ProjectV2ItemFieldSingleSelectValue),
+        ProjectV2ItemFieldDateValue(ProjectV2ItemFieldDateValue),
 
         #[cynic(fallback)]
         Other,
@@ -344,6 +359,13 @@ pub mod project_items_by_status {
                 Self::ProjectV2ItemFieldSingleSelectValue(val) => val.name.as_deref()?,
                 _ => return None,
             })
+        }
+
+        pub fn as_date(&self) -> Option<Date> {
+            match self {
+                Self::ProjectV2ItemFieldDateValue(val) => val.date,
+                _ => None,
+            }
         }
     }
 
@@ -357,5 +379,10 @@ pub mod project_items_by_status {
     #[derive(cynic::QueryFragment, Debug)]
     pub struct ProjectV2ItemFieldSingleSelectValue {
         pub name: Option<String>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    pub struct ProjectV2ItemFieldDateValue {
+        pub date: Option<Date>,
     }
 }
