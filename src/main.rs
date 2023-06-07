@@ -324,7 +324,8 @@ fn spawn_job_scheduler() {
             match res.await {
                 Err(err) if err.is_panic() => {
                     /* handle panic in above task, re-launching */
-                    tracing::trace!("schedule_jobs task died (error={})", err);
+                    tracing::error!("schedule_jobs task died (error={err})");
+                    tokio::time::sleep(std::time::Duration::new(5, 0)).await;
                 }
                 _ => unreachable!(),
             }
@@ -359,7 +360,8 @@ fn spawn_job_runner(ctx: Arc<Context>) {
             match res.await {
                 Err(err) if err.is_panic() => {
                     /* handle panic in above task, re-launching */
-                    tracing::trace!("run_scheduled_jobs task died (error={})", err);
+                    tracing::error!("run_scheduled_jobs task died (error={err})");
+                    tokio::time::sleep(std::time::Duration::new(5, 0)).await;
                 }
                 _ => unreachable!(),
             }
