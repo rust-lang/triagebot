@@ -5,7 +5,6 @@ use crate::jobs::Job;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use reqwest::Client;
 use std::fmt::Write;
 
 /// This is the repository where the commits will be created.
@@ -66,7 +65,7 @@ impl Job for DocsUpdateJob {
 }
 
 pub async fn docs_update() -> Result<Option<Issue>> {
-    let gh = GithubClient::new_with_default_token(Client::new());
+    let gh = GithubClient::new_from_env();
     let dest_repo = gh.repository(DEST_REPO).await?;
     let work_repo = gh.repository(WORK_REPO).await?;
 
