@@ -5,7 +5,6 @@ use crate::github::{self, GitTreeEntry, GithubClient, Issue, Repository};
 use anyhow::Context;
 use anyhow::Result;
 use cron::Schedule;
-use reqwest::Client;
 use std::fmt::Write;
 use std::str::FromStr;
 
@@ -63,7 +62,7 @@ pub async fn handle_job() -> Result<()> {
 }
 
 pub async fn docs_update() -> Result<Option<Issue>> {
-    let gh = GithubClient::new_with_default_token(Client::new());
+    let gh = GithubClient::new_from_env();
     let work_repo = gh.repository(WORK_REPO).await?;
     work_repo
         .merge_upstream(&gh, &work_repo.default_branch)

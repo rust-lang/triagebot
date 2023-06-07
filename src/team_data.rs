@@ -4,7 +4,8 @@ use rust_team_data::v1::{Teams, ZulipMapping, BASE_URL};
 use serde::de::DeserializeOwned;
 
 async fn by_url<T: DeserializeOwned>(client: &GithubClient, path: &str) -> anyhow::Result<T> {
-    let url = format!("{}{}", BASE_URL, path);
+    let base = std::env::var("TEAMS_API_URL").unwrap_or(BASE_URL.to_string());
+    let url = format!("{}{}", base, path);
     for _ in 0i32..3 {
         let map: Result<T, _> = client.json(client.raw().get(&url)).await;
         match map {
