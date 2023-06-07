@@ -1,0 +1,12 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/repos/ehuss/triagebot-test/labels/does-not-exist",
+  "query": null,
+  "request_body": "",
+  "response_code": 404,
+  "response_body": {
+    "documentation_url": "https://docs.github.com/rest/reference/issues#get-a-label",
+    "message": "Not Found"
+  }
+}

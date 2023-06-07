@@ -1,0 +1,19 @@
+{
+  "kind": "Request",
+  "method": "POST",
+  "path": "/repos/ehuss/triagebot-test/issues/115/labels",
+  "query": null,
+  "request_body": "{\"labels\":[\"enhancement\"]}",
+  "response_code": 200,
+  "response_body": [
+    {
+      "color": "a2eeef",
+      "default": true,
+      "description": "New feature or request",
+      "id": 4271056230,
+      "name": "enhancement",
+      "node_id": "LA_kwDOHkK3Xc7-kyVm",
+      "url": "https://api.github.com/repos/ehuss/triagebot-test/labels/enhancement"
+    }
+  ]
+}

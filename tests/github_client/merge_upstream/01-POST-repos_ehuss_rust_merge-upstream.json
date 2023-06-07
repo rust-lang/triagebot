@@ -1,0 +1,13 @@
+{
+  "kind": "Request",
+  "method": "POST",
+  "path": "/repos/ehuss/rust/merge-upstream",
+  "query": null,
+  "request_body": "{\"branch\":\"docs-update\"}",
+  "response_code": 200,
+  "response_body": {
+    "base_branch": "rust-lang:master",
+    "merge_type": "fast-forward",
+    "message": "Successfully fetched and fast-forwarded from upstream rust-lang:master."
+  }
+}

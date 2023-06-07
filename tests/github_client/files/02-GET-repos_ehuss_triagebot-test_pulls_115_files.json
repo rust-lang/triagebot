@@ -1,0 +1,22 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/repos/ehuss/triagebot-test/pulls/115/files",
+  "query": null,
+  "request_body": "",
+  "response_code": 200,
+  "response_body": [
+    {
+      "additions": 2,
+      "blob_url": "https://github.com/ehuss/triagebot-test/blob/f39d908ac31a6bccc4a0bba0497d3626756dacd7/README.md",
+      "changes": 2,
+      "contents_url": "https://api.github.com/repos/ehuss/triagebot-test/contents/README.md?ref=f39d908ac31a6bccc4a0bba0497d3626756dacd7",
+      "deletions": 0,
+      "filename": "README.md",
+      "patch": "@@ -1,2 +1,4 @@\n # triagebot-test\n Triagebot testing\n+\n+test",
+      "raw_url": "https://github.com/ehuss/triagebot-test/raw/f39d908ac31a6bccc4a0bba0497d3626756dacd7/README.md",
+      "sha": "ce54f760cbea22cc8e2ba87f8e1d420348d051eb",
+      "status": "modified"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "kind": "Request",
+  "method": "PATCH",
+  "path": "/repos/ehuss/rust/git/refs/heads/docs-update",
+  "query": null,
+  "request_body": "{\"force\":true,\"sha\":\"88a426017fa4635ba42203c3b1d1c19f6a028184\"}",
+  "response_code": 200,
+  "response_body": {
+    "node_id": "MDM6UmVmMTE3NDY0NjI1OnJlZnMvaGVhZHMvZG9jcy11cGRhdGU=",
+    "object": {
+      "sha": "88a426017fa4635ba42203c3b1d1c19f6a028184",
+      "type": "commit",
+      "url": "https://api.github.com/repos/ehuss/rust/git/commits/88a426017fa4635ba42203c3b1d1c19f6a028184"
+    },
+    "ref": "refs/heads/docs-update",
+    "url": "https://api.github.com/repos/ehuss/rust/git/refs/heads/docs-update"
+  }
+}

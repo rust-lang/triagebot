@@ -26,6 +26,7 @@ pub mod payload;
 pub mod rfcbot;
 pub mod team;
 mod team_data;
+pub mod test_record;
 pub mod triage;
 pub mod zulip;
 

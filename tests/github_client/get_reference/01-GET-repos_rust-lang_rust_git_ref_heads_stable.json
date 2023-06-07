@@ -1,0 +1,18 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/repos/rust-lang/rust/git/ref/heads/stable",
+  "query": null,
+  "request_body": "",
+  "response_code": 200,
+  "response_body": {
+    "node_id": "MDM6UmVmNzI0NzEyOnJlZnMvaGVhZHMvc3RhYmxl",
+    "object": {
+      "sha": "fc594f15669680fa70d255faec3ca3fb507c3405",
+      "type": "commit",
+      "url": "https://api.github.com/repos/rust-lang/rust/git/commits/fc594f15669680fa70d255faec3ca3fb507c3405"
+    },
+    "ref": "refs/heads/stable",
+    "url": "https://api.github.com/repos/rust-lang/rust/git/refs/heads/stable"
+  }
+}

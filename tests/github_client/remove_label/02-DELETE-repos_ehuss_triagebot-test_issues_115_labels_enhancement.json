@@ -1,0 +1,9 @@
+{
+  "kind": "Request",
+  "method": "DELETE",
+  "path": "/repos/ehuss/triagebot-test/issues/115/labels/enhancement",
+  "query": null,
+  "request_body": "",
+  "response_code": 200,
+  "response_body": []
+}
