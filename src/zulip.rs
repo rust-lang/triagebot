@@ -22,6 +22,7 @@ pub struct Request {
 
 #[derive(Debug, serde::Deserialize)]
 struct Message {
+    id: u64,
     sender_id: u64,
     #[allow(unused)]
     recipient_id: u64,
@@ -45,7 +46,8 @@ struct ResponseOwned {
     content: String,
 }
 
-pub const BOT_EMAIL: &str = "triage-rust-lang-bot@zulipchat.com";
+const BOT_EMAIL: &str = "triage-rust-lang-bot@zulipchat.com";
+const ZULIP_HOST: &str = "https://rust-lang.zulipchat.com";
 
 pub async fn to_github_id(client: &GithubClient, zulip_id: usize) -> anyhow::Result<Option<i64>> {
     let map = crate::team_data::zulip_map(client).await?;
@@ -188,6 +190,15 @@ fn handle_command<'a>(
                                 })
                                 .unwrap(),
                             },
+                            // @triagebot prio #12345 P-high
+                            Some("prio") => return match add_comment_to_issue(&ctx, message_data, words, CommentType::AssignIssuePriority).await {
+                                Ok(r) => r,
+                                Err(e) => serde_json::to_string(&Response {
+                                    content: &format!("Failed to await at this time: {:?}", e),
+                                })
+                                .unwrap(),
+                            },
+
                             _ => {}
                         }
                     }
@@ -201,6 +212,145 @@ fn handle_command<'a>(
             },
         }
     })
+}
+
+#[derive(PartialEq)]
+enum CommentType {
+    AssignIssuePriority,
+}
+
+// https://docs.zulip.com/api/outgoing-webhooks#outgoing-webhook-format
+#[derive(serde::Deserialize, Debug)]
+struct ZulipReply {
+    messages: Vec<ZulipMessage>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct ZulipMessage {
+    subject: String, // ex.: "[weekly] 2023-04-13"
+    stream_id: u32,
+    display_recipient: String, // ex. "t-compiler/major changes"
+}
+
+// TODO: figure out additional params to link to the exact message in a Zulip topic
+async fn get_zulip_msg(
+    ctx: &Context,
+    topic: Option<String>,
+    msg_id: Option<u64>,
+) -> anyhow::Result<ZulipReply> {
+    let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
+    let zulip_user = env::var("ZULIP_USER").expect("ZULIP_USER");
+    let mut url = format!(
+        "{}/api/v1/messages?apply_markdown=false&num_before=0&num_after=1&anchor=oldest",
+        ZULIP_HOST
+    );
+
+    // Either return a specific message or the first one (the oldest) of a topic
+    if msg_id.is_some() {
+        url = format!(
+            "{}&narrow=[{{\"operand\":\"{}\", \"operator\":\"id\"}}]",
+            url,
+            msg_id.unwrap()
+        )
+    } else if topic.is_some() {
+        url = format!(
+            "{}&narrow=[{{\"operand\":\"{}\", \"operator\":\"topic\"}}]",
+            url,
+            topic.unwrap()
+        )
+    } else {
+        return Err(anyhow::Error::msg(
+            "Zulip message ID and topic cannot be both empty",
+        ));
+    }
+
+    let zulip_resp = ctx
+        .github
+        .raw()
+        .get(url)
+        .basic_auth(zulip_user, Some(&bot_api_token))
+        .send()
+        .await?;
+
+    let zulip_msg_data = zulip_resp.json::<ZulipReply>().await?;
+    log::debug!("Zulip reply {:?}", zulip_msg_data);
+    Ok(zulip_msg_data)
+}
+
+// Add a comment to a Github issue/pr and issue a @rustbot command
+async fn add_comment_to_issue(
+    ctx: &Context,
+    message: &Message,
+    mut words: impl Iterator<Item = &str> + std::fmt::Debug,
+    ty: CommentType,
+) -> anyhow::Result<String> {
+    // retrieve the original Zulip topic and rebuild the complete URL
+    let zulip_msg = get_zulip_msg(ctx, message.subject.clone(), None).await?;
+
+    if zulip_msg.messages.is_empty() {
+        return Ok(serde_json::to_string(&Response {
+            content: &format!("Failed creating comment on Github: could not retrieve Zulip topic"),
+        })
+        .unwrap());
+    }
+
+    // comment example:
+    // WG-prioritization assigning priority ([Zulip discussion](#)).
+    // @rustbot label -I-prioritize +P-XXX
+    let mut issue_id = 0;
+    let mut comment = String::new();
+    if ty == CommentType::AssignIssuePriority {
+        // ex. "245100-t-compiler/wg-prioritization/alerts";
+        let zulip_stream = format!(
+            "{}-{}",
+            zulip_msg.messages[0].stream_id, zulip_msg.messages[0].display_recipient
+        );
+        let zulip_msg_link = format!(
+            "narrow/stream/{}/topic/{}/near/{}",
+            zulip_stream, zulip_msg.messages[0].subject, message.id
+        );
+        // Don't urlencode, just replace spaces (Zulip custom URL encoding)
+        let zulip_msg_link = zulip_msg_link.replace(" ", ".20");
+        let zulip_msg_link = format!("{}/#{}", ZULIP_HOST, zulip_msg_link);
+        log::debug!("Zulip link: {}", zulip_msg_link);
+
+        issue_id = words
+            .next()
+            .unwrap()
+            .replace("#", "")
+            .parse::<u64>()
+            .unwrap();
+        let p_label = words.next().unwrap();
+
+        comment = format!(
+            "WG-prioritization assigning priority ([Zulip discussion]({}))
+            \n\n@rustbot label -I-prioritize +{}",
+            zulip_msg_link, p_label
+        );
+    }
+    // else ... handle other comment type
+
+    let github_resp = ctx
+        .octocrab
+        .issues("rust-lang", "rust")
+        .create_comment(issue_id.clone(), comment.clone())
+        .await;
+
+    let _reply = match github_resp {
+        Ok(data) => data,
+        Err(e) => {
+            return Ok(serde_json::to_string(&Response {
+                content: &format!("Failed creating comment on Github: {:?}.", e),
+            })
+            .unwrap());
+        }
+    };
+    log::debug!("Created comment on issue #{}: {:?}", issue_id, comment);
+
+    Ok(serde_json::to_string(&ResponseNotRequired {
+        response_not_required: true,
+    })
+    .unwrap())
 }
 
 // This does two things:
@@ -249,7 +399,7 @@ async fn execute_for_other_user(
     let members = ctx
         .github
         .raw()
-        .get("https://rust-lang.zulipchat.com/api/v1/users")
+        .get(format!("{}/api/v1/users", ZULIP_HOST))
         .basic_auth(BOT_EMAIL, Some(&bot_api_token))
         .send()
         .await;
@@ -402,7 +552,7 @@ impl Recipient<'_> {
     }
 
     pub fn url(&self) -> String {
-        format!("https://rust-lang.zulipchat.com/#narrow/{}", self.narrow())
+        format!("{}/#narrow/{}", ZULIP_HOST, self.narrow())
     }
 }
 
@@ -458,7 +608,7 @@ impl<'a> MessageApiRequest<'a> {
         }
 
         Ok(client
-            .post("https://rust-lang.zulipchat.com/api/v1/messages")
+            .post(format!("{}/api/v1/messages", ZULIP_HOST))
             .basic_auth(BOT_EMAIL, Some(&bot_api_token))
             .form(&SerializedApi {
                 type_: match self.recipient {
@@ -510,8 +660,8 @@ impl<'a> UpdateMessageApiRequest<'a> {
 
         Ok(client
             .patch(&format!(
-                "https://rust-lang.zulipchat.com/api/v1/messages/{}",
-                self.message_id
+                "{}/api/v1/messages/{}",
+                ZULIP_HOST, self.message_id
             ))
             .basic_auth(BOT_EMAIL, Some(&bot_api_token))
             .form(&SerializedApi {
@@ -723,8 +873,8 @@ impl<'a> AddReaction<'a> {
 
         Ok(client
             .post(&format!(
-                "https://rust-lang.zulipchat.com/api/v1/messages/{}/reactions",
-                self.message_id
+                "{}/api/v1/messages/{}/reactions",
+                ZULIP_HOST, self.message_id
             ))
             .basic_auth(BOT_EMAIL, Some(&bot_api_token))
             .form(&self)
