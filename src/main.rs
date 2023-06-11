@@ -265,7 +265,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
                     input,
                     tower::limit::rate::Rate::new(2, std::time::Duration::from_secs(60)),
                 )),
-                |_| anyhow::anyhow!("Rate limit of 2 request / 60 seconds exceeded"),
+                |e| {
+                    tracing::error!("agenda request failed: {:?}", e);
+                    anyhow::anyhow!("Rate limit of 2 request / 60 seconds exceeded")
+                },
             )
         })
         .service_fn(handle_agenda_request);
