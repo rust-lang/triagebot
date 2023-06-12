@@ -2,7 +2,7 @@ use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
 use crate::github::{self, GithubClient};
 use crate::handlers::Context;
-use anyhow::Context as _;
+use anyhow::{format_err, Context as _};
 use std::convert::TryInto;
 use std::env;
 use std::fmt::Write as _;
@@ -36,12 +36,7 @@ struct Message {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct Response<'a> {
-    content: &'a str,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct ResponseOwned {
+struct Response {
     content: String,
 }
 
@@ -62,32 +57,29 @@ pub async fn to_zulip_id(client: &GithubClient, github_id: i64) -> anyhow::Resul
 }
 
 pub async fn respond(ctx: &Context, req: Request) -> String {
+    let content = match process_zulip_request(ctx, req).await {
+        Ok(s) => s,
+        Err(e) => format!("{:?}", e),
+    };
+    serde_json::to_string(&Response { content }).unwrap()
+}
+
+async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<String> {
     let expected_token = std::env::var("ZULIP_TOKEN").expect("`ZULIP_TOKEN` set for authorization");
 
     if !openssl::memcmp::eq(req.token.as_bytes(), expected_token.as_bytes()) {
-        return serde_json::to_string(&Response {
-            content: "Invalid authorization.",
-        })
-        .unwrap();
+        anyhow::bail!("Invalid authorization.");
     }
 
     log::trace!("zulip hook: {:?}", req);
     let gh_id = match to_github_id(&ctx.github, req.message.sender_id as usize).await {
         Ok(Some(gh_id)) => Ok(gh_id),
-        Ok(None) => Err(serde_json::to_string(&Response {
-            content: &format!(
-                "Unknown Zulip user. Please add `zulip-id = {}` to your file in \
+        Ok(None) => Err(format_err!(
+            "Unknown Zulip user. Please add `zulip-id = {}` to your file in \
                 [rust-lang/team](https://github.com/rust-lang/team).",
-                req.message.sender_id
-            ),
-        })
-        .unwrap()),
-        Err(e) => {
-            return serde_json::to_string(&Response {
-                content: &format!("Failed to query team API: {:?}", e),
-            })
-            .unwrap();
-        }
+            req.message.sender_id
+        )),
+        Err(e) => anyhow::bail!("Failed to query team API: {e:?}"),
     };
 
     handle_command(ctx, gh_id, &req.data, &req.message).await
@@ -95,110 +87,71 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
 
 fn handle_command<'a>(
     ctx: &'a Context,
-    gh_id: Result<i64, String>,
+    gh_id: anyhow::Result<i64>,
     words: &'a str,
     message_data: &'a Message,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = String> + Send + 'a>> {
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<String>> + Send + 'a>> {
     Box::pin(async move {
         log::trace!("handling zulip command {:?}", words);
         let mut words = words.split_whitespace();
         let mut next = words.next();
 
         if let Some("as") = next {
-            return match execute_for_other_user(&ctx, words, message_data).await {
-                Ok(r) => r,
-                Err(e) => serde_json::to_string(&Response {
-                    content: &format!(
-                        "Failed to parse; expected `as <username> <command...>`: {:?}.",
-                        e
-                    ),
-                })
-                .unwrap(),
-            };
+            return execute_for_other_user(&ctx, words, message_data)
+                .await
+                .map_err(|e| {
+                    format_err!("Failed to parse; expected `as <username> <command...>`: {e:?}.")
+                });
         }
-        let gh_id = match gh_id {
-            Ok(id) => id,
-            Err(e) => return e,
-        };
+        let gh_id = gh_id?;
 
         match next {
-            Some("acknowledge") | Some("ack") => match acknowledge(&ctx, gh_id, words).await {
-                Ok(r) => r,
-                Err(e) => serde_json::to_string(&Response {
-                    content: &format!(
-                        "Failed to parse acknowledgement, expected `(acknowledge|ack) <identifier>`: {:?}.",
-                        e
-                    ),
-                })
-                .unwrap(),
-            },
-            Some("add") => match add_notification(&ctx, gh_id, words).await {
-                Ok(r) => r,
-                Err(e) => serde_json::to_string(&Response {
-                    content: &format!(
-                        "Failed to parse description addition, expected `add <url> <description (multiple words)>`: {:?}.",
-                        e
-                    ),
-                })
-                .unwrap(),
-            },
-            Some("move") => match move_notification(&ctx, gh_id, words).await {
-                Ok(r) => r,
-                Err(e) => serde_json::to_string(&Response {
-                    content: &format!(
-                        "Failed to parse movement, expected `move <from> <to>`: {:?}.",
-                        e
-                    ),
-                })
-                .unwrap(),
-            },
-            Some("meta") => match add_meta_notification(&ctx, gh_id, words).await {
-                Ok(r) => r,
-                Err(e) => serde_json::to_string(&Response {
-                    content: &format!(
-                        "Failed to parse movement, expected `move <idx> <meta...>`: {:?}.",
-                        e
-                    ),
-                })
-                .unwrap(),
-            },
+            Some("acknowledge") | Some("ack") => acknowledge(&ctx, gh_id, words).await
+                .map_err(|e| format_err!("Failed to parse acknowledgement, expected `(acknowledge|ack) <identifier>`: {e:?}.")),
+            Some("add") => add_notification(&ctx, gh_id, words).await
+                .map_err(|e| format_err!("Failed to parse description addition, expected `add <url> <description (multiple words)>`: {e:?}.")),
+            Some("move") => move_notification(&ctx, gh_id, words).await
+                .map_err(|e| format_err!("Failed to parse movement, expected `move <from> <to>`: {e:?}.")),
+            Some("meta") => add_meta_notification(&ctx, gh_id, words).await
+                .map_err(|e| format_err!("Failed to parse movement, expected `move <idx> <meta...>`: {e:?}.")),
             _ => {
                 while let Some(word) = next {
                     if word == "@**triagebot**" {
                         let next = words.next();
                         match next {
-                            Some("end-topic") | Some("await") => return match post_waiter(&ctx, message_data, WaitingMessage::end_topic()).await {
-                                Ok(r) => r,
-                                Err(e) => serde_json::to_string(&Response {
-                                    content: &format!("Failed to await at this time: {:?}", e),
-                                })
-                                .unwrap(),
-                            },
-                            Some("end-meeting") => return match post_waiter(&ctx, message_data, WaitingMessage::end_meeting()).await {
-                                Ok(r) => r,
-                                Err(e) => serde_json::to_string(&Response {
-                                    content: &format!("Failed to await at this time: {:?}", e),
-                                })
-                                .unwrap(),
-                            },
-                            Some("read") => return match post_waiter(&ctx, message_data, WaitingMessage::start_reading()).await {
-                                Ok(r) => r,
-                                Err(e) => serde_json::to_string(&Response {
-                                    content: &format!("Failed to await at this time: {:?}", e),
-                                })
-                                .unwrap(),
-                            },
+                            Some("end-topic") | Some("await") => {
+                                return post_waiter(&ctx, message_data, WaitingMessage::end_topic())
+                                    .await
+                                    .map_err(|e| {
+                                        format_err!("Failed to await at this time: {e:?}")
+                                    })
+                            }
+                            Some("end-meeting") => {
+                                return post_waiter(
+                                    &ctx,
+                                    message_data,
+                                    WaitingMessage::end_meeting(),
+                                )
+                                .await
+                                .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                            }
+                            Some("read") => {
+                                return post_waiter(
+                                    &ctx,
+                                    message_data,
+                                    WaitingMessage::start_reading(),
+                                )
+                                .await
+                                .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                            }
                             _ => {}
                         }
                     }
                     next = words.next();
                 }
 
-                serde_json::to_string(&Response {
-                    content: "Unknown command.",
-                })
-                .unwrap()
-            },
+                Ok(String::from("Unknown command"))
+            }
         }
     })
 }
@@ -226,12 +179,7 @@ async fn execute_for_other_user(
     .context("getting ID of github user")?
     {
         Some(id) => id.try_into().unwrap(),
-        None => {
-            return Ok(serde_json::to_string(&Response {
-                content: "Can only authorize for other GitHub users.",
-            })
-            .unwrap());
-        }
+        None => anyhow::bail!("Can only authorize for other GitHub users."),
     };
     let mut command = words.fold(String::new(), |mut acc, piece| {
         acc.push_str(piece);
@@ -252,71 +200,34 @@ async fn execute_for_other_user(
         .get("https://rust-lang.zulipchat.com/api/v1/users")
         .basic_auth(BOT_EMAIL, Some(&bot_api_token))
         .send()
-        .await;
-    let members = match members {
-        Ok(members) => members,
-        Err(e) => {
-            return Ok(serde_json::to_string(&Response {
-                content: &format!("Failed to get list of zulip users: {:?}.", e),
-            })
-            .unwrap());
-        }
-    };
-    let members = members.json::<MembersApiResponse>().await;
-    let members = match members {
-        Ok(members) => members.members,
-        Err(e) => {
-            return Ok(serde_json::to_string(&Response {
-                content: &format!("Failed to get list of zulip users: {:?}.", e),
-            })
-            .unwrap());
-        }
-    };
+        .await
+        .map_err(|e| format_err!("Failed to get list of zulip users: {e:?}."))?;
+    let members = members
+        .json::<MembersApiResponse>()
+        .await
+        .map_err(|e| format_err!("Failed to get list of zulip users: {e:?}."))?;
 
     // Map GitHub `user_id` to `zulip_user_id`.
     let zulip_user_id = match to_zulip_id(&ctx.github, user_id).await {
         Ok(Some(id)) => id as u64,
-        Ok(None) => {
-            return Ok(serde_json::to_string(&Response {
-                content: &format!("Could not find Zulip ID for GitHub ID: {}", user_id),
-            })
-            .unwrap());
-        }
-        Err(e) => {
-            return Ok(serde_json::to_string(&Response {
-                content: &format!("Could not find Zulip ID for GitHub id {}: {:?}", user_id, e),
-            })
-            .unwrap());
-        }
+        Ok(None) => anyhow::bail!("Could not find Zulip ID for GitHub ID: {user_id}"),
+        Err(e) => anyhow::bail!("Could not find Zulip ID for GitHub id {user_id}: {e:?}"),
     };
 
-    let user = match members.iter().find(|m| m.user_id == zulip_user_id) {
-        Some(m) => m,
-        None => {
-            return Ok(serde_json::to_string(&Response {
-                content: &format!("Could not find Zulip user email."),
-            })
-            .unwrap());
-        }
-    };
+    let user = members
+        .members
+        .iter()
+        .find(|m| m.user_id == zulip_user_id)
+        .ok_or_else(|| format_err!("Could not find Zulip user email."))?;
 
-    let output = handle_command(ctx, Ok(user_id as i64), &command, message_data).await;
-    let output_msg: ResponseOwned =
-        serde_json::from_str(&output).expect("result should always be JSON");
-    let output_msg = output_msg.content;
+    let output = handle_command(ctx, Ok(user_id as i64), &command, message_data).await?;
 
-    // At this point, the command has been run (FIXME: though it may have
-    // errored, it's hard to determine that currently, so we'll just give the
-    // output from the command as well as the command itself).
-
+    // At this point, the command has been run.
     let sender = match &message_data.sender_short_name {
         Some(short_name) => format!("{} ({})", message_data.sender_full_name, short_name),
         None => message_data.sender_full_name.clone(),
     };
-    let message = format!(
-        "{} ran `{}` with output `{}` as you.",
-        sender, command, output_msg
-    );
+    let message = format!("{sender} ran `{command}` with output `{output}` as you.");
 
     let res = MessageApiRequest {
         recipient: Recipient::Private {
@@ -549,38 +460,34 @@ async fn acknowledge(
         Identifier::Url(filter)
     };
     let mut db = ctx.db.get().await;
-    match delete_ping(&mut *db, gh_id, ident).await {
-        Ok(deleted) => {
-            let resp = if deleted.is_empty() {
-                format!(
-                    "No notifications matched `{}`, so none were deleted.",
-                    filter
-                )
-            } else {
-                let mut resp = String::from("Acknowledged:\n");
-                for deleted in deleted {
-                    resp.push_str(&format!(
-                        " * [{}]({}){}\n",
-                        deleted
-                            .short_description
-                            .as_deref()
-                            .unwrap_or(&deleted.origin_url),
-                        deleted.origin_url,
-                        deleted
-                            .metadata
-                            .map_or(String::new(), |m| format!(" ({})", m)),
-                    ));
-                }
-                resp
-            };
+    let deleted = delete_ping(&mut *db, gh_id, ident)
+        .await
+        .map_err(|e| format_err!("Failed to acknowledge {filter}: {e:?}."))?;
 
-            Ok(serde_json::to_string(&Response { content: &resp }).unwrap())
+    let resp = if deleted.is_empty() {
+        format!(
+            "No notifications matched `{}`, so none were deleted.",
+            filter
+        )
+    } else {
+        let mut resp = String::from("Acknowledged:\n");
+        for deleted in deleted {
+            resp.push_str(&format!(
+                " * [{}]({}){}\n",
+                deleted
+                    .short_description
+                    .as_deref()
+                    .unwrap_or(&deleted.origin_url),
+                deleted.origin_url,
+                deleted
+                    .metadata
+                    .map_or(String::new(), |m| format!(" ({})", m)),
+            ));
         }
-        Err(e) => Ok(serde_json::to_string(&Response {
-            content: &format!("Failed to acknowledge {}: {:?}.", filter, e),
-        })
-        .unwrap()),
-    }
+        resp
+    };
+
+    Ok(resp)
 }
 
 async fn add_notification(
@@ -616,14 +523,8 @@ async fn add_notification(
     )
     .await
     {
-        Ok(()) => Ok(serde_json::to_string(&Response {
-            content: "Created!",
-        })
-        .unwrap()),
-        Err(e) => Ok(serde_json::to_string(&Response {
-            content: &format!("Failed to create: {:?}", e),
-        })
-        .unwrap()),
+        Ok(()) => Ok("Created!".to_string()),
+        Err(e) => Err(format_err!("Failed to create: {e:?}")),
     }
 }
 
@@ -654,14 +555,8 @@ async fn add_meta_notification(
     };
     let mut db = ctx.db.get().await;
     match add_metadata(&mut db, gh_id, idx, description.as_deref()).await {
-        Ok(()) => Ok(serde_json::to_string(&Response {
-            content: "Added metadata!",
-        })
-        .unwrap()),
-        Err(e) => Ok(serde_json::to_string(&Response {
-            content: &format!("Failed to add: {:?}", e),
-        })
-        .unwrap()),
+        Ok(()) => Ok("Added metadata!".to_string()),
+        Err(e) => Err(format_err!("Failed to add: {e:?}")),
     }
 }
 
@@ -689,15 +584,11 @@ async fn move_notification(
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
     match move_indices(&mut *ctx.db.get().await, gh_id, from, to).await {
-        Ok(()) => Ok(serde_json::to_string(&Response {
+        Ok(()) => {
             // to 1-base indices
-            content: &format!("Moved {} to {}.", from + 1, to + 1),
-        })
-        .unwrap()),
-        Err(e) => Ok(serde_json::to_string(&Response {
-            content: &format!("Failed to move: {:?}.", e),
-        })
-        .unwrap()),
+            Ok(format!("Moved {} to {}.", from + 1, to + 1))
+        }
+        Err(e) => Err(format_err!("Failed to move: {e:?}.")),
     }
 }
 
@@ -772,12 +663,13 @@ async fn post_waiter(
 ) -> anyhow::Result<String> {
     let posted = MessageApiRequest {
         recipient: Recipient::Stream {
-            id: message.stream_id.ok_or_else(|| {
-                anyhow::format_err!("private waiting not supported, missing stream id")
-            })?,
-            topic: message.subject.as_deref().ok_or_else(|| {
-                anyhow::format_err!("private waiting not supported, missing topic")
-            })?,
+            id: message
+                .stream_id
+                .ok_or_else(|| format_err!("private waiting not supported, missing stream id"))?,
+            topic: message
+                .subject
+                .as_deref()
+                .ok_or_else(|| format_err!("private waiting not supported, missing topic"))?,
         },
         content: waiting.primary,
     }
