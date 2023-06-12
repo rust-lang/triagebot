@@ -112,6 +112,7 @@ impl<'a> Action for Step<'a> {
                     // These are unused for query.
                     default_branch: "master".to_string(),
                     fork: false,
+                    parent: None,
                 };
 
                 for QueryMap { name, kind, query } in queries {
