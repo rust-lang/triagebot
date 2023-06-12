@@ -134,6 +134,13 @@ fn repository() {
         assert_eq!(repo.fork, false);
         assert_eq!(repo.owner(), "rust-lang");
         assert_eq!(repo.name(), "rust");
+        assert!(repo.parent.is_none());
+
+        let repo = gh.repository("ehuss/rust").await.unwrap();
+        assert_eq!(repo.fork, true);
+        let parent = repo.parent.unwrap();
+        assert_eq!(parent.full_name, "rust-lang/rust");
+        assert_eq!(parent.fork, false);
     });
 }
 
@@ -362,6 +369,15 @@ fn merge_upstream() {
     run_test("merge_upstream", |gh| async move {
         let repo = gh.repository("ehuss/rust").await.unwrap();
         repo.merge_upstream(&gh, "docs-update").await.unwrap();
+    });
+}
+
+#[test]
+fn merge_upstream_conflict() {
+    // Test when there is a merge conflict.
+    run_test("merge_upstream_conflict", |gh| async move {
+        let repo = gh.repository("ehuss/rust").await.unwrap();
+        repo.merge_upstream(&gh, "master").await.unwrap();
     });
 }
 
