@@ -1,6 +1,7 @@
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
 use crate::github::{self, GithubClient};
+use crate::handlers::docs_update::docs_update;
 use crate::handlers::Context;
 use anyhow::{format_err, Context as _};
 use std::convert::TryInto;
@@ -144,6 +145,7 @@ fn handle_command<'a>(
                                 .await
                                 .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
                             }
+                            Some("docs-update") => return trigger_docs_update().await,
                             _ => {}
                         }
                     }
@@ -694,4 +696,18 @@ async fn post_waiter(
         response_not_required: true,
     })
     .unwrap())
+}
+
+async fn trigger_docs_update() -> anyhow::Result<String> {
+    match docs_update().await {
+        Ok(None) => Ok("No updates found.".to_string()),
+        Ok(Some(pr)) => Ok(format!("Created docs update PR <{}>", pr.html_url)),
+        Err(e) => {
+            // Don't send errors to Zulip since they may contain sensitive data.
+            log::error!("Docs update via Zulip failed: {e:?}");
+            Err(format_err!(
+                "Docs update failed, please check the logs for more details."
+            ))
+        }
+    }
 }

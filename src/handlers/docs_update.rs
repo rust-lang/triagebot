@@ -1,7 +1,7 @@
 //! A scheduled job to post a PR to update the documentation on rust-lang/rust.
 
 use crate::db::jobs::JobSchedule;
-use crate::github::{self, GitTreeEntry, GithubClient, Repository};
+use crate::github::{self, GitTreeEntry, GithubClient, Issue, Repository};
 use anyhow::Context;
 use anyhow::Result;
 use cron::Schedule;
@@ -56,10 +56,13 @@ pub async fn handle_job() -> Result<()> {
     }
 
     tracing::trace!("starting docs-update");
-    docs_update().await.context("failed to process docs update")
+    docs_update()
+        .await
+        .context("failed to process docs update")?;
+    Ok(())
 }
 
-async fn docs_update() -> Result<()> {
+pub async fn docs_update() -> Result<Option<Issue>> {
     let gh = GithubClient::new_with_default_token(Client::new());
     let work_repo = gh.repository(WORK_REPO).await?;
     work_repo
@@ -69,12 +72,11 @@ async fn docs_update() -> Result<()> {
     let updates = get_submodule_updates(&gh, &work_repo).await?;
     if updates.is_empty() {
         tracing::trace!("no updates this week?");
-        return Ok(());
+        return Ok(None);
     }
 
     create_commit(&gh, &work_repo, &updates).await?;
-    create_pr(&gh, &updates).await?;
-    Ok(())
+    Ok(Some(create_pr(&gh, &updates).await?))
 }
 
 struct Update {
@@ -184,7 +186,7 @@ async fn create_commit(
     Ok(())
 }
 
-async fn create_pr(gh: &GithubClient, updates: &[Update]) -> Result<()> {
+async fn create_pr(gh: &GithubClient, updates: &[Update]) -> Result<Issue> {
     let dest_repo = gh.repository(DEST_REPO).await?;
     let mut body = String::new();
     for update in updates {
@@ -197,5 +199,5 @@ async fn create_pr(gh: &GithubClient, updates: &[Update]) -> Result<()> {
         .new_pr(gh, TITLE, &head, &dest_repo.default_branch, &body)
         .await?;
     tracing::debug!("created PR {}", pr.html_url);
-    Ok(())
+    Ok(pr)
 }
