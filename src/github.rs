@@ -124,6 +124,7 @@ impl GithubClient {
                         .unwrap(),
                 )
                 .await?;
+            rate_resp.error_for_status_ref()?;
             let rate_limit_response = rate_resp.json::<RateLimitResponse>().await?;
 
             // Check url for search path because github has different rate limits for the search api
