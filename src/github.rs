@@ -987,6 +987,7 @@ pub struct Repository {
     pub default_branch: String,
     #[serde(default)]
     pub fork: bool,
+    pub parent: Option<Box<Repository>>,
 }
 
 #[derive(Copy, Clone)]
@@ -1485,16 +1486,66 @@ impl Repository {
     }
 
     /// Synchronize a branch (in a forked repository) by pulling in its upstream contents.
+    ///
+    /// **Warning**: This will to a force update if there are conflicts.
     pub async fn merge_upstream(&self, client: &GithubClient, branch: &str) -> anyhow::Result<()> {
         let url = format!("{}/merge-upstream", self.url());
-        client
+        let merge_error = match client
             .send_req(client.post(&url).json(&serde_json::json!({
                 "branch": branch,
             })))
             .await
+        {
+            Ok(_) => return Ok(()),
+            Err(e) => {
+                if e.downcast_ref::<reqwest::Error>().map_or(false, |e| {
+                    matches!(
+                        e.status(),
+                        Some(StatusCode::UNPROCESSABLE_ENTITY | StatusCode::CONFLICT)
+                    )
+                }) {
+                    e
+                } else {
+                    return Err(e);
+                }
+            }
+        };
+        // 409 is a clear error that there is a merge conflict.
+        // However, I don't understand how/why 422 might happen. The docs don't really say.
+        // The gh cli falls back to trying to force a sync, so let's try that.
+        log::info!(
+            "{} failed to merge upstream branch {branch}, trying force sync: {merge_error:?}",
+            self.full_name
+        );
+        let parent = self.parent.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "{} failed to merge upstream branch {branch}, \
+                 force sync could not determine parent",
+                self.full_name
+            )
+        })?;
+        // Note: I'm not sure how to handle the case where the branch name
+        // differs to the upstream. For example, if I create a branch off
+        // master in my fork, somehow GitHub knows that my branch should push
+        // to upstream/master (not upstream/my-branch-name). I can't find a
+        // way to find that branch name. Perhaps GitHub assumes it is the
+        // default branch if there is no matching branch name?
+        let branch_ref = format!("heads/{branch}");
+        let latest_parent_commit = parent
+            .get_reference(client, &branch_ref)
+            .await
             .with_context(|| {
                 format!(
-                    "{} failed to merge upstream branch {branch}",
+                    "failed to get head branch {branch} when merging upstream to {}",
+                    self.full_name
+                )
+            })?;
+        let sha = latest_parent_commit.object.sha;
+        self.update_reference(client, &branch_ref, &sha)
+            .await
+            .with_context(|| {
+                format!(
+                    "failed to force update {branch} to {sha} for {}",
                     self.full_name
                 )
             })?;
