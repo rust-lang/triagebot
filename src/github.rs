@@ -2168,23 +2168,23 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
 async fn project_items_by_status(
     client: &GithubClient,
     status_filter: impl Fn(Option<&str>) -> bool,
-) -> anyhow::Result<Vec<github_graphql::project_items_by_status::ProjectV2ItemContent>> {
+) -> anyhow::Result<Vec<github_graphql::project_items::ProjectV2Item>> {
     use cynic::QueryBuilder;
-    use github_graphql::project_items_by_status;
+    use github_graphql::project_items;
 
     const DESIGN_MEETING_PROJECT: i32 = 31;
-    let mut args = project_items_by_status::Arguments {
+    let mut args = project_items::Arguments {
         project_number: DESIGN_MEETING_PROJECT,
         after: None,
     };
 
     let mut all_items = vec![];
     loop {
-        let query = project_items_by_status::Query::build(args.clone());
+        let query = project_items::Query::build(args.clone());
         let req = client.post(Repository::GITHUB_GRAPHQL_API_URL);
         let req = req.json(&query);
 
-        let data: cynic::GraphQlResponse<project_items_by_status::Query> = client.json(req).await?;
+        let data: cynic::GraphQlResponse<project_items::Query> = client.json(req).await?;
         if let Some(errors) = data.errors {
             anyhow::bail!("There were graphql errors. {:?}", errors);
         }
@@ -2201,14 +2201,7 @@ async fn project_items_by_status(
             .ok_or_else(|| anyhow!("Malformed response."))?
             .into_iter()
             .flatten()
-            .filter(|item| {
-                status_filter(
-                    item.field_value_by_name
-                        .as_ref()
-                        .and_then(|status| status.as_str()),
-                )
-            })
-            .flat_map(|item| item.content);
+            .filter(|item| status_filter(item.status()));
         all_items.extend(filtered);
 
         let page_info = items.page_info;
@@ -2218,26 +2211,49 @@ async fn project_items_by_status(
         args.after = page_info.end_cursor;
     }
 
+    all_items.sort_by_key(|item| item.date());
     Ok(all_items)
 }
 
-pub struct ProposedDesignMeetings;
+pub enum DesignMeetingStatus {
+    Proposed,
+    Scheduled,
+    Done,
+    Empty,
+}
+
+impl DesignMeetingStatus {
+    fn query_str(&self) -> Option<&str> {
+        match self {
+            DesignMeetingStatus::Proposed => Some("Needs triage"),
+            DesignMeetingStatus::Scheduled => Some("Scheduled"),
+            DesignMeetingStatus::Done => Some("Done"),
+            DesignMeetingStatus::Empty => None,
+        }
+    }
+}
+
+pub struct DesignMeetings {
+    pub with_status: DesignMeetingStatus,
+}
+
 #[async_trait]
-impl IssuesQuery for ProposedDesignMeetings {
+impl IssuesQuery for DesignMeetings {
     async fn query<'a>(
         &'a self,
         _repo: &'a Repository,
         _include_fcp_details: bool,
         client: &'a GithubClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
-        use github_graphql::project_items_by_status::ProjectV2ItemContent;
+        use github_graphql::project_items::ProjectV2ItemContent;
 
         let items =
-            project_items_by_status(client, |status| status == Some("Needs triage")).await?;
+            project_items_by_status(client, |status| status == self.with_status.query_str())
+                .await?;
         Ok(items
             .into_iter()
-            .flat_map(|item| match item {
-                ProjectV2ItemContent::Issue(issue) => Some(crate::actions::IssueDecorator {
+            .flat_map(|item| match item.content {
+                Some(ProjectV2ItemContent::Issue(issue)) => Some(crate::actions::IssueDecorator {
                     assignees: String::new(),
                     number: issue.number.try_into().unwrap(),
                     fcp_details: None,
