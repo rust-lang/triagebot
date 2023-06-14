@@ -94,8 +94,18 @@ pub(crate) struct AssignConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct NoMergesConfig {
+    /// No action will be taken on PRs with these labels.
     #[serde(default)]
-    _empty: (),
+    pub(crate) exclude_labels: Vec<String>,
+    /// Set these labels on the PR when merge commits are detected.
+    #[serde(default)]
+    pub(crate) labels: Vec<String>,
+    /// Override the default message to post when merge commits are detected.
+    ///
+    /// This message will always be followed up with
+    /// "The following commits are merge commits:" and then
+    /// a list of the merge commits.
+    pub(crate) message: Option<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]

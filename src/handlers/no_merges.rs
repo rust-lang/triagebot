@@ -4,7 +4,7 @@
 use crate::{
     config::NoMergesConfig,
     db::issue_data::IssueData,
-    github::{IssuesAction, IssuesEvent},
+    github::{IssuesAction, IssuesEvent, Label},
     handlers::Context,
 };
 use anyhow::Context as _;
@@ -38,14 +38,21 @@ pub(super) async fn parse_input(
         return Ok(None);
     }
 
-    // Require an empty configuration block to enable no-merges notifications.
-    if config.is_none() {
+    // Require a `[no_merges]` configuration block to enable no-merges notifications.
+    let Some(config) = config else {
         return Ok(None);
-    }
+    };
 
     // Don't ping on rollups or draft PRs.
     if event.issue.title.starts_with("Rollup of") || event.issue.draft {
         return Ok(None);
+    }
+
+    // Don't trigger if the PR has any of the excluded labels.
+    for label in event.issue.labels() {
+        if config.exclude_labels.contains(&label.name) {
+            return Ok(None);
+        }
     }
 
     let mut merge_commits = HashSet::new();
@@ -73,7 +80,7 @@ pub(super) async fn parse_input(
 
 pub(super) async fn handle_input(
     ctx: &Context,
-    _config: &NoMergesConfig,
+    config: &NoMergesConfig,
     event: &IssuesEvent,
     input: NoMergesInput,
 ) -> anyhow::Result<()> {
@@ -81,14 +88,9 @@ pub(super) async fn handle_input(
     let mut state: IssueData<'_, NoMergesState> =
         IssueData::load(&mut client, &event.issue, NO_MERGES_KEY).await?;
 
-    let since_last_posted = if state.data.mentioned_merge_commits.is_empty() {
-        ""
+    let mut message = if let Some(ref message) = config.message {
+        message.clone()
     } else {
-        " (since this message was last posted)"
-    };
-
-    let mut should_send = false;
-    let mut message = format!(
         "
         There are merge commits (commits with multiple parents) in your changes. We have a
         [no merge policy](https://rustc-dev-guide.rust-lang.org/git.html#no-merge-policy) so
@@ -102,11 +104,25 @@ pub(super) async fn handle_input(
         $ # delete any merge commits in the editor that appears
         $ git push --force-with-lease
         ```
+        "
+        .to_string()
+    };
 
+    let since_last_posted = if state.data.mentioned_merge_commits.is_empty() {
+        ""
+    } else {
+        " (since this message was last posted)"
+    };
+    write!(
+        message,
+        "
+    
         The following commits are merge commits{since_last_posted}:
+        "
+    )
+    .unwrap();
 
-    "
-    );
+    let mut should_send = false;
     for commit in &input.merge_commits {
         if state.data.mentioned_merge_commits.contains(commit) {
             continue;
@@ -118,6 +134,20 @@ pub(super) async fn handle_input(
     }
 
     if should_send {
+        // Set labels
+        let labels = config
+            .labels
+            .iter()
+            .cloned()
+            .map(|name| Label { name })
+            .collect();
+        event
+            .issue
+            .add_labels(&ctx.github, labels)
+            .await
+            .context("failed to set no_merges labels")?;
+
+        // Post comment
         event
             .issue
             .post_comment(&ctx.github, &message)
