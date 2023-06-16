@@ -57,15 +57,27 @@ pub async fn to_zulip_id(client: &GithubClient, github_id: i64) -> anyhow::Resul
         .map(|v| *v.0))
 }
 
+/// Top-level handler for Zulip webhooks.
+///
+/// Returns a JSON response.
 pub async fn respond(ctx: &Context, req: Request) -> String {
     let content = match process_zulip_request(ctx, req).await {
-        Ok(s) => s,
+        Ok(None) => {
+            return serde_json::to_string(&ResponseNotRequired {
+                response_not_required: true,
+            })
+            .unwrap();
+        }
+        Ok(Some(s)) => s,
         Err(e) => format!("{:?}", e),
     };
     serde_json::to_string(&Response { content }).unwrap()
 }
 
-async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<String> {
+/// Processes a Zulip webhook.
+///
+/// Returns a string of the response, or None if no response is needed.
+async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Option<String>> {
     let expected_token = std::env::var("ZULIP_TOKEN").expect("`ZULIP_TOKEN` set for authorization");
 
     if !openssl::memcmp::eq(req.token.as_bytes(), expected_token.as_bytes()) {
@@ -91,7 +103,8 @@ fn handle_command<'a>(
     gh_id: anyhow::Result<i64>,
     words: &'a str,
     message_data: &'a Message,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<String>> + Send + 'a>> {
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Option<String>>> + Send + 'a>>
+{
     Box::pin(async move {
         log::trace!("handling zulip command {:?}", words);
         let mut words = words.split_whitespace();
@@ -152,7 +165,7 @@ fn handle_command<'a>(
                     next = words.next();
                 }
 
-                Ok(String::from("Unknown command"))
+                Ok(Some(String::from("Unknown command")))
             }
         }
     })
@@ -166,7 +179,7 @@ async fn execute_for_other_user(
     ctx: &Context,
     mut words: impl Iterator<Item = &str>,
     message_data: &Message,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Option<String>> {
     // username is a GitHub username, not a Zulip username
     let username = match words.next() {
         Some(username) => username,
@@ -222,7 +235,9 @@ async fn execute_for_other_user(
         .find(|m| m.user_id == zulip_user_id)
         .ok_or_else(|| format_err!("Could not find Zulip user email."))?;
 
-    let output = handle_command(ctx, Ok(user_id as i64), &command, message_data).await?;
+    let output = handle_command(ctx, Ok(user_id as i64), &command, message_data)
+        .await?
+        .unwrap_or_default();
 
     // At this point, the command has been run.
     let sender = match &message_data.sender_short_name {
@@ -255,7 +270,7 @@ async fn execute_for_other_user(
         }
     }
 
-    Ok(output)
+    Ok(Some(output))
 }
 
 #[derive(serde::Deserialize)]
@@ -441,7 +456,7 @@ async fn acknowledge(
     ctx: &Context,
     gh_id: i64,
     mut words: impl Iterator<Item = &str>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Option<String>> {
     let filter = match words.next() {
         Some(filter) => {
             if words.next().is_some() {
@@ -489,14 +504,14 @@ async fn acknowledge(
         resp
     };
 
-    Ok(resp)
+    Ok(Some(resp))
 }
 
 async fn add_notification(
     ctx: &Context,
     gh_id: i64,
     mut words: impl Iterator<Item = &str>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Option<String>> {
     let url = match words.next() {
         Some(idx) => idx,
         None => anyhow::bail!("url not present"),
@@ -525,7 +540,7 @@ async fn add_notification(
     )
     .await
     {
-        Ok(()) => Ok("Created!".to_string()),
+        Ok(()) => Ok(Some("Created!".to_string())),
         Err(e) => Err(format_err!("Failed to create: {e:?}")),
     }
 }
@@ -534,7 +549,7 @@ async fn add_meta_notification(
     ctx: &Context,
     gh_id: i64,
     mut words: impl Iterator<Item = &str>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Option<String>> {
     let idx = match words.next() {
         Some(idx) => idx,
         None => anyhow::bail!("idx not present"),
@@ -557,7 +572,7 @@ async fn add_meta_notification(
     };
     let mut db = ctx.db.get().await;
     match add_metadata(&mut db, gh_id, idx, description.as_deref()).await {
-        Ok(()) => Ok("Added metadata!".to_string()),
+        Ok(()) => Ok(Some("Added metadata!".to_string())),
         Err(e) => Err(format_err!("Failed to add: {e:?}")),
     }
 }
@@ -566,7 +581,7 @@ async fn move_notification(
     ctx: &Context,
     gh_id: i64,
     mut words: impl Iterator<Item = &str>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Option<String>> {
     let from = match words.next() {
         Some(idx) => idx,
         None => anyhow::bail!("from idx not present"),
@@ -588,7 +603,7 @@ async fn move_notification(
     match move_indices(&mut *ctx.db.get().await, gh_id, from, to).await {
         Ok(()) => {
             // to 1-base indices
-            Ok(format!("Moved {} to {}.", from + 1, to + 1))
+            Ok(Some(format!("Moved {} to {}.", from + 1, to + 1)))
         }
         Err(e) => Err(format_err!("Failed to move: {e:?}.")),
     }
@@ -662,7 +677,7 @@ async fn post_waiter(
     ctx: &Context,
     message: &Message,
     waiting: WaitingMessage<'_>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Option<String>> {
     let posted = MessageApiRequest {
         recipient: Recipient::Stream {
             id: message
@@ -692,16 +707,13 @@ async fn post_waiter(
         .context("emoji reaction failed")?;
     }
 
-    Ok(serde_json::to_string(&ResponseNotRequired {
-        response_not_required: true,
-    })
-    .unwrap())
+    Ok(None)
 }
 
-async fn trigger_docs_update() -> anyhow::Result<String> {
+async fn trigger_docs_update() -> anyhow::Result<Option<String>> {
     match docs_update().await {
-        Ok(None) => Ok("No updates found.".to_string()),
-        Ok(Some(pr)) => Ok(format!("Created docs update PR <{}>", pr.html_url)),
+        Ok(None) => Ok(Some("No updates found.".to_string())),
+        Ok(Some(pr)) => Ok(Some(format!("Created docs update PR <{}>", pr.html_url))),
         Err(e) => {
             // Don't send errors to Zulip since they may contain sensitive data.
             log::error!("Docs update via Zulip failed: {e:?}");
