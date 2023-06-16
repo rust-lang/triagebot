@@ -21,19 +21,48 @@ pub struct Request {
     token: String,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 struct Message {
     sender_id: u64,
+    /// A unique ID for the set of users receiving the message (either a
+    /// stream or group of users). Useful primarily for hashing.
     #[allow(unused)]
     recipient_id: u64,
     sender_short_name: Option<String>,
     sender_full_name: String,
+    sender_email: String,
+    /// The ID of the stream.
+    ///
+    /// `None` if it is a private message.
     stream_id: Option<u64>,
-    // The topic of the incoming message. Not the stream name.
+    /// The topic of the incoming message. Not the stream name.
+    ///
+    /// Not currently set for private messages (though Zulip may change this in
+    /// the future if it adds topics to private messages).
     subject: Option<String>,
+    /// The type of the message: stream or private.
     #[allow(unused)]
     #[serde(rename = "type")]
     type_: String,
+}
+
+impl Message {
+    /// Creates a `Recipient` that will be addressed to the sender of this message.
+    fn sender_to_recipient(&self) -> Recipient<'_> {
+        match self.stream_id {
+            Some(id) => Recipient::Stream {
+                id,
+                topic: self
+                    .subject
+                    .as_ref()
+                    .expect("stream messages should have a topic"),
+            },
+            None => Recipient::Private {
+                id: self.sender_id,
+                email: &self.sender_email,
+            },
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -158,7 +187,7 @@ fn handle_command<'a>(
                                 .await
                                 .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
                             }
-                            Some("docs-update") => return trigger_docs_update().await,
+                            Some("docs-update") => return trigger_docs_update(message_data),
                             _ => {}
                         }
                     }
@@ -710,16 +739,30 @@ async fn post_waiter(
     Ok(None)
 }
 
-async fn trigger_docs_update() -> anyhow::Result<Option<String>> {
-    match docs_update().await {
-        Ok(None) => Ok(Some("No updates found.".to_string())),
-        Ok(Some(pr)) => Ok(Some(format!("Created docs update PR <{}>", pr.html_url))),
-        Err(e) => {
-            // Don't send errors to Zulip since they may contain sensitive data.
-            log::error!("Docs update via Zulip failed: {e:?}");
-            Err(format_err!(
-                "Docs update failed, please check the logs for more details."
-            ))
+fn trigger_docs_update(message: &Message) -> anyhow::Result<Option<String>> {
+    let message = message.clone();
+    // The default Zulip timeout of 10 seconds can be too short, so process in
+    // the background.
+    tokio::task::spawn(async move {
+        let response = match docs_update().await {
+            Ok(None) => "No updates found.".to_string(),
+            Ok(Some(pr)) => format!("Created docs update PR <{}>", pr.html_url),
+            Err(e) => {
+                // Don't send errors to Zulip since they may contain sensitive data.
+                log::error!("Docs update via Zulip failed: {e:?}");
+                "Docs update failed, please check the logs for more details.".to_string()
+            }
+        };
+        let recipient = message.sender_to_recipient();
+        let message = MessageApiRequest {
+            recipient,
+            content: &response,
+        };
+        if let Err(e) = message.send(&reqwest::Client::new()).await {
+            log::error!("failed to send Zulip response: {e:?}\nresponse was:\n{response}");
         }
-    }
+    });
+    Ok(Some(
+        "Docs update in progress, I'll let you know when I'm finished.".to_string(),
+    ))
 }
