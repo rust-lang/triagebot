@@ -2,10 +2,10 @@
 
 This is the triage and team assistance bot for the rust-lang organization.
 
-Please see the [wiki] for our documentation, and feel free to contribute edits
+Please see the [forge] for our documentation, and feel free to contribute edits
 if you find something helpful!
 
-[wiki]: https://github.com/rust-lang/triagebot/wiki
+[forge]: https://forge.rust-lang.org/triagebot/index.html
 
 ## How triagebot works
 
