@@ -163,6 +163,8 @@ pub(crate) struct AutolabelLabelConfig {
     pub(crate) trigger_files: Vec<String>,
     #[serde(default)]
     pub(crate) new_pr: bool,
+    #[serde(default)]
+    pub(crate) new_issue: bool,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
