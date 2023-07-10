@@ -1228,7 +1228,7 @@ impl Repository {
         client: &GithubClient,
         refname: &str,
         sha: &str,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<GitReference> {
         let url = format!("{}/git/refs/{}", self.url(), refname);
         client
             .json(client.patch(&url).json(&serde_json::json!({
@@ -1241,8 +1241,7 @@ impl Repository {
                     "{} failed to update reference {refname} to {sha}",
                     self.full_name
                 )
-            })?;
-        Ok(())
+            })
     }
 
     /// Returns a list of recent commits on the given branch.
