@@ -78,6 +78,21 @@ pub(super) async fn parse_input(
     })
 }
 
+const DEFAULT_MESSAGE: &str = "
+There are merge commits (commits with multiple parents) in your changes. We have a \
+[no merge policy](https://rustc-dev-guide.rust-lang.org/git.html#no-merge-policy) \
+so these commits will need to be removed for this pull request to be merged.
+
+You can start a rebase with the following commands:
+```shell-session
+$ # rebase
+$ git rebase -i master
+$ # delete any merge commits in the editor that appears
+$ git push --force-with-lease
+```
+
+";
+
 pub(super) async fn handle_input(
     ctx: &Context,
     config: &NoMergesConfig,
@@ -88,37 +103,20 @@ pub(super) async fn handle_input(
     let mut state: IssueData<'_, NoMergesState> =
         IssueData::load(&mut client, &event.issue, NO_MERGES_KEY).await?;
 
-    let mut message = if let Some(ref message) = config.message {
-        message.clone()
-    } else {
-        "
-        There are merge commits (commits with multiple parents) in your changes. We have a
-        [no merge policy](https://rustc-dev-guide.rust-lang.org/git.html#no-merge-policy) so
-        these commits will need to be removed for this pull request to be merged.
-
-        You can start a rebase with the following commands:
-
-        ```shell-session
-        $ # rebase
-        $ git rebase -i master
-        $ # delete any merge commits in the editor that appears
-        $ git push --force-with-lease
-        ```
-        "
-        .to_string()
-    };
+    let mut message = config
+        .message
+        .as_deref()
+        .unwrap_or(DEFAULT_MESSAGE)
+        .to_string();
 
     let since_last_posted = if state.data.mentioned_merge_commits.is_empty() {
         ""
     } else {
         " (since this message was last posted)"
     };
-    write!(
+    writeln!(
         message,
-        "
-    
-        The following commits are merge commits{since_last_posted}:
-        "
+        "The following commits are merge commits{since_last_posted}:"
     )
     .unwrap();
 
@@ -130,7 +128,7 @@ pub(super) async fn handle_input(
 
         should_send = true;
         state.data.mentioned_merge_commits.insert((*commit).clone());
-        write!(message, "- {commit}").unwrap();
+        writeln!(message, "- {commit}").unwrap();
     }
 
     if should_send {
@@ -156,4 +154,41 @@ pub(super) async fn handle_input(
         state.save().await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn message() {
+        let mut message = DEFAULT_MESSAGE.to_string();
+
+        writeln!(message, "The following commits are merge commits:").unwrap();
+
+        for n in 1..5 {
+            writeln!(message, "- commit{n}").unwrap();
+        }
+
+        assert_eq!(
+            message,
+            "
+There are merge commits (commits with multiple parents) in your changes. We have a [no merge policy](https://rustc-dev-guide.rust-lang.org/git.html#no-merge-policy) so these commits will need to be removed for this pull request to be merged.
+
+You can start a rebase with the following commands:
+```shell-session
+$ # rebase
+$ git rebase -i master
+$ # delete any merge commits in the editor that appears
+$ git push --force-with-lease
+```
+
+The following commits are merge commits:
+- commit1
+- commit2
+- commit3
+- commit4
+"
+        );
+    }
 }
