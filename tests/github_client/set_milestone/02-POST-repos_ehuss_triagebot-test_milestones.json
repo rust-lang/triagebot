@@ -1,0 +1,19 @@
+{
+  "kind": "Request",
+  "method": "POST",
+  "path": "/repos/ehuss/triagebot-test/milestones",
+  "query": null,
+  "request_body": "{\"title\":\"test\"}",
+  "response_code": 422,
+  "response_body": {
+    "documentation_url": "https://docs.github.com/rest/reference/issues#create-a-milestone",
+    "errors": [
+      {
+        "code": "already_exists",
+        "field": "title",
+        "resource": "Milestone"
+      }
+    ],
+    "message": "Validation Failed"
+  }
+}

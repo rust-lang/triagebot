@@ -1,0 +1,12 @@
+{
+  "kind": "Request",
+  "method": "POST",
+  "path": "/repos/ehuss/rust/merge-upstream",
+  "query": null,
+  "request_body": "{\"branch\":\"master\"}",
+  "response_code": 409,
+  "response_body": {
+    "documentation_url": "https://docs.github.com/rest/branches/branches#sync-a-fork-branch-with-the-upstream-repository",
+    "message": "There are merge conflicts"
+  }
+}

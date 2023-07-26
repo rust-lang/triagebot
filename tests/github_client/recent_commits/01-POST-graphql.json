@@ -1,0 +1,1938 @@
+{
+  "kind": "Request",
+  "method": "POST",
+  "path": "/graphql",
+  "query": null,
+  "request_body": "{\"query\":\"query($branch: String!, $name: String!, $owner: String!, $after: String) {\\n  repository(name: $name, owner: $owner) {\\n    ref(qualifiedName: $branch) {\\n      target {\\n        __typename\\n        ... on Commit {\\n          history(first: 100, after: $after) {\\n            totalCount\\n            pageInfo {\\n              hasNextPage\\n              endCursor\\n            }\\n            nodes {\\n              oid\\n              parents(first: 1) {\\n                nodes {\\n                  oid\\n                }\\n              }\\n              committedDate\\n              messageHeadline\\n              associatedPullRequests(first: 1) {\\n                nodes {\\n                  number\\n                  title\\n                }\\n              }\\n            }\\n          }\\n        }\\n      }\\n    }\\n  }\\n}\\n\\n\",\"variables\":{\"branch\":\"master\",\"name\":\"rust\",\"owner\":\"rust-lang\",\"after\":null}}",
+  "response_code": 200,
+  "response_body": {
+    "data": {
+      "repository": {
+        "ref": {
+          "target": {
+            "__typename": "Commit",
+            "history": {
+              "nodes": [
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-07T14:32:11Z",
+                  "messageHeadline": "Auto merge of #112383 - Dylan-DPC:rollup-et2z6nt, r=Dylan-DPC",
+                  "oid": "b2807b2bf3be9fbed9a0aadc97841c20a1ab5f79",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "e94bda3bf13303671427363d1cd93ac5e089f090"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-07T12:31:31Z",
+                  "messageHeadline": "Rollup merge of #112382 - jyn514:test-download-rustc-macos, r=albertl…",
+                  "oid": "90c361c8376e8ec9d63cbd78b6d68c9647eb32c1",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "1dc4b4001fe3809535b9405b55e281a42608fb77"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-07T12:31:30Z",
+                  "messageHeadline": "Rollup merge of #112359 - Nilstrieb:i-can-only-handle-so-many-backtra…",
+                  "oid": "1dc4b4001fe3809535b9405b55e281a42608fb77",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "42cf6da6af4dd738bacf851fc6361a8e3dfb8138"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-07T12:31:30Z",
+                  "messageHeadline": "Rollup merge of #112345 - bvanjoi:fix-112342, r=nilstrieb,est31",
+                  "oid": "42cf6da6af4dd738bacf851fc6361a8e3dfb8138",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "c6fda401f6d03c3947c6604a709e6a6239c76c4f"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-07T12:31:29Z",
+                  "messageHeadline": "Rollup merge of #112251 - notriddle:notriddle/cleanup-inlining, r=Gui…",
+                  "oid": "c6fda401f6d03c3947c6604a709e6a6239c76c4f",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "0b002eb90692cd30f09b3ed37b2fab55dfc6427a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-07T12:31:29Z",
+                  "messageHeadline": "Rollup merge of #112122 - compiler-errors:next-coherence, r=lcnr",
+                  "oid": "0b002eb90692cd30f09b3ed37b2fab55dfc6427a",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "cbe429c7a5fba9f77d76f214a45c03b67a1328c1"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-07T12:31:28Z",
+                  "messageHeadline": "Rollup merge of #112076 - compiler-errors:bidirectional-alias-eq, r=lcnr",
+                  "oid": "cbe429c7a5fba9f77d76f214a45c03b67a1328c1",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "e94bda3bf13303671427363d1cd93ac5e089f090"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-07T11:16:30Z",
+                  "messageHeadline": "download-rustc: Fix `x test core` on MacOS",
+                  "oid": "a2ab47f1e57a7192bbdb7f6e90e7776a458b3315",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "10b7e468f3cc263b8df8ff0212d0911ed5a3c090"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 111047,
+                        "title": "Emit an error when return-type-notation is used with type/const params"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-07T09:03:33Z",
+                  "messageHeadline": "Auto merge of #111047 - compiler-errors:rtn-no-ty-ct-params, r=spasto…",
+                  "oid": "e94bda3bf13303671427363d1cd93ac5e089f090",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "10b7e468f3cc263b8df8ff0212d0911ed5a3c090"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 96875,
+                        "title": "Add `task::Waker::noop`"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-07T06:04:32Z",
+                  "messageHeadline": "Auto merge of #96875 - SabrinaJewson:noop-waker, r=m-ou-se",
+                  "oid": "10b7e468f3cc263b8df8ff0212d0911ed5a3c090",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "b3dd578767299e6bcb617fbb28724fe32b31cf3b"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 111819,
+                        "title": "Improved std support for ps vita target"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-07T03:20:15Z",
+                  "messageHeadline": "Auto merge of #111819 - nikarh:vita-improved, r=Amanieu",
+                  "oid": "b3dd578767299e6bcb617fbb28724fe32b31cf3b",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "7b28a6b08aa072dde3260f16e175c565400c09d9"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-07T02:20:36Z",
+                  "messageHeadline": "feat(expand): emit note for doc comment in macro matcher",
+                  "oid": "5eafab30ba0721451f5114c5b27b37870bb3955a",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "c927743b7b7bd382836dcce2d1140a7e829dc3d0"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 111495,
+                        "title": "Run tests on PGO/LTO/BOLT optimized dist artifacts"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-07T00:14:06Z",
+                  "messageHeadline": "Auto merge of #111495 - Kobzol:dist-tests, r=Mark-Simulacrum",
+                  "oid": "7b28a6b08aa072dde3260f16e175c565400c09d9",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "afab3662eb066f05fcdb43c421b72dd19472e752"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112361,
+                        "title": "Rollup of 8 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T21:28:34Z",
+                  "messageHeadline": "Auto merge of #112361 - matthiaskrgr:rollup-39zxrw1, r=matthiaskrgr",
+                  "oid": "afab3662eb066f05fcdb43c421b72dd19472e752",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "b2b34bd83192c3d16c88655158f7d8d612513e88"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112358,
+                        "title": "Remove default visitor impl in region constraint generation"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T20:00:21Z",
+                  "messageHeadline": "Rollup merge of #112358 - Nilstrieb:fancy-more-borrowck-cleanups, r=c…",
+                  "oid": "63e0423cde981cc25d34421bf7b3347ea27163f3",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "53881f91b0036e65090bc874bf69b7ad6ab3ecde"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112356,
+                        "title": "Fix comment for `get_region_var_origins`"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T20:00:21Z",
+                  "messageHeadline": "Rollup merge of #112356 - Nilstrieb:get-region-var-origins, r=compile…",
+                  "oid": "53881f91b0036e65090bc874bf69b7ad6ab3ecde",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "fd6efcf9602d6a82068b6eb1600971795a0f3f93"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112350,
+                        "title": "Avoid duplicate type sanitization of local decls in borrowck"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T20:00:20Z",
+                  "messageHeadline": "Rollup merge of #112350 - Nilstrieb:borrow-me-some-cleanups, r=compil…",
+                  "oid": "fd6efcf9602d6a82068b6eb1600971795a0f3f93",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "38ddff516cc89d58a36293a32c11479a6ad063bc"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112343,
+                        "title": "Prevent emitting `missing_docs` for `pub extern crate`"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T20:00:20Z",
+                  "messageHeadline": "Rollup merge of #112343 - GuillaumeGomez:extern-crate-missing-docs, r…",
+                  "oid": "38ddff516cc89d58a36293a32c11479a6ad063bc",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "e937fa49dd463bc9503598e31c830103ee72919b"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112361,
+                        "title": "Rollup of 8 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T20:00:20Z",
+                  "messageHeadline": "Rollup merge of #112340 - lcnr:tyctxt-cleanup, r=compiler-errors",
+                  "oid": "e937fa49dd463bc9503598e31c830103ee72919b",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "319a905a92bd954ac7e906af0ead0715714a3e4f"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112334,
+                        "title": "Add myself to highfive rotation"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T20:00:19Z",
+                  "messageHeadline": "Rollup merge of #112334 - fee1-dead-contrib:add-rotation, r=Nilstrieb",
+                  "oid": "319a905a92bd954ac7e906af0ead0715714a3e4f",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "157d0f03ab9f1a7d50fa00f4d2a26c816fca9200"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112310,
+                        "title": "Add new Tier-3 targets: `loongarch64-unknown-none*`"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T20:00:19Z",
+                  "messageHeadline": "Rollup merge of #112310 - loongarch-rs:bare-metal, r=WaffleLapkin",
+                  "oid": "157d0f03ab9f1a7d50fa00f4d2a26c816fca9200",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "1788d49789060ede846df1dbd8762e9cb40e0ae0"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112361,
+                        "title": "Rollup of 8 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T20:00:18Z",
+                  "messageHeadline": "Rollup merge of #111250 - spastorino:smir-terminator-2, r=oli-obk",
+                  "oid": "1788d49789060ede846df1dbd8762e9cb40e0ae0",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "3572d7451d1062e8bccf310af6bbf6255091d296"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-06T19:24:33Z",
+                  "messageHeadline": "Respect `RUST_BACKTRACE` for delayed bugs",
+                  "oid": "70980929b480d6c13e23d79ad8de2ff0afbce60c",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "e4106065bf1bb515935d5d024e8d9c86454e2b22"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-06T19:20:54Z",
+                  "messageHeadline": "rustdoc: convert `if let Some()` that always matches to variable",
+                  "oid": "0f1aaef7e9a1776a81819ef4ae05b508fb12d572",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "3572d7451d1062e8bccf310af6bbf6255091d296"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112358,
+                        "title": "Remove default visitor impl in region constraint generation"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T19:00:47Z",
+                  "messageHeadline": "Remove default visitor impl in region constraint generation",
+                  "oid": "459bd2cbde9544be65371b7bf657aa7d2015c3fb",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "e4106065bf1bb515935d5d024e8d9c86454e2b22"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112350,
+                        "title": "Avoid duplicate type sanitization of local decls in borrowck"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T18:52:47Z",
+                  "messageHeadline": "Avoid duplicate type sanitization of local decls",
+                  "oid": "5593e7e2ba2c04c6ded2d01859d5f762bb4e043d",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "e4106065bf1bb515935d5d024e8d9c86454e2b22"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112356,
+                        "title": "Fix comment for `get_region_var_origins`"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T18:50:38Z",
+                  "messageHeadline": "Fix comment for `get_region_var_origins`",
+                  "oid": "0e01088f077c572bbca791fbed54c1bbe80afdb0",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "e4106065bf1bb515935d5d024e8d9c86454e2b22"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-06T18:44:22Z",
+                  "messageHeadline": "Fall back to bidirectional normalizes-to if no subst-eq in alias-eq goal",
+                  "oid": "3ea7c512bd1587006a1c196df841e9b7ec60fb0b",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "7a2cdf20e42c5b2a4d0f259eab8968cda7ae55c2"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-06T18:44:22Z",
+                  "messageHeadline": "Move alias-relate to its own module",
+                  "oid": "7a2cdf20e42c5b2a4d0f259eab8968cda7ae55c2",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "3572d7451d1062e8bccf310af6bbf6255091d296"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-06T18:43:20Z",
+                  "messageHeadline": "bless coherence test",
+                  "oid": "aabdeedc7c812388b30575a5f53292128f4f7464",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "3d4da98273553b2307d8ce3a03c476e459aa3f45"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-06T18:43:20Z",
+                  "messageHeadline": "Make TraitEngine::new use the right solver, add compare mode",
+                  "oid": "3d4da98273553b2307d8ce3a03c476e459aa3f45",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "b637048a89654d105a17b6b6f1a060fd8dcfd093"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-06T18:43:20Z",
+                  "messageHeadline": "Add -Ztrait-solver=next-coherence",
+                  "oid": "b637048a89654d105a17b6b6f1a060fd8dcfd093",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "e0acff796a9221bc4d6769e3db5bf158647ef0e1"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-06T18:43:06Z",
+                  "messageHeadline": "New trait solver is a property of inference context",
+                  "oid": "e0acff796a9221bc4d6769e3db5bf158647ef0e1",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "3572d7451d1062e8bccf310af6bbf6255091d296"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T17:56:23Z",
+                  "messageHeadline": "Auto merge of #112344 - matthiaskrgr:rollup-tswr83e, r=matthiaskrgr",
+                  "oid": "b2b34bd83192c3d16c88655158f7d8d612513e88",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "3572d7451d1062e8bccf310af6bbf6255091d296"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": []
+                  },
+                  "committedDate": "2023-06-06T15:11:08Z",
+                  "messageHeadline": "fix(expand): prevent infinity loop in macro containing only \"///\"",
+                  "oid": "c927743b7b7bd382836dcce2d1140a7e829dc3d0",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "fd9bf594366e73efb1a26a023e0b4de8eff82b94"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 111819,
+                        "title": "Improved std support for ps vita target"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T13:09:05Z",
+                  "messageHeadline": "Bumped libc version",
+                  "oid": "032857e7e403f654129c45dc7e6718a9ad49e377",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "ac48d49ff8c757ce8380b0ea0dc8048a841db192"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T10:00:34Z",
+                  "messageHeadline": "Rollup merge of #112325 - notriddle:notriddle/issue-111932, r=compile…",
+                  "oid": "38c92cca65041f50c2b62262fa8bff13b034f000",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "7c76f3b9d8e9b0419c4cb3d7b90043531ff7be42"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T10:00:34Z",
+                  "messageHeadline": "Rollup merge of #112220 - kylematsuda:earlybinder-fix, r=compiler-errors",
+                  "oid": "7c76f3b9d8e9b0419c4cb3d7b90043531ff7be42",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "71a72ee34a8a456c632c71dea53372cb343f495e"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T10:00:33Z",
+                  "messageHeadline": "Rollup merge of #112199 - jieyouxu:issue-112188, r=compiler-errors",
+                  "oid": "71a72ee34a8a456c632c71dea53372cb343f495e",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "21e7463bf8eb45cc8d9d9e4e111e64061da0d16a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T10:00:33Z",
+                  "messageHeadline": "Rollup merge of #112019 - jieyouxu:issue-111554, r=compiler-errors",
+                  "oid": "21e7463bf8eb45cc8d9d9e4e111e64061da0d16a",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "29871d5480c887abdaf4b8b2b925a9e4aee7b521"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T10:00:32Z",
+                  "messageHeadline": "Rollup merge of #111962 - theIDinside:better-gdb, r=Mark-Simulacrum",
+                  "oid": "29871d5480c887abdaf4b8b2b925a9e4aee7b521",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "c4e11dc3277ee44d4fbfb58da5273bd00940e6d4"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T10:00:32Z",
+                  "messageHeadline": "Rollup merge of #111369 - Nassiel:master, r=oli-obk",
+                  "oid": "c4e11dc3277ee44d4fbfb58da5273bd00940e6d4",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "92327c05f1c54b403f3537a275baf469cdbe6632"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T10:00:31Z",
+                  "messageHeadline": "Rollup merge of #111058 - fortanix:raoul/fix_lvi_mitigations, r=cuviper",
+                  "oid": "92327c05f1c54b403f3537a275baf469cdbe6632",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "fd9bf594366e73efb1a26a023e0b4de8eff82b94"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112343,
+                        "title": "Prevent emitting `missing_docs` for `pub extern crate`"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T09:50:24Z",
+                  "messageHeadline": "Add regression test for #112308",
+                  "oid": "550fe634bf5914e01ea529119bd23bf276fe673b",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "4711c3078a653ab7242ed5b9e954ae7ad03646f3"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112343,
+                        "title": "Prevent emitting `missing_docs` for `pub extern crate`"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T09:50:04Z",
+                  "messageHeadline": "Prevent emitting `missing_docs` for `pub extern crate`",
+                  "oid": "4711c3078a653ab7242ed5b9e954ae7ad03646f3",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "51f714c8c5021fe25442e46798b1cbef2f2249ed"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112312,
+                        "title": "Update to LLVM 16.0.5"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T09:40:31Z",
+                  "messageHeadline": "Auto merge of #112312 - nikic:llvm-16.0.5, r=cuviper",
+                  "oid": "3572d7451d1062e8bccf310af6bbf6255091d296",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "fd9bf594366e73efb1a26a023e0b4de8eff82b94"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112361,
+                        "title": "Rollup of 8 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T07:37:30Z",
+                  "messageHeadline": "remove `has_error_field` helper method",
+                  "oid": "01aaad3f1fd224d3761c2d3b78469c5ed9db7ff5",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "fd9bf594366e73efb1a26a023e0b4de8eff82b94"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112334,
+                        "title": "Add myself to highfive rotation"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T03:15:52Z",
+                  "messageHeadline": "Add myself to highfive rotation",
+                  "oid": "aaca1712dbd5c674b6d05c539c4c2e630d38edfc",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "a28e125b2130c179e40023317b7c6004c08442ff"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112310,
+                        "title": "Add new Tier-3 targets: `loongarch64-unknown-none*`"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T02:55:52Z",
+                  "messageHeadline": "Add new Tier-3 targets: `loongarch64-unknown-none*`",
+                  "oid": "bd32075934ca2825e6b51d246e19670941598240",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "42f28f9eb41adb7a197697e5e2d6535d00fd0f4a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T02:05:15Z",
+                  "messageHeadline": "diagnostics: do not suggest type name tweaks on type-inferred closure…",
+                  "oid": "467bc9ffd56dc31d6db79820bd07dbdd5f653783",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "408bbd040613f6776e0a7d05d582c81f4ddc189a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 111999,
+                        "title": "Use `load`+`store` instead of `memcpy` for small integer arrays"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T01:50:28Z",
+                  "messageHeadline": "Auto merge of #111999 - scottmcm:codegen-less-memcpy, r=compiler-errors",
+                  "oid": "fd9bf594366e73efb1a26a023e0b4de8eff82b94",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "adc719d7147d5e2578ce08e0b4504be44650256e"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-06T00:40:36Z",
+                  "messageHeadline": "cleanup some skip_binder -> subst_identity",
+                  "oid": "57cbe250069e7c8eca6bf1e89c6a6b37c71b790d",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "e6d4725c76f3b526c74454bc51afdf6daf133506"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112324,
+                        "title": "Rollup of 6 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T22:44:59Z",
+                  "messageHeadline": "Auto merge of #112324 - matthiaskrgr:rollup-qscmi3c, r=matthiaskrgr",
+                  "oid": "adc719d7147d5e2578ce08e0b4504be44650256e",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "e6d4725c76f3b526c74454bc51afdf6daf133506"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112322,
+                        "title": "Don't mention `IMPLIED_BOUNDS_ENTAILMENT` if signatures reference error"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T21:48:00Z",
+                  "messageHeadline": "Rollup merge of #112322 - compiler-errors:no-IMPLIED_BOUNDS_ENTAILMEN…",
+                  "oid": "dcdd867a5298b5e5aedb77dc6b38862aa1867a44",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "44acf796c7e7ce441c8d7d7a34877554aeecdf27"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112318,
+                        "title": "Merge method, type and const object safety checks"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T21:48:00Z",
+                  "messageHeadline": "Rollup merge of #112318 - oli-obk:assoc_ty_sized_bound_for_object_saf…",
+                  "oid": "44acf796c7e7ce441c8d7d7a34877554aeecdf27",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "0ff5a6ee57d866c005b4ab8ba13c904e4211c5be"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112316,
+                        "title": "Ensure space is inserted after keyword in `unused_delims`"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T21:47:59Z",
+                  "messageHeadline": "Rollup merge of #112316 - clubby789:unused-parens-space, r=compiler-e…",
+                  "oid": "0ff5a6ee57d866c005b4ab8ba13c904e4211c5be",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "ff43249b0efd274322cbd53441ff15fcdb7096ba"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112303,
+                        "title": "Normalize in infcx instead of globally for `Option::as_deref` suggestion"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T21:47:59Z",
+                  "messageHeadline": "Rollup merge of #112303 - Nilstrieb:as-deref, r=compiler-errors",
+                  "oid": "ff43249b0efd274322cbd53441ff15fcdb7096ba",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "9ce0c7951c3f36d81809e43584c601536badb45f"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112324,
+                        "title": "Rollup of 6 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T21:47:58Z",
+                  "messageHeadline": "Rollup merge of #112196 - compiler-errors:new-solver-resolv, r=lcnr",
+                  "oid": "9ce0c7951c3f36d81809e43584c601536badb45f",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "129a57a9f6f7824ce59e70c3dcc6584447d38898"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112324,
+                        "title": "Rollup of 6 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T21:47:57Z",
+                  "messageHeadline": "Rollup merge of #112081 - obeis:doc-test-literal, r=compiler-errors",
+                  "oid": "129a57a9f6f7824ce59e70c3dcc6584447d38898",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "408bbd040613f6776e0a7d05d582c81f4ddc189a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112322,
+                        "title": "Don't mention `IMPLIED_BOUNDS_ENTAILMENT` if signatures reference error"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T21:20:51Z",
+                  "messageHeadline": "Don't mention IMPLIED_BOUNDS_ENTAILMENT if signatures reference error",
+                  "oid": "0e9e91a95ace9f23e5371bd97e54fe4567150058",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "408bbd040613f6776e0a7d05d582c81f4ddc189a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 111047,
+                        "title": "Emit an error when return-type-notation is used with type/const params"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T20:05:08Z",
+                  "messageHeadline": "Remove redundant InferCtxtExt::fresh_item_substs",
+                  "oid": "b0eaaca31457672a8022312cc0f89b18ebc9d754",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "bbc536d3ac83ad0e3600af2d04701faed63ecd79"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 111495,
+                        "title": "Run tests on PGO/LTO/BOLT optimized dist artifacts"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T19:54:52Z",
+                  "messageHeadline": "Test the PGO/BOLT/LTO optimized x64 Linux compiler on CI",
+                  "oid": "c91a3a4d0cd178cbc30b87ba08ac9ee29083fa57",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "774a3d1523bde3a16f8a92dbaac01d211ba911c3"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 111047,
+                        "title": "Emit an error when return-type-notation is used with type/const params"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T19:52:04Z",
+                  "messageHeadline": "Emit an error when RTN is used with ty/ct params",
+                  "oid": "bbc536d3ac83ad0e3600af2d04701faed63ecd79",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "408bbd040613f6776e0a7d05d582c81f4ddc189a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112324,
+                        "title": "Rollup of 6 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T19:40:30Z",
+                  "messageHeadline": "Resolve vars in result from scrape_region_constraints",
+                  "oid": "979379aff720ec20e99eeaef3d015088de0ae93d",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "408bbd040613f6776e0a7d05d582c81f4ddc189a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112071,
+                        "title": "Group rfcs tests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T19:36:17Z",
+                  "messageHeadline": "Auto merge of #112071 - WaffleLapkin:group-rfcs-tests, r=oli-obk",
+                  "oid": "e6d4725c76f3b526c74454bc51afdf6daf133506",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "408bbd040613f6776e0a7d05d582c81f4ddc189a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112317,
+                        "title": "Rollup of 6 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T16:50:32Z",
+                  "messageHeadline": "Auto merge of #112317 - GuillaumeGomez:rollup-toh0gpo, r=GuillaumeGomez",
+                  "oid": "408bbd040613f6776e0a7d05d582c81f4ddc189a",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "2f896da247e0ee8f0bef7cd7c54cfbea255b9f68"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112318,
+                        "title": "Merge method, type and const object safety checks"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T16:39:16Z",
+                  "messageHeadline": "Merge method, type and const object safety checks",
+                  "oid": "58972d19e7ba591321d6e67d32080a5e5a78e19a",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "604ffab063e0b488f43b6f8faf60421a4533dbc0"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 111819,
+                        "title": "Improved std support for ps vita target"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T16:26:04Z",
+                  "messageHeadline": "Simplified bool to int conversion",
+                  "oid": "ac48d49ff8c757ce8380b0ea0dc8048a841db192",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "50117af409ada03f7ee895c12e0009060f8ba4c1"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 111819,
+                        "title": "Improved std support for ps vita target"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T16:14:09Z",
+                  "messageHeadline": "Std support improvement for ps vita target",
+                  "oid": "50117af409ada03f7ee895c12e0009060f8ba4c1",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "7452822843cf461b56742f0fc648af35889a3070"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112071,
+                        "title": "Group rfcs tests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T16:10:46Z",
+                  "messageHeadline": "Bless tidy root entry limit",
+                  "oid": "18e016f7e05d8d6c81bd68b0c36e4981da8004f6",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "9d3482c403f781a0d1c81508a7fa5bda5e56ceee"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112071,
+                        "title": "Group rfcs tests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T16:09:46Z",
+                  "messageHeadline": "Better group RFC ui tests together",
+                  "oid": "9d3482c403f781a0d1c81508a7fa5bda5e56ceee",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "7452822843cf461b56742f0fc648af35889a3070"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T15:33:26Z",
+                  "messageHeadline": "Verify that (almost) all `ret` instructions have been replaced",
+                  "oid": "b35f243c89907ba86b55fac5f86f591f7f342cde",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "62c8c7cca8f4e8133878c6e42ebb3c4236b3e7ff"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112315,
+                        "title": "fix spelling error"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T15:02:53Z",
+                  "messageHeadline": "Rollup merge of #112315 - lucascherzer:master, r=Nilstrieb",
+                  "oid": "7c363c22a26e947071e0c7288ae418f056b995eb",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "714ab6dc37f0c399f2ee6a7fa55bea3560689483"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112311,
+                        "title": "Ignore fluent message reordering in `git blame`"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T15:02:52Z",
+                  "messageHeadline": "Rollup merge of #112311 - clubby789:blame-ignore-fluent-reorder, r=Ni…",
+                  "oid": "714ab6dc37f0c399f2ee6a7fa55bea3560689483",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "154949dacdf4d34c967c3aeddcf0cdc27878ad59"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112299,
+                        "title": "Don't double-print status messages in GHA"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T15:02:52Z",
+                  "messageHeadline": "Rollup merge of #112299 - jyn514:gha-progress, r=oli-obk",
+                  "oid": "154949dacdf4d34c967c3aeddcf0cdc27878ad59",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "0258a16cdc917e379898c8b0e5765e5cf209994e"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112317,
+                        "title": "Rollup of 6 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T15:02:51Z",
+                  "messageHeadline": "Rollup merge of #112291 - sigaloid:master, r=clubby789",
+                  "oid": "0258a16cdc917e379898c8b0e5765e5cf209994e",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "200d03acad67cc76c9d103ce0c0b36f2e1880384"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112317,
+                        "title": "Rollup of 6 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T15:02:51Z",
+                  "messageHeadline": "Rollup merge of #112263 - GrishaVar:remove-extend-element, r=scottmcm",
+                  "oid": "200d03acad67cc76c9d103ce0c0b36f2e1880384",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "aabffef06d80ab2ff877e794f4d237148af1dc11"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112317,
+                        "title": "Rollup of 6 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T15:02:50Z",
+                  "messageHeadline": "Rollup merge of #112243 - GuillaumeGomez:rm-unneeded-buffer-creations…",
+                  "oid": "aabffef06d80ab2ff877e794f4d237148af1dc11",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "7452822843cf461b56742f0fc648af35889a3070"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112316,
+                        "title": "Ensure space is inserted after keyword in `unused_delims`"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T14:25:00Z",
+                  "messageHeadline": "Ensure space is inserted after keyword in `unused_delims`",
+                  "oid": "1fa769234e8345a1bcc687d31104b458b2be81d7",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "7452822843cf461b56742f0fc648af35889a3070"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112318,
+                        "title": "Merge method, type and const object safety checks"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T14:22:45Z",
+                  "messageHeadline": "Avoid going through queries if a value of type `AssocItem` is already…",
+                  "oid": "604ffab063e0b488f43b6f8faf60421a4533dbc0",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "42f28f9eb41adb7a197697e5e2d6535d00fd0f4a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112315,
+                        "title": "fix spelling error"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T14:01:09Z",
+                  "messageHeadline": "fix spelling error",
+                  "oid": "e30c52d428a2e4347244fd382f956ab04c100d6c",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "7452822843cf461b56742f0fc648af35889a3070"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112317,
+                        "title": "Rollup of 6 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T13:31:18Z",
+                  "messageHeadline": "Move write! arguments directly into the string",
+                  "oid": "48c46f275b6431966edf243965b027aaf0f4e09d",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "5c77a0d7a7543addab9ca5c4c32c330fb8620e83"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112305,
+                        "title": ":arrow_up: rust-analyzer"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T13:31:08Z",
+                  "messageHeadline": "Auto merge of #112305 - lnicola:sync-from-ra, r=lnicola",
+                  "oid": "2f896da247e0ee8f0bef7cd7c54cfbea255b9f68",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "7452822843cf461b56742f0fc648af35889a3070"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112311,
+                        "title": "Ignore fluent message reordering in `git blame`"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T12:25:23Z",
+                  "messageHeadline": "Ignore fluent message reordering in `git blame`",
+                  "oid": "679f29aa73704c5e5bb9acdd7671fc85571e7393",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "42f28f9eb41adb7a197697e5e2d6535d00fd0f4a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112312,
+                        "title": "Update to LLVM 16.0.5"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T12:19:09Z",
+                  "messageHeadline": "Update to LLVM 16.0.5",
+                  "oid": "5ff8767b36256650561ecbeac565e9b7e1f34470",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "42f28f9eb41adb7a197697e5e2d6535d00fd0f4a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112305,
+                        "title": ":arrow_up: rust-analyzer"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T12:10:05Z",
+                  "messageHeadline": "Merge commit 'ed87e0a20a9d196a5ea659ea46ae9574be666d4f' into sync-fro…",
+                  "oid": "6c1f108453a1ad34d2395bcdc2a76f554712e985",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "b8a7d439db0cfd765ed4bfedd2bbaeeee58b05a5"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T12:03:36Z",
+                  "messageHeadline": "Correct LVI print function test",
+                  "oid": "62c8c7cca8f4e8133878c6e42ebb3c4236b3e7ff",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "e4106065bf1bb515935d5d024e8d9c86454e2b22"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112344,
+                        "title": "Rollup of 7 pull requests"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T11:56:31Z",
+                  "messageHeadline": "Fix #111961 r=Mark-Simulacrum",
+                  "oid": "c5145dc87a2b750a12e8f36d84ff6fb4f8edfdf4",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "cade26637fe1c23965ce644299ed5200db7c92dd"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112305,
+                        "title": ":arrow_up: rust-analyzer"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T11:54:45Z",
+                  "messageHeadline": "Auto merge of #14984 - lnicola:rm-test-gate, r=Veykril",
+                  "oid": "ed87e0a20a9d196a5ea659ea46ae9574be666d4f",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "aa9bc8612514d216f84eec218dfd19ab83f3598a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112305,
+                        "title": ":arrow_up: rust-analyzer"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T11:43:31Z",
+                  "messageHeadline": "Add back sysroot-abi feature gate to rust-analyzer",
+                  "oid": "768a6c5931e4674a5a80185c130199dc86fa2970",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "aa9bc8612514d216f84eec218dfd19ab83f3598a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 107583,
+                        "title": "Support the rustc metadata for AIX"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T10:42:05Z",
+                  "messageHeadline": "Auto merge of #107583 - EsmeYi:aix_xcoff_metadata, r=bjorn3",
+                  "oid": "7452822843cf461b56742f0fc648af35889a3070",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "42f28f9eb41adb7a197697e5e2d6535d00fd0f4a"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112305,
+                        "title": ":arrow_up: rust-analyzer"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T09:04:23Z",
+                  "messageHeadline": "Merge commit 'aa9bc8612514d216f84eec218dfd19ab83f3598a' into sync-fro…",
+                  "oid": "b8a7d439db0cfd765ed4bfedd2bbaeeee58b05a5",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "51f714c8c5021fe25442e46798b1cbef2f2249ed"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112303,
+                        "title": "Normalize in infcx instead of globally for `Option::as_deref` suggestion"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T08:34:06Z",
+                  "messageHeadline": "Normalize in infcx instead of globally for `Option::as_deref` suggestion",
+                  "oid": "c12575d3173eb6ba985482808a87e54f23ad328e",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "896ccb96063526818aa560af43d3a918df97fe48"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112305,
+                        "title": ":arrow_up: rust-analyzer"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T08:33:53Z",
+                  "messageHeadline": "Auto merge of #14980 - lnicola:sync-from-rust, r=lnicola",
+                  "oid": "aa9bc8612514d216f84eec218dfd19ab83f3598a",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "c6a3fe051a7c4284821c12ffe922087fb8662f2b"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112303,
+                        "title": "Normalize in infcx instead of globally for `Option::as_deref` suggestion"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T08:26:53Z",
+                  "messageHeadline": "Properly compare types for `Option::as_deref` suggestion",
+                  "oid": "896ccb96063526818aa560af43d3a918df97fe48",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "e4106065bf1bb515935d5d024e8d9c86454e2b22"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112305,
+                        "title": ":arrow_up: rust-analyzer"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T08:07:47Z",
+                  "messageHeadline": "Merge remote-tracking branch 'upstream/master' into sync-from-rust",
+                  "oid": "c3dbe7c7176963509612012df321334227ba4299",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "1570299af4df53aacd6d68cf1b24aee734e9cdcd"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 110221,
+                        "title": "Greatly decrease the size of `rustc_driver.so` when debuginfo is enabled"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T07:48:47Z",
+                  "messageHeadline": "Auto merge of #110221 - jyn514:smaller-debuginfo, r=Mark-Simulacrum",
+                  "oid": "42f28f9eb41adb7a197697e5e2d6535d00fd0f4a",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "51f714c8c5021fe25442e46798b1cbef2f2249ed"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112305,
+                        "title": ":arrow_up: rust-analyzer"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T07:26:30Z",
+                  "messageHeadline": "Auto merge of #14978 - HKalbasi:lifetime-display, r=HKalbasi",
+                  "oid": "c6a3fe051a7c4284821c12ffe922087fb8662f2b",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "2f1b7cedcf5044ba620646c6758bbb99f46b8d95"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 112305,
+                        "title": ":arrow_up: rust-analyzer"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T07:25:47Z",
+                  "messageHeadline": "Emit `'_` for lifetime generics in `HirDisplay`",
+                  "oid": "5531d46c95f4a2745458790a640abc0ec198fd78",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "b4907a531f596b54ed6fe66d0f208b76179f5e06"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "associatedPullRequests": {
+                    "nodes": [
+                      {
+                        "number": 107583,
+                        "title": "Support the rustc metadata for AIX"
+                      }
+                    ]
+                  },
+                  "committedDate": "2023-06-05T07:15:09Z",
+                  "messageHeadline": "Address @bjorn3's comments.",
+                  "oid": "e31661cb9e5effdae3be7eec55143e2e8ece9e14",
+                  "parents": {
+                    "nodes": [
+                      {
+                        "oid": "18fdca37cf0c1e0b8e2a71c9fb36d02467b618ef"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "pageInfo": {
+                "endCursor": "b2807b2bf3be9fbed9a0aadc97841c20a1ab5f79 99",
+                "hasNextPage": true
+              },
+              "totalCount": 226379
+            }
+          }
+        }
+      }
+    }
+  }
+}

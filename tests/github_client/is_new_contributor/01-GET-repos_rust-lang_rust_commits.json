@@ -1,0 +1,9 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/repos/rust-lang/rust/commits",
+  "query": "author=octocat",
+  "request_body": "",
+  "response_code": 200,
+  "response_body": []
+}

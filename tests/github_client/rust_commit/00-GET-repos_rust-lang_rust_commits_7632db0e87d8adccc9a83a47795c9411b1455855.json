@@ -1,0 +1,123 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/repos/rust-lang/rust/commits/7632db0e87d8adccc9a83a47795c9411b1455855",
+  "query": null,
+  "request_body": "",
+  "response_code": 200,
+  "response_body": {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+      "events_url": "https://api.github.com/users/bors/events{/privacy}",
+      "followers_url": "https://api.github.com/users/bors/followers",
+      "following_url": "https://api.github.com/users/bors/following{/other_user}",
+      "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/bors",
+      "id": 3372342,
+      "login": "bors",
+      "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+      "organizations_url": "https://api.github.com/users/bors/orgs",
+      "received_events_url": "https://api.github.com/users/bors/received_events",
+      "repos_url": "https://api.github.com/users/bors/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/bors"
+    },
+    "comments_url": "https://api.github.com/repos/rust-lang/rust/commits/7632db0e87d8adccc9a83a47795c9411b1455855/comments",
+    "commit": {
+      "author": {
+        "date": "2022-12-08T07:46:42Z",
+        "email": "bors@rust-lang.org",
+        "name": "bors"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2022-12-08T07:46:42Z",
+        "email": "bors@rust-lang.org",
+        "name": "bors"
+      },
+      "message": "Auto merge of #105415 - nikic:update-llvm-10, r=cuviper\n\nUpdate LLVM submodule\n\nThis is a rebase to LLVM 15.0.6.\n\nFixes #103380.\nFixes #104099.",
+      "tree": {
+        "sha": "48b86a3f0b0ab76a8205a5b56444c7e511340f8a",
+        "url": "https://api.github.com/repos/rust-lang/rust/git/trees/48b86a3f0b0ab76a8205a5b56444c7e511340f8a"
+      },
+      "url": "https://api.github.com/repos/rust-lang/rust/git/commits/7632db0e87d8adccc9a83a47795c9411b1455855",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/3372342?v=4",
+      "events_url": "https://api.github.com/users/bors/events{/privacy}",
+      "followers_url": "https://api.github.com/users/bors/followers",
+      "following_url": "https://api.github.com/users/bors/following{/other_user}",
+      "gists_url": "https://api.github.com/users/bors/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/bors",
+      "id": 3372342,
+      "login": "bors",
+      "node_id": "MDQ6VXNlcjMzNzIzNDI=",
+      "organizations_url": "https://api.github.com/users/bors/orgs",
+      "received_events_url": "https://api.github.com/users/bors/received_events",
+      "repos_url": "https://api.github.com/users/bors/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/bors/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/bors/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/bors"
+    },
+    "files": [
+      {
+        "additions": 1,
+        "blob_url": "https://github.com/rust-lang/rust/blob/7632db0e87d8adccc9a83a47795c9411b1455855/.gitmodules",
+        "changes": 2,
+        "contents_url": "https://api.github.com/repos/rust-lang/rust/contents/.gitmodules?ref=7632db0e87d8adccc9a83a47795c9411b1455855",
+        "deletions": 1,
+        "filename": ".gitmodules",
+        "patch": "@@ -28,7 +28,7 @@\n [submodule \"src/llvm-project\"]\n \tpath = src/llvm-project\n \turl = https://github.com/rust-lang/llvm-project.git\n-\tbranch = rustc/15.0-2022-08-09\n+\tbranch = rustc/15.0-2022-12-07\n [submodule \"src/doc/embedded-book\"]\n \tpath = src/doc/embedded-book\n \turl = https://github.com/rust-embedded/book.git",
+        "raw_url": "https://github.com/rust-lang/rust/raw/7632db0e87d8adccc9a83a47795c9411b1455855/.gitmodules",
+        "sha": "4011a6fa6b95b3e0104a4f99ab5c912790d7a333",
+        "status": "modified"
+      },
+      {
+        "additions": 1,
+        "blob_url": null,
+        "changes": 2,
+        "contents_url": "https://api.github.com/repos/rust-lang/rust/contents/src%2Fllvm-project?ref=7632db0e87d8adccc9a83a47795c9411b1455855",
+        "deletions": 1,
+        "filename": "src/llvm-project",
+        "patch": "@@ -1 +1 @@\n-Subproject commit a1232c451fc27173f8718e05d174b2503ca0b607\n+Subproject commit 3dfd4d93fa013e1c0578d3ceac5c8f4ebba4b6ec",
+        "raw_url": null,
+        "sha": "3dfd4d93fa013e1c0578d3ceac5c8f4ebba4b6ec",
+        "status": "modified"
+      }
+    ],
+    "html_url": "https://github.com/rust-lang/rust/commit/7632db0e87d8adccc9a83a47795c9411b1455855",
+    "node_id": "C_kwDOAAsO6NoAKDc2MzJkYjBlODdkOGFkY2NjOWE4M2E0Nzc5NWM5NDExYjE0NTU4NTU",
+    "parents": [
+      {
+        "html_url": "https://github.com/rust-lang/rust/commit/f5418b09e84883c4de2e652a147ab9faff4eee29",
+        "sha": "f5418b09e84883c4de2e652a147ab9faff4eee29",
+        "url": "https://api.github.com/repos/rust-lang/rust/commits/f5418b09e84883c4de2e652a147ab9faff4eee29"
+      },
+      {
+        "html_url": "https://github.com/rust-lang/rust/commit/530a687a4bb0bd0e8ab7b3f7d80f2c773be120ef",
+        "sha": "530a687a4bb0bd0e8ab7b3f7d80f2c773be120ef",
+        "url": "https://api.github.com/repos/rust-lang/rust/commits/530a687a4bb0bd0e8ab7b3f7d80f2c773be120ef"
+      }
+    ],
+    "sha": "7632db0e87d8adccc9a83a47795c9411b1455855",
+    "stats": {
+      "additions": 2,
+      "deletions": 2,
+      "total": 4
+    },
+    "url": "https://api.github.com/repos/rust-lang/rust/commits/7632db0e87d8adccc9a83a47795c9411b1455855"
+  }
+}

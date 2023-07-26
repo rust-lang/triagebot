@@ -115,6 +115,21 @@ You need to sign up for a free account, and also deal with configuring the GitHu
       * Secret: Enter a shared secret (some longish random text)
       * Events: "Send me everything"
 
+## Tests
+
+When possible, writing unittests is very helpful and one of the easiest ways to test.
+For more advanced testing, there is an integration test called `testsuite` which provides a testing environment for testing triagebot.
+At this time, there is one part to it:
+
+* [`github_client`](tests/github_client/mod.rs) — Tests specifically targeting `GithubClient`.
+  This sets up an HTTP server that mimics api.github.com and verifies the client's behavior.
+
+Other parts may be added in the future, such as testing the database or the triagebot server itself.
+
+The real GitHub API responses are recorded in JSON files that the tests can later replay to verify the behavior of triagebot.
+These recordings are enabled with the `TRIAGEBOT_TEST_RECORD_DIR` environment variable.
+See the documentation in `github_client` for the steps for setting up recording to write a test.
+
 ## License
 
 Triagebot is distributed under the terms of both the MIT license and the

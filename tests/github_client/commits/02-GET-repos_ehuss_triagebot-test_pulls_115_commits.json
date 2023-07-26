@@ -1,0 +1,89 @@
+{
+  "kind": "Request",
+  "method": "GET",
+  "path": "/repos/ehuss/triagebot-test/pulls/115/commits",
+  "query": "page=1&per_page=100",
+  "request_body": "",
+  "response_code": 200,
+  "response_body": [
+    {
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/43198?v=4",
+        "events_url": "https://api.github.com/users/ehuss/events{/privacy}",
+        "followers_url": "https://api.github.com/users/ehuss/followers",
+        "following_url": "https://api.github.com/users/ehuss/following{/other_user}",
+        "gists_url": "https://api.github.com/users/ehuss/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/ehuss",
+        "id": 43198,
+        "login": "ehuss",
+        "node_id": "MDQ6VXNlcjQzMTk4",
+        "organizations_url": "https://api.github.com/users/ehuss/orgs",
+        "received_events_url": "https://api.github.com/users/ehuss/received_events",
+        "repos_url": "https://api.github.com/users/ehuss/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/ehuss/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/ehuss/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/ehuss"
+      },
+      "comments_url": "https://api.github.com/repos/ehuss/triagebot-test/commits/f39d908ac31a6bccc4a0bba0497d3626756dacd7/comments",
+      "commit": {
+        "author": {
+          "date": "2023-06-06T00:33:20Z",
+          "email": "eric@huss.org",
+          "name": "Eric Huss"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2023-06-06T00:33:20Z",
+          "email": "eric@huss.org",
+          "name": "Eric Huss"
+        },
+        "message": "test",
+        "tree": {
+          "sha": "4645075b7c02de65a59592f9d124b57f3c4160a7",
+          "url": "https://api.github.com/repos/ehuss/triagebot-test/git/trees/4645075b7c02de65a59592f9d124b57f3c4160a7"
+        },
+        "url": "https://api.github.com/repos/ehuss/triagebot-test/git/commits/f39d908ac31a6bccc4a0bba0497d3626756dacd7",
+        "verification": {
+          "payload": null,
+          "reason": "unsigned",
+          "signature": null,
+          "verified": false
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/43198?v=4",
+        "events_url": "https://api.github.com/users/ehuss/events{/privacy}",
+        "followers_url": "https://api.github.com/users/ehuss/followers",
+        "following_url": "https://api.github.com/users/ehuss/following{/other_user}",
+        "gists_url": "https://api.github.com/users/ehuss/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/ehuss",
+        "id": 43198,
+        "login": "ehuss",
+        "node_id": "MDQ6VXNlcjQzMTk4",
+        "organizations_url": "https://api.github.com/users/ehuss/orgs",
+        "received_events_url": "https://api.github.com/users/ehuss/received_events",
+        "repos_url": "https://api.github.com/users/ehuss/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/ehuss/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/ehuss/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/ehuss"
+      },
+      "html_url": "https://github.com/ehuss/triagebot-test/commit/f39d908ac31a6bccc4a0bba0497d3626756dacd7",
+      "node_id": "C_kwDOHkK3XdoAKGYzOWQ5MDhhYzMxYTZiY2NjNGEwYmJhMDQ5N2QzNjI2NzU2ZGFjZDc",
+      "parents": [
+        {
+          "html_url": "https://github.com/ehuss/triagebot-test/commit/9a00ee2312071126101bb900f363210d6f3d1402",
+          "sha": "9a00ee2312071126101bb900f363210d6f3d1402",
+          "url": "https://api.github.com/repos/ehuss/triagebot-test/commits/9a00ee2312071126101bb900f363210d6f3d1402"
+        }
+      ],
+      "sha": "f39d908ac31a6bccc4a0bba0497d3626756dacd7",
+      "url": "https://api.github.com/repos/ehuss/triagebot-test/commits/f39d908ac31a6bccc4a0bba0497d3626756dacd7"
+    }
+  ]
+}
