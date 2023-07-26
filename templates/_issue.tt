@@ -1,1 +1,1 @@
-{% macro render(issue, with_age="") %}"{{issue.title}}" [{{issue.repo_name}}#{{issue.number}}]({{issue.html_url}}) {% if with_age %}(last review activity: {{issue.updated_at_hts}}){% endif %}{% endmacro %}
+{% macro render(issue, with_age="") %}"{{issue.title}}" [{{issue.repo_name}}#{{issue.number}}]({{issue.html_url}}){% if with_age %}(last review activity: {{issue.updated_at_hts}}){% endif %}{% endmacro %}

@@ -169,15 +169,6 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                             exclude_labels: vec!["beta-accepted"],
                         }),
                     },
-                    QueryMap {
-                        name: "beta_nominated_t_rustdoc",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![],
-                            include_labels: vec!["beta-nominated", "T-rustdoc"],
-                            exclude_labels: vec!["beta-accepted"],
-                        }),
-                    },
                     // stable nomination queries
                     QueryMap {
                         name: "stable_nominated_t_compiler",
@@ -185,15 +176,6 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         query: Arc::new(github::Query {
                             filters: vec![],
                             include_labels: vec!["stable-nominated", "T-compiler"],
-                            exclude_labels: vec!["stable-accepted"],
-                        }),
-                    },
-                    QueryMap {
-                        name: "stable_nominated_t_rustdoc",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![],
-                            include_labels: vec!["stable-nominated", "T-rustdoc"],
                             exclude_labels: vec!["stable-accepted"],
                         }),
                     },
