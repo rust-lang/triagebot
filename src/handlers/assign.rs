@@ -61,12 +61,18 @@ const RETURNING_USER_WELCOME_MESSAGE: &str = "r? @{assignee}
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
     "@{author}: no appropriate reviewer found, use r? to override";
 
+const ON_VACATION_WARNING: &str = "{username} is on vacation. Please do not assign them to PRs.";
+
 const NON_DEFAULT_BRANCH: &str =
     "Pull requests are usually filed against the {default} branch for this repo, \
      but this one is against {target}. \
      Please double check that you specified the right target!";
 
 const SUBMODULE_WARNING_MSG: &str = "These commits modify **submodules**.";
+
+fn on_vacation_msg(user: &str) -> String {
+    ON_VACATION_WARNING.replace("{username}", user)
+}
 
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct AssignData {
@@ -295,6 +301,7 @@ async fn determine_assignee(
                     is there maybe a misconfigured group?",
                     event.issue.global_id()
                 ),
+                // TODO: post a comment on the PR if the reviewers were filtered due to being on vacation
                 Err(
                     e @ FindReviewerError::NoReviewer { .. }
                     | e @ FindReviewerError::AllReviewersFiltered { .. },
@@ -438,7 +445,19 @@ pub(super) async fn handle_command(
         }
         let username = match cmd {
             AssignCommand::Own => event.user().login.clone(),
-            AssignCommand::User { username } => username,
+            AssignCommand::User { username } => {
+                // Allow users on vacation to assign themselves to a PR, but not anyone else.
+                if config.is_on_vacation(&username)
+                    && event.user().login.to_lowercase() != username.to_lowercase()
+                {
+                    // This is a comment, so there must already be a reviewer assigned. No need to assign anyone else.
+                    issue
+                        .post_comment(&ctx.github, &on_vacation_msg(&username))
+                        .await?;
+                    return Ok(());
+                }
+                username
+            }
             AssignCommand::Release => {
                 log::trace!(
                     "ignoring release on PR {:?}, must always have assignee",
@@ -604,7 +623,7 @@ impl fmt::Display for FindReviewerError {
                 write!(
                     f,
                     "Could not assign reviewer from: `{}`.\n\
-                     User(s) `{}` are either the PR author or are already assigned, \
+                     User(s) `{}` are either the PR author, already assigned, or on vacation, \
                      and there are no other candidates.\n\
                      Use r? to specify someone else to assign.",
                     initial.join(","),
@@ -680,6 +699,7 @@ fn candidate_reviewers_from_names<'a>(
     let mut filter = |name: &&str| -> bool {
         let name_lower = name.to_lowercase();
         let ok = name_lower != issue.user.login.to_lowercase()
+            && !config.is_on_vacation(name)
             && !issue
                 .assignees
                 .iter()
