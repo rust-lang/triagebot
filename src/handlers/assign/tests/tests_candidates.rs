@@ -265,3 +265,33 @@ fn invalid_org_doesnt_match() {
         )),
     );
 }
+
+#[test]
+fn vacation() {
+    let teams = toml::toml!(bootstrap = ["jyn514", "Mark-Simulacrum"]);
+    let config = toml::toml!(users_on_vacation = ["jyn514"]);
+    let issue = generic_issue("octocat", "rust-lang/rust");
+
+    // Test that `r? user` falls through to assigning from the team.
+    // See `determine_assignee` - ideally we would test that function directly instead of indirectly through `find_reviewer_from_names`.
+    let err_names = vec!["jyn514".into()];
+    test_from_names(
+        Some(teams.clone()),
+        config.clone(),
+        issue.clone(),
+        &["jyn514"],
+        Err(FindReviewerError::AllReviewersFiltered {
+            initial: err_names.clone(),
+            filtered: err_names,
+        }),
+    );
+
+    // Test that `r? bootstrap` doesn't assign from users on vacation.
+    test_from_names(
+        Some(teams.clone()),
+        config.clone(),
+        issue,
+        &["bootstrap"],
+        Ok(&["Mark-Simulacrum"]),
+    );
+}

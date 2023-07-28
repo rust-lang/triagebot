@@ -90,6 +90,17 @@ pub(crate) struct AssignConfig {
     /// usernames, team names, or ad-hoc groups.
     #[serde(default)]
     pub(crate) owners: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub(crate) users_on_vacation: HashSet<String>,
+}
+
+impl AssignConfig {
+    pub(crate) fn is_on_vacation(&self, user: &str) -> bool {
+        let name_lower = user.to_lowercase();
+        self.users_on_vacation
+            .iter()
+            .any(|vacationer| name_lower == vacationer.to_lowercase())
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -337,6 +348,7 @@ mod tests {
             ]
 
             [assign]
+            users_on_vacation = ["jyn514"]
 
             [note]
 
@@ -393,6 +405,7 @@ mod tests {
                     contributing_url: None,
                     adhoc_groups: HashMap::new(),
                     owners: HashMap::new(),
+                    users_on_vacation: HashSet::from(["jyn514".into()]),
                 }),
                 note: Some(NoteConfig { _empty: () }),
                 ping: Some(PingConfig { teams: ping_teams }),
