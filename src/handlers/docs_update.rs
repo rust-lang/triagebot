@@ -64,10 +64,8 @@ pub async fn handle_job() -> Result<()> {
 
 pub async fn docs_update() -> Result<Option<Issue>> {
     let gh = GithubClient::new_with_default_token(Client::new());
+    let dest_repo = gh.repository(DEST_REPO).await?;
     let work_repo = gh.repository(WORK_REPO).await?;
-    work_repo
-        .merge_upstream(&gh, &work_repo.default_branch)
-        .await?;
 
     let updates = get_submodule_updates(&gh, &work_repo).await?;
     if updates.is_empty() {
@@ -75,8 +73,8 @@ pub async fn docs_update() -> Result<Option<Issue>> {
         return Ok(None);
     }
 
-    create_commit(&gh, &work_repo, &updates).await?;
-    Ok(Some(create_pr(&gh, &updates).await?))
+    create_commit(&gh, &dest_repo, &work_repo, &updates).await?;
+    Ok(Some(create_pr(&gh, &dest_repo, &updates).await?))
 }
 
 struct Update {
@@ -158,11 +156,12 @@ async fn generate_pr_body(
 
 async fn create_commit(
     gh: &GithubClient,
+    dest_repo: &Repository,
     rust_repo: &Repository,
     updates: &[Update],
 ) -> Result<()> {
-    let master_ref = rust_repo
-        .get_reference(gh, &format!("heads/{}", rust_repo.default_branch))
+    let master_ref = dest_repo
+        .get_reference(gh, &format!("heads/{}", dest_repo.default_branch))
         .await?;
     let master_commit = rust_repo.git_commit(gh, &master_ref.object.sha).await?;
     let tree_entries: Vec<_> = updates
@@ -186,8 +185,7 @@ async fn create_commit(
     Ok(())
 }
 
-async fn create_pr(gh: &GithubClient, updates: &[Update]) -> Result<Issue> {
-    let dest_repo = gh.repository(DEST_REPO).await?;
+async fn create_pr(gh: &GithubClient, dest_repo: &Repository, updates: &[Update]) -> Result<Issue> {
     let mut body = String::new();
     for update in updates {
         write!(body, "{}\n", update.pr_body).unwrap();
