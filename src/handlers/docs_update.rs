@@ -67,7 +67,7 @@ pub async fn docs_update() -> Result<Option<Issue>> {
     let dest_repo = gh.repository(DEST_REPO).await?;
     let work_repo = gh.repository(WORK_REPO).await?;
 
-    let updates = get_submodule_updates(&gh, &work_repo).await?;
+    let updates = get_submodule_updates(&gh, &dest_repo).await?;
     if updates.is_empty() {
         tracing::trace!("no updates this week?");
         return Ok(None);
