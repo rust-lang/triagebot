@@ -1918,26 +1918,120 @@ impl GithubClient {
         }
     }
 
+    /// Issues an ad-hoc GraphQL query.
+    pub async fn graphql_query<T: serde::de::DeserializeOwned>(
+        &self,
+        query: &str,
+        vars: serde_json::Value,
+    ) -> anyhow::Result<T> {
+        self.json(
+            self.post(Repository::GITHUB_GRAPHQL_API_URL)
+                .json(&serde_json::json!({
+                    "query": query,
+                    "variables": vars,
+                })),
+        )
+        .await
+    }
+
+    /// Returns the object ID of the given user.
+    ///
+    /// Returns `None` if the user doesn't exist.
+    pub async fn user_object_id(&self, user: &str) -> anyhow::Result<Option<String>> {
+        let user_info: serde_json::Value = self
+            .graphql_query(
+                "query($user:String!) {
+                    user(login:$user) {
+                        id
+                    }
+                }",
+                serde_json::json!({
+                    "user": user,
+                }),
+            )
+            .await?;
+        if let Some(id) = user_info["data"]["user"]["id"].as_str() {
+            return Ok(Some(id.to_string()));
+        }
+        if let Some(errors) = user_info["errors"].as_array() {
+            if errors
+                .iter()
+                .any(|err| err["type"].as_str().unwrap_or_default() == "NOT_FOUND")
+            {
+                return Ok(None);
+            }
+            let messages: Vec<_> = errors
+                .iter()
+                .map(|err| err["message"].as_str().unwrap_or_default())
+                .collect();
+            anyhow::bail!("failed to query user: {}", messages.join("\n"));
+        }
+        anyhow::bail!("query for user {user} failed, no error message? {user_info:?}");
+    }
+
     /// Returns whether or not the given GitHub login has made any commits to
     /// the given repo.
     pub async fn is_new_contributor(&self, repo: &Repository, author: &str) -> bool {
-        let url = format!(
-            "{}/repos/{}/commits?author={}",
-            Repository::GITHUB_API_URL,
-            repo.full_name,
-            author,
-        );
-        let req = self.get(&url);
-        match self.json::<Vec<GithubCommit>>(req).await {
-            // Note: This only returns results for the default branch.
-            // That should be fine in most cases since I think it is rare for
-            // new users to make their first commit to a different branch.
-            Ok(res) => res.is_empty(),
+        let user_id = match self.user_object_id(author).await {
+            Ok(None) => return true,
+            Ok(Some(id)) => id,
+            Err(e) => {
+                log::warn!("failed to query user: {e:?}");
+                return true;
+            }
+        };
+        // Note: This only returns results for the default branch. That should
+        // be fine in most cases since I think it is rare for new users to
+        // make their first commit to a different branch.
+        //
+        // Note: This is using GraphQL because the
+        // `/repos/ORG/REPO/commits?author=AUTHOR` API was having problems not
+        // finding users (https://github.com/rust-lang/triagebot/issues/1689).
+        // The other possibility is the `/search/commits?q=repo:{}+author:{}`
+        // API, but that endpoint has a very limited rate limit, and doesn't
+        // work on forks. This GraphQL query seems to work fairly reliably,
+        // and seems to cost only 1 point.
+        match self
+            .graphql_query::<serde_json::Value>(
+                "query($repository_owner:String!, $repository_name:String!, $user_id:ID!) {
+                        repository(owner: $repository_owner, name: $repository_name) {
+                            defaultBranchRef {
+                                target {
+                                    ... on Commit {
+                                        history(author: {id: $user_id}) {
+                                            totalCount
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }",
+                serde_json::json!({
+                        "repository_owner": repo.owner(),
+                        "repository_name": repo.name(),
+                        "user_id": user_id
+                }),
+            )
+            .await
+        {
+            Ok(c) => {
+                if let Some(c) = c["data"]["repository"]["defaultBranchRef"]["target"]["history"]
+                    ["totalCount"]
+                    .as_i64()
+                {
+                    return c == 0;
+                }
+                log::warn!("new user query failed: {c:?}");
+                false
+            }
             Err(e) => {
                 log::warn!(
                     "failed to search for user commits in {} for author {author}: {e:?}",
                     repo.full_name
                 );
+                // Using `false` since if there is some underlying problem, we
+                // don't need to spam everyone with the "new user" welcome
+                // message.
                 false
             }
         }
