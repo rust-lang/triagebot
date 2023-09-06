@@ -249,8 +249,8 @@ async fn set_assignee(issue: &Issue, github: &GithubClient, username: &str) {
                 &format!(
                     "Failed to set assignee to `{username}`: {err}\n\
                      \n\
-                     > **Note**: Only org members, users with write \
-                       permissions, or people who have commented on the PR may \
+                     > **Note**: Only org members with at least the repository \"read\" role, \
+                       users with write permissions, or people who have commented on the PR may \
                        be assigned."
                 ),
             )
