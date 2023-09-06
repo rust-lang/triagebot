@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Review settings backoffice</title>
+        <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico">
+        <style type="text/css" media="screen">
+         @media (prefers-color-scheme: dark) {
+             body {
+                 background-color: #252d30;
+                 filter: invert(70%);
+             }
+             .checkboxtrue {
+                 border: green;
+             }
+             .checkboxfalse {
+                 pointer-events: none;
+             }
+         }
+
+         td, th {
+             border: 1px solid #cacaca;
+             padding: 5px;
+             text-align: center;
+             /* vertical-align: middle; */
+         }
+
+         form {
+             display: table;
+         }
+
+         div.form-example {
+             display: table-row;
+         }
+
+         input {
+             display: inline-flex;
+             margin-bottom: 10px;
+             vertical-align: middle;
+         }
+
+         input[type='number'] {
+             width: 60px;
+         }
+
+         label {
+             display:block;
+             vertical-align: middle;
+         }
+
+         .title {
+             text-align: center;
+         }
+
+         /* Courtesy w3schools */
+         .tooltip {
+             position: relative;
+             display: inline-block;
+             border-bottom: 1px dotted black;
+         }
+
+         .tooltip .tooltiptext {
+             visibility: hidden;
+             width: 240px;
+             background-color: black;
+             color: #fff;
+             text-align: center;
+             border-radius: 6px;
+             padding: 5px;
+
+             /* Position the tooltip */
+             position: absolute;
+             z-index: 1;
+         }
+
+         .tooltip:hover .tooltiptext {
+             visibility: visible;
+         }
+
+         .success {
+             color: green;
+         }
+
+         .fail {
+             color: red;
+         }
+        </style>
+    </head>
+    <body>
+        <form id="review-capacity-form" method="post" class="form-example" accept-charset="utf-8">
+            <table>
+                <thead>
+                    <tr>
+                        <td colspan=5 class="title" id="message"><h2></h2></td>
+                        <td><span><a target="_new" href="https://github.com/rust-lang/triagebot"><img width=48 height=48 src="https://www.inflectra.com/Images/ApplicationIcons/git.svg" alt="Contribute a patch or report a bug"/></span></td>
+                    <tr>
+                        <td colspan=6 class="title">
+                            <h2>Rust project review capacity</h2>
+                        </td></tr>
+                    <tr><td colspan=6 class="title"><h4>A backoffice to set your own review capacity.<br />These settings will be automatically used by the Triagebot when assigning a review</h4></td></tr>
+                    <tr>
+                        <th>Team member</th>
+                        <th>Active <div class="tooltip">[&quest;<span class="tooltiptext">Uncheck this if you want to set yourself off-duty without a timeframe.</span></div>]</th>
+                        <th>Max # assigned PRs</th>
+                        <th>Time off</th>
+                        <th>Please notify me after <div class="tooltip">[&quest;<span class="tooltiptext">Days that you allow before being pinged for a review assigned to you.</span></div>]</th>
+                        <th>Publish my preferences <div class="tooltip">[&quest;<span class="tooltiptext">Check this to have your settings publicly visible.<br/><br/>Note: admins will always see all members settings</span></div>]</th>
+                    </tr>
+                </thead>
+                <tbody id="my-prefs">
+                    <!-- START user prefs -->
+                    <tr><td colspan=6 class="title">My prefs</td></tr>
+                    <tr>
+                        <td>
+                            <input id=user_id name=user_id type=hidden value="{{ user_prefs.user_id }}">
+                            <a href="https://github.com/rust-lang/rust/pulls/assigned/{{ user_prefs.username }}">{{ user_prefs.username }}</a>
+                        </td>
+                        <td><label><input id=active name=active type=checkbox {% if user_prefs.active %}checked="checked"{% endif %} onClick="enableDisableFields(this.checked);"></label></td>
+                        <td>
+                            <input id=enable_max_assigned_prs name=enable_max_assigned_prs type=checkbox checked=checked onClick="enableDisableField(this.checked);">
+                            {{ user_prefs.num_assigned_prs }} / <input id=max_assigned_prs name=max_assigned_prs type=number value="{{ user_prefs.max_assigned_prs }}">
+                            <td>
+                                <input id=pto_date_start name=pto_date_start type=date value="{{ user_prefs.pto_date_start }}">&nbsp;
+                                <input id=pto_date_end name=pto_date_end type=date value="{{ user_prefs.pto_date_end }}">
+                            </td>
+                            <td><input id=allow_ping_after_days name=allow_ping_after_days type=number value="{{ user_prefs.allow_ping_after_days }}"></td>
+                            <td><label><input id=publish_prefs name="publish_prefs" type=checkbox {% if user_prefs.publish_prefs %}checked="checked"{% endif %}></label></td>
+                    </tr>
+                    <!-- END user prefs -->
+                </tbody>
+                <tbody>
+                    <tr><td colspan=6 class="title"><input id=save_prefs type="submit" value="Save my preferences"/></td></tr>
+                    <tr><td colspan=6 class="title">My team prefs (read-only)</td></tr>
+                </tbody>
+                <tbody id="other-prefs">
+                    <!-- START team prefs -->
+                    {% for pref in team_prefs %}
+                    <tr>
+                        <td><a href="https://github.com/rust-lang/rust/pulls/assigned/{{ pref.username }}">{{ pref.username }}</a></td>
+                        <td><label><input id=x type=checkbox {% if user_prefs.active %}checked="checked"{% endif %} disabled></label></td>
+                        <td>{{ pref.num_assigned_prs }} / <input id=x type=number value="{{ pref.max_assigned_prs }}" disabled></td>
+                        <td>
+                            <input id=x type=date value="{{ user_prefs.pto_date_start }}" disabled>&nbsp;
+                            <input id=x type=date value="{{ user_prefs.pto_date_end }}" disabled>
+                        </td>
+                        <td><input id=x type=number value="{{ user_prefs.allow_ping_after_days }}" disabled></td>
+                        <td><label class="checkboxfalse"><input id=x class=${publish?"checkboxtrue":"checkboxfalse"} type=checkbox ${publish}></label></td>
+                    </tr>
+                    {% endfor %}
+                    <!-- END team prefs -->
+                </tbody>
+            </table>
+        </form>
+        <script type="text/javascript">
+         function enableDisableField(is_checked) {
+             var elem = document.getElementById('max_assigned_prs');
+             if (is_checked === true) {
+                 elem.removeAttribute('disabled', '');
+             } else {
+                 elem.setAttribute('disabled', 'disabled');
+             }
+         }
+
+         function enableDisableFields(is_checked) {
+             const form = document.querySelectorAll('form')[0];
+             var flds = ['enable_max_assigned_prs', 'max_assigned_prs', 'pto_date_start', 'pto_date_end','allow_ping_after_days'];
+             Array.from(form.elements).forEach((input) => {
+                 const elem = document.getElementById(input.id);
+                 if (flds.includes(elem.id)) {
+                     if (is_checked === true) {
+                         elem.removeAttribute('disabled', '');
+                     } else {
+                         elem.setAttribute('disabled', 'disabled');
+                     }
+                 }
+             });
+         }
+
+        </script>
+    </body>
+</html>

@@ -3,7 +3,9 @@ use chrono::{Duration, Utc};
 use hyper::{Body, Response, StatusCode};
 use serde::Serialize;
 use serde_json::value::{to_value, Value};
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
+use tokio::io::AsyncReadExt;
+use tracing::log;
 use url::Url;
 
 const YELLOW_DAYS: i64 = 7;
@@ -11,10 +13,38 @@ const RED_DAYS: i64 = 14;
 
 pub fn index() -> Result<Response<Body>, hyper::Error> {
     Ok(Response::builder()
-        .header("Content-Type", "text/html")
+        .header("Content-Type", "text/html; charset=utf-8")
         .status(StatusCode::OK)
         .body(Body::from(include_str!("../templates/triage/index.html")))
         .unwrap())
+}
+
+pub async fn asset(path: &str, _file: &str) -> Result<Response<Body>, hyper::Error> {
+    let s = format!("static/{}/{}", path, _file);
+    let ext = Path::new(&s).extension().unwrap().to_str().unwrap();
+    if let Ok(mut fd) = tokio::fs::File::open(&s).await {
+        let mut contents = String::new();
+        fd.read_to_string(&mut contents)
+            .await
+            .unwrap_or_else(|err| panic!("Error loading file {}: {}", s, err));
+        contents = contents.trim_end().to_string();
+        let body = Body::from(contents);
+        let _ty = match ext {
+            "css" => "text/css",
+            "js" => "text/javascript",
+            _ => "text/plain",
+        };
+        Ok(Response::builder()
+            .header("Content-Type", _ty)
+            .body(body)
+            .unwrap())
+    } else {
+        log::debug!("File {} NOT FOUND?", s);
+        Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::empty())
+            .unwrap())
+    }
 }
 
 pub async fn pulls(

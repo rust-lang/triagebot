@@ -15,6 +15,8 @@ use std::{
 };
 use tracing as log;
 
+use crate::Config;
+
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct User {
     pub login: String,
@@ -166,6 +168,23 @@ impl GithubClient {
     {
         let (body, _req_dbg) = self.send_req(req).await?;
         Ok(serde_json::from_slice(&body)?)
+    }
+
+    pub async fn get_team_members<'a>(
+        &self,
+        admins: &mut Vec<String>,
+        members: &mut Vec<String>,
+        team: &str,
+    ) {
+        let req = self.get(&format!(
+            "https://raw.githubusercontent.com/rust-lang/team/HEAD/teams/{}",
+            team,
+        ));
+        let (contents, _) = self.send_req(req).await.unwrap();
+        let body = String::from_utf8_lossy(&contents).to_string();
+        let mut config: Config = toml::from_str(&body).unwrap();
+        members.append(&mut config.people.members);
+        admins.append(&mut config.people.leads);
     }
 }
 
@@ -2045,6 +2064,18 @@ impl GithubClient {
         self.json(req)
             .await
             .with_context(|| format!("{} failed to get repo", full_name))
+    }
+
+    pub async fn get_profile(&self, access_token: &str) -> anyhow::Result<User> {
+        let c = self
+            .client
+            .get("https://api.github.com/user")
+            .header("Authorization", format!("Bearer {}", access_token))
+            .header("User-Agent", "rust-lang-triagebot");
+        log::debug!("client={:?}", c);
+        let resp = self.json::<User>(c).await;
+        log::debug!("resp={:?}", resp);
+        resp
     }
 }
 
