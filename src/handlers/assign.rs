@@ -61,7 +61,7 @@ const RETURNING_USER_WELCOME_MESSAGE: &str = "r? @{assignee}
 (rustbot has picked a reviewer for you, use r? to override)";
 
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
-    "@{author}: no appropriate reviewer found, use r? to override";
+    "@{author}: no appropriate reviewer found, use `r?` to override";
 
 const ON_VACATION_WARNING: &str = "{username} is on vacation. Please do not assign them to PRs.";
 
@@ -627,7 +627,7 @@ impl fmt::Display for FindReviewerError {
                     f,
                     "No reviewers could be found from initial request `{}`\n\
                      This repo may be misconfigured.\n\
-                     Use r? to specify someone else to assign.",
+                     Use `r?` to specify someone else to assign.",
                     initial.join(",")
                 )
             }
@@ -637,7 +637,7 @@ impl fmt::Display for FindReviewerError {
                     "Could not assign reviewer from: `{}`.\n\
                      User(s) `{}` are either the PR author, already assigned, or on vacation, \
                      and there are no other candidates.\n\
-                     Use r? to specify someone else to assign.",
+                     Use `r?` to specify someone else to assign.",
                     initial.join(","),
                     filtered.join(","),
                 )
