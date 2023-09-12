@@ -41,6 +41,7 @@ mod notify_zulip;
 mod ping;
 mod prioritize;
 mod relabel;
+pub mod review_prefs;
 mod review_submitted;
 mod rfc_helper;
 pub mod rustc_commits;
@@ -157,6 +158,8 @@ macro_rules! issue_handlers {
 //
 // This is for events that happen only on issues (e.g. label changes).
 // Each module in the list must contain the functions `parse_input` and `handle_input`.
+// - `parse_input` should parse and validate the input, return an object with everything needed to perform an action
+// - `handle_input`: performs the action (optionally) using the input object received
 issue_handlers! {
     assign,
     autolabel,
@@ -164,6 +167,7 @@ issue_handlers! {
     mentions,
     no_merges,
     notify_zulip,
+    review_prefs,
 }
 
 macro_rules! command_handlers {

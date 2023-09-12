@@ -20,16 +20,18 @@
 use crate::{
     config::AssignConfig,
     github::{self, Event, Issue, IssuesAction, Selection},
+    handlers::review_prefs::{get_review_candidate_by_capacity, get_review_candidates_by_username},
     handlers::{Context, GithubClient, IssuesEvent},
     interactions::EditIssueBody,
+    ReviewCapacityUser,
 };
 use anyhow::{bail, Context as _};
 use parser::command::assign::AssignCommand;
 use parser::command::{Command, Input};
-use rand::seq::IteratorRandom;
 use rust_team_data::v1::Teams;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use tokio_postgres::Client as DbClient;
 use tracing as log;
 
 #[cfg(test)]
@@ -274,14 +276,16 @@ async fn determine_assignee(
     config: &AssignConfig,
     input: &AssignInput,
 ) -> anyhow::Result<(Option<String>, bool)> {
+    let db_client = ctx.db.get().await;
+
     let teams = crate::team_data::teams(&ctx.github).await?;
     if let Some(name) = find_assign_command(ctx, event) {
         if is_self_assign(&name, &event.issue.user.login) {
             return Ok((Some(name.to_string()), true));
         }
         // User included `r?` in the opening PR body.
-        match find_reviewer_from_names(&teams, config, &event.issue, &[name]) {
-            Ok(assignee) => return Ok((Some(assignee), true)),
+        match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &[name]).await {
+            Ok(assignee) => return Ok((Some(assignee.username), true)),
             Err(e) => {
                 event
                     .issue
@@ -294,8 +298,10 @@ async fn determine_assignee(
     // Errors fall-through to try fallback group.
     match find_reviewers_from_diff(config, &input.git_diff) {
         Ok(candidates) if !candidates.is_empty() => {
-            match find_reviewer_from_names(&teams, config, &event.issue, &candidates) {
-                Ok(assignee) => return Ok((Some(assignee), false)),
+            match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &candidates)
+                .await
+            {
+                Ok(assignee) => return Ok((Some(assignee.username), false)),
                 Err(FindReviewerError::TeamNotFound(team)) => log::warn!(
                     "team {team} not found via diff from PR {}, \
                     is there maybe a misconfigured group?",
@@ -322,8 +328,8 @@ async fn determine_assignee(
     }
 
     if let Some(fallback) = config.adhoc_groups.get("fallback") {
-        match find_reviewer_from_names(&teams, config, &event.issue, fallback) {
-            Ok(assignee) => return Ok((Some(assignee), false)),
+        match find_reviewer_from_names(&db_client, &teams, config, &event.issue, fallback).await {
+            Ok(assignee) => return Ok((Some(assignee.username), false)),
             Err(e) => {
                 log::trace!(
                     "failed to select from fallback group for PR {}: {e}",
@@ -436,6 +442,7 @@ pub(super) async fn handle_command(
     }
 
     let issue = event.issue().unwrap();
+    let db_client = ctx.db.get().await;
     if issue.is_pr() {
         if !issue.is_open() {
             issue
@@ -487,8 +494,9 @@ pub(super) async fn handle_command(
                     name.to_string()
                 } else {
                     let teams = crate::team_data::teams(&ctx.github).await?;
-                    match find_reviewer_from_names(&teams, config, issue, &[name]) {
-                        Ok(assignee) => assignee,
+                    match find_reviewer_from_names(&db_client, &teams, config, issue, &[name]).await
+                    {
+                        Ok(assignee) => assignee.username,
                         Err(e) => {
                             issue.post_comment(&ctx.github, &e.to_string()).await?;
                             return Ok(());
@@ -497,7 +505,11 @@ pub(super) async fn handle_command(
                 }
             }
         };
+        // NOTE: this will not handle PR assignment requested from the web Github UI
+        // that case is handled in the review_prefs module
         set_assignee(issue, &ctx.github, &username).await;
+        // This PR will be registered in the reviewer's work queue using a `IssuesAction::Assigned`
+        // and its delegate `handlers::review_prefs::handle_input()`
         return Ok(());
     }
 
@@ -634,19 +646,7 @@ impl fmt::Display for FindReviewerError {
     }
 }
 
-/// Finds a reviewer to assign to a PR.
-///
-/// The `names` is a list of candidate reviewers `r?`, such as `compiler` or
-/// `@octocat`, or names from the owners map. It can contain GitHub usernames,
-/// auto-assign groups, or rust-lang team names. It must have at least one
-/// entry.
-fn find_reviewer_from_names(
-    teams: &Teams,
-    config: &AssignConfig,
-    issue: &Issue,
-    names: &[String],
-) -> Result<String, FindReviewerError> {
-    let candidates = candidate_reviewers_from_names(teams, config, issue, names)?;
+fn old_find_reviewer_from_names(candidates: HashSet<&str>) -> Result<String, FindReviewerError> {
     // This uses a relatively primitive random choice algorithm.
     // GitHub's CODEOWNERS supports much more sophisticated options, such as:
     //
@@ -666,6 +666,7 @@ fn find_reviewer_from_names(
     //
     // These are all ideas for improving the selection here. However, I'm not
     // sure they are really worth the effort.
+    use rand::prelude::IteratorRandom;
     Ok(candidates
         .into_iter()
         .choose(&mut rand::thread_rng())
@@ -673,7 +674,104 @@ fn find_reviewer_from_names(
         .to_string())
 }
 
-/// Returns a list of candidate usernames to choose as a reviewer.
+async fn new_find_reviewer_from_names(
+    db_client: &DbClient,
+    candidates: &HashSet<&str>,
+) -> Result<ReviewCapacityUser, FindReviewerError> {
+    let candidates_vec = candidates
+        .iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>();
+    let assignee = if candidates_vec.len() > 1 {
+        // Select the best candidate from the pool
+        match get_review_candidate_by_capacity(&db_client, candidates_vec.clone()).await {
+            Ok(reviewers) => reviewers,
+            Err(_) => {
+                return Err(FindReviewerError::NoReviewer {
+                    initial: candidates_vec,
+                });
+            }
+        }
+    } else {
+        // Get the prefs of the only candidate identified
+        match get_review_candidates_by_username(&db_client, candidates_vec).await {
+            Ok(mut reviewers) => {
+                if reviewers.is_empty() {
+                    return Err(FindReviewerError::NoReviewer { initial: vec![] });
+                }
+                reviewers
+                    .pop()
+                    .expect("Something wrong happened while getting the reviewer")
+            }
+            Err(_) => {
+                return Err(FindReviewerError::NoReviewer { initial: vec![] });
+            }
+        }
+    };
+    Ok(assignee)
+}
+
+/// Finds a reviewer to assign to a PR.
+/// Accounts for reviewer's capacity preferences.
+/// If just one candidate is available (or a specific reviewer is invoked), return that one.
+///
+/// The `names` is a list of candidate reviewers `r?`, such as `compiler` or
+/// `@octocat`, or names from the owners map. It can contain GitHub usernames,
+/// auto-assign groups, or rust-lang team names. It must have at least one
+/// entry.
+async fn find_reviewer_from_names(
+    db_client: &DbClient,
+    teams: &Teams,
+    config: &AssignConfig,
+    issue: &Issue,
+    names: &[String],
+) -> Result<ReviewCapacityUser, FindReviewerError> {
+    let candidates = candidate_reviewers_from_names(teams, config, issue, names)?;
+    let assignee: Result<ReviewCapacityUser, FindReviewerError>;
+    if use_new_pr_assignment(teams, &candidates) {
+        log::debug!("Using NEW pull request assignment workflow");
+        assignee = new_find_reviewer_from_names(db_client, &candidates).await;
+    } else {
+        log::debug!("Using OLD pull request assignment workflow");
+        let username = old_find_reviewer_from_names(candidates);
+        assignee = Ok(ReviewCapacityUser::phony(username.unwrap()));
+    }
+    assignee
+}
+
+/// Decide whether to use the new PR assignment workflow. Returns true if:
+/// - env var USE_NEW_PR_ASSIGNMENT is set
+/// - candidates belong to at least 1 whitelisted team in env var NEW_PR_ASSIGNMENT_TEAMS i.e. teams selected as
+///   testers cohort
+fn use_new_pr_assignment(teams: &Teams, candidates: &HashSet<&str>) -> bool {
+    // this filter will return if a candidate is a member of a team
+    let mut filter = |team_member_name: &&str| -> bool {
+        candidates
+            .iter()
+            .any(|candidate_name| candidate_name == team_member_name)
+    };
+
+    if std::env::var("USE_NEW_PR_ASSIGNMENT").is_ok() {
+        let x = std::env::var("NEW_PR_ASSIGNMENT_TEAMS")
+            .expect("NEW_PR_ASSIGNMENT_TEAMS env var must be set");
+        let allowed_teams = x.split(",").collect::<Vec<&str>>();
+        for t in allowed_teams {
+            let team = teams.teams.get(t).unwrap();
+            // find the first candidate that belongs to an allowed team
+            let candidates_that_are_members = team
+                .members
+                .iter()
+                .map(|member| member.github.as_str())
+                .filter(&mut filter)
+                .collect::<Vec<&str>>();
+            if !candidates_that_are_members.is_empty() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 fn candidate_reviewers_from_names<'a>(
     teams: &'a Teams,
     config: &'a AssignConfig,
