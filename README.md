@@ -50,6 +50,12 @@ The general overview of what you will need to do:
 6. Add a `triagebot.toml` file to the main branch of your GitHub repo with whichever services you want to try out.
 7. Try interacting with your repo, such as issuing `@rustbot` commands or interacting with PRs and issues (depending on which services you enabled in `triagebot.toml`). Watch the logs from the server to see what's going on.
 
+## The pull requests assignment preferences backoffice
+
+This is an administrative backoffice targeted at the Rust project contributors to set their preferences for pull request assignment.
+
+Read all the documentation [here](./pr_prefs_backoffice.md).
+
 ### Configure a database
 
 To use Postgres, you will need to install it and configure it:
