@@ -31,6 +31,8 @@ Teams members are expected to set their own review preferences using this backof
 
 ## TODO
 
+- [ ] Build some tooling to import members from a team `.toml` file (SQL fixtures, CLI, or else)
+- [ ] Set some defaults in the DB table structure for contributors that did not set any for themselves.
 - [ ] Handle cleanup of the preferences DB table for team members not existing anymore in the teams .toml: delete their assignments, PRs go back to the pool of those needing an assignee
 - [ ] Cache somehow teams .toml download from github to avoid retrieving those `.toml` files too often
 - [ ] maybe more input validation, see `validate_data()` in `./src/main.rs`
