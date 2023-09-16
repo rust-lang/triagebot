@@ -105,9 +105,9 @@ impl AssignConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct NoMergesConfig {
-    /// No action will be taken on PRs with these labels.
+    /// No action will be taken on PRs with these substrings in the title.
     #[serde(default)]
-    pub(crate) exclude_labels: Vec<String>,
+    pub(crate) exclude_titles: Vec<String>,
     /// Set these labels on the PR when merge commits are detected.
     #[serde(default)]
     pub(crate) labels: Vec<String>,
