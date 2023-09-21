@@ -480,6 +480,18 @@ impl Issue {
         Ok(comment)
     }
 
+    // returns an array of one element
+    pub async fn get_first_comment(&self, client: &GithubClient) -> anyhow::Result<Vec<Comment>> {
+        let comment_url = format!(
+            "{}/issues/{}/comments?page=1&per_page=1",
+            self.repository().url(),
+            self.number,
+        );
+        Ok(client
+            .json::<Vec<Comment>>(client.get(&comment_url))
+            .await?)
+    }
+
     pub async fn edit_body(&self, client: &GithubClient, body: &str) -> anyhow::Result<()> {
         let edit_url = format!("{}/issues/{}", self.repository().url(), self.number);
         #[derive(serde::Serialize)]
@@ -1574,6 +1586,7 @@ impl<'q> IssuesQuery for Query<'q> {
         &'a self,
         repo: &'a Repository,
         include_fcp_details: bool,
+        include_mcp_details: bool,
         client: &'a GithubClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         let issues = repo
@@ -1588,12 +1601,13 @@ impl<'q> IssuesQuery for Query<'q> {
         };
 
         let mut issues_decorator = Vec::new();
+        let re = regex::Regex::new("https://github.com/rust-lang/|/").unwrap();
+        let re_zulip_link = regex::Regex::new(r"\[stream\]:\s").unwrap();
         for issue in issues {
             let fcp_details = if include_fcp_details {
                 let repository_name = if let Some(repo) = issue.repository.get() {
                     repo.repository.clone()
                 } else {
-                    let re = regex::Regex::new("https://github.com/rust-lang/|/").unwrap();
                     let split = re.split(&issue.html_url).collect::<Vec<&str>>();
                     split[1].to_string()
                 };
@@ -1626,6 +1640,18 @@ impl<'q> IssuesQuery for Query<'q> {
             } else {
                 None
             };
+
+            let mcp_details = if include_mcp_details {
+                let first_comment = issue.get_first_comment(&client).await?;
+                let split = re_zulip_link
+                    .split(&first_comment[0].body)
+                    .collect::<Vec<&str>>();
+                let zulip_link = split.last().unwrap_or(&"#").to_string();
+                Some(crate::actions::MCPDetails { zulip_link })
+            } else {
+                None
+            };
+
             issues_decorator.push(crate::actions::IssueDecorator {
                 title: issue.title.clone(),
                 number: issue.number,
@@ -1645,6 +1671,7 @@ impl<'q> IssuesQuery for Query<'q> {
                     .join(", "),
                 updated_at_hts: crate::actions::to_human(issue.updated_at),
                 fcp_details,
+                mcp_details,
             });
         }
 
@@ -2112,6 +2139,7 @@ pub trait IssuesQuery {
         &'a self,
         repo: &'a Repository,
         include_fcp_details: bool,
+        include_mcp_details: bool,
         client: &'a GithubClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>>;
 }
@@ -2123,6 +2151,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
         &'a self,
         repo: &'a Repository,
         _include_fcp_details: bool,
+        _include_mcp_details: bool,
         client: &'a GithubClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         use cynic::QueryBuilder;
@@ -2249,6 +2278,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                         assignees,
                         updated_at_hts,
                         fcp_details: None,
+                        mcp_details: None,
                     }
                 },
             )
@@ -2336,6 +2366,7 @@ impl IssuesQuery for DesignMeetings {
         &'a self,
         _repo: &'a Repository,
         _include_fcp_details: bool,
+        _include_mcp_details: bool,
         client: &'a GithubClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         use github_graphql::project_items::ProjectV2ItemContent;
@@ -2350,6 +2381,7 @@ impl IssuesQuery for DesignMeetings {
                     assignees: String::new(),
                     number: issue.number.try_into().unwrap(),
                     fcp_details: None,
+                    mcp_details: None,
                     html_url: issue.url.0,
                     title: issue.title,
                     repo_name: String::new(),

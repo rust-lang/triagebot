@@ -52,6 +52,7 @@ pub struct IssueDecorator {
     pub updated_at_hts: String,
 
     pub fcp_details: Option<FCPDetails>,
+    pub mcp_details: Option<MCPDetails>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -60,6 +61,11 @@ pub struct FCPDetails {
     pub bot_tracking_comment_content: String,
     pub initiating_comment_html_url: String,
     pub initiating_comment_content: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MCPDetails {
+    pub zulip_link: String,
 }
 
 lazy_static! {
@@ -124,8 +130,21 @@ impl<'a> Action for Step<'a> {
                     let query = query.clone();
                     handles.push(tokio::task::spawn(async move {
                         let _permit = semaphore.acquire().await?;
+                        let mcps_groups = [
+                            "mcp_new_not_seconded",
+                            "mcp_old_not_seconded",
+                            "mcp_accepted",
+                            "in_pre_fcp",
+                            "in_fcp",
+                        ];
                         let issues = query
-                            .query(&repository, name == "proposed_fcp", &gh)
+                            .query(
+                                &repository,
+                                name == "proposed_fcp",
+                                mcps_groups.contains(&name.as_str())
+                                    && repository.full_name.contains("rust-lang/compiler-team"),
+                                &gh,
+                            )
                             .await?;
                         Ok((name, kind, issues))
                     }));
