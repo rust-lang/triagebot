@@ -28,7 +28,6 @@ struct Message {
     /// stream or group of users). Useful primarily for hashing.
     #[allow(unused)]
     recipient_id: u64,
-    sender_short_name: Option<String>,
     sender_full_name: String,
     sender_email: String,
     /// The ID of the stream.
@@ -269,10 +268,7 @@ async fn execute_for_other_user(
         .unwrap_or_default();
 
     // At this point, the command has been run.
-    let sender = match &message_data.sender_short_name {
-        Some(short_name) => format!("{} ({})", message_data.sender_full_name, short_name),
-        None => message_data.sender_full_name.clone(),
-    };
+    let sender = &message_data.sender_full_name;
     let message = format!("{sender} ran `{command}` with output `{output}` as you.");
 
     let res = MessageApiRequest {
