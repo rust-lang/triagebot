@@ -487,6 +487,22 @@ pub(super) async fn handle_command(
                     name.to_string()
                 } else {
                     let teams = crate::team_data::teams(&ctx.github).await?;
+                    // Determine if assignee is a team. If yes, add the corresponding label
+                    // team name here is without prefix 't-' (e.g. 'compiler', 'libs', etc.)
+                    if let Some(team) = teams.teams.get(&name) {
+                        let t_label = format!("t-{}", &team.name);
+                        if let Err(err) = issue
+                            .add_labels(&ctx.github, vec![github::Label { name: t_label }])
+                            .await
+                        {
+                            if let Some(github::UnknownLabels { .. }) = err.downcast_ref() {
+                                log::warn!("Error assigning label: {}", err);
+                            } else {
+                                return Err(err);
+                            }
+                        }
+                    }
+
                     match find_reviewer_from_names(&teams, config, issue, &[name]) {
                         Ok(assignee) => assignee,
                         Err(e) => {
