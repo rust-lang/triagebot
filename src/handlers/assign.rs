@@ -487,10 +487,11 @@ pub(super) async fn handle_command(
                     name.to_string()
                 } else {
                     let teams = crate::team_data::teams(&ctx.github).await?;
-                    // Determine if assignee is a team. If yes, add the corresponding label
-                    // team name here is without prefix 't-' (e.g. 'compiler', 'libs', etc.)
-                    if let Some(team) = teams.teams.get(&name) {
-                        let t_label = format!("t-{}", &team.name);
+                    // remove "t-" or "T-" prefixes before checking if it's a team name
+                    let team_name = name.trim_start_matches("t-").trim_start_matches("T-");
+                    // Determine if assignee is a team. If yes, add the corresponding GH label.
+                    if teams.teams.get(team_name).is_some() {
+                        let t_label = format!("T-{}", &team_name);
                         if let Err(err) = issue
                             .add_labels(&ctx.github, vec![github::Label { name: t_label }])
                             .await
@@ -503,7 +504,8 @@ pub(super) async fn handle_command(
                         }
                     }
 
-                    match find_reviewer_from_names(&teams, config, issue, &[name]) {
+                    match find_reviewer_from_names(&teams, config, issue, &[team_name.to_string()])
+                    {
                         Ok(assignee) => assignee,
                         Err(e) => {
                             issue.post_comment(&ctx.github, &e.to_string()).await?;
