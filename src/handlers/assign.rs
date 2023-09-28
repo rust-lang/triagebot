@@ -734,7 +734,7 @@ async fn find_reviewer_from_names(
     } else {
         log::debug!("Using OLD pull request assignment workflow");
         let username = old_find_reviewer_from_names(candidates);
-        assignee = Ok(ReviewCapacityUser::phony(username.unwrap()));
+        assignee = Ok(ReviewCapacityUser::default(username.unwrap()));
     }
     assignee
 }

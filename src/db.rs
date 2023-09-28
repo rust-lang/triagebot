@@ -92,7 +92,7 @@ impl ClientPool {
     }
 }
 
-async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
+pub async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
     let db_url = std::env::var("DATABASE_URL").expect("needs DATABASE_URL");
     if db_url.contains("rds.amazonaws.com") {
         let cert = &CERTIFICATE_PEM[..];
@@ -277,15 +277,15 @@ CREATE UNIQUE INDEX jobs_name_scheduled_at_unique_index
 CREATE table review_capacity (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id BIGINT REFERENCES users(user_id),
-    checksum TEXT NOT NULL,
-    assigned_prs INT[] NOT NULL,
+    active boolean NOT NULL DEFAULT true,
+    assigned_prs INT[] NOT NULL DEFAULT array[]::INT[],
+    max_assigned_prs INTEGER NOT NULL DEFAULT 5,
     num_assigned_prs INTEGER,
-    max_assigned_prs INTEGER,
     pto_date_start date,
     pto_date_end date,
-    active boolean default true,
-    allow_ping_after_days INTEGER,
-    publish_prefs boolean NOT NULL DEFAULT false
+    allow_ping_after_days INTEGER NOT NULL DEFAULT 15,
+    publish_prefs boolean NOT NULL DEFAULT false,
+    checksum TEXT
 );
 ",
 ];

@@ -8,7 +8,7 @@ use crate::github::PullRequestDetails;
 use anyhow::Context;
 use handlers::HandlerError;
 use interactions::ErrorComment;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::{collections::HashMap, fmt};
 use tracing as log;
 
@@ -26,7 +26,7 @@ pub mod notification_listing;
 pub mod payload;
 pub mod rfcbot;
 pub mod team;
-mod team_data;
+pub mod team_data;
 pub mod triage;
 pub mod zulip;
 
@@ -263,23 +263,24 @@ pub async fn webhook(
     }
 }
 
-const PREF_ALLOW_PING_AFTER_DAYS: i32 = 20;
+// these constants should match the DB table fields defaults in ./src/db.rs
+const PREF_ALLOW_PING_AFTER_DAYS: i32 = 15;
 const PREF_MAX_ASSIGNED_PRS: i32 = 5;
 
 #[derive(Debug, Serialize)]
 pub struct ReviewCapacityUser {
     pub username: String,
     pub id: uuid::Uuid,
-    pub checksum: String,
     pub user_id: i64,
+    pub active: bool,
     pub assigned_prs: Vec<i32>,
-    pub num_assigned_prs: Option<i32>,
     pub max_assigned_prs: Option<i32>,
+    pub num_assigned_prs: Option<i32>,
     pub pto_date_start: Option<chrono::NaiveDate>,
     pub pto_date_end: Option<chrono::NaiveDate>,
-    pub active: bool,
     pub allow_ping_after_days: Option<i32>,
     pub publish_prefs: bool,
+    pub checksum: Option<String>,
 }
 
 impl ReviewCapacityUser {
@@ -290,21 +291,20 @@ impl ReviewCapacityUser {
         self.active && is_available
     }
 
-    // thin compat. layer, will be removed after stabilizing the new PR assignment
-    fn phony(username: String) -> Self {
+    pub fn default(username: String) -> Self {
         Self {
             username,
             id: uuid::Uuid::new_v4(),
             user_id: -1,
-            checksum: String::new(),
+            active: true,
             assigned_prs: vec![],
+            max_assigned_prs: Some(PREF_MAX_ASSIGNED_PRS),
             num_assigned_prs: None,
-            max_assigned_prs: None,
             pto_date_start: None,
             pto_date_end: None,
-            active: false,
-            allow_ping_after_days: None,
+            allow_ping_after_days: Some(PREF_ALLOW_PING_AFTER_DAYS),
             publish_prefs: false,
+            checksum: None,
         }
     }
 }
@@ -398,7 +398,7 @@ impl From<HashMap<String, String>> for ReviewCapacityUser {
             // fields we don't receive from the web form (they are here ignored)
             username: String::new(),
             id: uuid::Uuid::new_v4(),
-            checksum: String::new(),
+            checksum: None,
             // fields received from the web form
             user_id: obj.get("user_id").unwrap().parse::<i64>().unwrap(),
             assigned_prs,
@@ -431,16 +431,4 @@ impl From<tokio_postgres::row::Row> for ReviewCapacityUser {
             publish_prefs: row.get("publish_prefs"),
         }
     }
-}
-
-// Used to deserialize .toml from GitHub
-#[derive(Deserialize)]
-struct Config {
-    people: People,
-}
-
-#[derive(Deserialize)]
-struct People {
-    leads: Vec<String>,
-    members: Vec<String>,
 }

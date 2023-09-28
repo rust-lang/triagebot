@@ -7,6 +7,7 @@ use hyper::header::HeaderValue;
 use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
+use rust_team_data::v1::TeamMember;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::{
@@ -168,21 +169,23 @@ impl GithubClient {
         Ok(serde_json::from_slice(&body)?)
     }
 
-    pub async fn get_team_members<'a>(
+    pub fn get_team_members<'a>(
         &self,
-        admins: &mut Vec<String>,
-        members: &mut Vec<String>,
-        team: &str,
+        admins: &mut Vec<User>,
+        members: &mut Vec<User>,
+        team_members: &Vec<TeamMember>,
     ) {
-        let req = self.get(&format!(
-            "https://raw.githubusercontent.com/rust-lang/team/HEAD/teams/{}",
-            team,
-        ));
-        let (contents, _) = self.send_req(req).await.unwrap();
-        let body = String::from_utf8_lossy(&contents).to_string();
-        let mut config: crate::Config = toml::from_str(&body).unwrap();
-        members.append(&mut config.people.members);
-        admins.append(&mut config.people.leads);
+        for tm in team_members {
+            let m = User {
+                id: Some(tm.github_id as i64),
+                login: tm.github.clone(),
+            };
+            if tm.is_lead {
+                admins.push(m);
+            } else {
+                members.push(m);
+            }
+        }
     }
 }
 

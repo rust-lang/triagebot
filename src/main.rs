@@ -184,11 +184,7 @@ async fn serve_req(
     }
 
     if req.uri.path() == "/review-settings" {
-        let mut members = vec![];
-        // yes, I am an hardcoded admin
-        let mut admins = vec!["apiraino".to_string()];
         let gh = github::GithubClient::new_with_default_token(Client::new());
-
         // check if we received a session cookie
         let maybe_user_enc = match req.headers.get("Cookie") {
             Some(cookie_string) => cookie_string
@@ -207,6 +203,7 @@ async fn serve_req(
             _ => None,
         };
 
+        // Authentication: understand who this user is
         let db_client = ctx.db.get().await;
         let user = match maybe_user_enc {
             Some(user_enc) => {
@@ -312,26 +309,29 @@ async fn serve_req(
             }
         };
 
-        // Here we have a validated username. From now on, we will trust this user
-        let is_admin = admins.contains(&user.login);
-        log::debug!("current user={}, is admin: {}", user.login, is_admin);
+        let mut members: Vec<User> = vec![];
+        // I am an hardcoded admin
+        let mut admins = vec![User {
+            id: Some(6098822),
+            login: "apiraino".to_string(),
+        }];
 
         // get team members from github (HTTP raw file retrieval, no auth used)
-        // TODO: maybe add some kind of caching for these files
+        let teams_data = triagebot::team_data::teams(&gh).await.unwrap();
         let x = std::env::var("NEW_PR_ASSIGNMENT_TEAMS")
             .expect("NEW_PR_ASSIGNMENT_TEAMS env var must be set");
         let allowed_teams = x.split(",").collect::<Vec<&str>>();
-        for team in &allowed_teams {
-            gh.get_team_members(&mut admins, &mut members, &format!("{}.toml", team))
-                .await;
+        for allowed_team in &allowed_teams {
+            let team = teams_data.teams.get(*allowed_team).unwrap();
+            gh.get_team_members(&mut admins, &mut members, &team.members);
         }
-        members.sort();
+
         log::debug!(
             "Allowed teams: {:?}, members loaded {:?}",
             &allowed_teams,
             members
         );
-        if !members.iter().any(|m| m == &user.login) {
+        if !members.iter().any(|m| m.login == user.login) {
             return Ok(Response::builder()
                 .status(StatusCode::UNAUTHORIZED)
                 .body(Body::from(
@@ -339,6 +339,10 @@ async fn serve_req(
                 ))
                 .unwrap());
         }
+
+        // Here we have a validated username. From now on, we will trust this user
+        let is_admin = admins.contains(&user);
+        log::debug!("current user={}, is admin: {}", user.login, is_admin);
 
         let mut info_msg: &str = "";
         if req.method == hyper::Method::POST {
@@ -357,13 +361,19 @@ async fn serve_req(
             validate_data(&prefs).unwrap();
 
             // save changes
-            set_prefs(&db_client, prefs).await.unwrap();
+            set_prefs(&db_client, &prefs).await.unwrap();
 
             info_msg = "Preferences saved";
         }
 
         // Query and return all team member prefs
-        let mut review_capacity = get_prefs(&db_client, &mut members, &user.login, is_admin).await;
+        let mut review_capacity = get_prefs(
+            &db_client,
+            &members.iter().map(|tm| tm.login.clone()).collect(),
+            &user.login,
+            is_admin,
+        )
+        .await;
         let curr_user_prefs = serde_json::json!(&review_capacity.swap_remove(0));
         let team_prefs = serde_json::json!(&review_capacity);
         // log::debug!("My prefs: {:?}", curr_user_prefs);

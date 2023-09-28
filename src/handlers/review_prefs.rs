@@ -13,10 +13,32 @@ use tracing as log;
 // - Removes the PR from the work queue of the user (when the PR is unassigned or closed)
 // - Rollbacks the PR assignment in case the specific user ("r? user") is inactive/not available
 
-/// Set review capacity for a team member
+/// Remove review preferences for these team members
+pub async fn delete_prefs(db: &DbClient, user_ids: &Vec<i64>) -> anyhow::Result<()> {
+    db.execute(
+        "DELETE FROM review_capacity where user_id = any($1)",
+        &[&user_ids],
+    )
+    .await
+    .context("Delete DB error")?;
+    Ok(())
+}
+
+/// Add stub record for a team member review capacity
+pub async fn add_prefs(db: &DbClient, user_id: i64) -> anyhow::Result<()> {
+    db.execute(
+        "INSERT INTO review_capacity (user_id) VALUES ($1)",
+        &[&user_id],
+    )
+    .await
+    .context("Insert DB error")?;
+    Ok(())
+}
+
+/// Update review capacity for a team member
 pub async fn set_prefs(
     db: &DbClient,
-    prefs: ReviewCapacityUser,
+    prefs: &ReviewCapacityUser,
 ) -> anyhow::Result<ReviewCapacityUser> {
     let q = "
 UPDATE review_capacity r
@@ -62,7 +84,7 @@ WHERE r.checksum=$1";
 /// - is_admin: if `true` return also preferences marked as not public
 pub async fn get_prefs(
     db: &DbClient,
-    users: &mut Vec<String>,
+    users: &Vec<String>,
     me: &str,
     is_admin: bool,
 ) -> Vec<ReviewCapacityUser> {
@@ -76,7 +98,11 @@ ORDER BY case when username='{}' then 1 else 2 end, username;",
         me
     );
 
-    let rows = db.query(&q, &[users]).await.unwrap();
+    let rows = db
+        .query(&q, &[&users])
+        .await
+        .context("Error retrieving review preferences")
+        .unwrap();
     rows.into_iter()
         .filter_map(|row| {
             let rec = ReviewCapacityUser::from(row);
