@@ -15,12 +15,11 @@ This backoffice will set one cookie (`triagebot.session`) to understand if a use
 
 Access authorization is handled by GitHub, so users will need to be logged in GitHub and authorize this Github Application.
 
-Access to this backoffice is granted only to GitHub users that are members of a Rust project team (teams are defined [here](https://github.com/rust-lang/team/tree/HEAD/teams)). Only specific Rust teams are allowed to use
-this backoffice (mostly for testing purposes, to switch users to the new workflow slowly). Teams allowed are defined in the env var `NEW_PR_ASSIGNMENT_TEAMS` (see `.env.sample`).
+Access to this backoffice is granted only to GitHub users that are members of a Rust project team (teams are defined [here](https://github.com/rust-lang/team/tree/HEAD/teams)). Only specific Rust teams are allowed to use this backoffice (mostly for testing purposes, to gradually onboard users to the new workflow). Teams allowed are defined in the env var `NEW_PR_ASSIGNMENT_TEAMS` (see `.env.sample`).
 
 Teams members are expected to set their own review preferences using this backoffice. In case a team member didn't yet set their own preferences, these defaults will be applied:
 - Max 5 pull requests assigned (see constant `PREF_MAX_ASSIGNED_PRS`)
-- 20 days before a notification is sent for a pull request assigned that is waiting for review (see constant `PREF_ALLOW_PING_AFTER_DAYS`)
+- 15 days before a notification is sent for a pull request assigned that is waiting for review (see constant `PREF_ALLOW_PING_AFTER_DAYS`)
 
 ## How to locally run this backoffice
 
@@ -31,11 +30,10 @@ Teams members are expected to set their own review preferences using this backof
 
 ## TODO
 
-- [ ] Build some tooling to import members from a team `.toml` file (SQL fixtures, CLI, or else)
-- [ ] Set some defaults in the DB table structure for contributors that did not set any for themselves.
-- [ ] Handle cleanup of the preferences DB table for team members not existing anymore in the teams .toml: delete their assignments, PRs go back to the pool of those needing an assignee
-- [ ] Cache somehow teams .toml download from github to avoid retrieving those `.toml` files too often
+- [x] Build some tooling to import members from teams
+- [x] Set some defaults in the DB table structure for contributors that did not set any for themselves.
+- [ ] Handle cleanup of the preferences DB table for team members not existing anymore (or were moved to "alumni") in the teams: delete their assignments, PRs go back to the pool of those needing an assignee
 - [ ] maybe more input validation, see `validate_data()` in `./src/main.rs`
 - [ ] Now we are handling contributors workload for a single team. Some contributors work across teams. Make this backoffice aware of other teams and show the actual workload of contributors
-
+- [ ] Finally, disable the "on vacation" flag in .toml files (revert [triagebot#1712](https://github.com/rust-lang/triagebot/pull/1712)). Give notice on Zulip (f.e. [here](https://rust-lang.zulipchat.com/#narrow/stream/131828-t-compiler/topic/.22on_vacation.22.20triagebot.20config))
 

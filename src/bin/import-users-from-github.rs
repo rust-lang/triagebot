@@ -5,17 +5,10 @@ use triagebot::github::User;
 use triagebot::handlers::review_prefs::{add_prefs, delete_prefs, get_prefs};
 use triagebot::{db::make_client, github};
 
-// - 1. Download the teams and retrieve those listed in $NEW_PR_ASSIGNMENT_TEAMS
-// - 2. match the team `people.members` with the table `users` and `review_capacity`
-// - 3. Follow this scheme to perform a sync
-
-// | - | triagebot.users | triagebot.review_capacity | action                                |
-// |-------|-----------------|---------------------------|---------------------------------------|
-// | V     | V               | X                         | add                                   |
-// | V     | X               | X                         | add                                   |
-// | V     | X               | V                         | add                                   |
-// | X     | V               | X                         | do nothing                            |
-// | X     | X               | V                         | remove from triagebot.review_capacity |
+// Import and synchronization:
+// 1. Download teams and retrieve those listed in $NEW_PR_ASSIGNMENT_TEAMS
+// 2. Add missing team members to the review preferences table
+// 3. Delete preferences for members not present in the team roster anymore
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
@@ -43,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
             .collect::<Vec<_>>();
         debug!("Team {} members loaded: {:?}", team, team_members);
 
-        // 2. get team members review capacity
+        // get team members review capacity
         let team_review_prefs = get_prefs(
             &db_client,
             &team_members
@@ -55,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .await;
 
-        // 3. Add missing team members to the review preferences table
+        // 2. Add missing team members to the review preferences table
         for member in &team_members {
             if !team_review_prefs
                 .iter()
@@ -84,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        // 4. delete prefs for members not present in the team roster anymore
+        // 3. delete prefs for members not present in the team roster anymore
         let removed_members = team_review_prefs
             .iter()
             .filter(|tm| {
