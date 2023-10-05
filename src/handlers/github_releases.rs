@@ -40,7 +40,7 @@ pub(super) async fn handle(
     log::debug!("loading the git tags");
     let tags = load_paginated(
         ctx,
-        &format!("repos/{}/git/matching-refs/tags", event.repo().full_name),
+        &format!("/repos/{}/git/matching-refs/tags", event.repo().full_name),
         |git_ref: &GitRef| {
             git_ref
                 .name
@@ -54,7 +54,7 @@ pub(super) async fn handle(
     log::debug!("loading the existing releases");
     let releases = load_paginated(
         ctx,
-        &format!("repos/{}/releases", event.repo().full_name),
+        &format!("/repos/{}/releases", event.repo().full_name),
         |release: &Release| release.tag_name.clone(),
     )
     .await?;
@@ -85,7 +85,7 @@ pub(super) async fn handle(
                 let e: octocrab::Result<serde_json::Value> = ctx
                     .octocrab
                     .post(
-                        format!("repos/{}/releases", event.repo().full_name),
+                        format!("/repos/{}/releases", event.repo().full_name),
                         Some(&serde_json::json!({
                             "tag_name": tag,
                             "name": expected_name,
@@ -141,7 +141,11 @@ where
     R: Eq + PartialEq + std::hash::Hash,
     F: Fn(&T) -> R,
 {
-    let mut current_page: Page<T> = ctx.octocrab.get::<Page<T>, _, ()>(url, None).await?;
+    let mut current_page: Page<T> = ctx
+        .octocrab
+        .get::<Page<T>, _, ()>(url, None)
+        .await
+        .with_context(|| format!("failed to load {url}"))?;
 
     let mut items = current_page
         .take_items()
@@ -149,7 +153,12 @@ where
         .map(|val| (key(&val), val))
         .collect::<HashMap<R, T>>();
 
-    while let Some(mut new_page) = ctx.octocrab.get_page::<T>(&current_page.next).await? {
+    while let Some(mut new_page) = ctx
+        .octocrab
+        .get_page::<T>(&current_page.next)
+        .await
+        .with_context(|| format!("failed to load next page {:?}", current_page.next))?
+    {
         items.extend(
             new_page
                 .take_items()
