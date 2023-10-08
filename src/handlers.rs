@@ -46,6 +46,7 @@ mod rfc_helper;
 pub mod rustc_commits;
 mod shortcut;
 pub mod types_planning_updates;
+mod validate_config;
 
 pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo()).await;
@@ -166,6 +167,7 @@ issue_handlers! {
     no_merges,
     notify_zulip,
     review_requested,
+    validate_config,
 }
 
 macro_rules! command_handlers {

@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tracing as log;
 
-static CONFIG_FILE_NAME: &str = "triagebot.toml";
+pub(crate) static CONFIG_FILE_NAME: &str = "triagebot.toml";
 const REFRESH_EVERY: Duration = Duration::from_secs(2 * 60); // Every two minutes
 
 lazy_static::lazy_static! {
@@ -36,6 +36,9 @@ pub(crate) struct Config {
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
     pub(crate) no_merges: Option<NoMergesConfig>,
+    // We want this validation to run even without the entry in the config file
+    #[serde(default = "ValidateConfig::default")]
+    pub(crate) validate_config: Option<ValidateConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -165,6 +168,15 @@ pub(crate) struct ShortcutConfig {
 #[serde(deny_unknown_fields)]
 pub(crate) struct PrioritizeConfig {
     pub(crate) label: String,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct ValidateConfig {}
+
+impl ValidateConfig {
+    fn default() -> Option<Self> {
+        Some(ValidateConfig {})
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -450,6 +462,7 @@ mod tests {
                 review_requested: None,
                 mentions: None,
                 no_merges: None,
+                validate_config: Some(ValidateConfig {}),
             }
         );
     }
