@@ -41,6 +41,7 @@ mod notify_zulip;
 mod ping;
 mod prioritize;
 mod relabel;
+mod review_requested;
 mod review_submitted;
 mod rfc_helper;
 pub mod rustc_commits;
@@ -101,6 +102,20 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
         if let Err(e) = review_submitted::handle(ctx, event, config).await {
             log::error!(
                 "failed to process event {:?} with review_submitted handler: {:?}",
+                event,
+                e
+            )
+        }
+    }
+
+    if let Some(config) = config
+        .as_ref()
+        .ok()
+        .and_then(|c| c.review_requested.as_ref())
+    {
+        if let Err(e) = review_requested::handle(ctx, event, config).await {
+            log::error!(
+                "failed to process event {:?} with review_requested handler: {:?}",
                 event,
                 e
             )
