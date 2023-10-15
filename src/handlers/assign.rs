@@ -47,8 +47,8 @@ minimum review times lag, PR authors and assigned reviewers should ensure that t
 label (`S-waiting-on-review` and `S-waiting-on-author`) stays updated, invoking these commands \
 when appropriate:
 
-- `@rustbot author`: the review is finished, PR author should check the comments and take action accordingly
-- `@rustbot review`: the author is ready for a review, this PR will be queued again in the reviewer's queue";
+- `@{bot} author`: the review is finished, PR author should check the comments and take action accordingly
+- `@{bot} review`: the author is ready for a review, this PR will be queued again in the reviewer's queue";
 
 const WELCOME_WITH_REVIEWER: &str = "@{assignee} (or someone else)";
 
@@ -56,7 +56,7 @@ const WELCOME_WITHOUT_REVIEWER: &str = "@Mark-Simulacrum (NB. this repo may be m
 
 const RETURNING_USER_WELCOME_MESSAGE: &str = "r? @{assignee}
 
-(rustbot has picked a reviewer for you, use r? to override)";
+({bot} has picked a reviewer for you, use r? to override)";
 
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
     "@{author}: no appropriate reviewer found, use r? to override";
@@ -141,12 +141,18 @@ pub(super) async fn handle_input(
             let mut welcome = NEW_USER_WELCOME_MESSAGE.replace("{who}", &who_text);
             if let Some(contrib) = &config.contributing_url {
                 welcome.push_str("\n\n");
-                welcome.push_str(&CONTRIBUTION_MESSAGE.replace("{contributing_url}", contrib));
+                welcome.push_str(
+                    &CONTRIBUTION_MESSAGE
+                        .replace("{contributing_url}", contrib)
+                        .replace("{bot}", &ctx.username),
+                );
             }
             Some(welcome)
         } else if !from_comment {
             let welcome = match &assignee {
-                Some(assignee) => RETURNING_USER_WELCOME_MESSAGE.replace("{assignee}", assignee),
+                Some(assignee) => RETURNING_USER_WELCOME_MESSAGE
+                    .replace("{assignee}", assignee)
+                    .replace("{bot}", &ctx.username),
                 None => RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER
                     .replace("{author}", &event.issue.user.login),
             };
