@@ -108,20 +108,6 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
         }
     }
 
-    if let Some(config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.review_requested.as_ref())
-    {
-        if let Err(e) = review_requested::handle(ctx, event, config).await {
-            log::error!(
-                "failed to process event {:?} with review_requested handler: {:?}",
-                event,
-                e
-            )
-        }
-    }
-
     if let Some(ghr_config) = config
         .as_ref()
         .ok()
@@ -179,6 +165,7 @@ issue_handlers! {
     mentions,
     no_merges,
     notify_zulip,
+    review_requested,
 }
 
 macro_rules! command_handlers {
