@@ -48,11 +48,13 @@ pub(super) async fn parse_input(
         return Ok(None);
     }
 
-    // Don't trigger if the PR has any of the excluded labels.
-    for label in event.issue.labels() {
-        if config.exclude_labels.contains(&label.name) {
-            return Ok(None);
-        }
+    // Don't trigger if the PR has any of the excluded title segments.
+    if config
+        .exclude_titles
+        .iter()
+        .any(|s| event.issue.title.contains(s))
+    {
+        return Ok(None);
     }
 
     let mut merge_commits = HashSet::new();
@@ -70,12 +72,11 @@ pub(super) async fn parse_input(
         }
     }
 
-    let input = NoMergesInput { merge_commits };
-    Ok(if input.merge_commits.is_empty() {
-        None
-    } else {
-        Some(input)
-    })
+    if merge_commits.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(NoMergesInput { merge_commits }))
 }
 
 const DEFAULT_MESSAGE: &str = "
@@ -102,6 +103,7 @@ pub(super) async fn handle_input(
     let mut client = ctx.db.get().await;
     let mut state: IssueData<'_, NoMergesState> =
         IssueData::load(&mut client, &event.issue, NO_MERGES_KEY).await?;
+    let first_time = state.data.mentioned_merge_commits.is_empty();
 
     let mut message = config
         .message
@@ -109,7 +111,7 @@ pub(super) async fn handle_input(
         .unwrap_or(DEFAULT_MESSAGE)
         .to_string();
 
-    let since_last_posted = if state.data.mentioned_merge_commits.is_empty() {
+    let since_last_posted = if first_time {
         ""
     } else {
         " (since this message was last posted)"
@@ -132,6 +134,22 @@ pub(super) async fn handle_input(
     }
 
     if should_send {
+        if !first_time {
+            // Check if the labels are still set.
+            // Otherwise, they were probably removed manually.
+            let any_removed = config.labels.iter().any(|label| {
+                // No label on the issue matches.
+                event.issue.labels().iter().all(|l| &l.name != label)
+            });
+
+            if any_removed {
+                // Assume it was a false positive, so don't
+                // re-add the labels or send a message this time.
+                state.save().await?;
+                return Ok(());
+            }
+        }
+
         // Set labels
         let labels = config
             .labels
