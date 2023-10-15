@@ -911,7 +911,7 @@ pub struct IssueCommentEvent {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", tag = "action")]
 pub enum IssuesAction {
     Opened,
     Edited,
@@ -923,13 +923,22 @@ pub enum IssuesAction {
     Reopened,
     Assigned,
     Unassigned,
-    Labeled,
-    Unlabeled,
+    Labeled {
+        /// The label added from the issue
+        label: Label,
+    },
+    Unlabeled {
+        /// The label removed from the issue
+        label: Label,
+    },
     Locked,
     Unlocked,
     Milestoned,
     Demilestoned,
-    ReviewRequested,
+    ReviewRequested {
+        /// The person requested to review the pull request
+        requested_reviewer: User,
+    },
     ReviewRequestRemoved,
     ReadyForReview,
     Synchronize,
@@ -940,13 +949,14 @@ pub enum IssuesAction {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct IssuesEvent {
+    #[serde(flatten)]
     pub action: IssuesAction,
     #[serde(alias = "pull_request")]
     pub issue: Issue,
     pub changes: Option<Changes>,
     pub repository: Repository,
-    /// Some if action is IssuesAction::Labeled, for example
-    pub label: Option<Label>,
+    /// The GitHub user that triggered the event.
+    pub sender: User,
 }
 
 #[derive(Debug, serde::Deserialize)]
