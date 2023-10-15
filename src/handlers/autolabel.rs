@@ -95,9 +95,9 @@ pub(super) async fn parse_input(
         }
     }
 
-    if event.action == IssuesAction::Labeled {
+    if let IssuesAction::Labeled { label } = &event.action {
         let mut autolabels = Vec::new();
-        let applied_label = &event.label.as_ref().expect("label").name;
+        let applied_label = &label.name;
 
         'outer: for (label, config) in config.get_by_trigger(applied_label) {
             let exclude_patterns: Vec<glob::Pattern> = config

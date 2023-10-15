@@ -30,6 +30,7 @@ pub(crate) struct Config {
     pub(crate) notify_zulip: Option<NotifyZulipConfig>,
     pub(crate) github_releases: Option<GitHubReleasesConfig>,
     pub(crate) review_submitted: Option<ReviewSubmittedConfig>,
+    pub(crate) review_requested: Option<ReviewRequestedConfig>,
     pub(crate) shortcut: Option<ShortcutConfig>,
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
@@ -253,6 +254,12 @@ pub(crate) struct ReviewSubmittedConfig {
     pub(crate) reviewed_label: String,
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct ReviewRequestedConfig {
+    pub(crate) remove_labels: Vec<String>,
+    pub(crate) add_labels: Vec<String>,
+}
+
 pub(crate) async fn get(
     gh: &GithubClient,
     repo: &Repository,
@@ -421,6 +428,7 @@ mod tests {
                 notify_zulip: None,
                 github_releases: None,
                 review_submitted: None,
+                review_requested: None,
                 mentions: None,
                 no_merges: None,
             }

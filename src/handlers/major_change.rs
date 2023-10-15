@@ -55,11 +55,7 @@ pub(super) async fn parse_input(
     }
 
     // If we were labeled with accepted, then issue that event
-    if event.action == IssuesAction::Labeled
-        && event
-            .label
-            .as_ref()
-            .map_or(false, |l| l.name == config.accept_label)
+    if matches!(&event.action, IssuesAction::Labeled { label } if label.name == config.accept_label)
     {
         return Ok(Some(Invocation::AcceptedProposal));
     }
@@ -70,17 +66,8 @@ pub(super) async fn parse_input(
     // We want to treat reopened issues as new proposals but if the
     // issue is freshly opened, we only want to trigger once;
     // currently we do so on the label event.
-    if (event.action == IssuesAction::Reopened
-        && event
-            .issue
-            .labels()
-            .iter()
-            .any(|l| l.name == enabling_label))
-        || (event.action == IssuesAction::Labeled
-            && event
-                .label
-                .as_ref()
-                .map_or(false, |l| l.name == enabling_label))
+    if matches!(event.action, IssuesAction::Reopened if event.issue.labels().iter().any(|l| l.name == enabling_label))
+        || matches!(&event.action, IssuesAction::Labeled { label } if label.name == enabling_label)
     {
         return Ok(Some(Invocation::NewProposal));
     }
