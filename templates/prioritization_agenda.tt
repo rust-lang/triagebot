@@ -4,6 +4,7 @@
 ---
 tags: weekly, rustc
 type: docs
+note_id: xxx
 ---
 
 # T-compiler Meeting Agenda YYYY-MM-DD
@@ -89,9 +90,6 @@ don't know
 
 [T-types](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AP-critical+label%3AT-types)
 {{-issues::render(issues=p_critical_t_types, empty="No `P-critical` issues for `T-types` this time.")}}
-
-[T-rustdoc](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AP-critical+label%3AT-rustdoc)
-{{-issues::render(issues=p_critical_t_rustdoc, empty="No `P-critical` issues for `T-rustdoc` this time.")}}
 
 ### P-high regressions
 

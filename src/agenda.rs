@@ -23,6 +23,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                                 "major-change-accepted",
                                 "t-libs",
                                 "t-libs-api",
+                                "t-rustdoc",
                             ],
                         }),
                     },
@@ -39,6 +40,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                                 "final-comment-period",
                                 "t-libs",
                                 "t-libs-api",
+                                "t-rustdoc",
                             ],
                         }),
                     },
@@ -48,7 +50,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         query: Arc::new(github::Query {
                             filters: vec![("state", "open")],
                             include_labels: vec!["proposed-final-comment-period"],
-                            exclude_labels: vec!["t-libs", "t-libs-api"],
+                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -57,7 +59,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         query: Arc::new(github::Query {
                             filters: vec![("state", "open")],
                             include_labels: vec!["final-comment-period"],
-                            exclude_labels: vec!["t-libs", "t-libs-api"],
+                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -66,7 +68,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         query: Arc::new(github::Query {
                             filters: vec![("state", "all")],
                             include_labels: vec!["major-change-accepted", "to-announce"],
-                            exclude_labels: vec!["t-libs", "t-libs-api"],
+                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -79,7 +81,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                                 "disposition-merge",
                                 "to-announce",
                             ],
-                            exclude_labels: vec!["t-libs", "t-libs-api"],
+                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
                         }),
                     },
                 ],
@@ -93,7 +95,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         query: Arc::new(github::Query {
                             filters: vec![("state", "open")],
                             include_labels: vec!["proposed-final-comment-period", "T-compiler"],
-                            exclude_labels: vec!["t-libs", "t-libs-api"],
+                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -102,7 +104,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         query: Arc::new(github::Query {
                             filters: vec![("state", "open")],
                             include_labels: vec!["final-comment-period", "T-compiler"],
-                            exclude_labels: vec!["t-libs", "t-libs-api"],
+                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -115,7 +117,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                                 "disposition-merge",
                                 "to-announce",
                             ],
-                            exclude_labels: vec!["t-libs", "t-libs-api"],
+                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
                         }),
                     },
                 ],
@@ -129,7 +131,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         query: Arc::new(github::Query {
                             filters: vec![("state", "open")],
                             include_labels: vec!["proposed-final-comment-period"],
-                            exclude_labels: vec!["t-libs", "t-libs-api"],
+                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -138,7 +140,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         query: Arc::new(github::Query {
                             filters: vec![("state", "open")],
                             include_labels: vec!["final-comment-period"],
-                            exclude_labels: vec!["t-libs", "t-libs-api"],
+                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -151,7 +153,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                                 "disposition-merge",
                                 "to-announce",
                             ],
-                            exclude_labels: vec!["t-libs", "t-libs-api"],
+                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
                         }),
                     },
                 ],
@@ -349,15 +351,6 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         query: Arc::new(github::Query {
                             filters: vec![("state", "open")],
                             include_labels: vec!["T-types", "P-critical"],
-                            exclude_labels: vec![],
-                        }),
-                    },
-                    QueryMap {
-                        name: "p_critical_t_rustdoc",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open")],
-                            include_labels: vec!["T-rustdoc", "P-critical"],
                             exclude_labels: vec![],
                         }),
                     },
