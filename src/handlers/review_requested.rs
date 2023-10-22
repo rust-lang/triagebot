@@ -7,9 +7,13 @@ pub(crate) struct ReviewRequestedInput {}
 pub(crate) async fn parse_input(
     _ctx: &Context,
     event: &IssuesEvent,
-    _config: Option<&ReviewRequestedConfig>,
+    config: Option<&ReviewRequestedConfig>,
 ) -> Result<Option<ReviewRequestedInput>, String> {
     // PR author requests a review from one of the assignees
+
+    if config.is_none() {
+        return Ok(None);
+    }
 
     let IssuesAction::ReviewRequested { requested_reviewer } = &event.action else {
         return Ok(None);
