@@ -38,8 +38,14 @@ mod tests {
     mod tests_from_diff;
 }
 
+const RESPONSE_TIME_EXPECTATIONS: &str = "Note that Rust project members are predominantly \
+volunteers with their own priorities and lives beyond Rust. It may take several weeks before \
+they get back to you. Please be patient.";
+
 const NEW_USER_WELCOME_MESSAGE: &str = "Thanks for the pull request, and welcome! \
-The Rust team is excited to review your changes, and you should hear from {who} soon.";
+The Rust team is excited to review your changes, and you should hear from {who} soon.
+
+" + RESPONSE_TIME_EXPECTATIONS;
 
 const CONTRIBUTION_MESSAGE: &str = "Please see [the contribution \
 instructions]({contributing_url}) for more information. Namely, in order to ensure the \
@@ -56,7 +62,9 @@ const WELCOME_WITHOUT_REVIEWER: &str = "@Mark-Simulacrum (NB. this repo may be m
 
 const RETURNING_USER_WELCOME_MESSAGE: &str = "r? @{assignee}
 
-({bot} has picked a reviewer for you, use r? to override)";
+({bot} has picked a reviewer for you, use r? to override)
+
+" + RESPONSE_TIME_EXPECTATIONS;
 
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
     "@{author}: no appropriate reviewer found, use r? to override";
