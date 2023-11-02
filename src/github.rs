@@ -2135,6 +2135,7 @@ pub struct RecentCommit {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct GitUser {
+    pub name: String,
     pub date: DateTime<FixedOffset>,
 }
 

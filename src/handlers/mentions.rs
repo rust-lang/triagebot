@@ -17,6 +17,7 @@ use tracing as log;
 const MENTIONS_KEY: &str = "mentions";
 
 pub(super) struct MentionsInput {
+    has_bors_commit: bool,
     paths: Vec<String>,
 }
 
@@ -50,6 +51,17 @@ pub(super) async fn parse_input(
         return Ok(None);
     }
 
+    let has_bors_commit = event.action == IssuesAction::Opened
+        && config.bors_commit_message.is_some()
+        && event
+            .issue
+            .commits(&ctx.github)
+            .await
+            .map_err(|e| log::error!("failed to fetch commits: {:?}", e))
+            .unwrap_or_default()
+            .into_iter()
+            .any(|commit| commit.commit.author.name == "bors");
+
     if let Some(diff) = event
         .issue
         .diff(&ctx.github)
@@ -78,7 +90,10 @@ pub(super) async fn parse_input(
             .map(|(key, _mention)| key.to_string())
             .collect();
         if !to_mention.is_empty() {
-            return Ok(Some(MentionsInput { paths: to_mention }));
+            return Ok(Some(MentionsInput {
+                has_bors_commit,
+                paths: to_mention,
+            }));
         }
     }
     Ok(None)
@@ -95,6 +110,14 @@ pub(super) async fn handle_input(
         IssueData::load(&mut client, &event.issue, MENTIONS_KEY).await?;
     // Build the message to post to the issue.
     let mut result = String::new();
+    if input.has_bors_commit {
+        write!(
+            result,
+            "{}\n",
+            config.bors_commit_message.as_deref().unwrap()
+        )
+        .unwrap();
+    }
     for to_mention in &input.paths {
         if state.data.paths.iter().any(|p| p == to_mention) {
             // Avoid duplicate mentions.
@@ -109,6 +132,11 @@ pub(super) async fn handle_input(
             None => write!(result, "Some changes occurred in {to_mention}").unwrap(),
         }
         if !cc.is_empty() {
+            let cc: Vec<String> = if input.has_bors_commit {
+                cc.iter().map(|s| format!("`{s}`")).collect()
+            } else {
+                cc.to_owned()
+            };
             write!(result, "\n\ncc {}", cc.join(", ")).unwrap();
         }
         state.data.paths.push(to_mention.to_string());
