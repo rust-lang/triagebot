@@ -591,6 +591,69 @@ pub fn lang_planning<'a>() -> Box<dyn Action + Send + Sync> {
     })
 }
 
+pub fn types_planning<'a>() -> Box<dyn Action + Send + Sync> {
+    Box::new(Step {
+        name: "types_planning_agenda",
+        actions: vec![
+            Query {
+                repos: vec![("rust-lang", "types-team")],
+                queries: vec![
+                    QueryMap {
+                        name: "roadmap_tracking_issues",
+                        kind: QueryKind::List,
+                        query: Arc::new(github::Query {
+                            filters: vec![("state", "open"), ("is", "issue")],
+                            include_labels: vec!["roadmap-tracking-issue"],
+                            exclude_labels: vec![],
+                        }),
+                    },
+                    QueryMap {
+                        name: "deep_dive_proposals",
+                        kind: QueryKind::List,
+                        query: Arc::new(github::Query {
+                            filters: vec![("state", "open"), ("is", "issue")],
+                            include_labels: vec!["deep-dive-proposal"],
+                            exclude_labels: vec![],
+                        }),
+                    },
+                    QueryMap {
+                        name: "major_changes",
+                        kind: QueryKind::List,
+                        query: Arc::new(github::Query {
+                            filters: vec![("state", "open"), ("is", "issue")],
+                            include_labels: vec!["major-change"],
+                            exclude_labels: vec![],
+                        }),
+                    },
+                ],
+            },
+            Query {
+                repos: vec![("rust-lang", "rust")],
+                queries: vec![
+                    QueryMap {
+                        name: "nominated_issues",
+                        kind: QueryKind::List,
+                        query: Arc::new(github::Query {
+                            filters: vec![("state", "open"), ("is", "issue")],
+                            include_labels: vec!["I-types-nominated"],
+                            exclude_labels: vec![],
+                        }),
+                    },
+                    QueryMap {
+                        name: "types_fcps",
+                        kind: QueryKind::List,
+                        query: Arc::new(github::Query {
+                            filters: vec![("state", "open")],
+                            include_labels: vec!["T-types", "proposed-final-comment-period"],
+                            exclude_labels: vec![],
+                        }),
+                    },
+                ],
+            },
+        ],
+    })
+}
+
 // Things to add (maybe):
 // - Compiler RFCs
 // - P-high issues
