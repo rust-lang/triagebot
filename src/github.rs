@@ -492,6 +492,21 @@ impl Issue {
             .await?)
     }
 
+    // returns an array of one element
+    pub async fn get_first100_comments(
+        &self,
+        client: &GithubClient,
+    ) -> anyhow::Result<Vec<Comment>> {
+        let comment_url = format!(
+            "{}/issues/{}/comments?page=1&per_page=100",
+            self.repository().url(),
+            self.number,
+        );
+        Ok(client
+            .json::<Vec<Comment>>(client.get(&comment_url))
+            .await?)
+    }
+
     pub async fn edit_body(&self, client: &GithubClient, body: &str) -> anyhow::Result<()> {
         let edit_url = format!("{}/issues/{}", self.repository().url(), self.number);
         #[derive(serde::Serialize)]

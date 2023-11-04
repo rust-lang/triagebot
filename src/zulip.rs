@@ -299,14 +299,14 @@ async fn execute_for_other_user(
 }
 
 #[derive(serde::Deserialize)]
-struct MembersApiResponse {
-    members: Vec<Member>,
+pub struct MembersApiResponse {
+    pub members: Vec<Member>,
 }
 
 #[derive(serde::Deserialize)]
-struct Member {
-    email: String,
-    user_id: u64,
+pub struct Member {
+    pub email: String,
+    pub user_id: u64,
 }
 
 #[derive(serde::Serialize)]
