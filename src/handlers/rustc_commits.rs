@@ -155,7 +155,7 @@ pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u
 
 pub fn job() -> JobSchedule {
     JobSchedule {
-        name: "rustc_commits".to_string(),
+        name: "rustc_commits",
         // Every 30 minutes...
         schedule: Schedule::from_str("* 0,30 * * * * *").unwrap(),
         metadata: serde_json::Value::Null,

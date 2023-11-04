@@ -30,7 +30,7 @@ const TITLE: &str = "Update books";
 
 pub fn job() -> JobSchedule {
     JobSchedule {
-        name: "docs_update".to_string(),
+        name: "docs_update",
         // Around 9am Pacific time on every Monday.
         schedule: Schedule::from_str("0 00 17 * * Mon *").unwrap(),
         metadata: serde_json::Value::Null,
