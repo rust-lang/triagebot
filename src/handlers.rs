@@ -29,7 +29,6 @@ mod close;
 pub mod docs_update;
 mod github_releases;
 mod glacier;
-pub mod jobs;
 mod major_change;
 mod mentions;
 mod milestone_prs;

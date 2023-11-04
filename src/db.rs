@@ -1,5 +1,4 @@
-use crate::handlers::jobs::handle_job;
-use crate::{db::jobs::*, handlers::Context};
+use crate::{db::jobs::*, handlers::Context, jobs::jobs};
 use anyhow::Context as _;
 use chrono::Utc;
 use native_tls::{Certificate, TlsConnector};
@@ -188,9 +187,9 @@ pub async fn schedule_jobs(db: &DbClient, jobs: Vec<JobSchedule>) -> anyhow::Res
         let mut upcoming = job.schedule.upcoming(Utc).take(1);
 
         if let Some(scheduled_at) = upcoming.next() {
-            if let Err(_) = get_job_by_name_and_scheduled_at(&db, &job.name, &scheduled_at).await {
+            if let Err(_) = get_job_by_name_and_scheduled_at(&db, job.name, &scheduled_at).await {
                 // mean there's no job already in the db with that name and scheduled_at
-                insert_job(&db, &job.name, &scheduled_at, &job.metadata).await?;
+                insert_job(&db, job.name, &scheduled_at, &job.metadata).await?;
             }
         }
     }
@@ -216,6 +215,26 @@ pub async fn run_scheduled_jobs(ctx: &Context, db: &DbClient) -> anyhow::Result<
             }
         }
     }
+
+    Ok(())
+}
+
+// Try to handle a specific job
+async fn handle_job(
+    ctx: &Context,
+    name: &String,
+    metadata: &serde_json::Value,
+) -> anyhow::Result<()> {
+    for job in jobs() {
+        if &job.name() == &name {
+            return job.run(ctx, metadata).await;
+        }
+    }
+    tracing::trace!(
+        "handle_job fell into default case: (name={:?}, metadata={:?})",
+        name,
+        metadata
+    );
 
     Ok(())
 }
