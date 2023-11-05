@@ -1287,9 +1287,9 @@ impl Repository {
         };
 
         let mut args = RecentCommitsArguments {
-            branch: branch.to_string(),
-            name: self.name().to_string(),
-            owner: self.owner().to_string(),
+            branch,
+            name: self.name(),
+            owner: self.owner(),
             after: None,
         };
         let mut found_newest = false;
@@ -2167,14 +2167,14 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
         use cynic::QueryBuilder;
         use github_graphql::queries;
 
-        let repository_owner = repo.owner().to_owned();
-        let repository_name = repo.name().to_owned();
+        let repository_owner = repo.owner();
+        let repository_name = repo.name();
 
         let mut prs: Vec<queries::PullRequest> = vec![];
 
         let mut args = queries::LeastRecentlyReviewedPullRequestsArguments {
             repository_owner,
-            repository_name: repository_name.clone(),
+            repository_name,
             after: None,
         };
         loop {
@@ -2264,7 +2264,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                     pr.number as u64,
                     pr.title,
                     pr.url.0,
-                    repository_name.clone(),
+                    repository_name,
                     labels,
                     assignees,
                 ))
@@ -2283,7 +2283,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                         number,
                         title,
                         html_url,
-                        repo_name,
+                        repo_name: repo_name.to_string(),
                         labels,
                         assignees,
                         updated_at_hts,
