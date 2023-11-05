@@ -187,11 +187,27 @@ pub async fn schedule_jobs(db: &DbClient, jobs: Vec<JobSchedule>) -> anyhow::Res
         let mut upcoming = job.schedule.upcoming(Utc).take(1);
 
         if let Some(scheduled_at) = upcoming.next() {
-            if let Err(_) = get_job_by_name_and_scheduled_at(&db, job.name, &scheduled_at).await {
-                // mean there's no job already in the db with that name and scheduled_at
-                insert_job(&db, job.name, &scheduled_at, &job.metadata).await?;
-            }
+            schedule_job(db, job.name, job.metadata, scheduled_at).await?;
         }
+    }
+
+    Ok(())
+}
+
+pub async fn schedule_job(
+    db: &DbClient,
+    job_name: &str,
+    job_metadata: serde_json::Value,
+    when: chrono::DateTime<Utc>,
+) -> anyhow::Result<()> {
+    let all_jobs = jobs();
+    if !all_jobs.iter().any(|j| j.name() == job_name) {
+        anyhow::bail!("Job {} does not exist in the current job list.", job_name);
+    }
+
+    if let Err(_) = get_job_by_name_and_scheduled_at(&db, job_name, &when).await {
+        // mean there's no job already in the db with that name and scheduled_at
+        insert_job(&db, job_name, &when, &job_metadata).await?;
     }
 
     Ok(())

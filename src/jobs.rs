@@ -48,7 +48,14 @@ use cron::Schedule;
 
 use crate::{
     db::jobs::JobSchedule,
-    handlers::{docs_update::DocsUpdateJob, rustc_commits::RustcCommitsJob, Context},
+    handlers::{
+        docs_update::DocsUpdateJob,
+        rustc_commits::RustcCommitsJob,
+        types_planning_updates::{
+            TypesPlanningMeetingThreadOpenJob, TypesPlanningMeetingUpdatesPing,
+        },
+        Context,
+    },
 };
 
 // How often new cron-based jobs will be placed in the queue.
@@ -61,7 +68,12 @@ pub const JOB_PROCESSING_CADENCE_IN_SECS: u64 = 60;
 
 // The default jobs to schedule, repeatedly.
 pub fn jobs() -> Vec<Box<dyn Job + Send + Sync>> {
-    vec![Box::new(DocsUpdateJob), Box::new(RustcCommitsJob)]
+    vec![
+        Box::new(DocsUpdateJob),
+        Box::new(RustcCommitsJob),
+        Box::new(TypesPlanningMeetingThreadOpenJob),
+        Box::new(TypesPlanningMeetingUpdatesPing),
+    ]
 }
 
 pub fn default_jobs() -> Vec<JobSchedule> {
@@ -76,6 +88,12 @@ pub fn default_jobs() -> Vec<JobSchedule> {
             name: RustcCommitsJob.name(),
             // Every 30 minutes...
             schedule: Schedule::from_str("* 0,30 * * * * *").unwrap(),
+            metadata: serde_json::Value::Null,
+        },
+        JobSchedule {
+            name: TypesPlanningMeetingThreadOpenJob.name(),
+            // Last Monday of every month
+            schedule: Schedule::from_str("0 0 12 ? * 2L *").unwrap(),
             metadata: serde_json::Value::Null,
         },
     ]
