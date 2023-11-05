@@ -682,6 +682,7 @@ pub static INDEX: &str = r#"
 <ul>
     <li><a href="/agenda/lang/triage">T-lang triage agenda</a></li>
     <li><a href="/agenda/lang/planning">T-lang planning agenda</a></li>
+    <li><a href="/agenda/types/planning">T-types planning agenda</a></li>
 </ul>
 </body>
 </html>
