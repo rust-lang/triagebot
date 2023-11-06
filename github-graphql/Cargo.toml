@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
-cynic = { version = "3", features = ["rkyv"] }
+cynic = { version = "3.2.2", features = ["rkyv"] }
 
 [build-dependencies]
-cynic-codegen = { version = "3", features = ["rkyv"] }
+cynic-codegen = { version = "3.2.2", features = ["rkyv"] }
