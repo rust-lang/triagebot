@@ -1,14 +1,14 @@
 use crate::db::schedule_job;
 use crate::github;
 use crate::jobs::Job;
-use crate::zulip::BOT_EMAIL;
-use crate::zulip::{to_zulip_id, MembersApiResponse};
-use anyhow::{format_err, Context as _};
+use anyhow::Context as _;
 use async_trait::async_trait;
 use chrono::{Datelike, Duration, NaiveTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
 const TYPES_REPO: &'static str = "rust-lang/types-team";
+// T-types/meetings
+const TYPES_MEETINGS_STREAM: u64 = 326132;
 
 pub struct TypesPlanningMeetingThreadOpenJob;
 
@@ -22,6 +22,10 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
         // On the last week of the month, we open a thread on zulip for the next Monday
         let today = chrono::Utc::now().date().naive_utc();
         let first_monday = today + chrono::Duration::days(7);
+        // We actually schedule for every Monday, so first check if this is the last Monday of the month
+        if first_monday.month() == today.month() {
+            return Ok(());
+        }
         let meeting_date_string = first_monday.format("%Y-%m-%d").to_string();
         let message = format!("\
             Hello @*T-types/meetings*. Monthly planning meeting in one week.\n\
@@ -29,7 +33,7 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
             Extra reminders will be sent later this week.");
         let zulip_req = crate::zulip::MessageApiRequest {
             recipient: crate::zulip::Recipient::Stream {
-                id: 326132,
+                id: TYPES_MEETINGS_STREAM,
                 topic: &format!("{meeting_date_string} planning meeting"),
             },
             content: &message,
@@ -99,20 +103,9 @@ pub async fn request_updates(
 
     let mut issues_needs_updates = vec![];
     for issue in issues {
-        // Github doesn't have a nice way to get the *last* comment; we would have to paginate all comments to get it.
-        // For now, just bail out if there are more than 100 comments (if this ever becomes a problem, we will have to fix).
-        let comments = issue.get_first100_comments(gh).await?;
-        if comments.len() >= 100 {
-            anyhow::bail!(
-                "Encountered types tracking issue with 100 or more comments; needs implementation."
-            );
-        }
-
-        // If there are any comments in the past 7 days, we consider this "updated". We *could* be more clever, but
+        // If the issue has been updated in the past 7 days, we consider this "updated". We *could* be more clever, but
         // this is fine under the assumption that tracking issues should only contain updates.
-        let older_than_7_days = comments
-            .last()
-            .map_or(true, |c| c.updated_at < (Utc::now() - Duration::days(7)));
+        let older_than_7_days = issue.updated_at < (Utc::now() - Duration::days(7));
         if !older_than_7_days {
             continue;
         }
@@ -166,7 +159,7 @@ pub async fn request_updates(
     let meeting_date_string = metadata.date_string;
     let zulip_req = crate::zulip::MessageApiRequest {
         recipient: crate::zulip::Recipient::Stream {
-            id: 326132,
+            id: TYPES_MEETINGS_STREAM,
             topic: &format!("{meeting_date_string} planning meeting"),
         },
         content: &message,
@@ -174,35 +167,4 @@ pub async fn request_updates(
     zulip_req.send(&ctx.github.raw()).await?;
 
     Ok(())
-}
-
-#[allow(unused)] // Needed for commented out bit above
-async fn zulip_id_and_email(
-    ctx: &super::Context,
-    github_id: i64,
-) -> anyhow::Result<Option<(u64, String)>> {
-    let bot_api_token = std::env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
-
-    let members = ctx
-        .github
-        .raw()
-        .get("https://rust-lang.zulipchat.com/api/v1/users")
-        .basic_auth(BOT_EMAIL, Some(&bot_api_token))
-        .send()
-        .await
-        .map_err(|e| format_err!("Failed to get list of zulip users: {e:?}."))?;
-    let members = members
-        .json::<MembersApiResponse>()
-        .await
-        .map_err(|e| format_err!("Failed to get list of zulip users: {e:?}."))?;
-
-    let zulip_id = match to_zulip_id(&ctx.github, github_id).await {
-        Ok(Some(id)) => id as u64,
-        Ok(None) => return Ok(None),
-        Err(e) => anyhow::bail!("Could not find Zulip ID for GitHub id {github_id}: {e:?}"),
-    };
-
-    let user = members.members.iter().find(|m| m.user_id == zulip_id);
-
-    Ok(user.map(|m| (m.user_id, m.email.clone())))
 }
