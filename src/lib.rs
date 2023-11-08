@@ -8,6 +8,7 @@ use crate::github::PullRequestDetails;
 use anyhow::Context;
 use handlers::HandlerError;
 use interactions::ErrorComment;
+use serde::Serialize;
 use std::fmt;
 use tracing as log;
 
@@ -25,7 +26,7 @@ pub mod notification_listing;
 pub mod payload;
 pub mod rfcbot;
 pub mod team;
-mod team_data;
+pub mod team_data;
 pub mod triage;
 pub mod zulip;
 
@@ -259,5 +260,70 @@ pub async fn webhook(
         )))
     } else {
         Ok(true)
+    }
+}
+
+// these constants should match the DB table fields defaults in ./src/db.rs
+const PREF_ALLOW_PING_AFTER_DAYS: i32 = 15;
+const PREF_MAX_ASSIGNED_PRS: i32 = 5;
+
+#[derive(Debug, Serialize)]
+pub struct ReviewCapacityUser {
+    pub username: String,
+    pub id: uuid::Uuid,
+    pub user_id: i64,
+    pub active: bool,
+    pub assigned_prs: Vec<i32>,
+    pub max_assigned_prs: Option<i32>,
+    pub num_assigned_prs: Option<i32>,
+    pub pto_date_start: Option<chrono::NaiveDate>,
+    pub pto_date_end: Option<chrono::NaiveDate>,
+    pub allow_ping_after_days: Option<i32>,
+    pub publish_prefs: bool,
+    pub checksum: Option<String>,
+}
+
+impl ReviewCapacityUser {
+    pub(crate) fn is_available(&self) -> bool {
+        let today = chrono::Utc::today().naive_utc();
+        let is_available = (self.pto_date_end.is_some() && self.pto_date_start.is_some())
+            && (self.pto_date_end.unwrap() < today || self.pto_date_start.unwrap() > today);
+        self.active && is_available
+    }
+
+    pub fn default(username: String) -> Self {
+        Self {
+            username,
+            id: uuid::Uuid::new_v4(),
+            user_id: -1,
+            active: true,
+            assigned_prs: vec![],
+            max_assigned_prs: Some(PREF_MAX_ASSIGNED_PRS),
+            num_assigned_prs: None,
+            pto_date_start: None,
+            pto_date_end: None,
+            allow_ping_after_days: Some(PREF_ALLOW_PING_AFTER_DAYS),
+            publish_prefs: false,
+            checksum: None,
+        }
+    }
+}
+
+impl From<tokio_postgres::row::Row> for ReviewCapacityUser {
+    fn from(row: tokio_postgres::row::Row) -> Self {
+        Self {
+            username: row.get("username"),
+            id: row.get("id"),
+            checksum: row.get("checksum"),
+            user_id: row.get("user_id"),
+            assigned_prs: row.get("assigned_prs"),
+            num_assigned_prs: row.get("num_assigned_prs"),
+            max_assigned_prs: row.get("max_assigned_prs"),
+            pto_date_start: row.get("pto_date_start"),
+            pto_date_end: row.get("pto_date_end"),
+            active: row.get("active"),
+            allow_ping_after_days: row.get("allow_ping_after_days"),
+            publish_prefs: row.get("publish_prefs"),
+        }
     }
 }

@@ -35,6 +35,7 @@ pub(crate) struct Config {
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
     pub(crate) no_merges: Option<NoMergesConfig>,
+    pub(crate) review_prefs: Option<ReviewPrefsConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -148,6 +149,12 @@ pub(crate) struct RelabelConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct ShortcutConfig {
+    #[serde(default)]
+    _empty: (),
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct ReviewPrefsConfig {
     #[serde(default)]
     _empty: (),
 }
@@ -431,6 +438,7 @@ mod tests {
                 review_requested: None,
                 mentions: None,
                 no_merges: None,
+                review_prefs: None
             }
         );
     }

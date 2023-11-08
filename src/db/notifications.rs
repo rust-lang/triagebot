@@ -15,7 +15,7 @@ pub struct Notification {
     pub team_name: Option<String>,
 }
 
-pub async fn record_username(db: &DbClient, user_id: i64, username: String) -> anyhow::Result<()> {
+pub async fn record_username(db: &DbClient, user_id: i64, username: &str) -> anyhow::Result<()> {
     db.execute(
         "INSERT INTO users (user_id, username) VALUES ($1, $2) ON CONFLICT DO NOTHING",
         &[&user_id, &username],

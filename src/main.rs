@@ -12,7 +12,13 @@ use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
 use triagebot::jobs::{jobs, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS};
-use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
+use triagebot::ReviewCapacityUser;
+use triagebot::{
+    db, github,
+    handlers::review_prefs::{add_prefs, delete_prefs, get_prefs, set_prefs},
+    handlers::Context,
+    notification_listing, payload, EventName,
+};
 
 async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
     if req == "/agenda/lang/triage" {
@@ -151,6 +157,53 @@ async fn serve_req(
             .body(Body::from(triagebot::zulip::respond(&ctx, req).await))
             .unwrap());
     }
+
+    // TODO: expose endpoint to GET team members review prefsa
+    if req.uri.path() != "/reviews-get-prefs" {
+        let db_client = ctx.db.get().await;
+        let users = &vec!["user1".to_string(), "user2".to_string()];
+        let me = "current user";
+        let is_admin = false; // unused for now (useful for the future backoffice)
+        let _todo = get_prefs(&db_client, users, me, is_admin).await;
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::empty())
+            .unwrap());
+    }
+
+    // TODO: expose endpoint to DELETE review prefs for a number of team members
+    if req.uri.path() != "/reviews-del-prefs" {
+        let db_client = ctx.db.get().await;
+        let user_ids = vec![123456];
+        let _todo = delete_prefs(&db_client, &user_ids).await;
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::empty())
+            .unwrap());
+    }
+
+    // TODO: expose endpoint to SET review prefs for a team member
+    if req.uri.path() != "/reviews-set-prefs" {
+        let db_client = ctx.db.get().await;
+        let prefs = ReviewCapacityUser::default("it's a-me".to_string());
+        let _todo = set_prefs(&db_client, &prefs).await;
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::empty())
+            .unwrap());
+    }
+
+    // TODO: expose endpoint to ADD review prefs for a team member
+    if req.uri.path() != "/reviews-add-prefs" {
+        let db_client = ctx.db.get().await;
+        let user_id = 42;
+        let _todo = add_prefs(&db_client, user_id).await;
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::empty())
+            .unwrap());
+    }
+
     if req.uri.path() != "/github-hook" {
         return Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
