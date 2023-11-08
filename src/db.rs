@@ -92,7 +92,7 @@ impl ClientPool {
     }
 }
 
-pub async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
+async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
     let db_url = std::env::var("DATABASE_URL").expect("needs DATABASE_URL");
     if db_url.contains("rds.amazonaws.com") {
         let cert = &CERTIFICATE_PEM[..];

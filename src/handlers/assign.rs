@@ -528,8 +528,6 @@ pub(super) async fn handle_command(
                 }
             }
         };
-        // NOTE: this will not handle PR assignment requested from the web Github UI
-        // that case is handled in the review_prefs module
         set_assignee(issue, &ctx.github, &username).await;
         // This PR will be registered in the reviewer's work queue using a `IssuesAction::Assigned`
         // and its delegate `handlers::review_prefs::handle_input()`

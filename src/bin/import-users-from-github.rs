@@ -1,9 +1,12 @@
 use reqwest::Client;
 use tracing::{debug, info};
-use triagebot::db::notifications::record_username;
+// TODO: this should become an HTTP API
+// use triagebot::db::notifications::record_username;
+use triagebot::github;
 use triagebot::github::User;
-use triagebot::handlers::review_prefs::{add_prefs, delete_prefs, get_prefs};
-use triagebot::{db::make_client, github};
+
+// TODO: these should become HTTP APIs
+// use triagebot::handlers::review_prefs::{add_prefs, delete_prefs, get_prefs};
 
 // Import and synchronization:
 // 1. Download teams and retrieve those listed in $NEW_PR_ASSIGNMENT_TEAMS
@@ -16,7 +19,6 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let gh = github::GithubClient::new_with_default_token(Client::new());
-    let db_client = make_client().await.unwrap();
     let teams_data = triagebot::team_data::teams(&gh).await?;
 
     // 1. get team members

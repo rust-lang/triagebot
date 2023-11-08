@@ -9,7 +9,7 @@ use anyhow::Context;
 use handlers::HandlerError;
 use interactions::ErrorComment;
 use serde::Serialize;
-use std::{collections::HashMap, fmt};
+use std::fmt;
 use tracing as log;
 
 pub mod actions;
@@ -306,111 +306,6 @@ impl ReviewCapacityUser {
             publish_prefs: false,
             checksum: None,
         }
-    }
-}
-
-impl From<HashMap<String, String>> for ReviewCapacityUser {
-    fn from(obj: HashMap<String, String>) -> Self {
-        // Note: if user set themselves as inactive all other prefs will be ignored
-        let active = {
-            let _o = obj.get("active");
-            if _o.is_none() || _o.unwrap() == "no" {
-                false
-            } else {
-                true
-            }
-        };
-
-        let assigned_prs = if active {
-            if let Some(x) = obj.get("assigned_prs") {
-                x.parse::<String>()
-                    .unwrap()
-                    .split(",")
-                    .map(|x| x.parse::<i32>().unwrap())
-                    .collect()
-            } else {
-                vec![]
-            }
-        } else {
-            vec![]
-        };
-
-        let num_assigned_prs = if active {
-            if let Some(x) = obj.get("num_assigned_prs") {
-                Some(x.parse::<i32>().unwrap())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let max_assigned_prs = if active {
-            if let Some(x) = obj.get("max_assigned_prs") {
-                Some(x.parse::<i32>().unwrap_or(PREF_MAX_ASSIGNED_PRS))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let pto_date_start = if active {
-            if let Some(x) = obj.get("pto_date_start") {
-                Some(x.parse::<chrono::NaiveDate>().unwrap())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let pto_date_end = if active {
-            if let Some(x) = obj.get("pto_date_end") {
-                Some(x.parse::<chrono::NaiveDate>().unwrap())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let allow_ping_after_days = if active {
-            if let Some(x) = obj.get("allow_ping_after_days") {
-                Some(x.parse::<i32>().unwrap_or(PREF_ALLOW_PING_AFTER_DAYS))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let publish_prefs = {
-            let _obj = obj.get("publish_prefs");
-            if _obj.is_none() || _obj.unwrap() == "no" {
-                false
-            } else {
-                true
-            }
-        };
-
-        let prefs = ReviewCapacityUser {
-            // fields we don't receive from the web form (they are here ignored)
-            username: String::new(),
-            id: uuid::Uuid::new_v4(),
-            checksum: None,
-            // fields received from the web form
-            user_id: obj.get("user_id").unwrap().parse::<i64>().unwrap(),
-            assigned_prs,
-            num_assigned_prs,
-            max_assigned_prs,
-            pto_date_start,
-            pto_date_end,
-            active,
-            allow_ping_after_days,
-            publish_prefs,
-        };
-        prefs
     }
 }
 

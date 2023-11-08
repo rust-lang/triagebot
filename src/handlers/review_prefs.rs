@@ -65,20 +65,6 @@ RETURNING u.username, r.*";
     Ok(rec.into())
 }
 
-/// Return a team member identified by a checksum
-pub async fn get_user(db_client: &DbClient, checksum: &str) -> anyhow::Result<ReviewCapacityUser> {
-    let q = "
-SELECT username,r.*
-FROM review_capacity r
-JOIN users on r.user_id=users.user_id
-WHERE r.checksum=$1";
-    let rec = db_client
-        .query_one(q, &[&checksum])
-        .await
-        .context("SQL error")?;
-    Ok(rec.into())
-}
-
 /// Get review preferences for a number of team members
 /// - me: sort the current user at the top of the list
 /// - is_admin: if `true` return also preferences marked as not public

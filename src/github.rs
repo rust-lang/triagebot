@@ -7,7 +7,6 @@ use hyper::header::HeaderValue;
 use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
-use rust_team_data::v1::TeamMember;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::{
@@ -167,25 +166,6 @@ impl GithubClient {
     {
         let (body, _req_dbg) = self.send_req(req).await?;
         Ok(serde_json::from_slice(&body)?)
-    }
-
-    pub fn get_team_members<'a>(
-        &self,
-        admins: &mut Vec<User>,
-        members: &mut Vec<User>,
-        team_members: &Vec<TeamMember>,
-    ) {
-        for tm in team_members {
-            let m = User {
-                id: Some(tm.github_id as i64),
-                login: tm.github.clone(),
-            };
-            if tm.is_lead {
-                admins.push(m);
-            } else {
-                members.push(m);
-            }
-        }
     }
 }
 
@@ -2103,53 +2083,6 @@ impl GithubClient {
             .await
             .with_context(|| format!("{} failed to get repo", full_name))
     }
-
-    pub async fn get_profile(&self, access_token: &str) -> anyhow::Result<User> {
-        let c = self
-            .client
-            .get("https://api.github.com/user")
-            .header("Authorization", format!("Bearer {}", access_token))
-            .header("User-Agent", "rust-lang-triagebot");
-        self.json::<User>(c).await
-    }
-}
-
-pub async fn exchange_code(
-    code: &str,
-    client_id: &str,
-    client_secret: &str,
-) -> anyhow::Result<String> {
-    let client = reqwest::Client::new();
-    let payload =
-        serde_json::json!({"client_id":client_id, "client_secret":client_secret, "code":code});
-
-    let tk = client
-        .post("https://github.com/login/oauth/access_token")
-        .header("Accept", "application/json")
-        .json(&payload)
-        .send()
-        .await
-        .context("Failed to contact remote host")
-        .unwrap()
-        .json::<serde_json::Value>()
-        .await
-        .context("Could not decode response")
-        .expect("Error while retrieving the GH token");
-
-    if let Some(err_msg) = tk.get("error_description").cloned() {
-        return Err(anyhow::Error::msg(err_msg));
-    }
-    Ok(tk
-        .get("access_token")
-        .unwrap()
-        .to_string()
-        .replace("\"", ""))
-}
-
-pub async fn get_gh_user(access_token: &str) -> anyhow::Result<User> {
-    let client = reqwest::Client::new();
-    let gh = GithubClient::new(client, access_token.to_string());
-    gh.get_profile(access_token).await
 }
 
 #[derive(Debug, serde::Deserialize)]

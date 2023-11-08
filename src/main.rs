@@ -1,40 +1,24 @@
 #![allow(clippy::new_without_default)]
 
 use anyhow::Context as _;
-use chrono::{Duration, Utc};
-use crypto_hash::{hex_digest, Algorithm};
-use flate2::{write::GzEncoder, Compression};
 use futures::future::FutureExt;
 use futures::StreamExt;
 use hyper::{header, Body, Request, Response, Server, StatusCode};
 use reqwest::Client;
 use route_recognizer::Router;
-use std::collections::HashMap;
-use std::io::Write;
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::{task, time};
 use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
-use triagebot::actions::TEMPLATES;
-use triagebot::github::User;
-use triagebot::handlers::review_prefs::get_user;
 use triagebot::jobs::{jobs, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS};
 use triagebot::ReviewCapacityUser;
 use triagebot::{
     db, github,
-    handlers::review_prefs::{get_prefs, set_prefs},
+    handlers::review_prefs::{add_prefs, delete_prefs, get_prefs, set_prefs},
     handlers::Context,
     notification_listing, payload, EventName,
 };
-
-const TINFRA_ZULIP_LINK: &str = "https://rust-lang.zulipchat.com/#narrow/stream/242791-t-infra";
-const ERR_AUTH : &str = "<html><body>Fatal error occurred during authentication. Please click <a href='{login_link}'>here</a> to retry. \
-                             <br/><br/>If the error persists, please contact an administrator on <a href='{tinfra_zulip_link}'>Zulip</a> and provide your GitHub username.</body></html>";
-const ERR_NO_GH_USER: &str = "<html><body>Fatal error: cannot load the backoffice. Please contact an administrator on <a href='{tinfra_zulip_link}'>Zulip</a> and provide your GitHub username. \
-                                        <!-- Hint: cannot retrieve user from the github API --></body></html>";
-const ERR_AUTH_UNAUTHORIZED : &str = "<html><body>You are not allowed to enter this website. \
-                                      <br/><br/>If you think this is a mistake, please contact an administrator on <a href='{tinfra_zulip_link}'>Zulip</a> and provide your GitHub username.</body></html>";
 
 async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
     if req == "/agenda/lang/triage" {
@@ -48,15 +32,6 @@ async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
     }
 
     anyhow::bail!("Unknown agenda; see /agenda for index.")
-}
-
-fn validate_data(prefs: &ReviewCapacityUser) -> anyhow::Result<()> {
-    if prefs.pto_date_start > prefs.pto_date_end {
-        return Err(anyhow::anyhow!(
-            "pto_date_start cannot be bigger than pto_date_end"
-        ));
-    }
-    Ok(())
 }
 
 async fn serve_req(
@@ -189,239 +164,41 @@ async fn serve_req(
             .unwrap());
     }
 
-    if req.uri.path() == "/review-settings" {
-        let gh = github::GithubClient::new_with_default_token(Client::new());
-        // check if we received a session cookie
-        let maybe_user_enc = match req.headers.get("Cookie") {
-            Some(cookie_string) => cookie_string
-                .to_str()
-                .unwrap()
-                .split(';')
-                .filter_map(|cookie| {
-                    let c = cookie.split('=').map(|x| x.trim()).collect::<Vec<&str>>();
-                    if c[0] == "triagebot.session".to_string() {
-                        Some(c[1])
-                    } else {
-                        None
-                    }
-                })
-                .last(),
-            _ => None,
-        };
-
-        // Authentication: understand who this user is
+    // TODO: expose endpoint to GET team members review prefsa
+    if req.uri.path() != "/reviews-get-prefs" {
         let db_client = ctx.db.get().await;
-        let user = match maybe_user_enc {
-            Some(user_enc) => {
-                // We have a user in the cookie
-                // Verify who this user claims to be
-                // format is: {"checksum":"...", "exp":"...", "sub":"...", "uid":"..."}
-                let user_check: serde_json::Value = serde_json::from_str(user_enc).unwrap();
-                let basic_check = create_cookie_content(
-                    user_check["sub"].as_str().unwrap(),
-                    user_check["uid"].as_i64().unwrap(),
-                );
-                if basic_check["checksum"] != user_check["checksum"] {
-                    return Ok(Response::builder()
-                        .status(StatusCode::UNAUTHORIZED)
-                        .body(Body::from(
-                            ERR_AUTH.replace("{tinfra_zulip_link}", TINFRA_ZULIP_LINK),
-                        ))
-                        .unwrap());
-                }
-
-                match get_user(&db_client, user_check["checksum"].as_str().unwrap()).await {
-                    Ok(u) => User {
-                        login: u.username,
-                        id: Some(u.user_id),
-                    },
-                    Err(err) => {
-                        log::debug!("{:?}", err);
-                        return Ok(Response::builder()
-                            .status(StatusCode::FORBIDDEN)
-                            .body(Body::empty())
-                            .unwrap());
-                    }
-                }
-            }
-            _ => {
-                // No username. Did we receive a `code` in the query URL (i.e. did the user went through the GH auth)?
-                let client_id = std::env::var("CLIENT_ID").expect("CLIENT_ID is not set");
-                let client_secret =
-                    std::env::var("CLIENT_SECRET").expect("CLIENT_SECRET is not set");
-                if let Some(query) = req.uri.query() {
-                    let code =
-                        url::form_urlencoded::parse(query.as_bytes()).find(|(k, _)| k == "code");
-                    let login_link = format!(
-                        "https://github.com/login/oauth/authorize?client_id={}",
-                        client_id
-                    );
-                    if let Some((_, code)) = code {
-                        // generate a token to impersonate the user
-                        let maybe_access_token =
-                            github::exchange_code(&code, &client_id, &client_secret).await;
-                        if let Err(err_msg) = maybe_access_token {
-                            log::debug!("Github auth failed: {}", err_msg);
-                            return Ok(Response::builder()
-                                .status(StatusCode::OK)
-                                .header(hyper::header::CONTENT_TYPE, "text/html")
-                                .body(Body::from(
-                                    ERR_AUTH
-                                        .replace("{login_link}", &login_link)
-                                        .replace("{}", TINFRA_ZULIP_LINK),
-                                ))
-                                .unwrap());
-                        }
-                        let access_token = maybe_access_token.unwrap();
-                        // Ok, we have an access token. Retrieve the GH username
-                        match github::get_gh_user(&access_token).await {
-                            Ok(user) => user,
-                            Err(err) => {
-                                log::debug!("Could not retrieve the user from GH: {:?}", err);
-                                return Ok(Response::builder()
-                                    .status(StatusCode::OK)
-                                    .header(hyper::header::CONTENT_TYPE, "text/html")
-                                    .body(Body::from(
-                                        ERR_NO_GH_USER.replace("{}", TINFRA_ZULIP_LINK),
-                                    ))
-                                    .unwrap());
-                            }
-                        }
-                    } else {
-                        // no code. Bail out
-                        return Ok(Response::builder()
-                            .status(StatusCode::UNAUTHORIZED)
-                            .body(Body::from(
-                                ERR_AUTH
-                                    .replace("{login_link}", &login_link)
-                                    .replace("{tinfra_login_link}", TINFRA_ZULIP_LINK),
-                            ))
-                            .unwrap());
-                    }
-                } else {
-                    // no code and no username received: we know nothing about this visitor. Redirect to GH login.
-                    return Ok(Response::builder()
-                        .status(StatusCode::MOVED_PERMANENTLY)
-                        .header(
-                            hyper::header::LOCATION,
-                            format!(
-                                "https://github.com/login/oauth/authorize?client_id={}",
-                                client_id
-                            ),
-                        )
-                        .body(Body::empty())
-                        .unwrap());
-                }
-            }
-        };
-
-        let mut members: Vec<User> = vec![];
-        // I am an hardcoded admin
-        let mut admins = vec![User {
-            id: Some(6098822),
-            login: "apiraino".to_string(),
-        }];
-
-        // get team members from github (HTTP raw file retrieval, no auth used)
-        let teams_data = triagebot::team_data::teams(&gh).await.unwrap();
-        let x = std::env::var("NEW_PR_ASSIGNMENT_TEAMS")
-            .expect("NEW_PR_ASSIGNMENT_TEAMS env var must be set");
-        let allowed_teams = x.split(",").collect::<Vec<&str>>();
-        for allowed_team in &allowed_teams {
-            let team = teams_data.teams.get(*allowed_team).unwrap();
-            gh.get_team_members(&mut admins, &mut members, &team.members);
-        }
-
-        log::debug!(
-            "Allowed teams: {:?}, members loaded {:?}",
-            &allowed_teams,
-            members
-        );
-        if !members.iter().any(|m| m.login == user.login) {
-            return Ok(Response::builder()
-                .status(StatusCode::UNAUTHORIZED)
-                .body(Body::from(
-                    ERR_AUTH_UNAUTHORIZED.replace("{tinfra_zulip_link}", TINFRA_ZULIP_LINK),
-                ))
-                .unwrap());
-        }
-
-        // Here we have a validated username. From now on, we will trust this user
-        let is_admin = admins.contains(&user);
-        log::debug!("current user={}, is admin: {}", user.login, is_admin);
-
-        let mut info_msg: &str = "";
-        if req.method == hyper::Method::POST {
-            let mut c = body_stream;
-            let mut payload = Vec::new();
-            while let Some(chunk) = c.next().await {
-                let chunk = chunk?;
-                payload.extend_from_slice(&chunk);
-            }
-            let prefs = url::form_urlencoded::parse(payload.as_ref())
-                .into_owned()
-                .collect::<HashMap<String, String>>()
-                .into();
-
-            // TODO: maybe add more input validation
-            validate_data(&prefs).unwrap();
-
-            // save changes
-            set_prefs(&db_client, &prefs).await.unwrap();
-
-            info_msg = "Preferences saved";
-        }
-
-        // Query and return all team member prefs
-        let mut review_capacity = get_prefs(
-            &db_client,
-            &members.iter().map(|tm| tm.login.clone()).collect(),
-            &user.login,
-            is_admin,
-        )
-        .await;
-        let curr_user_prefs = serde_json::json!(&review_capacity.swap_remove(0));
-        let team_prefs = serde_json::json!(&review_capacity);
-        // log::debug!("My prefs: {:?}", curr_user_prefs);
-        // log::debug!("Other team prefs: {:?}", team_prefs);
-
-        let mut context = tera::Context::new();
-        context.insert("user_prefs", &curr_user_prefs);
-        context.insert("team_prefs", &team_prefs);
-        context.insert("message", &info_msg);
-        let body = TEMPLATES
-            .render("pr-prefs-backoffice.html", &context)
-            .unwrap();
-
-        let status_code = if req.method == hyper::Method::POST {
-            StatusCode::CREATED
-        } else {
-            StatusCode::OK
-        };
-        let cookie_exp = Utc::now() + Duration::hours(1);
-        let cookie_content = format!(
-            "triagebot.session={}; Expires={}; Secure; HttpOnly; SameSite=Strict",
-            create_cookie_content(&user.login, user.id.unwrap()).to_string(),
-            // RFC 5322: Thu, 31 Dec 2023 23:00:00 GMT
-            cookie_exp.format("%a, %d %b %Y %H:%M:%S %Z")
-        );
-
-        // compress the response
-        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(body.as_bytes()).unwrap();
-        let body_gzipped = encoder.finish().unwrap();
-        let resp = Response::builder()
-            .header(hyper::header::CONTENT_TYPE, "text/html")
-            .header(hyper::header::CONTENT_ENCODING, "gzip")
-            .header(
-                hyper::header::SET_COOKIE,
-                header::HeaderValue::from_str(&cookie_content).unwrap(),
-            )
-            .status(status_code)
-            .body(Body::from(body_gzipped));
-
-        return Ok(resp.unwrap());
+        let users = &vec!["user1".to_string(), "user2".to_string()];
+        let me = "current user";
+        let is_admin = false; // unused for now (useful for the future backoffice)
+        let _todo = get_prefs(&db_client, users, me, is_admin).await;
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::empty())
+            .unwrap());
     }
+
+    // TODO: expose endpoint to DELETE review prefs for a number of team members
+    if req.uri.path() != "/reviews-del-prefs" {
+        let db_client = ctx.db.get().await;
+        let user_ids = vec![123456];
+        let _todo = delete_prefs(&db_client, &user_ids).await;
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::empty())
+            .unwrap());
+    }
+
+    // TODO: expose endpoint to SET review prefs for a team member
+    if req.uri.path() != "/reviews-set-prefs" {
+        let db_client = ctx.db.get().await;
+        let prefs = ReviewCapacityUser::default("it's a-me".to_string());
+        let _todo = set_prefs(&db_client, &prefs).await;
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::empty())
+            .unwrap());
+    }
+
     if req.uri.path() != "/github-hook" {
         return Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
@@ -508,15 +285,6 @@ async fn serve_req(
                 .unwrap())
         }
     }
-}
-
-/// iss=triagebot, sub=gh username, uid=gh user_id, exp=now+30', checksum=sha256(user data)
-fn create_cookie_content(user_login: &str, user_id: i64) -> serde_json::Value {
-    let auth_secret = std::env::var("BACKOFFICE_SECRET").expect("BACKOFFICE_SECRET is not set");
-    let exp = Utc::now() + Duration::minutes(30);
-    let digest = format!("{};{};{}", user_id, user_login, auth_secret);
-    let digest = hex_digest(Algorithm::SHA256, &digest.into_bytes());
-    serde_json::json!({"iss":"triagebot", "sub":user_login, "uid": user_id, "exp":exp, "checksum":digest})
 }
 
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
