@@ -4,6 +4,7 @@
 ---
 tags: weekly, rustc
 type: docs
+note_id: xxx
 ---
 
 # T-compiler Meeting Agenda YYYY-MM-DD
@@ -12,7 +13,7 @@ type: docs
 
 - (TIP) add here non-recurrent scheduled meetings, [check the schedule calendar](https://calendar.google.com/calendar/htmlembed?src=6u5rrtce6lrtv07pfi3damgjus%40group.calendar.google.com)
 - (TIP) mention upcoming Rust stable releases, [check the release calendar](https://calendar.google.com/calendar/htmlembed?src=l1b1gkqvfbgunjs18nemq4c580%40group.calendar.google.com)
-- Reminder: if you see a PR/issue that seems like there might be legal implications due to copyright/IP/etc, please let the Core team know (or at least message @_**pnkfelix** or @_**Wesley Wiser** so we can pass it along).
+- Reminder: if you see a PR/issue that seems like there might be legal implications due to copyright/IP/etc, please let us know (or at least message @_**davidtwco** or @_**Wesley Wiser** so we can pass it along).
 
 ### Other WG meetings ([calendar link](https://calendar.google.com/calendar/embed?src=6u5rrtce6lrtv07pfi3damgjus%40group.calendar.google.com))
 
@@ -68,6 +69,7 @@ don't know
 
 [T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+label%3AS-waiting-on-team+label%3AT-compiler)
 {{-issues::render(issues=prs_waiting_on_team_t_compiler, empty="No PRs waiting on `T-compiler` this time.")}}
+- Other issues [in progress or waiting on other teams](https://hackmd.io/XYr1BrOWSiqCrl8RCWXRaQ)
 
 ## Issues of Note
 
@@ -88,9 +90,6 @@ don't know
 
 [T-types](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AP-critical+label%3AT-types)
 {{-issues::render(issues=p_critical_t_types, empty="No `P-critical` issues for `T-types` this time.")}}
-
-[T-rustdoc](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AP-critical+label%3AT-rustdoc)
-{{-issues::render(issues=p_critical_t_rustdoc, empty="No `P-critical` issues for `T-rustdoc` this time.")}}
 
 ### P-high regressions
 
@@ -124,4 +123,4 @@ don't know
 - @*WG-X* checkin by @**person1**
 - @*WG-X* checkin by @**person2**
 
-Next meetings' agenda draft: `<hackmd link>`
+Next meetings' agenda draft: [hackmd link](#)

@@ -97,7 +97,7 @@ pub async fn pulls(
         let days_from_last_updated_at = if let Some(updated_at) = base_pull.updated_at {
             (Utc::now() - updated_at).num_days()
         } else {
-            (Utc::now() - base_pull.created_at).num_days()
+            (Utc::now() - base_pull.created_at.unwrap()).num_days()
         };
 
         let labels = base_pull.labels.map_or("".to_string(), |labels| {
@@ -109,10 +109,10 @@ pub async fn pulls(
         });
         let wait_for_author = labels.contains("S-waiting-on-author");
         let wait_for_review = labels.contains("S-waiting-on-review");
-        let html_url = base_pull.html_url;
+        let html_url = base_pull.html_url.unwrap();
         let number = base_pull.number;
-        let title = base_pull.title;
-        let author = base_pull.user.login;
+        let title = base_pull.title.unwrap();
+        let author = base_pull.user.unwrap().login;
 
         let pull = PullRequest {
             html_url,

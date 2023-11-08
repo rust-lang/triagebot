@@ -42,6 +42,7 @@ mod ping;
 mod prioritize;
 mod relabel;
 pub mod review_prefs;
+mod review_requested;
 mod review_submitted;
 mod rfc_helper;
 pub mod rustc_commits;
@@ -168,6 +169,7 @@ issue_handlers! {
     no_merges,
     notify_zulip,
     review_prefs,
+    review_requested,
 }
 
 macro_rules! command_handlers {

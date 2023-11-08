@@ -30,6 +30,7 @@ pub(crate) struct Config {
     pub(crate) notify_zulip: Option<NotifyZulipConfig>,
     pub(crate) github_releases: Option<GitHubReleasesConfig>,
     pub(crate) review_submitted: Option<ReviewSubmittedConfig>,
+    pub(crate) review_requested: Option<ReviewRequestedConfig>,
     pub(crate) shortcut: Option<ShortcutConfig>,
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
@@ -106,9 +107,9 @@ impl AssignConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct NoMergesConfig {
-    /// No action will be taken on PRs with these labels.
+    /// No action will be taken on PRs with these substrings in the title.
     #[serde(default)]
-    pub(crate) exclude_labels: Vec<String>,
+    pub(crate) exclude_titles: Vec<String>,
     /// Set these labels on the PR when merge commits are detected.
     #[serde(default)]
     pub(crate) labels: Vec<String>,
@@ -258,6 +259,12 @@ pub(crate) struct CloseConfig {}
 pub(crate) struct ReviewSubmittedConfig {
     pub(crate) review_labels: Vec<String>,
     pub(crate) reviewed_label: String,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct ReviewRequestedConfig {
+    pub(crate) remove_labels: Vec<String>,
+    pub(crate) add_labels: Vec<String>,
 }
 
 pub(crate) async fn get(
@@ -428,6 +435,7 @@ mod tests {
                 notify_zulip: None,
                 github_releases: None,
                 review_submitted: None,
+                review_requested: None,
                 mentions: None,
                 no_merges: None,
                 review_prefs: None

@@ -49,8 +49,8 @@ minimum review times lag, PR authors and assigned reviewers should ensure that t
 label (`S-waiting-on-review` and `S-waiting-on-author`) stays updated, invoking these commands \
 when appropriate:
 
-- `@rustbot author`: the review is finished, PR author should check the comments and take action accordingly
-- `@rustbot review`: the author is ready for a review, this PR will be queued again in the reviewer's queue";
+- `@{bot} author`: the review is finished, PR author should check the comments and take action accordingly
+- `@{bot} review`: the author is ready for a review, this PR will be queued again in the reviewer's queue";
 
 const WELCOME_WITH_REVIEWER: &str = "@{assignee} (or someone else)";
 
@@ -58,7 +58,7 @@ const WELCOME_WITHOUT_REVIEWER: &str = "@Mark-Simulacrum (NB. this repo may be m
 
 const RETURNING_USER_WELCOME_MESSAGE: &str = "r? @{assignee}
 
-(rustbot has picked a reviewer for you, use r? to override)";
+({bot} has picked a reviewer for you, use r? to override)";
 
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
     "@{author}: no appropriate reviewer found, use `r?` to override";
@@ -143,12 +143,18 @@ pub(super) async fn handle_input(
             let mut welcome = NEW_USER_WELCOME_MESSAGE.replace("{who}", &who_text);
             if let Some(contrib) = &config.contributing_url {
                 welcome.push_str("\n\n");
-                welcome.push_str(&CONTRIBUTION_MESSAGE.replace("{contributing_url}", contrib));
+                welcome.push_str(
+                    &CONTRIBUTION_MESSAGE
+                        .replace("{contributing_url}", contrib)
+                        .replace("{bot}", &ctx.username),
+                );
             }
             Some(welcome)
         } else if !from_comment {
             let welcome = match &assignee {
-                Some(assignee) => RETURNING_USER_WELCOME_MESSAGE.replace("{assignee}", assignee),
+                Some(assignee) => RETURNING_USER_WELCOME_MESSAGE
+                    .replace("{assignee}", assignee)
+                    .replace("{bot}", &ctx.username),
                 None => RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER
                     .replace("{author}", &event.issue.user.login),
             };
@@ -251,8 +257,8 @@ async fn set_assignee(issue: &Issue, github: &GithubClient, username: &str) {
                 &format!(
                     "Failed to set assignee to `{username}`: {err}\n\
                      \n\
-                     > **Note**: Only org members, users with write \
-                       permissions, or people who have commented on the PR may \
+                     > **Note**: Only org members with at least the repository \"read\" role, \
+                       users with write permissions, or people who have commented on the PR may \
                        be assigned."
                 ),
             )
@@ -494,6 +500,23 @@ pub(super) async fn handle_command(
                     name.to_string()
                 } else {
                     let teams = crate::team_data::teams(&ctx.github).await?;
+                    // remove "t-" or "T-" prefixes before checking if it's a team name
+                    let team_name = name.trim_start_matches("t-").trim_start_matches("T-");
+                    // Determine if assignee is a team. If yes, add the corresponding GH label.
+                    if teams.teams.get(team_name).is_some() {
+                        let t_label = format!("T-{}", &team_name);
+                        if let Err(err) = issue
+                            .add_labels(&ctx.github, vec![github::Label { name: t_label }])
+                            .await
+                        {
+                            if let Some(github::UnknownLabels { .. }) = err.downcast_ref() {
+                                log::warn!("Error assigning label: {}", err);
+                            } else {
+                                return Err(err);
+                            }
+                        }
+                    }
+
                     match find_reviewer_from_names(&db_client, &teams, config, issue, &[name]).await
                     {
                         Ok(assignee) => assignee.username,

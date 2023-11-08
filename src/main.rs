@@ -43,6 +43,9 @@ async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
     if req == "/agenda/lang/planning" {
         return triagebot::agenda::lang_planning().call().await;
     }
+    if req == "/agenda/types/planning" {
+        return triagebot::agenda::types_planning().call().await;
+    }
 
     anyhow::bail!("Unknown agenda; see /agenda for index.")
 }
@@ -90,7 +93,10 @@ async fn serve_req(
             .body(Body::from(triagebot::agenda::INDEX))
             .unwrap());
     }
-    if req.uri.path() == "/agenda/lang/triage" || req.uri.path() == "/agenda/lang/planning" {
+    if req.uri.path() == "/agenda/lang/triage"
+        || req.uri.path() == "/agenda/lang/planning"
+        || req.uri.path() == "/agenda/types/planning"
+    {
         match agenda
             .ready()
             .await
@@ -526,7 +532,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .build()
         .expect("Failed to build octograb.");
     let ctx = Arc::new(Context {
-        username: String::from("rustbot"),
+        username: std::env::var("TRIAGEBOT_USERNAME").or_else(|err| match err {
+            std::env::VarError::NotPresent => Ok("rustbot".to_owned()),
+            err => Err(err),
+        })?,
         db: pool,
         github: gh,
         octocrab: oc,
