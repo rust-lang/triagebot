@@ -2,8 +2,13 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
+use cynic::QueryBuilder;
 use futures::{future::BoxFuture, FutureExt};
+use github_graphql::old_label_queries::{
+    OldLabelArguments, OldLabelCandidateIssue, OldLabelIssuesQuery,
+};
 use hyper::header::HeaderValue;
+use log::{debug, info};
 use once_cell::sync::OnceCell;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
@@ -1281,7 +1286,6 @@ impl Repository {
         // commits will only show up once).
         let mut prs_seen = HashSet::new();
         let mut recent_commits = Vec::new(); // This is the final result.
-        use cynic::QueryBuilder;
         use github_graphql::docs_update_queries::{
             GitObject, RecentCommits, RecentCommitsArguments,
         };
@@ -2302,7 +2306,6 @@ async fn project_items_by_status(
     client: &GithubClient,
     status_filter: impl Fn(Option<&str>) -> bool,
 ) -> anyhow::Result<Vec<github_graphql::project_items::ProjectV2Item>> {
-    use cynic::QueryBuilder;
     use github_graphql::project_items;
 
     const DESIGN_MEETING_PROJECT: i32 = 31;
@@ -2346,6 +2349,63 @@ async fn project_items_by_status(
 
     all_items.sort_by_key(|item| item.date());
     Ok(all_items)
+}
+
+pub async fn issues_with_label(
+    repository_owner: &str,
+    repository_name: &str,
+    label: &str,
+    client: &GithubClient,
+) -> anyhow::Result<Vec<OldLabelCandidateIssue>> {
+    let mut issues: Vec<OldLabelCandidateIssue> = vec![];
+
+    let mut args = OldLabelArguments {
+        repository_owner: repository_owner.to_owned(),
+        repository_name: repository_name.to_owned(),
+        label: label.to_owned(),
+        after: None,
+    };
+
+    let mut max_iterations_left = 100;
+    loop {
+        max_iterations_left -= 1;
+        if max_iterations_left < 0 {
+            anyhow::bail!("Bailing to avoid rate limit depletion in case of buggy code/queries.");
+        }
+
+        let query = OldLabelIssuesQuery::build(args.clone());
+        let req = client.post(Repository::GITHUB_GRAPHQL_API_URL);
+        let req = req.json(&query);
+
+        info!("GitHub GraphQL API endpoint request (affects rate limit)");
+        let data: cynic::GraphQlResponse<OldLabelIssuesQuery> = client.json(req).await?;
+
+        if let Some(errors) = data.errors {
+            anyhow::bail!("There were graphql errors. {:?}", errors);
+        }
+
+        let repository = data
+            .data
+            .ok_or_else(|| anyhow::anyhow!("No data returned."))?
+            .repository
+            .ok_or_else(|| anyhow::anyhow!("No repository."))?;
+
+        issues.extend(repository.issues.nodes);
+
+        debug!(
+            "Now have {} issues of {}",
+            issues.len(),
+            repository.issues.total_count
+        );
+
+        let page_info = repository.issues.page_info;
+        if !page_info.has_next_page || page_info.end_cursor.is_none() {
+            break;
+        }
+        args.after = page_info.end_cursor;
+    }
+
+    Ok(issues)
 }
 
 pub enum DesignMeetingStatus {

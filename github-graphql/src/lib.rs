@@ -30,6 +30,64 @@ pub mod queries {
         pub repository: Option<Repository>,
     }
 
+    #[derive(cynic::Enum, Clone, Copy, Debug)]
+    #[cynic(rename_all = "SCREAMING_SNAKE_CASE")]
+    pub enum IssueTimelineItemsItemType {
+        AddedToProjectEvent,
+        AssignedEvent,
+        ClosedEvent,
+        CommentDeletedEvent,
+        ConnectedEvent,
+        ConvertedNoteToIssueEvent,
+        ConvertedToDiscussionEvent,
+        CrossReferencedEvent,
+        DemilestonedEvent,
+        DisconnectedEvent,
+        IssueComment,
+        LabeledEvent,
+        LockedEvent,
+        MarkedAsDuplicateEvent,
+        MentionedEvent,
+        MilestonedEvent,
+        MovedColumnsInProjectEvent,
+        PinnedEvent,
+        ReferencedEvent,
+        RemovedFromProjectEvent,
+        RenamedTitleEvent,
+        ReopenedEvent,
+        SubscribedEvent,
+        TransferredEvent,
+        UnassignedEvent,
+        UnlabeledEvent,
+        UnlockedEvent,
+        UnmarkedAsDuplicateEvent,
+        UnpinnedEvent,
+        UnsubscribedEvent,
+        UserBlockedEvent,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(graphql_type = "IssueTimelineItemsConnection")]
+    pub struct IssueTimelineItemsConnection {
+        pub total_count: i32,
+        pub page_info: PageInfo,
+        #[cynic(flatten)]
+        pub nodes: Vec<IssueTimelineItems>,
+    }
+
+    #[derive(cynic::InlineFragments, Debug)]
+    pub enum IssueTimelineItems {
+        LabeledEvent(LabeledEvent),
+        #[cynic(fallback)]
+        Other, // Implement more when needed
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    pub struct LabeledEvent {
+        pub label: Label,
+        pub created_at: DateTime,
+    }
+
     #[derive(cynic::QueryFragment, Debug)]
     #[cynic(variables = "LeastRecentlyReviewedPullRequestsArguments")]
     pub struct Repository {
@@ -266,6 +324,64 @@ pub mod docs_update_queries {
 
     #[derive(cynic::Scalar, Debug, Clone)]
     pub struct GitObjectID(pub String);
+}
+
+#[cynic::schema_for_derives(file = "src/github.graphql", module = "schema")]
+pub mod old_label_queries {
+    use super::queries::*;
+    use super::schema;
+
+    #[derive(cynic::QueryVariables, Debug, Clone)]
+    pub struct OldLabelArguments {
+        pub repository_owner: String,
+        pub repository_name: String,
+        pub label: String,
+        pub after: Option<String>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(graphql_type = "Query", variables = "OldLabelArguments")]
+    pub struct OldLabelIssuesQuery {
+        #[arguments(owner: $repository_owner, name: $repository_name)]
+        pub repository: Option<OldLabelRepository>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(graphql_type = "Repository", variables = "OldLabelArguments")]
+    pub struct OldLabelRepository {
+        #[arguments(
+            states: "OPEN",
+            first: 30,
+            after: $after,
+            labels: [$label],
+            orderBy: {direction: "ASC", field: "CREATED_AT"}
+        )]
+        pub issues: OldLabelIssueConnection,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(graphql_type = "IssueConnection")]
+    pub struct OldLabelIssueConnection {
+        pub total_count: i32,
+        pub page_info: PageInfo,
+        #[cynic(flatten)]
+        pub nodes: Vec<OldLabelCandidateIssue>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(graphql_type = "Issue")]
+    pub struct OldLabelCandidateIssue {
+        pub number: i32,
+        pub created_at: DateTime,
+        pub url: Uri,
+        pub title: String,
+        #[arguments(first = 100)]
+        pub labels: Option<LabelConnection>,
+        #[arguments(last = 1)]
+        pub comments: IssueCommentConnection,
+        #[arguments(last = 250, itemTypes = Some(vec![IssueTimelineItemsItemType::LabeledEvent]))]
+        pub timeline_items: Option<IssueTimelineItemsConnection>,
+    }
 }
 
 #[allow(non_snake_case, non_camel_case_types)]
