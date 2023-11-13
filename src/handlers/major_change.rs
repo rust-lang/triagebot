@@ -264,6 +264,27 @@ async fn handle(
         procedural comments, such as volunteering to review, indicating that you \
         second the proposal (or third, etc), or raising a concern that you would \
         like to be addressed. \
+        \n\n \
+        Concerns or objections to the proposal should be discussed on Zulip and formally registered \
+        here by adding a comment with the following syntax: \
+        \n \
+        ``` \
+        \n \
+        @rustbot concern reason-for-concern \
+        \n \
+        <description of the concern> \
+        \n \
+        ``` \
+        \n \
+        Concerns can be lifted with: \
+        \n \
+        ``` \
+        \n \
+        @rustbot resolve reason-for-concern \
+        \n \
+        ``` \
+        \n\n \
+        See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/compiler/mcp.html#what-kinds-of-comments-should-go-on-the-tracking-issue-in-compiler-team-repo) \
         \n\n{} \
         \n\n[stream]: {}",
             config.open_extra_text.as_deref().unwrap_or_default(),
