@@ -181,6 +181,26 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                             exclude_labels: vec!["stable-accepted"],
                         }),
                     },
+                    // beta nomination t-types
+                    QueryMap {
+                        name: "beta_nominated_t_types",
+                        kind: QueryKind::List,
+                        query: Arc::new(github::Query {
+                            filters: vec![],
+                            include_labels: vec!["beta-nominated", "T-types"],
+                            exclude_labels: vec!["beta-accepted"],
+                        }),
+                    },
+                    // stable nomination queries
+                    QueryMap {
+                        name: "stable_nominated_t_types",
+                        kind: QueryKind::List,
+                        query: Arc::new(github::Query {
+                            filters: vec![],
+                            include_labels: vec!["stable-nominated", "T-Types"],
+                            exclude_labels: vec!["stable-accepted"],
+                        }),
+                    },
                     // prs waiting on team queries
                     QueryMap {
                         name: "prs_waiting_on_team_t_compiler",

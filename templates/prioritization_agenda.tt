@@ -65,6 +65,23 @@ decline
 don't know
 -->
 
+[T-types stable](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-types) / [T-types beta](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-types)
+{{-issues::render(issues=beta_nominated_t_types, branch=":beta:", empty="No beta nominations for `T-types` this time.")}}
+<!--
+/poll Approve beta backport of #12345?
+approve
+decline
+don't know
+-->
+{{-issues::render(issues=stable_nominated_t_types, branch=":stable:", empty="No stable nominations for `T-types` this time.")}}
+<!--
+/poll Approve stable backport of #12345?
+approve
+approve but does not justify new dot release
+decline
+don't know
+-->
+
 ## PRs S-waiting-on-team
 
 [T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+label%3AS-waiting-on-team+label%3AT-compiler)
