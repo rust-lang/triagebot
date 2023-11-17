@@ -232,7 +232,30 @@ pub struct Label {
 /// needed at this time (merged_at, diff_url, html_url, patch_url, url).
 #[derive(Debug, serde::Deserialize)]
 pub struct PullRequestDetails {
-    // none for now
+    /// This is a slot to hold the diff for a PR.
+    ///
+    /// This will be filled in only once as an optimization since multiple
+    /// handlers want to see PR changes, and getting the diff can be
+    /// expensive.
+    #[serde(skip)]
+    files_changed: tokio::sync::OnceCell<Vec<FileDiff>>,
+}
+
+/// Representation of a diff to a single file.
+#[derive(Debug)]
+pub struct FileDiff {
+    /// The full path of the file.
+    pub path: String,
+    /// The diff for the file.
+    pub diff: String,
+}
+
+impl PullRequestDetails {
+    pub fn new() -> PullRequestDetails {
+        PullRequestDetails {
+            files_changed: tokio::sync::OnceCell::new(),
+        }
+    }
 }
 
 /// An issue or pull request.
@@ -786,23 +809,33 @@ impl Issue {
     }
 
     /// Returns the diff in this event, for Open and Synchronize events for now.
-    pub async fn diff(&self, client: &GithubClient) -> anyhow::Result<Option<String>> {
+    ///
+    /// Returns `None` if the issue is not a PR.
+    pub async fn diff(&self, client: &GithubClient) -> anyhow::Result<Option<&[FileDiff]>> {
+        let Some(pr) = &self.pull_request else {
+            return Ok(None);
+        };
         let (before, after) = if let (Some(base), Some(head)) = (&self.base, &self.head) {
-            (base.sha.clone(), head.sha.clone())
+            (&base.sha, &head.sha)
         } else {
             return Ok(None);
         };
 
-        let mut req = client.get(&format!(
-            "{}/compare/{}...{}",
-            self.repository().url(),
-            before,
-            after
-        ));
-        req = req.header("Accept", "application/vnd.github.v3.diff");
-        let (diff, _) = client.send_req(req).await?;
-        let body = String::from_utf8_lossy(&diff).to_string();
-        Ok(Some(body))
+        let diff = pr
+            .files_changed
+            .get_or_try_init::<anyhow::Error, _, _>(|| async move {
+                let url = format!("{}/compare/{before}...{after}", self.repository().url());
+                let mut req = client.get(&url);
+                req = req.header("Accept", "application/vnd.github.v3.diff");
+                let (diff, _) = client
+                    .send_req(req)
+                    .await
+                    .with_context(|| format!("failed to fetch diff comparison for {url}"))?;
+                let body = String::from_utf8_lossy(&diff);
+                Ok(parse_diff(&body))
+            })
+            .await?;
+        Ok(Some(diff))
     }
 
     /// Returns the commits from this pull request (no commits are returned if this `Issue` is not
@@ -982,19 +1015,29 @@ pub struct CommitBase {
     pub repo: Repository,
 }
 
-pub fn files_changed(diff: &str) -> Vec<&str> {
-    let mut files = Vec::new();
-    for line in diff.lines() {
-        // mostly copied from highfive
-        if line.starts_with("diff --git ") {
-            files.push(
-                line[line.find(" b/").unwrap()..]
-                    .strip_prefix(" b/")
-                    .unwrap(),
-            );
-        }
-    }
+pub fn parse_diff(diff: &str) -> Vec<FileDiff> {
+    // This does not properly handle filenames with spaces.
+    let re = regex::Regex::new("(?m)^diff --git .* b/(.*)").unwrap();
+    let mut files: Vec<_> = re
+        .captures_iter(diff)
+        .map(|cap| {
+            let start = cap.get(0).unwrap().start();
+            let path = cap.get(1).unwrap().as_str().to_string();
+            (start, path)
+        })
+        .collect();
+    // Break the list up into (start, end) pairs starting from the "diff --git" line.
+    files.push((diff.len(), String::new()));
     files
+        .windows(2)
+        .map(|w| {
+            let (start, end) = (&w[0], &w[1]);
+            FileDiff {
+                path: start.1.clone(),
+                diff: diff[start.0..end.0].to_string(),
+            }
+        })
+        .collect()
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -1503,7 +1546,7 @@ impl Repository {
                     self.full_name
                 )
             })?;
-        issue.pull_request = Some(PullRequestDetails {});
+        issue.pull_request = Some(PullRequestDetails::new());
         Ok(issue)
     }
 
@@ -2484,7 +2527,8 @@ index fb9cee43b2d..b484c25ea51 100644
     zulip_stream = 245100 # #t-compiler/wg-prioritization/alerts
     topic = "#{number} {title}"
          "##;
-        assert_eq!(files_changed(input), vec!["triagebot.toml".to_string()]);
+        let files: Vec<_> = parse_diff(input).into_iter().map(|d| d.path).collect();
+        assert_eq!(files, vec!["triagebot.toml".to_string()]);
     }
 
     #[test]
@@ -2516,8 +2560,9 @@ index c58310947d2..3b0854d4a9b 100644
 }
 +
 "##;
+        let files: Vec<_> = parse_diff(input).into_iter().map(|d| d.path).collect();
         assert_eq!(
-            files_changed(input),
+            files,
             vec![
                 "library/stdarch".to_string(),
                 "src/librustdoc/clean/types.rs".to_string(),
