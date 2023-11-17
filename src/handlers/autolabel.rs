@@ -1,6 +1,6 @@
 use crate::{
     config::AutolabelConfig,
-    github::{files_changed, IssuesAction, IssuesEvent, Label},
+    github::{IssuesAction, IssuesEvent, Label},
     handlers::Context,
 };
 use anyhow::Context as _;
@@ -27,7 +27,7 @@ pub(super) async fn parse_input(
     // remove. Not much can be done about that currently; the before/after on
     // synchronize may be straddling a rebase, which will break diff generation.
     if event.action == IssuesAction::Opened || event.action == IssuesAction::Synchronize {
-        let diff = event
+        let files = event
             .issue
             .diff(&ctx.github)
             .await
@@ -35,7 +35,6 @@ pub(super) async fn parse_input(
                 log::error!("failed to fetch diff: {:?}", e);
             })
             .unwrap_or_default();
-        let files = diff.as_deref().map(files_changed);
         let mut autolabels = Vec::new();
 
         'outer: for (label, cfg) in config.labels.iter() {
@@ -64,7 +63,7 @@ pub(super) async fn parse_input(
                 if cfg
                     .trigger_files
                     .iter()
-                    .any(|f| files.iter().any(|diff_file| diff_file.starts_with(f)))
+                    .any(|f| files.iter().any(|file_diff| file_diff.path.starts_with(f)))
                 {
                     autolabels.push(Label {
                         name: label.to_owned(),

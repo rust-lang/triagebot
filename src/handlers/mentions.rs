@@ -5,7 +5,7 @@
 use crate::{
     config::{MentionsConfig, MentionsPathConfig},
     db::issue_data::IssueData,
-    github::{files_changed, IssuesAction, IssuesEvent},
+    github::{IssuesAction, IssuesEvent},
     handlers::Context,
 };
 use anyhow::Context as _;
@@ -50,7 +50,7 @@ pub(super) async fn parse_input(
         return Ok(None);
     }
 
-    if let Some(diff) = event
+    if let Some(files) = event
         .issue
         .diff(&ctx.github)
         .await
@@ -59,8 +59,7 @@ pub(super) async fn parse_input(
         })
         .unwrap_or_default()
     {
-        let files = files_changed(&diff);
-        let file_paths: Vec<_> = files.iter().map(|p| Path::new(p)).collect();
+        let file_paths: Vec<_> = files.iter().map(|fd| Path::new(&fd.path)).collect();
         let to_mention: Vec<_> = config
             .paths
             .iter()

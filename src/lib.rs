@@ -146,7 +146,7 @@ pub async fn webhook(
                 .map_err(anyhow::Error::from)?;
 
             log::info!("handling pull request review comment {:?}", payload);
-            payload.pull_request.pull_request = Some(PullRequestDetails {});
+            payload.pull_request.pull_request = Some(PullRequestDetails::new());
 
             // Treat pull request review comments exactly like pull request
             // review comments.
@@ -171,7 +171,7 @@ pub async fn webhook(
                 .context("PullRequestReview(Comment) failed to deserialize")
                 .map_err(anyhow::Error::from)?;
 
-            payload.issue.pull_request = Some(PullRequestDetails {});
+            payload.issue.pull_request = Some(PullRequestDetails::new());
 
             log::info!("handling pull request review comment {:?}", payload);
 
@@ -200,7 +200,7 @@ pub async fn webhook(
                 .map_err(anyhow::Error::from)?;
 
             if matches!(event, EventName::PullRequest) {
-                payload.issue.pull_request = Some(PullRequestDetails {});
+                payload.issue.pull_request = Some(PullRequestDetails::new());
             }
 
             log::info!("handling issue event {:?}", payload);
