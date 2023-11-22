@@ -7,7 +7,7 @@ use tokio_postgres::Client as DbClient;
 use uuid::Uuid;
 
 pub struct JobSchedule {
-    pub name: String,
+    pub name: &'static str,
     pub schedule: Schedule,
     pub metadata: serde_json::Value,
 }
@@ -24,7 +24,7 @@ pub struct Job {
 
 pub async fn insert_job(
     db: &DbClient,
-    name: &String,
+    name: &str,
     scheduled_at: &DateTime<Utc>,
     metadata: &serde_json::Value,
 ) -> Result<()> {
@@ -76,7 +76,7 @@ pub async fn update_job_executed_at(db: &DbClient, id: &Uuid) -> Result<()> {
 
 pub async fn get_job_by_name_and_scheduled_at(
     db: &DbClient,
-    name: &String,
+    name: &str,
     scheduled_at: &DateTime<Utc>,
 ) -> Result<Job> {
     tracing::trace!(

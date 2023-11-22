@@ -11,7 +11,9 @@ use tokio::{task, time};
 use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
-use triagebot::jobs::{jobs, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS};
+use triagebot::jobs::{
+    default_jobs, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS,
+};
 use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
 
 async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
@@ -326,7 +328,7 @@ fn spawn_job_scheduler() {
 
                 loop {
                     interval.tick().await;
-                    db::schedule_jobs(&*pool.get().await, jobs())
+                    db::schedule_jobs(&*pool.get().await, default_jobs())
                         .await
                         .context("database schedule jobs")
                         .unwrap();

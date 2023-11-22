@@ -1,13 +1,12 @@
 //! A scheduled job to post a PR to update the documentation on rust-lang/rust.
 
-use crate::db::jobs::JobSchedule;
 use crate::github::{self, GitTreeEntry, GithubClient, Issue, Repository};
+use crate::jobs::Job;
 use anyhow::Context;
 use anyhow::Result;
-use cron::Schedule;
+use async_trait::async_trait;
 use reqwest::Client;
 use std::fmt::Write;
-use std::str::FromStr;
 
 /// This is the repository where the commits will be created.
 const WORK_REPO: &str = "rustbot/rust";
@@ -28,38 +27,42 @@ const SUBMODULES: &[&str] = &[
 
 const TITLE: &str = "Update books";
 
-pub fn job() -> JobSchedule {
-    JobSchedule {
-        name: "docs_update".to_string(),
-        // Around 9am Pacific time on every Monday.
-        schedule: Schedule::from_str("0 00 17 * * Mon *").unwrap(),
-        metadata: serde_json::Value::Null,
-    }
-}
+pub struct DocsUpdateJob;
 
-pub async fn handle_job() -> Result<()> {
-    // Only run every other week. Doing it every week can be a bit noisy, and
-    // (rarely) a PR can take longer than a week to merge (like if there are
-    // CI issues). `Schedule` does not allow expressing this, so check it
-    // manually.
-    //
-    // This is set to run the first week after a release, and the week just
-    // before a release. That allows getting the latest changes in the next
-    // release, accounting for possibly taking a few days for the PR to land.
-    let today = chrono::Utc::today().naive_utc();
-    let base = chrono::naive::NaiveDate::from_ymd(2015, 12, 10);
-    let duration = today.signed_duration_since(base);
-    let weeks = duration.num_weeks();
-    if weeks % 2 != 0 {
-        tracing::trace!("skipping job, this is an odd week");
-        return Ok(());
+#[async_trait]
+impl Job for DocsUpdateJob {
+    fn name(&self) -> &'static str {
+        "docs_update"
     }
 
-    tracing::trace!("starting docs-update");
-    docs_update()
-        .await
-        .context("failed to process docs update")?;
-    Ok(())
+    async fn run(
+        &self,
+        _ctx: &super::Context,
+        _metadata: &serde_json::Value,
+    ) -> anyhow::Result<()> {
+        // Only run every other week. Doing it every week can be a bit noisy, and
+        // (rarely) a PR can take longer than a week to merge (like if there are
+        // CI issues). `Schedule` does not allow expressing this, so check it
+        // manually.
+        //
+        // This is set to run the first week after a release, and the week just
+        // before a release. That allows getting the latest changes in the next
+        // release, accounting for possibly taking a few days for the PR to land.
+        let today = chrono::Utc::today().naive_utc();
+        let base = chrono::naive::NaiveDate::from_ymd(2015, 12, 10);
+        let duration = today.signed_duration_since(base);
+        let weeks = duration.num_weeks();
+        if weeks % 2 != 0 {
+            tracing::trace!("skipping job, this is an odd week");
+            return Ok(());
+        }
+
+        tracing::trace!("starting docs-update");
+        docs_update()
+            .await
+            .context("failed to process docs update")?;
+        Ok(())
+    }
 }
 
 pub async fn docs_update() -> Result<Option<Issue>> {

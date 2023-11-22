@@ -29,7 +29,6 @@ mod close;
 pub mod docs_update;
 mod github_releases;
 mod glacier;
-pub mod jobs;
 mod major_change;
 mod mentions;
 mod milestone_prs;
@@ -46,6 +45,7 @@ mod review_submitted;
 mod rfc_helper;
 pub mod rustc_commits;
 mod shortcut;
+pub mod types_planning_updates;
 
 pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo()).await;
