@@ -426,6 +426,10 @@ impl IssueRepository {
         )
     }
 
+    fn full_repo_name(&self) -> String {
+        format!("{}/{}", self.organization, self.repository)
+    }
+
     async fn has_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<bool> {
         #[allow(clippy::redundant_pattern_matching)]
         let url = format!("{}/labels/{}", self.url(), label);
@@ -745,6 +749,10 @@ impl Issue {
         Ok(())
     }
 
+    /// Sets the milestone of the issue or PR.
+    ///
+    /// This will create the milestone if it does not exist. The new milestone
+    /// will start in the "open" state.
     pub async fn set_milestone(&self, client: &GithubClient, title: &str) -> anyhow::Result<()> {
         log::trace!(
             "Setting milestone for rust-lang/rust#{} to {}",
@@ -752,42 +760,14 @@ impl Issue {
             title
         );
 
-        let create_url = format!("{}/milestones", self.repository().url());
-        let resp = client
-            .send_req(
-                client
-                    .post(&create_url)
-                    .body(serde_json::to_vec(&MilestoneCreateBody { title }).unwrap()),
-            )
-            .await;
-        // Explicitly do *not* try to return Err(...) if this fails -- that's
-        // fine, it just means the milestone was already created.
-        log::trace!("Created milestone: {:?}", resp);
+        let full_repo_name = self.repository().full_repo_name();
+        let milestone = client
+            .get_or_create_milestone(&full_repo_name, title, "open")
+            .await?;
 
-        let list_url = format!("{}/milestones", self.repository().url());
-        let milestone_list: Vec<Milestone> = client.json(client.get(&list_url)).await?;
-        let milestone_no = if let Some(milestone) = milestone_list.iter().find(|v| v.title == title)
-        {
-            milestone.number
-        } else {
-            anyhow::bail!(
-                "Despite just creating milestone {} on {}, it does not exist?",
-                title,
-                self.repository()
-            )
-        };
-
-        #[derive(serde::Serialize)]
-        struct SetMilestone {
-            milestone: u64,
-        }
-        let url = format!("{}/issues/{}", self.repository().url(), self.number);
         client
-            .send_req(client.patch(&url).json(&SetMilestone {
-                milestone: milestone_no,
-            }))
-            .await
-            .context("failed to set milestone")?;
+            .set_milestone(&full_repo_name, &milestone, self.number)
+            .await?;
         Ok(())
     }
 
@@ -884,11 +864,6 @@ pub struct PullRequestFile {
     pub sha: String,
     pub filename: String,
     pub blob_url: String,
-}
-
-#[derive(serde::Serialize)]
-struct MilestoneCreateBody<'a> {
-    title: &'a str,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -1244,6 +1219,33 @@ impl Repository {
             ordering.per_page,
             ordering.page,
         )
+    }
+
+    /// Returns a list of commits between the SHA ranges of start (exclusive)
+    /// and end (inclusive).
+    pub async fn commits_in_range(
+        &self,
+        client: &GithubClient,
+        start: &str,
+        end: &str,
+    ) -> anyhow::Result<Vec<GithubCommit>> {
+        let mut commits = Vec::new();
+        let mut page = 1;
+        loop {
+            let url = format!("{}/commits?sha={end}&per_page=100&page={page}", self.url());
+            let mut this_page: Vec<GithubCommit> = client
+                .json(client.get(&url))
+                .await
+                .with_context(|| format!("failed to fetch commits for {url}"))?;
+            if let Some(idx) = this_page.iter().position(|commit| commit.sha == start) {
+                this_page.truncate(idx);
+                commits.extend(this_page);
+                return Ok(commits);
+            } else {
+                commits.extend(this_page);
+            }
+            page += 1;
+        }
     }
 
     /// Retrieves a git commit for the given SHA.
@@ -1615,6 +1617,40 @@ impl Repository {
                 )
             })?;
         Ok(())
+    }
+
+    /// Get or create a [`Milestone`].
+    ///
+    /// This will not change the state if it already exists.
+    pub async fn get_or_create_milestone(
+        &self,
+        client: &GithubClient,
+        title: &str,
+        state: &str,
+    ) -> anyhow::Result<Milestone> {
+        client
+            .get_or_create_milestone(&self.full_name, title, state)
+            .await
+    }
+
+    /// Set the milestone of an issue or PR.
+    pub async fn set_milestone(
+        &self,
+        client: &GithubClient,
+        milestone: &Milestone,
+        issue_num: u64,
+    ) -> anyhow::Result<()> {
+        client
+            .set_milestone(&self.full_name, milestone, issue_num)
+            .await
+    }
+
+    pub async fn get_issue(&self, client: &GithubClient, issue_num: u64) -> anyhow::Result<Issue> {
+        let url = format!("{}/pulls/{issue_num}", self.url());
+        client
+            .json(client.get(&url))
+            .await
+            .with_context(|| format!("{} failed to get issue {issue_num}", self.full_name))
     }
 }
 
@@ -2125,6 +2161,83 @@ impl GithubClient {
         self.json(req)
             .await
             .with_context(|| format!("{} failed to get repo", full_name))
+    }
+
+    /// Get or create a [`Milestone`].
+    ///
+    /// This will not change the state if it already exists.
+    async fn get_or_create_milestone(
+        &self,
+        full_repo_name: &str,
+        title: &str,
+        state: &str,
+    ) -> anyhow::Result<Milestone> {
+        let url = format!(
+            "{}/repos/{full_repo_name}/milestones",
+            Repository::GITHUB_API_URL
+        );
+        let resp = self
+            .send_req(self.post(&url).json(&serde_json::json!({
+                "title": title,
+                "state": state,
+            })))
+            .await;
+        match resp {
+            Ok((body, _dbg)) => {
+                let milestone = serde_json::from_slice(&body)?;
+                log::trace!("Created milestone: {milestone:?}");
+                return Ok(milestone);
+            }
+            Err(e) => {
+                if e.downcast_ref::<reqwest::Error>().map_or(false, |e| {
+                    matches!(e.status(), Some(StatusCode::UNPROCESSABLE_ENTITY))
+                }) {
+                    // fall-through, it already exists
+                } else {
+                    return Err(e.context(format!(
+                        "failed to create milestone {url} with title {title}"
+                    )));
+                }
+            }
+        }
+        // In the case where it already exists, we need to search for its number.
+        let mut page = 1;
+        loop {
+            let url = format!(
+                "{}/repos/{full_repo_name}/milestones?page={page}&state=all",
+                Repository::GITHUB_API_URL
+            );
+            let milestones: Vec<Milestone> = self
+                .json(self.get(&url))
+                .await
+                .with_context(|| format!("failed to get milestones {url} searching for {title}"))?;
+            if milestones.is_empty() {
+                anyhow::bail!("expected to find milestone with title {title}");
+            }
+            if let Some(milestone) = milestones.into_iter().find(|m| m.title == title) {
+                return Ok(milestone);
+            }
+            page += 1;
+        }
+    }
+
+    /// Set the milestone of an issue or PR.
+    async fn set_milestone(
+        &self,
+        full_repo_name: &str,
+        milestone: &Milestone,
+        issue_num: u64,
+    ) -> anyhow::Result<()> {
+        let url = format!(
+            "{}/repos/{full_repo_name}/issues/{issue_num}",
+            Repository::GITHUB_API_URL
+        );
+        self.send_req(self.patch(&url).json(&serde_json::json!({
+            "milestone": milestone.number
+        })))
+        .await
+        .with_context(|| format!("failed to set milestone for {url} to milestone {milestone:?}"))?;
+        Ok(())
     }
 }
 
