@@ -94,7 +94,7 @@ pub fn default_jobs() -> Vec<JobSchedule> {
             name: TypesPlanningMeetingThreadOpenJob.name(),
             // We want last Monday of every month, but cron unfortunately doesn't support that
             // Instead, every Monday and we can check
-            schedule: Schedule::from_str("0 0 12 ? * * *").unwrap(),
+            schedule: Schedule::from_str("0 0 0 ? * MON *").unwrap(),
             metadata: serde_json::Value::Null,
         },
     ]
