@@ -3,7 +3,6 @@
 //! See <https://docs.github.com/en/graphql> for more GitHub's GraphQL API.
 
 // This schema can be downloaded from https://docs.github.com/public/schema.docs.graphql
-#[cynic::schema_for_derives(file = "src/github.graphql", module = "schema")]
 pub mod queries {
     use super::schema;
 
@@ -14,9 +13,9 @@ pub mod queries {
     cynic::impl_scalar!(DateTime, schema::DateTime);
 
     #[derive(cynic::QueryVariables, Debug, Clone)]
-    pub struct LeastRecentlyReviewedPullRequestsArguments {
-        pub repository_owner: String,
-        pub repository_name: String,
+    pub struct LeastRecentlyReviewedPullRequestsArguments<'a> {
+        pub repository_owner: &'a str,
+        pub repository_name: &'a str,
         pub after: Option<String>,
     }
 
@@ -132,16 +131,15 @@ pub mod queries {
     pub struct Uri(pub String);
 }
 
-#[cynic::schema_for_derives(file = "src/github.graphql", module = "schema")]
 pub mod docs_update_queries {
     use super::queries::{DateTime, PageInfo};
     use super::schema;
 
     #[derive(cynic::QueryVariables, Clone, Debug)]
-    pub struct RecentCommitsArguments {
-        pub branch: String,
-        pub name: String,
-        pub owner: String,
+    pub struct RecentCommitsArguments<'a> {
+        pub branch: &'a str,
+        pub name: &'a str,
+        pub owner: &'a str,
         pub after: Option<String>,
     }
 
@@ -268,12 +266,9 @@ pub mod docs_update_queries {
     pub struct GitObjectID(pub String);
 }
 
-#[allow(non_snake_case, non_camel_case_types)]
-mod schema {
-    cynic::use_schema!("src/github.graphql");
-}
+#[cynic::schema("github")]
+mod schema {}
 
-#[cynic::schema_for_derives(file = "src/github.graphql", module = "schema")]
 pub mod project_items {
     use super::queries::{Date, PageInfo, Uri};
     use super::schema;
