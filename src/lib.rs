@@ -285,11 +285,13 @@ pub struct ReviewCapacityUser {
 
 impl ReviewCapacityUser {
     pub(crate) fn is_available(&self) -> bool {
+match (self.active, self.pto_date_start, self.pto_date_end) {
+    (true, Some(pto_date_start), Some(pto_date_end)) => {
         let today = chrono::Utc::today().naive_utc();
-        let is_available = (self.pto_date_end.is_some() && self.pto_date_start.is_some())
-            && (self.pto_date_end.unwrap() < today || self.pto_date_start.unwrap() > today);
-        self.active && is_available
-    }
+        today < pto_date_start || pto_date_end < today
+    } 
+    _ => false;
+}
 
     pub fn default(username: String) -> Self {
         Self {
