@@ -39,7 +39,7 @@ mod tests {
 }
 
 const NEW_USER_WELCOME_MESSAGE: &str = "Thanks for the pull request, and welcome! \
-The Rust team is excited to review your changes, and you should hear from {who} soon.";
+The Rust team is excited to review your changes, and you should hear from {who} soon. (°꒳°)";
 
 const CONTRIBUTION_MESSAGE: &str = "Please see [the contribution \
 instructions]({contributing_url}) for more information. Namely, in order to ensure the \
@@ -56,17 +56,17 @@ const WELCOME_WITHOUT_REVIEWER: &str = "@Mark-Simulacrum (NB. this repo may be m
 
 const RETURNING_USER_WELCOME_MESSAGE: &str = "r? @{assignee}
 
-({bot} has picked a reviewer for you, use r? to override)";
+({bot} has picked a reviewer for you, use r? to override) (*・ω・)ﾉ ";
 
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
     "@{author}: no appropriate reviewer found, use r? to override";
 
-const ON_VACATION_WARNING: &str = "{username} is on vacation. Please do not assign them to PRs.";
+const ON_VACATION_WARNING: &str = "{username} is on vacation. Please do not assign them to PRs. :3";
 
 const NON_DEFAULT_BRANCH: &str =
     "Pull requests are usually filed against the {default} branch for this repo, \
      but this one is against {target}. \
-     Please double check that you specified the right target!";
+     Please double check that you specified the right target! (´•.•`)";
 
 const SUBMODULE_WARNING_MSG: &str = "These commits modify **submodules**.";
 
