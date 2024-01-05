@@ -3,6 +3,12 @@ allow-unauthenticated = ["bug", "invalid", "question", "enhancement"]
 
 [assign]
 
+# Enable this feature to keep track of the PR review assignment
+[review-work-queue]
+# A list of teams that will use the new PR review assignment workflow.
+# Team names match https://github.com/rust-lang/team/tree/master/teams
+enabled-for-teams=["compiler", "compiler-contributors"]
+
 [note]
 
 [ping.wg-meta]

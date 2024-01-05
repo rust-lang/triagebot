@@ -42,6 +42,7 @@ mod prioritize;
 mod relabel;
 mod review_requested;
 mod review_submitted;
+mod review_work_queue;
 mod rfc_helper;
 pub mod rustc_commits;
 mod shortcut;
@@ -166,6 +167,7 @@ issue_handlers! {
     no_merges,
     notify_zulip,
     review_requested,
+    review_work_queue,
 }
 
 macro_rules! command_handlers {

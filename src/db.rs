@@ -308,4 +308,13 @@ CREATE UNIQUE INDEX jobs_name_scheduled_at_unique_index
         name, scheduled_at
     );
 ",
+    "
+CREATE table review_prefs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id BIGINT REFERENCES users(user_id),
+    assigned_prs INT[] NOT NULL DEFAULT array[]::INT[],
+    num_assigned_prs INTEGER
+);
+CREATE UNIQUE INDEX review_prefs_user_id ON review_prefs(user_id);
+",
 ];

@@ -35,6 +35,7 @@ pub(crate) struct Config {
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
     pub(crate) no_merges: Option<NoMergesConfig>,
+    pub(crate) review_work_queue: Option<TeamMemberWorkQueueConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -150,6 +151,13 @@ pub(crate) struct RelabelConfig {
 pub(crate) struct ShortcutConfig {
     #[serde(default)]
     _empty: (),
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct TeamMemberWorkQueueConfig {
+    #[serde(default)]
+    pub(crate) enabled_for_teams: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -357,6 +365,9 @@ mod tests {
             [assign]
             users_on_vacation = ["jyn514"]
 
+            [review-work-queue]
+            enabled-for-teams = ["aaa", "bbb"]
+
             [note]
 
             [ping.compiler]
@@ -429,6 +440,9 @@ mod tests {
                 github_releases: None,
                 review_submitted: None,
                 review_requested: None,
+                review_work_queue: Some(TeamMemberWorkQueueConfig {
+                    enabled_for_teams: vec!["aaa".into(), "bbb".into()]
+                }),
                 mentions: None,
                 no_merges: None,
             }
