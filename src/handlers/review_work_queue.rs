@@ -18,7 +18,7 @@ async fn get_pr_assignees(
     issue_num: i32,
 ) -> anyhow::Result<Vec<TeamMemberWorkQueue>> {
     let q = "
-SELECT u.username, r.*
+SELECT u.username, r.*, array_length(assigned_prs, 1) as num_assigned_prs
 FROM review_prefs r
 JOIN users u on u.user_id=r.user_id
 WHERE $1 = ANY (assigned_prs)";
@@ -36,27 +36,19 @@ async fn update_team_member_workqueue(
 ) -> anyhow::Result<TeamMemberWorkQueue> {
     let q = "
 UPDATE review_prefs r
-SET assigned_prs = $2, num_assigned_prs = $3
+SET assigned_prs = $2
 FROM users u
 WHERE r.user_id=$1 AND u.user_id=r.user_id
-RETURNING u.username, r.*";
-    let num_assigned_prs = assignee.assigned_prs.len() as i32;
+RETURNING u.username, r.*, array_length(assigned_prs, 1) as num_assigned_prs";
     let rec = db
-        .query_one(
-            q,
-            &[&assignee.user_id, &assignee.assigned_prs, &num_assigned_prs],
-        )
+        .query_one(q, &[&assignee.user_id, &assignee.assigned_prs])
         .await
         .context("Update DB error")?;
     Ok(rec.into())
 }
 
 /// Add a new user (if not existing)
-async fn maybe_create_team_member(
-    db: &DbClient,
-    user_id: i64,
-    username: &str,
-) -> anyhow::Result<u64> {
+async fn ensure_team_member(db: &DbClient, user_id: i64, username: &str) -> anyhow::Result<u64> {
     let q = "
 INSERT INTO users (user_id, username) VALUES ($1, $2)
 ON CONFLICT DO NOTHING";
@@ -73,12 +65,11 @@ async fn upsert_team_member_workqueue(
     user_id: i64,
     pr: i32,
 ) -> anyhow::Result<u64, anyhow::Error> {
-    let q =
-        "
+    let q = "
 INSERT INTO review_prefs
-(user_id, assigned_prs, num_assigned_prs) VALUES ($1, $2, 1)
+(user_id, assigned_prs) VALUES ($1, $2)
 ON CONFLICT (user_id)
-DO UPDATE SET assigned_prs = array_append(review_prefs.assigned_prs, $3), num_assigned_prs = review_prefs.num_assigned_prs + 1
+DO UPDATE SET assigned_prs = array_append(review_prefs.assigned_prs, $3)
 WHERE review_prefs.user_id=$1";
     let pr_v = vec![pr];
     db.execute(q, &[&user_id, &pr_v, &pr])
@@ -142,7 +133,7 @@ pub(super) async fn handle_input<'a>(
     for u in event.issue.assignees.iter() {
         let user_id = u.id.expect("Github user was expected! Please investigate.");
 
-        if let Err(err) = maybe_create_team_member(&db_client, user_id, &u.login).await {
+        if let Err(err) = ensure_team_member(&db_client, user_id, &u.login).await {
             log::error!("Failed to create user in DB: this PR assignment won't be tracked.");
             return Err(err);
         }
