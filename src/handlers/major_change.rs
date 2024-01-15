@@ -73,7 +73,7 @@ pub(super) async fn parse_input(
     }
 
     // All other issue events are ignored
-    return Ok(None);
+    Ok(None)
 }
 
 pub(super) async fn handle_input(
@@ -126,7 +126,7 @@ pub(super) async fn handle_input(
                 content: "The associated GitHub issue has been renamed. Renaming this Zulip topic.",
             };
             let zulip_send_res = zulip_send_req
-                .send(&ctx.github.raw())
+                .send(ctx.github.raw())
                 .await
                 .context("zulip post failed")?;
 
@@ -139,7 +139,7 @@ pub(super) async fn handle_input(
                 content: None,
             };
             zulip_update_req
-                .send(&ctx.github.raw())
+                .send(ctx.github.raw())
                 .await
                 .context("zulip message update failed")?;
 
@@ -162,7 +162,7 @@ pub(super) async fn handle_input(
                 content: &breadcrumb_comment,
             };
             zulip_send_breadcrumb_req
-                .send(&ctx.github.raw())
+                .send(ctx.github.raw())
                 .await
                 .context("zulip post failed")?;
 
@@ -194,8 +194,8 @@ pub(super) async fn handle_command(
         .any(|l| l.name == config.enabling_label)
     {
         let cmnt = ErrorComment::new(
-            &issue,
-            &format!(
+            issue,
+            format!(
                 "This issue cannot be seconded; it lacks the `{}` label.",
                 config.enabling_label
             ),
@@ -212,7 +212,7 @@ pub(super) async fn handle_command(
         .unwrap_or(false);
 
     if !is_team_member {
-        let cmnt = ErrorComment::new(&issue, "Only team members can second issues.");
+        let cmnt = ErrorComment::new(issue, "Only team members can second issues.");
         cmnt.post(&ctx.github).await?;
         return Ok(());
     }
@@ -296,7 +296,7 @@ async fn handle(
             .context("post major change comment")?;
     }
 
-    let zulip_req = zulip_req.send(&ctx.github.raw());
+    let zulip_req = zulip_req.send(ctx.github.raw());
 
     let (gh_res, zulip_res) = futures::join!(github_req, zulip_req);
     zulip_res.context("zulip post failed")?;

@@ -378,7 +378,7 @@ mod tests {
 
             [shortcut]
         "#;
-        let config = toml::from_str::<Config>(&config).unwrap();
+        let config = toml::from_str::<Config>(config).unwrap();
         let mut ping_teams = HashMap::new();
         ping_teams.insert(
             "compiler".to_owned(),

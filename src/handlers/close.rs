@@ -16,7 +16,7 @@ pub(super) async fn handle_command(
         .await
         .unwrap_or(false);
     if !is_team_member {
-        let cmnt = ErrorComment::new(&issue, "Only team members can close issues.");
+        let cmnt = ErrorComment::new(issue, "Only team members can close issues.");
         cmnt.post(&ctx.github).await?;
         return Ok(());
     }

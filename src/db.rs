@@ -95,7 +95,7 @@ async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
     let db_url = std::env::var("DATABASE_URL").expect("needs DATABASE_URL");
     if db_url.contains("rds.amazonaws.com") {
         let cert = &CERTIFICATE_PEM[..];
-        let cert = Certificate::from_pem(&cert).context("made certificate")?;
+        let cert = Certificate::from_pem(cert).context("made certificate")?;
         let connector = TlsConnector::builder()
             .add_root_certificate(cert)
             .build()
@@ -205,29 +205,29 @@ pub async fn schedule_job(
         anyhow::bail!("Job {} does not exist in the current job list.", job_name);
     }
 
-    if let Err(_) = get_job_by_name_and_scheduled_at(&db, job_name, &when).await {
+    if let Err(_) = get_job_by_name_and_scheduled_at(db, job_name, &when).await {
         // mean there's no job already in the db with that name and scheduled_at
-        insert_job(&db, job_name, &when, &job_metadata).await?;
+        insert_job(db, job_name, &when, &job_metadata).await?;
     }
 
     Ok(())
 }
 
 pub async fn run_scheduled_jobs(ctx: &Context, db: &DbClient) -> anyhow::Result<()> {
-    let jobs = get_jobs_to_execute(&db).await.unwrap();
+    let jobs = get_jobs_to_execute(db).await.unwrap();
     tracing::trace!("jobs to execute: {:#?}", jobs);
 
     for job in jobs.iter() {
-        update_job_executed_at(&db, &job.id).await?;
+        update_job_executed_at(db, &job.id).await?;
 
-        match handle_job(&ctx, &job.name, &job.metadata).await {
+        match handle_job(ctx, &job.name, &job.metadata).await {
             Ok(_) => {
                 tracing::trace!("job successfully executed (id={})", job.id);
-                delete_job(&db, &job.id).await?;
+                delete_job(db, &job.id).await?;
             }
             Err(e) => {
                 tracing::error!("job failed on execution (id={:?}, error={:?})", job.id, e);
-                update_job_error_message(&db, &job.id, &e.to_string()).await?;
+                update_job_error_message(db, &job.id, &e.to_string()).await?;
             }
         }
     }

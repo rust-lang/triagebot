@@ -114,7 +114,7 @@ async fn serve_req(
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
                     .body(Body::from(
-                        notification_listing::render(&ctx.db.get().await, &*name).await,
+                        notification_listing::render(&ctx.db.get().await, &name).await,
                     ))
                     .unwrap());
             }
@@ -212,7 +212,7 @@ async fn serve_req(
         payload.extend_from_slice(&chunk);
     }
 
-    if let Err(_) = payload::assert_signed(signature, &payload) {
+    if payload::assert_signed(signature, &payload).is_err() {
         return Ok(Response::builder()
             .status(StatusCode::FORBIDDEN)
             .body(Body::from("Wrong signature"))

@@ -27,8 +27,8 @@ pub(super) async fn handle_command(
 
     if !is_team_member {
         let cmnt = ErrorComment::new(
-            &event.issue().unwrap(),
-            format!("Only Rust team members can ping teams."),
+            event.issue().unwrap(),
+            "Only Rust team members can ping teams.".to_string(),
         );
         cmnt.post(&ctx.github).await?;
         return Ok(());
@@ -38,7 +38,7 @@ pub(super) async fn handle_command(
         Some(v) => v,
         None => {
             let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
+                event.issue().unwrap(),
                 format!(
                     "This team (`{}`) cannot be pinged via this command; \
                     it may need to be added to `triagebot.toml` on the default branch.",
@@ -49,12 +49,12 @@ pub(super) async fn handle_command(
             return Ok(());
         }
     };
-    let team = github::get_team(&ctx.github, &gh_team).await?;
+    let team = github::get_team(&ctx.github, gh_team).await?;
     let team = match team {
         Some(team) => team,
         None => {
             let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
+                event.issue().unwrap(),
                 format!(
                     "This team (`{}`) does not exist in the team repository.",
                     team_name.team,
@@ -90,7 +90,7 @@ pub(super) async fn handle_command(
     }
 
     let ping_msg = if users.is_empty() {
-        format!("no known users to ping?")
+        "no known users to ping?".to_string()
     } else {
         format!("cc {}", users.join(" "))
     };

@@ -23,11 +23,10 @@ pub(super) async fn handle_command(
 
     if !is_team_member {
         let cmnt = ErrorComment::new(
-            &event.issue().unwrap(),
-            format!(
-                "Nominating and approving issues and pull requests is restricted to members of\
+            event.issue().unwrap(),
+            "Nominating and approving issues and pull requests is restricted to members of\
                  the Rust teams."
-            ),
+                .to_string(),
         );
         cmnt.post(&ctx.github).await?;
         return Ok(());
@@ -38,7 +37,7 @@ pub(super) async fn handle_command(
     if cmd.style == Style::BetaApprove {
         if !issue_labels.iter().any(|l| l.name == "beta-nominated") {
             let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
+                event.issue().unwrap(),
                 format!(
                     "This pull request is not beta-nominated, so it cannot be approved yet.\
                      Perhaps try to beta-nominate it by using `@{} beta-nominate <team>`?",
@@ -57,7 +56,7 @@ pub(super) async fn handle_command(
     } else {
         if !config.teams.contains_key(&cmd.team) {
             let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
+                event.issue().unwrap(),
                 format!(
                     "This team (`{}`) cannot be nominated for via this command;\
                      it may need to be added to `triagebot.toml` on the default branch.",

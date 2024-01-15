@@ -24,7 +24,7 @@ pub(crate) async fn handle(
         if event.issue.assignees.contains(&event.comment.user) {
             // Remove review labels
             for label in &config.review_labels {
-                event.issue.remove_label(&ctx.github, &label).await?;
+                event.issue.remove_label(&ctx.github, label).await?;
             }
             // Add waiting on author
             event

@@ -139,7 +139,7 @@ fn handle_command<'a>(
         let mut next = words.next();
 
         if let Some("as") = next {
-            return execute_for_other_user(&ctx, words, message_data)
+            return execute_for_other_user(ctx, words, message_data)
                 .await
                 .map_err(|e| {
                     format_err!("Failed to parse; expected `as <username> <command...>`: {e:?}.")
@@ -148,13 +148,13 @@ fn handle_command<'a>(
         let gh_id = gh_id?;
 
         match next {
-            Some("acknowledge") | Some("ack") => acknowledge(&ctx, gh_id, words).await
+            Some("acknowledge") | Some("ack") => acknowledge(ctx, gh_id, words).await
                 .map_err(|e| format_err!("Failed to parse acknowledgement, expected `(acknowledge|ack) <identifier>`: {e:?}.")),
-            Some("add") => add_notification(&ctx, gh_id, words).await
+            Some("add") => add_notification(ctx, gh_id, words).await
                 .map_err(|e| format_err!("Failed to parse description addition, expected `add <url> <description (multiple words)>`: {e:?}.")),
-            Some("move") => move_notification(&ctx, gh_id, words).await
+            Some("move") => move_notification(ctx, gh_id, words).await
                 .map_err(|e| format_err!("Failed to parse movement, expected `move <from> <to>`: {e:?}.")),
-            Some("meta") => add_meta_notification(&ctx, gh_id, words).await
+            Some("meta") => add_meta_notification(ctx, gh_id, words).await
                 .map_err(|e| format_err!("Failed to parse movement, expected `move <idx> <meta...>`: {e:?}.")),
             _ => {
                 while let Some(word) = next {
@@ -162,7 +162,7 @@ fn handle_command<'a>(
                         let next = words.next();
                         match next {
                             Some("end-topic") | Some("await") => {
-                                return post_waiter(&ctx, message_data, WaitingMessage::end_topic())
+                                return post_waiter(ctx, message_data, WaitingMessage::end_topic())
                                     .await
                                     .map_err(|e| {
                                         format_err!("Failed to await at this time: {e:?}")
@@ -170,7 +170,7 @@ fn handle_command<'a>(
                             }
                             Some("end-meeting") => {
                                 return post_waiter(
-                                    &ctx,
+                                    ctx,
                                     message_data,
                                     WaitingMessage::end_meeting(),
                                 )
@@ -179,7 +179,7 @@ fn handle_command<'a>(
                             }
                             Some("read") => {
                                 return post_waiter(
-                                    &ctx,
+                                    ctx,
                                     message_data,
                                     WaitingMessage::start_reading(),
                                 )
@@ -502,7 +502,7 @@ async fn acknowledge(
         Identifier::Url(filter)
     };
     let mut db = ctx.db.get().await;
-    let deleted = delete_ping(&mut *db, gh_id, ident)
+    let deleted = delete_ping(&mut db, gh_id, ident)
         .await
         .map_err(|e| format_err!("Failed to acknowledge {filter}: {e:?}."))?;
 
@@ -727,7 +727,7 @@ async fn post_waiter(
             message_id,
             emoji_name: reaction,
         }
-        .send(&ctx.github.raw())
+        .send(ctx.github.raw())
         .await
         .context("emoji reaction failed")?;
     }

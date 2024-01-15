@@ -14,7 +14,7 @@ impl std::error::Error for SignedPayloadError {}
 
 pub fn assert_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPayloadError> {
     let signature = signature.get("sha1=".len()..).ok_or(SignedPayloadError)?;
-    let signature = match hex::decode(&signature) {
+    let signature = match hex::decode(signature) {
         Ok(e) => e,
         Err(e) => {
             tracing::trace!("hex decode failed for {:?}: {:?}", signature, e);
@@ -29,7 +29,7 @@ pub fn assert_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPayloa
     )
     .unwrap();
     let mut signer = Signer::new(MessageDigest::sha1(), &key).unwrap();
-    signer.update(&payload).unwrap();
+    signer.update(payload).unwrap();
     let hmac = signer.sign_to_vec().unwrap();
 
     if !memcmp::eq(&hmac, &signature) {
