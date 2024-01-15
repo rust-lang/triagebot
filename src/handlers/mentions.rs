@@ -69,7 +69,7 @@ pub(super) async fn parse_input(
                 let touches_relevant_files = file_paths.iter().any(|p| p.starts_with(path));
                 // Don't mention if only the author is in the list.
                 let pings_non_author = match &cc[..] {
-                    [only_cc] => only_cc.trim_start_matches('@') != &event.issue.user.login,
+                    [only_cc] => only_cc.trim_start_matches('@') != event.issue.user.login,
                     _ => true,
                 };
                 touches_relevant_files && pings_non_author

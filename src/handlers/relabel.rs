@@ -155,15 +155,17 @@ enum MatchPatternResult {
 }
 
 fn match_pattern(pattern: &str, label: &str) -> anyhow::Result<MatchPatternResult> {
-    let (pattern, inverse) = if pattern.starts_with('!') {
-        (&pattern[1..], true)
+    let (pattern, inverse) = if let Some(rest) = pattern.strip_prefix('!') {
+        (rest, true)
     } else {
         (pattern, false)
     };
 
     let glob = glob::Pattern::new(pattern)?;
-    let mut matchopts = glob::MatchOptions::default();
-    matchopts.case_sensitive = false;
+    let matchopts = glob::MatchOptions {
+        case_sensitive: false,
+        ..Default::default()
+    };
 
     Ok(match (glob.matches_with(label, matchopts), inverse) {
         (true, false) => MatchPatternResult::Allow,

@@ -205,7 +205,10 @@ pub async fn schedule_job(
         anyhow::bail!("Job {} does not exist in the current job list.", job_name);
     }
 
-    if let Err(_) = get_job_by_name_and_scheduled_at(db, job_name, &when).await {
+    if get_job_by_name_and_scheduled_at(db, job_name, &when)
+        .await
+        .is_err()
+    {
         // mean there's no job already in the db with that name and scheduled_at
         insert_job(db, job_name, &when, &job_metadata).await?;
     }
@@ -242,7 +245,7 @@ async fn handle_job(
     metadata: &serde_json::Value,
 ) -> anyhow::Result<()> {
     for job in jobs() {
-        if &job.name() == &name {
+        if job.name() == name {
             return job.run(ctx, metadata).await;
         }
     }

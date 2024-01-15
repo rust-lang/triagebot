@@ -6,15 +6,10 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let args: Vec<String> = std::env::args().collect();
-    if args.len() == 2 {
-        match &args[1][..] {
-            "planning" => {
-                let agenda = agenda::types_planning();
-                print!("{}", agenda.call().await?);
-                return Ok(());
-            }
-            _ => {}
-        }
+    if args.len() == 2 && args[1] == "planning" {
+        let agenda = agenda::types_planning();
+        print!("{}", agenda.call().await?);
+        return Ok(());
     }
 
     eprintln!("Usage: types (planning)");

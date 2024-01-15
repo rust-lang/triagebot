@@ -19,7 +19,7 @@ fn test_from_names(
         (Ok(candidates), Ok(expected)) => {
             let mut candidates: Vec<_> = candidates.into_iter().collect();
             candidates.sort();
-            let expected: Vec<_> = expected.iter().copied().collect();
+            let expected: Vec<_> = expected.to_vec();
             assert_eq!(candidates, expected);
         }
         (Err(actual), Err(expected)) => {

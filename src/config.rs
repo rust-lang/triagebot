@@ -9,9 +9,11 @@ use tracing as log;
 static CONFIG_FILE_NAME: &str = "triagebot.toml";
 const REFRESH_EVERY: Duration = Duration::from_secs(2 * 60); // Every two minutes
 
+type CacheLeaf = (Result<Arc<Config>, ConfigurationError>, Instant);
+
 lazy_static::lazy_static! {
     static ref CONFIG_CACHE:
-        RwLock<HashMap<String, (Result<Arc<Config>, ConfigurationError>, Instant)>> =
+        RwLock<HashMap<String, CacheLeaf>> =
         RwLock::new(HashMap::new());
 }
 

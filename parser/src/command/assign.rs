@@ -47,7 +47,7 @@ impl AssignCommand {
             if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
                 *input = toks;
-                return Ok(Some(AssignCommand::Own));
+                Ok(Some(AssignCommand::Own))
             } else {
                 return Err(toks.error(ParseError::ExpectedEnd));
             }
@@ -97,9 +97,9 @@ impl AssignCommand {
 mod tests {
     use super::*;
 
-    fn parse<'a>(input: &'a str) -> Result<Option<AssignCommand>, Error<'a>> {
+    fn parse(input: &str) -> Result<Option<AssignCommand>, Error<'_>> {
         let mut toks = Tokenizer::new(input);
-        Ok(AssignCommand::parse(&mut toks)?)
+        AssignCommand::parse(&mut toks)
     }
 
     #[test]
@@ -135,9 +135,9 @@ mod tests {
         );
     }
 
-    fn parse_review<'a>(input: &'a str) -> Result<Option<AssignCommand>, Error<'a>> {
+    fn parse_review(input: &str) -> Result<Option<AssignCommand>, Error<'_>> {
         let mut toks = Tokenizer::new(input);
-        Ok(AssignCommand::parse_review(&mut toks)?)
+        AssignCommand::parse_review(&mut toks)
     }
 
     #[test]

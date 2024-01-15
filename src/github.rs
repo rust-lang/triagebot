@@ -1150,8 +1150,8 @@ impl Repository {
 
     fn build_issues_url(
         &self,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         self.build_endpoint_url("issues", filters, include_labels, ordering)
@@ -1159,8 +1159,8 @@ impl Repository {
 
     fn build_pulls_url(
         &self,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         self.build_endpoint_url("pulls", filters, include_labels, ordering)
@@ -1169,8 +1169,8 @@ impl Repository {
     fn build_endpoint_url(
         &self,
         endpoint: &str,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         let filters = filters
@@ -1199,9 +1199,9 @@ impl Repository {
 
     fn build_search_issues_url(
         &self,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
-        exclude_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
+        exclude_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         let filters = filters
@@ -1905,14 +1905,12 @@ impl RequestSend for RequestBuilder {
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
 pub fn default_token_from_env() -> String {
-    match std::env::var("GITHUB_API_TOKEN") {
-        Ok(v) => return v,
-        Err(_) => (),
+    if let Ok(v) = std::env::var("GITHUB_API_TOKEN") {
+        return v;
     }
 
-    match get_token_from_git_config() {
-        Ok(v) => return v,
-        Err(_) => (),
+    if let Ok(v) = get_token_from_git_config() {
+        return v;
     }
 
     panic!("could not find token in GITHUB_API_TOKEN or .gitconfig/github.oath-token")

@@ -425,12 +425,11 @@ pub(super) async fn handle_command(
     event: &Event,
     cmd: AssignCommand,
 ) -> anyhow::Result<()> {
-    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
-    {
-        false
-    } else {
-        true
-    };
+    let is_team_member = event
+        .user()
+        .is_team_member(&ctx.github)
+        .await
+        .unwrap_or(false);
 
     // Don't handle commands in comments from the bot. Some of the comments it
     // posts contain commands to instruct the user, not things that the bot

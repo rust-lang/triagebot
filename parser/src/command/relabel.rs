@@ -92,13 +92,13 @@ impl LabelDelta {
                 return Err(input.error(ParseError::ExpectedLabelDelta));
             }
         };
-        if delta.starts_with('+') {
+        if let Some(rest) = delta.strip_prefix('+') {
             Ok(LabelDelta::Add(
-                Label::parse(&delta[1..]).map_err(|e| input.error(e))?,
+                Label::parse(rest).map_err(|e| input.error(e))?,
             ))
-        } else if delta.starts_with('-') {
+        } else if let Some(rest) = delta.strip_prefix('-') {
             Ok(LabelDelta::Remove(
-                Label::parse(&delta[1..]).map_err(|e| input.error(e))?,
+                Label::parse(rest).map_err(|e| input.error(e))?,
             ))
         } else {
             Ok(LabelDelta::Add(
@@ -165,7 +165,7 @@ impl RelabelCommand {
 }
 
 #[cfg(test)]
-fn parse<'a>(input: &'a str) -> Result<Option<Vec<LabelDelta>>, Error<'a>> {
+fn parse(input: &str) -> Result<Option<Vec<LabelDelta>>, Error<'_>> {
     let mut toks = Tokenizer::new(input);
     Ok(RelabelCommand::parse(&mut toks)?.map(|c| c.0))
 }
