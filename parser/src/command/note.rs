@@ -29,7 +29,7 @@ impl NoteCommand {
             let mut remove = false;
             loop {
                 match toks.next_token()? {
-                    Some(Token::Word(title)) if title == "remove" => {
+                    Some(Token::Word("remove")) => {
                         remove = true;
                         continue;
                     }

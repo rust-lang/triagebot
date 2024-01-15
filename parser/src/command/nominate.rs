@@ -72,7 +72,7 @@ impl NominateCommand {
         if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
             toks.next_token()?;
             *input = toks;
-            return Ok(Some(NominateCommand { team, style }));
+            Ok(Some(NominateCommand { team, style }))
         } else {
             return Err(toks.error(ParseError::ExpectedEnd));
         }
@@ -80,9 +80,9 @@ impl NominateCommand {
 }
 
 #[cfg(test)]
-fn parse<'a>(input: &'a str) -> Result<Option<NominateCommand>, Error<'a>> {
+fn parse(input: &str) -> Result<Option<NominateCommand>, Error<'_>> {
     let mut toks = Tokenizer::new(input);
-    Ok(NominateCommand::parse(&mut toks)?)
+    NominateCommand::parse(&mut toks)
 }
 
 #[test]

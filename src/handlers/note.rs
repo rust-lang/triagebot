@@ -121,7 +121,7 @@ pub(super) async fn handle_command(
     cmd: NoteCommand,
 ) -> anyhow::Result<()> {
     let issue = event.issue().unwrap();
-    let e = EditIssueBody::new(&issue, "SUMMARY");
+    let e = EditIssueBody::new(issue, "SUMMARY");
 
     let mut current: NoteData = e.current_data().unwrap_or_default();
 

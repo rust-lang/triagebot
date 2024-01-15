@@ -57,7 +57,7 @@ impl ShortcutCommand {
 #[cfg(test)]
 fn parse(input: &str) -> Result<Option<ShortcutCommand>, Error<'_>> {
     let mut toks = Tokenizer::new(input);
-    Ok(ShortcutCommand::parse(&mut toks)?)
+    ShortcutCommand::parse(&mut toks)
 }
 
 #[test]

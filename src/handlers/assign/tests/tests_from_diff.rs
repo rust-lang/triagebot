@@ -135,7 +135,7 @@ fn empty_file_still_counts() {
     let diff = "diff --git a/compiler/rustc_parse/src/foo.rs b/compiler/rustc_parse/src/foo.rs\n\
                 new file mode 100644\n\
                 index 0000000..e69de29\n";
-    test_from_diff(&diff, config, &["parser"]);
+    test_from_diff(diff, config, &["parser"]);
 }
 
 #[test]

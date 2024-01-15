@@ -1,5 +1,6 @@
 use anyhow::Context as _;
 use chrono::{DateTime, FixedOffset};
+use std::cmp::Ordering;
 use tokio_postgres::Client as DbClient;
 use tracing as log;
 
@@ -222,10 +223,10 @@ pub async fn move_indices(
             );
         }
 
-        if from < to {
-            notifications[from..=to].rotate_left(1);
-        } else if to < from {
-            notifications[to..=from].rotate_right(1);
+        match from.cmp(&to) {
+            Ordering::Less => notifications[from..=to].rotate_left(1),
+            Ordering::Greater => notifications[to..=from].rotate_right(1),
+            Ordering::Equal => (),
         }
 
         for (idx, id) in notifications.into_iter().enumerate() {

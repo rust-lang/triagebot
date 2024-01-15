@@ -2,7 +2,7 @@ use crate::actions::{Action, Query, QueryKind, QueryMap, Step};
 use crate::github;
 use std::sync::Arc;
 
-pub fn prioritization<'a>() -> Box<dyn Action> {
+pub fn prioritization() -> Box<dyn Action> {
     Box::new(Step {
         name: "prioritization_agenda",
         actions: vec![
@@ -442,7 +442,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
     })
 }
 
-pub fn lang<'a>() -> Box<dyn Action + Send + Sync> {
+pub fn lang() -> Box<dyn Action + Send + Sync> {
     Box::new(Step {
         name: "lang_agenda",
         actions: vec![
@@ -561,7 +561,7 @@ pub fn lang<'a>() -> Box<dyn Action + Send + Sync> {
     })
 }
 
-pub fn lang_planning<'a>() -> Box<dyn Action + Send + Sync> {
+pub fn lang_planning() -> Box<dyn Action + Send + Sync> {
     Box::new(Step {
         name: "lang_planning_agenda",
         actions: vec![
@@ -611,7 +611,7 @@ pub fn lang_planning<'a>() -> Box<dyn Action + Send + Sync> {
     })
 }
 
-pub fn types_planning<'a>() -> Box<dyn Action + Send + Sync> {
+pub fn types_planning() -> Box<dyn Action + Send + Sync> {
     Box::new(Step {
         name: "types_planning_agenda",
         actions: vec![
@@ -677,7 +677,7 @@ pub fn types_planning<'a>() -> Box<dyn Action + Send + Sync> {
 // Things to add (maybe):
 // - Compiler RFCs
 // - P-high issues
-pub fn compiler_backlog_bonanza<'a>() -> Box<dyn Action> {
+pub fn compiler_backlog_bonanza() -> Box<dyn Action> {
     Box::new(Step {
         name: "compiler_backlog_bonanza",
         actions: vec![Query {

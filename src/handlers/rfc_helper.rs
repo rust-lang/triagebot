@@ -15,7 +15,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    if let Err(e) = add_rendered_link(&ctx, &e).await {
+    if let Err(e) = add_rendered_link(ctx, e).await {
         tracing::error!("Error adding rendered link: {:?}", e);
     }
 

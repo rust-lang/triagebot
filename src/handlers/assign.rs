@@ -118,7 +118,7 @@ pub(super) async fn handle_input(
 
     // Don't auto-assign or welcome if the user manually set the assignee when opening.
     if event.issue.assignees.is_empty() {
-        let (assignee, from_comment) = determine_assignee(ctx, event, config, &diff).await?;
+        let (assignee, from_comment) = determine_assignee(ctx, event, config, diff).await?;
         if assignee.as_deref() == Some("ghost") {
             // "ghost" is GitHub's placeholder account for deleted accounts.
             // It is used here as a convenient way to prevent assignment. This
@@ -231,7 +231,7 @@ fn modifies_submodule(diff: &[FileDiff]) -> Option<String> {
 /// Sets the assignee of a PR, alerting any errors.
 async fn set_assignee(issue: &Issue, github: &GithubClient, username: &str) {
     // Don't re-assign if already assigned, e.g. on comment edit
-    if issue.contain_assignee(&username) {
+    if issue.contain_assignee(username) {
         log::trace!(
             "ignoring assign PR {} to {}, already assigned",
             issue.global_id(),
@@ -239,7 +239,7 @@ async fn set_assignee(issue: &Issue, github: &GithubClient, username: &str) {
         );
         return;
     }
-    if let Err(err) = issue.set_assignee(github, &username).await {
+    if let Err(err) = issue.set_assignee(github, username).await {
         log::warn!(
             "failed to set assignee of PR {} to {}: {:?}",
             issue.global_id(),
@@ -425,12 +425,11 @@ pub(super) async fn handle_command(
     event: &Event,
     cmd: AssignCommand,
 ) -> anyhow::Result<()> {
-    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
-    {
-        false
-    } else {
-        true
-    };
+    let is_team_member = event
+        .user()
+        .is_team_member(&ctx.github)
+        .await
+        .unwrap_or(false);
 
     // Don't handle commands in comments from the bot. Some of the comments it
     // posts contain commands to instruct the user, not things that the bot
@@ -523,7 +522,7 @@ pub(super) async fn handle_command(
         return Ok(());
     }
 
-    let e = EditIssueBody::new(&issue, "ASSIGN");
+    let e = EditIssueBody::new(issue, "ASSIGN");
 
     let to_assign = match cmd {
         AssignCommand::Own => event.user().login.clone(),
@@ -550,7 +549,7 @@ pub(super) async fn handle_command(
                 let current = &event.user().login;
                 if issue.contain_assignee(current) {
                     issue
-                        .remove_assignees(&ctx.github, Selection::One(&current))
+                        .remove_assignees(&ctx.github, Selection::One(current))
                         .await?;
                     e.apply(&ctx.github, String::new(), AssignData { user: None })
                         .await?;
@@ -783,7 +782,7 @@ fn candidate_reviewers_from_names<'a>(
         }
     }
     if candidates.is_empty() {
-        let initial = names.iter().cloned().collect();
+        let initial = names.to_vec();
         if filtered.is_empty() {
             Err(FindReviewerError::NoReviewer { initial })
         } else {

@@ -13,7 +13,7 @@ impl IgnoreBlocks {
         while let Some((event, range)) = parser.next() {
             if let Event::Start(Tag::CodeBlock(_)) = event {
                 let start = range.start;
-                while let Some((event, range)) = parser.next() {
+                for (event, range) in parser.by_ref() {
                     if let Event::End(Tag::CodeBlock(_)) = event {
                         ignore.push(start..range.end);
                         break;
@@ -22,7 +22,7 @@ impl IgnoreBlocks {
             } else if let Event::Start(Tag::BlockQuote) = event {
                 let start = range.start;
                 let mut count = 1;
-                while let Some((event, range)) = parser.next() {
+                for (event, range) in parser.by_ref() {
                     if let Event::Start(Tag::BlockQuote) = event {
                         count += 1;
                     } else if let Event::End(Tag::BlockQuote) = event {

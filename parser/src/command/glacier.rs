@@ -45,7 +45,7 @@ impl GlacierCommand {
                 Some(Token::Quote(s)) => {
                     let source = s.to_owned();
                     if source.starts_with("https://gist.github.com/") {
-                        return Ok(Some(GlacierCommand { source }));
+                        Ok(Some(GlacierCommand { source }))
                     } else {
                         return Err(toks.error(ParseError::InvalidLink));
                     }
@@ -67,9 +67,9 @@ impl GlacierCommand {
 mod test {
     use super::*;
 
-    fn parse<'a>(input: &'a str) -> Result<Option<GlacierCommand>, Error<'a>> {
+    fn parse(input: &str) -> Result<Option<GlacierCommand>, Error<'_>> {
         let mut toks = Tokenizer::new(input);
-        Ok(GlacierCommand::parse(&mut toks)?)
+        GlacierCommand::parse(&mut toks)
     }
 
     #[test]

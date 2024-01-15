@@ -51,8 +51,8 @@ impl HttpClient for CompilerMeeting {
             }
         };
         let google_calendar_id = "6u5rrtce6lrtv07pfi3damgjus%40group.calendar.google.com";
-        let time_min = format!("{}T00:00:00+00:00", start_date.format("%F").to_string());
-        let time_max = format!("{}T23:59:59+00:00", end_date.format("%F").to_string());
+        let time_min = format!("{}T00:00:00+00:00", start_date.format("%F"));
+        let time_max = format!("{}T23:59:59+00:00", end_date.format("%F"));
         let url = Url::parse_with_params(
             &format!(
                 "https://www.googleapis.com/calendar/v3/calendars/{}/events",

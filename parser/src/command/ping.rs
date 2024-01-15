@@ -47,20 +47,20 @@ impl PingCommand {
             if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
                 *input = toks;
-                return Ok(Some(PingCommand { team }));
+                Ok(Some(PingCommand { team }))
             } else {
                 return Err(toks.error(ParseError::ExpectedEnd));
             }
         } else {
-            return Ok(None);
+            Ok(None)
         }
     }
 }
 
 #[cfg(test)]
-fn parse<'a>(input: &'a str) -> Result<Option<PingCommand>, Error<'a>> {
+fn parse(input: &str) -> Result<Option<PingCommand>, Error<'_>> {
     let mut toks = Tokenizer::new(input);
-    Ok(PingCommand::parse(&mut toks)?)
+    PingCommand::parse(&mut toks)
 }
 
 #[test]

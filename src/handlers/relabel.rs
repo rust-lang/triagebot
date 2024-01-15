@@ -26,7 +26,7 @@ pub(super) async fn handle_command(
     let mut to_add = vec![];
     for delta in &input.0 {
         let name = delta.label().as_str();
-        let err = match check_filter(name, config, is_member(&event.user(), &ctx.github).await) {
+        let err = match check_filter(name, config, is_member(event.user(), &ctx.github).await) {
             Ok(CheckFilterResult::Allow) => None,
             Ok(CheckFilterResult::Deny) => Some(format!(
                 "Label {} can only be set by Rust team members",
@@ -40,7 +40,7 @@ pub(super) async fn handle_command(
             Err(err) => Some(err),
         };
         if let Some(msg) = err {
-            let cmnt = ErrorComment::new(&event.issue().unwrap(), msg);
+            let cmnt = ErrorComment::new(event.issue().unwrap(), msg);
             cmnt.post(&ctx.github).await?;
             return Ok(());
         }
@@ -53,7 +53,7 @@ pub(super) async fn handle_command(
             LabelDelta::Remove(label) => {
                 results.push((
                     label,
-                    event.issue().unwrap().remove_label(&ctx.github, &label),
+                    event.issue().unwrap().remove_label(&ctx.github, label),
                 ));
             }
         }
@@ -139,7 +139,7 @@ fn check_filter(
         }
     }
     if matched {
-        return Ok(CheckFilterResult::Allow);
+        Ok(CheckFilterResult::Allow)
     } else if is_member == TeamMembership::Outsider {
         return Ok(CheckFilterResult::Deny);
     } else {
@@ -155,15 +155,17 @@ enum MatchPatternResult {
 }
 
 fn match_pattern(pattern: &str, label: &str) -> anyhow::Result<MatchPatternResult> {
-    let (pattern, inverse) = if pattern.starts_with('!') {
-        (&pattern[1..], true)
+    let (pattern, inverse) = if let Some(rest) = pattern.strip_prefix('!') {
+        (rest, true)
     } else {
         (pattern, false)
     };
 
     let glob = glob::Pattern::new(pattern)?;
-    let mut matchopts = glob::MatchOptions::default();
-    matchopts.case_sensitive = false;
+    let matchopts = glob::MatchOptions {
+        case_sensitive: false,
+        ..Default::default()
+    };
 
     Ok(match (glob.matches_with(label, matchopts), inverse) {
         (true, false) => MatchPatternResult::Allow,

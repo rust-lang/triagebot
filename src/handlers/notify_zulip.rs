@@ -167,7 +167,7 @@ pub(super) async fn handle_input<'a>(
             },
             content: &msg,
         };
-        zulip_req.send(&ctx.github.raw()).await?;
+        zulip_req.send(ctx.github.raw()).await?;
     }
 
     Ok(())

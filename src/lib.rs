@@ -123,7 +123,7 @@ impl From<anyhow::Error> for WebhookError {
 }
 
 pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::Result<T> {
-    let mut deserializer = serde_json::Deserializer::from_str(&v);
+    let mut deserializer = serde_json::Deserializer::from_str(v);
     let res: Result<T, _> = serde_path_to_error::deserialize(&mut deserializer);
     match res {
         Ok(r) => Ok(r),
@@ -230,7 +230,7 @@ pub async fn webhook(
             return Ok(false);
         }
     };
-    let errors = handlers::handle(&ctx, &event).await;
+    let errors = handlers::handle(ctx, &event).await;
     let mut other_error = false;
     let mut message = String::new();
     for err in errors {

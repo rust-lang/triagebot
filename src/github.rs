@@ -514,9 +514,7 @@ impl Issue {
             self.repository().url(),
             self.number,
         );
-        Ok(client
-            .json::<Vec<Comment>>(client.get(&comment_url))
-            .await?)
+        client.json::<Vec<Comment>>(client.get(&comment_url)).await
     }
 
     // returns an array of one element
@@ -529,9 +527,7 @@ impl Issue {
             self.repository().url(),
             self.number,
         );
-        Ok(client
-            .json::<Vec<Comment>>(client.get(&comment_url))
-            .await?)
+        client.json::<Vec<Comment>>(client.get(&comment_url)).await
     }
 
     pub async fn edit_body(&self, client: &GithubClient, body: &str) -> anyhow::Result<()> {
@@ -625,7 +621,7 @@ impl Issue {
         // Don't try to add labels already present on this issue.
         let labels = labels
             .into_iter()
-            .filter(|l| !self.labels().contains(&l))
+            .filter(|l| !self.labels().contains(l))
             .map(|l| l.name)
             .collect::<Vec<_>>();
 
@@ -870,7 +866,7 @@ impl Issue {
             self.repository().url(),
             self.number
         ));
-        Ok(client.json(req).await?)
+        client.json(req).await
     }
 }
 
@@ -1154,8 +1150,8 @@ impl Repository {
 
     fn build_issues_url(
         &self,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         self.build_endpoint_url("issues", filters, include_labels, ordering)
@@ -1163,8 +1159,8 @@ impl Repository {
 
     fn build_pulls_url(
         &self,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         self.build_endpoint_url("pulls", filters, include_labels, ordering)
@@ -1173,8 +1169,8 @@ impl Repository {
     fn build_endpoint_url(
         &self,
         endpoint: &str,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         let filters = filters
@@ -1203,9 +1199,9 @@ impl Repository {
 
     fn build_search_issues_url(
         &self,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
-        exclude_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
+        exclude_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         let filters = filters
@@ -1680,7 +1676,7 @@ fn quote_reply(markdown: &str) -> String {
     if markdown.is_empty() {
         String::from("*No content*")
     } else {
-        format!("\n\t> {}", markdown.replace("\n", "\n\t> "))
+        format!("\n\t> {}", markdown.replace('\n', "\n\t> "))
     }
 }
 
@@ -1694,7 +1690,7 @@ impl<'q> IssuesQuery for Query<'q> {
         client: &'a GithubClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         let issues = repo
-            .get_issues(&client, self)
+            .get_issues(client, self)
             .await
             .with_context(|| "Unable to get issues.")?;
 
@@ -1729,7 +1725,7 @@ impl<'q> IssuesQuery for Query<'q> {
 
                     let fk_initiating_comment = fcp.fcp.fk_initiating_comment;
                     let init_comment = issue
-                        .get_comment(&client, fk_initiating_comment.try_into()?)
+                        .get_comment(client, fk_initiating_comment.try_into()?)
                         .await?;
 
                     Some(crate::actions::FCPDetails {
@@ -1746,7 +1742,7 @@ impl<'q> IssuesQuery for Query<'q> {
             };
 
             let mcp_details = if include_mcp_details {
-                let first_comment = issue.get_first_comment(&client).await?;
+                let first_comment = issue.get_first_comment(client).await?;
                 let split = re_zulip_link
                     .split(&first_comment[0].body)
                     .collect::<Vec<&str>>();
@@ -1909,14 +1905,12 @@ impl RequestSend for RequestBuilder {
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
 pub fn default_token_from_env() -> String {
-    match std::env::var("GITHUB_API_TOKEN") {
-        Ok(v) => return v,
-        Err(_) => (),
+    if let Ok(v) = std::env::var("GITHUB_API_TOKEN") {
+        return v;
     }
 
-    match get_token_from_git_config() {
-        Ok(v) => return v,
-        Err(_) => (),
+    if let Ok(v) = get_token_from_git_config() {
+        return v;
     }
 
     panic!("could not find token in GITHUB_API_TOKEN or .gitconfig/github.oath-token")

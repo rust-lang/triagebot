@@ -207,7 +207,7 @@ impl<'a> Tokenizer<'a> {
             }
             self.advance();
         }
-        Ok(Some(Token::Word(&self.str_from(start))))
+        Ok(Some(Token::Word(self.str_from(start))))
     }
 
     pub fn eat_token(&mut self, token: Token<'a>) -> Result<bool, Error<'a>> {
@@ -222,7 +222,7 @@ impl<'a> Tokenizer<'a> {
 }
 
 #[cfg(test)]
-fn tokenize<'a>(input: &'a str) -> Result<Vec<Token<'a>>, Error<'a>> {
+fn tokenize(input: &str) -> Result<Vec<Token<'_>>, Error<'_>> {
     let mut tokens = Vec::new();
     let mut gen = Tokenizer::new(input);
     while let Some(tok) = gen.next_token()? {

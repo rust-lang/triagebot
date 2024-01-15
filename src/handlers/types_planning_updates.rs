@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use chrono::{Datelike, Duration, NaiveTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
-const TYPES_REPO: &'static str = "rust-lang/types-team";
+const TYPES_REPO: &str = "rust-lang/types-team";
 // T-types/meetings
 const TYPES_MEETINGS_STREAM: u64 = 326132;
 
@@ -27,10 +27,10 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
             return Ok(());
         }
         let meeting_date_string = first_monday.format("%Y-%m-%d").to_string();
-        let message = format!("\
+        let message = "\
             Hello @*T-types/meetings*. Monthly planning meeting in one week.\n\
             This is a reminder to update the current [roadmap tracking issues](https://github.com/rust-lang/types-team/issues?q=is%3Aissue+is%3Aopen+label%3Aroadmap-tracking-issue).\n\
-            Extra reminders will be sent later this week.");
+            Extra reminders will be sent later this week.".to_string();
         let zulip_req = crate::zulip::MessageApiRequest {
             recipient: crate::zulip::Recipient::Stream {
                 id: TYPES_MEETINGS_STREAM,
@@ -38,7 +38,7 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
             },
             content: &message,
         };
-        zulip_req.send(&ctx.github.raw()).await?;
+        zulip_req.send(ctx.github.raw()).await?;
 
         // Then, we want to schedule the next Thursday after this
         let mut thursday = today;
@@ -97,7 +97,7 @@ pub async fn request_updates(
         exclude_labels: vec![],
     };
     let issues = types_repo
-        .get_issues(&gh, &tracking_issues_query)
+        .get_issues(gh, &tracking_issues_query)
         .await
         .with_context(|| "Unable to get issues.")?;
 
@@ -164,7 +164,7 @@ pub async fn request_updates(
         },
         content: &message,
     };
-    zulip_req.send(&ctx.github.raw()).await?;
+    zulip_req.send(ctx.github.raw()).await?;
 
     Ok(())
 }
