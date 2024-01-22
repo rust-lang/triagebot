@@ -999,7 +999,7 @@ struct PullRequestEventFields {}
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct CommitBase {
-    sha: String,
+    pub sha: String,
     #[serde(rename = "ref")]
     pub git_ref: String,
     pub repo: Repository,

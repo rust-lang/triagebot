@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tracing as log;
 
-static CONFIG_FILE_NAME: &str = "triagebot.toml";
+pub(crate) static CONFIG_FILE_NAME: &str = "triagebot.toml";
 const REFRESH_EVERY: Duration = Duration::from_secs(2 * 60); // Every two minutes
 
 lazy_static::lazy_static! {
@@ -17,6 +17,7 @@ lazy_static::lazy_static! {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 pub(crate) struct Config {
     pub(crate) relabel: Option<RelabelConfig>,
     pub(crate) assign: Option<AssignConfig>,
@@ -35,9 +36,13 @@ pub(crate) struct Config {
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
     pub(crate) no_merges: Option<NoMergesConfig>,
+    // We want this validation to run even without the entry in the config file
+    #[serde(default = "ValidateConfig::default")]
+    pub(crate) validate_config: Option<ValidateConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NominateConfig {
     // team name -> label
     pub(crate) teams: HashMap<String, String>,
@@ -68,6 +73,7 @@ impl PingConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct PingTeamConfig {
     pub(crate) message: String,
     #[serde(default)]
@@ -76,6 +82,7 @@ pub(crate) struct PingTeamConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct AssignConfig {
     /// If `true`, then posts a warning comment if the PR is opened against a
     /// different branch than the default (usually master or main).
@@ -105,6 +112,7 @@ impl AssignConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NoMergesConfig {
     /// No action will be taken on PRs with these substrings in the title.
     #[serde(default)]
@@ -121,6 +129,7 @@ pub(crate) struct NoMergesConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NoteConfig {
     #[serde(default)]
     _empty: (),
@@ -133,6 +142,7 @@ pub(crate) struct MentionsConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct MentionsPathConfig {
     pub(crate) message: Option<String>,
     #[serde(default)]
@@ -141,20 +151,32 @@ pub(crate) struct MentionsPathConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RelabelConfig {
     #[serde(default)]
     pub(crate) allow_unauthenticated: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ShortcutConfig {
     #[serde(default)]
     _empty: (),
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct PrioritizeConfig {
     pub(crate) label: String,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct ValidateConfig {}
+
+impl ValidateConfig {
+    fn default() -> Option<Self> {
+        Some(ValidateConfig {})
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -176,6 +198,7 @@ impl AutolabelConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct AutolabelLabelConfig {
     #[serde(default)]
     pub(crate) trigger_labels: Vec<String>,
@@ -196,6 +219,7 @@ pub(crate) struct NotifyZulipConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) zulip_stream: u64,
     pub(crate) topic: String,
@@ -208,6 +232,7 @@ pub(crate) struct NotifyZulipLabelConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct MajorChangeConfig {
     /// A username (typically a group, e.g. T-lang) to ping on Zulip for newly
     /// opened proposals.
@@ -243,18 +268,22 @@ impl MajorChangeConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct GlacierConfig {}
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct CloseConfig {}
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ReviewSubmittedConfig {
     pub(crate) review_labels: Vec<String>,
     pub(crate) reviewed_label: String,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ReviewRequestedConfig {
     pub(crate) remove_labels: Vec<String>,
     pub(crate) add_labels: Vec<String>,
@@ -280,6 +309,7 @@ pub(crate) async fn get(
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 pub(crate) struct GitHubReleasesConfig {
     pub(crate) format: ChangelogFormat,
     pub(crate) project_name: String,
@@ -307,7 +337,8 @@ async fn get_fresh_config(
         .await
         .map_err(|e| ConfigurationError::Http(Arc::new(e)))?
         .ok_or(ConfigurationError::Missing)?;
-    let config = Arc::new(toml::from_slice::<Config>(&contents).map_err(ConfigurationError::Toml)?);
+    let contents = String::from_utf8_lossy(&*contents);
+    let config = Arc::new(toml::from_str::<Config>(&contents).map_err(ConfigurationError::Toml)?);
     log::debug!("fresh configuration for {}: {:?}", repo.full_name, config);
     Ok(config)
 }
@@ -431,6 +462,7 @@ mod tests {
                 review_requested: None,
                 mentions: None,
                 no_merges: None,
+                validate_config: Some(ValidateConfig {}),
             }
         );
     }
