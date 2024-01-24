@@ -65,6 +65,7 @@ pub struct FCPDetails {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MCPDetails {
     pub zulip_link: String,
+    pub concerns: Option<Vec<(String, String)>>,
 }
 
 lazy_static! {

@@ -5,6 +5,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use futures::{future::BoxFuture, FutureExt};
 use hyper::header::HeaderValue;
 use once_cell::sync::OnceCell;
+use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
 use std::collections::{HashMap, HashSet};
@@ -509,19 +510,6 @@ impl Issue {
         Ok(comment)
     }
 
-    // returns an array of one element
-    pub async fn get_first_comment(&self, client: &GithubClient) -> anyhow::Result<Vec<Comment>> {
-        let comment_url = format!(
-            "{}/issues/{}/comments?page=1&per_page=1",
-            self.repository().url(client),
-            self.number,
-        );
-        Ok(client
-            .json::<Vec<Comment>>(client.get(&comment_url))
-            .await?)
-    }
-
-    // returns an array of one element
     pub async fn get_first100_comments(
         &self,
         client: &GithubClient,
@@ -1763,12 +1751,22 @@ impl<'q> IssuesQuery for Query<'q> {
             };
 
             let mcp_details = if include_mcp_details {
-                let first_comment = issue.get_first_comment(&client).await?;
-                let split = re_zulip_link
-                    .split(&first_comment[0].body)
-                    .collect::<Vec<&str>>();
-                let zulip_link = split.last().unwrap_or(&"#").to_string();
-                Some(crate::actions::MCPDetails { zulip_link })
+                let first100_comments = issue.get_first100_comments(&client).await?;
+                let (zulip_link, concerns) = if !first100_comments.is_empty() {
+                    let split = re_zulip_link
+                        .split(&first100_comments[0].body)
+                        .collect::<Vec<&str>>();
+                    let zulip_link = split.last().unwrap_or(&"#").to_string();
+                    let concerns = find_open_concerns(first100_comments);
+                    (zulip_link, concerns)
+                } else {
+                    ("".to_string(), None)
+                };
+
+                Some(crate::actions::MCPDetails {
+                    zulip_link,
+                    concerns,
+                })
             } else {
                 None
             };
@@ -1798,6 +1796,56 @@ impl<'q> IssuesQuery for Query<'q> {
 
         Ok(issues_decorator)
     }
+}
+
+/// Return open concerns filed in an issue under MCP/RFC process
+/// Concerns are marked by `@rfcbot concern` and `@rfcbot resolve`
+fn find_open_concerns(comments: Vec<Comment>) -> Option<Vec<(String, String)>> {
+    let re_concern_raise =
+        Regex::new(r"@rfcbot concern (?P<concern_title>.*)").expect("Invalid regexp");
+    let re_concern_solve =
+        Regex::new(r"@rfcbot resolve (?P<concern_title>.*)").expect("Invalid regexp");
+    let mut raised: HashMap<String, String> = HashMap::new();
+    let mut solved: HashMap<String, String> = HashMap::new();
+
+    for comment in comments {
+        // Parse the comment and look for text markers to raise or resolve concerns
+        let comment_lines = comment.body.lines();
+        for line in comment_lines {
+            let r: Vec<&str> = re_concern_raise
+                .captures_iter(line)
+                .map(|caps| caps.name("concern_title").map(|f| f.as_str()).unwrap_or(""))
+                .collect();
+            let s: Vec<&str> = re_concern_solve
+                .captures_iter(line)
+                .map(|caps| caps.name("concern_title").map(|f| f.as_str()).unwrap_or(""))
+                .collect();
+
+            // pick the first match only
+            if !r.is_empty() {
+                let x = r[0].replace("@rfcbot concern", "");
+                raised.insert(x.trim().to_string(), comment.html_url.to_string());
+            }
+            if !s.is_empty() {
+                let x = s[0].replace("@rfcbot resolve", "");
+                solved.insert(x.trim().to_string(), comment.html_url.to_string());
+            }
+        }
+    }
+
+    // remove solved concerns and return the rest
+    let unresolved_concerns = raised
+        .iter()
+        .filter_map(|(&ref title, &ref comment_url)| {
+            if !solved.contains_key(title) {
+                Some((title.to_string(), comment_url.to_string()))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Some(unresolved_concerns)
 }
 
 #[derive(Debug, serde::Deserialize)]
