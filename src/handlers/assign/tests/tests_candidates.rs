@@ -4,8 +4,8 @@ use super::super::*;
 
 /// Basic test function for testing `candidate_reviewers_from_names`.
 fn test_from_names(
-    teams: Option<toml::Value>,
-    config: toml::Value,
+    teams: Option<toml::Table>,
+    config: toml::Table,
     issue: serde_json::Value,
     names: &[&str],
     expected: Result<&[&str], FindReviewerError>,
@@ -32,8 +32,8 @@ fn test_from_names(
 
 /// Convert the simplified input in preparation for `candidate_reviewers_from_names`.
 fn convert_simplified(
-    teams: Option<toml::Value>,
-    config: toml::Value,
+    teams: Option<toml::Table>,
+    config: toml::Table,
     issue: serde_json::Value,
 ) -> (Teams, AssignConfig, Issue) {
     // Convert the simplified team config to a real team config.
