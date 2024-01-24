@@ -56,3 +56,12 @@ default-features = false
 
 [profile.release]
 debug = 2
+
+[profile.opt-size]
+inherits = "release"
+opt-level = "z"
+lto = "on"
+codegen-units = 1
+panic = "abort"
+incremental = false
+strip = true
