@@ -24,6 +24,9 @@ pub(super) struct NoMergesInput {
 struct NoMergesState {
     /// Hashes of merge commits that have already been mentioned by triagebot in a comment.
     mentioned_merge_commits: HashSet<String>,
+    /// Labels that the bot added as part of the no-merges check.
+    #[serde(default)]
+    added_labels: Vec<String>,
 }
 
 pub(super) async fn parse_input(
@@ -72,10 +75,8 @@ pub(super) async fn parse_input(
         }
     }
 
-    if merge_commits.is_empty() {
-        return Ok(None);
-    }
-
+    // Run the handler even if we have no merge commits,
+    // so we can take an action if some were removed.
     Ok(Some(NoMergesInput { merge_commits }))
 }
 
@@ -103,6 +104,32 @@ pub(super) async fn handle_input(
     let mut client = ctx.db.get().await;
     let mut state: IssueData<'_, NoMergesState> =
         IssueData::load(&mut client, &event.issue, NO_MERGES_KEY).await?;
+
+    // No merge commits.
+    if input.merge_commits.is_empty() {
+        if state.data.mentioned_merge_commits.is_empty() {
+            // No merge commits from before, so do nothing.
+            return Ok(());
+        }
+
+        // Merge commits were removed, so remove the labels we added.
+        for name in state.data.added_labels.iter() {
+            event
+                .issue
+                .remove_label(&ctx.github, name)
+                .await
+                .context("failed to remove label")?;
+        }
+
+        // FIXME: Minimize prior no_merges comments.
+
+        // Clear from state.
+        state.data.mentioned_merge_commits.clear();
+        state.data.added_labels.clear();
+        state.save().await?;
+        return Ok(());
+    }
+
     let first_time = state.data.mentioned_merge_commits.is_empty();
 
     let mut message = config
@@ -137,7 +164,7 @@ pub(super) async fn handle_input(
         if !first_time {
             // Check if the labels are still set.
             // Otherwise, they were probably removed manually.
-            let any_removed = config.labels.iter().any(|label| {
+            let any_removed = state.data.added_labels.iter().any(|label| {
                 // No label on the issue matches.
                 event.issue.labels().iter().all(|l| &l.name != label)
             });
@@ -150,13 +177,18 @@ pub(super) async fn handle_input(
             }
         }
 
+        let existing_labels = event.issue.labels();
+
+        let mut labels = Vec::new();
+        for name in config.labels.iter() {
+            // Only add labels not already on the issue.
+            if existing_labels.iter().all(|l| &l.name != name) {
+                state.data.added_labels.push(name.clone());
+                labels.push(Label { name: name.clone() });
+            }
+        }
+
         // Set labels
-        let labels = config
-            .labels
-            .iter()
-            .cloned()
-            .map(|name| Label { name })
-            .collect();
         event
             .issue
             .add_labels(&ctx.github, labels)
