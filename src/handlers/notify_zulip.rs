@@ -160,6 +160,31 @@ pub(super) async fn handle_input<'a>(
         msg = msg.replace("{number}", &event.issue.number.to_string());
         msg = msg.replace("{title}", &event.issue.title);
 
+        let teams = event
+            .issue
+            .labels
+            .iter()
+            .map(|label| &label.name)
+            .filter_map(|label| label.strip_prefix("T-"))
+            .collect::<Vec<&str>>();
+
+        if teams.is_empty() {
+            log::debug!("No team label found, please investigate");
+        } else if teams.len() == 1 {
+            // If there is a single team label, replace the placeholder straight away
+            // If there are multiple team labels and one of them is "compiler", pick that one
+            //   (currently the only team handling these Zulip notification)
+            // if there are multiple team labels and none is "compiler", have someone else take a decision
+            msg = msg.replace("{team}", teams[0]);
+        } else if teams.contains(&"compiler") {
+            msg = msg.replace("{team}", "compiler");
+        } else {
+            msg = msg.replace(
+                "Needs `I-{team}-nominated`?",
+                "Issue needs to be nominated?",
+            );
+        }
+
         let zulip_req = crate::zulip::MessageApiRequest {
             recipient: crate::zulip::Recipient::Stream {
                 id: config.zulip_stream,
