@@ -19,6 +19,10 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
     }
 
     async fn run(&self, ctx: &super::Context, _metadata: &serde_json::Value) -> anyhow::Result<()> {
+        let Some(ctx) = crate::zulip::ZulipContext::from_ctx(ctx) else {
+            return Ok(());
+        };
+
         // On the last week of the month, we open a thread on zulip for the next Monday
         let today = chrono::Utc::now().date().naive_utc();
         let first_monday = today + chrono::Duration::days(7);
@@ -38,7 +42,7 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
             },
             content: &message,
         };
-        zulip_req.send(&ctx.github.raw()).await?;
+        zulip_req.send(&ctx, &ctx.github.raw()).await?;
 
         // Then, we want to schedule the next Thursday after this
         let mut thursday = today;
@@ -88,6 +92,10 @@ pub async fn request_updates(
     ctx: &super::Context,
     metadata: PlanningMeetingUpdatesPingMetadata,
 ) -> anyhow::Result<()> {
+    let Some(ctx) = crate::zulip::ZulipContext::from_ctx(ctx) else {
+        return Ok(());
+    };
+
     let gh = &ctx.github;
     let types_repo = gh.repository(TYPES_REPO).await?;
 
@@ -164,7 +172,7 @@ pub async fn request_updates(
         },
         content: &message,
     };
-    zulip_req.send(&ctx.github.raw()).await?;
+    zulip_req.send(&ctx, &ctx.github.raw()).await?;
 
     Ok(())
 }

@@ -137,37 +137,39 @@ pub(super) async fn handle_input<'a>(
     event: &IssuesEvent,
     inputs: Vec<NotifyZulipInput>,
 ) -> anyhow::Result<()> {
-    for input in inputs {
-        let config = &config.labels[&input.label.name];
+    if let Some(ctx) = crate::zulip::ZulipContext::from_ctx(ctx) {
+        for input in inputs {
+            let config = &config.labels[&input.label.name];
 
-        let mut topic = config.topic.clone();
-        topic = topic.replace("{number}", &event.issue.number.to_string());
-        topic = topic.replace("{title}", &event.issue.title);
-        // Truncate to 60 chars (a Zulip limitation)
-        let mut chars = topic.char_indices().skip(59);
-        if let (Some((len, _)), Some(_)) = (chars.next(), chars.next()) {
-            topic.truncate(len);
-            topic.push('…');
+            let mut topic = config.topic.clone();
+            topic = topic.replace("{number}", &event.issue.number.to_string());
+            topic = topic.replace("{title}", &event.issue.title);
+            // Truncate to 60 chars (a Zulip limitation)
+            let mut chars = topic.char_indices().skip(59);
+            if let (Some((len, _)), Some(_)) = (chars.next(), chars.next()) {
+                topic.truncate(len);
+                topic.push('…');
+            }
+
+            let mut msg = match input.notification_type {
+                NotificationType::Labeled => config.message_on_add.as_ref().unwrap().clone(),
+                NotificationType::Unlabeled => config.message_on_remove.as_ref().unwrap().clone(),
+                NotificationType::Closed => config.message_on_close.as_ref().unwrap().clone(),
+                NotificationType::Reopened => config.message_on_reopen.as_ref().unwrap().clone(),
+            };
+
+            msg = msg.replace("{number}", &event.issue.number.to_string());
+            msg = msg.replace("{title}", &event.issue.title);
+
+            let zulip_req = crate::zulip::MessageApiRequest {
+                recipient: crate::zulip::Recipient::Stream {
+                    id: config.zulip_stream,
+                    topic: &topic,
+                },
+                content: &msg,
+            };
+            zulip_req.send(&ctx, &ctx.github.raw()).await?;
         }
-
-        let mut msg = match input.notification_type {
-            NotificationType::Labeled => config.message_on_add.as_ref().unwrap().clone(),
-            NotificationType::Unlabeled => config.message_on_remove.as_ref().unwrap().clone(),
-            NotificationType::Closed => config.message_on_close.as_ref().unwrap().clone(),
-            NotificationType::Reopened => config.message_on_reopen.as_ref().unwrap().clone(),
-        };
-
-        msg = msg.replace("{number}", &event.issue.number.to_string());
-        msg = msg.replace("{title}", &event.issue.title);
-
-        let zulip_req = crate::zulip::MessageApiRequest {
-            recipient: crate::zulip::Recipient::Stream {
-                id: config.zulip_stream,
-                topic: &topic,
-            },
-            content: &msg,
-        };
-        zulip_req.send(&ctx.github.raw()).await?;
     }
 
     Ok(())
