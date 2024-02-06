@@ -39,7 +39,8 @@ mod tests {
 }
 
 const NEW_USER_WELCOME_MESSAGE: &str = "Thanks for the pull request, and welcome! \
-The Rust team is excited to review your changes, and you should hear from {who} soon.";
+The Rust team is excited to review your changes, and you should hear from {who} \
+some time within the next two weeks.";
 
 const CONTRIBUTION_MESSAGE: &str = "Please see [the contribution \
 instructions]({contributing_url}) for more information. Namely, in order to ensure the \
@@ -56,7 +57,11 @@ const WELCOME_WITHOUT_REVIEWER: &str = "@Mark-Simulacrum (NB. this repo may be m
 
 const RETURNING_USER_WELCOME_MESSAGE: &str = "r? @{assignee}
 
-({bot} has picked a reviewer for you, use r? to override)";
+{bot} has assigned @{assignee}.
+They will have a look at your PR within the next two weeks and either review your PR or
+reassign to another reviewer.
+
+Use r? to explicitly pick a reviewer";
 
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
     "@{author}: no appropriate reviewer found, use r? to override";
