@@ -26,6 +26,7 @@ impl fmt::Display for HandlerError {
 mod assign;
 mod autolabel;
 mod close;
+mod closed_pr;
 mod converted_to_draft;
 pub mod docs_update;
 mod github_releases;
@@ -171,6 +172,7 @@ issue_handlers! {
     review_requested,
     converted_to_draft,
     ready_for_review,
+    closed_pr,
     validate_config,
 }
 

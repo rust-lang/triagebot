@@ -34,6 +34,7 @@ pub(crate) struct Config {
     pub(crate) review_requested: Option<ReviewRequestedConfig>,
     pub(crate) converted_to_draft: Option<ConvertedToDraftConfig>,
     pub(crate) ready_for_review: Option<ReadyForReviewConfig>,
+    pub(crate) closed_pr: Option<ClosedPrConfig>,
     pub(crate) shortcut: Option<ShortcutConfig>,
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
@@ -307,6 +308,13 @@ pub(crate) struct ConvertedToDraftConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReadyForReviewConfig {
+    pub(crate) remove_labels: Vec<String>,
+    pub(crate) add_labels: Vec<String>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ClosedPrConfig {
     pub(crate) remove_labels: Vec<String>,
     pub(crate) add_labels: Vec<String>,
 }
