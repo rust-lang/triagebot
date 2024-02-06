@@ -213,6 +213,10 @@ pub(crate) struct AutolabelLabelConfig {
     #[serde(default)]
     pub(crate) new_draft_pr: bool,
     #[serde(default)]
+    pub(crate) reopened_pr: bool,
+    #[serde(default)]
+    pub(crate) reopened_draft_pr: bool,
+    #[serde(default)]
     pub(crate) new_issue: bool,
 }
 
