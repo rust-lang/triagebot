@@ -69,17 +69,18 @@ pub(super) async fn parse_input(
                         name: label.to_owned(),
                     });
                 }
-                if cfg.new_pr && event.action == IssuesAction::Opened {
-                    autolabels.push(Label {
-                        name: label.to_owned(),
-                    });
-                }
             }
 
-            if event.issue.pull_request.is_none()
-                && cfg.new_issue
-                && event.action == IssuesAction::Opened
+            if event.issue.is_pr()
+                && matches!(event.action, IssuesAction::Opened)
+                && ((cfg.new_pr && !event.issue.draft) || (cfg.new_draft_pr && event.issue.draft))
             {
+                autolabels.push(Label {
+                    name: label.to_owned(),
+                });
+            }
+
+            if !event.issue.is_pr() && cfg.new_issue && event.action == IssuesAction::Opened {
                 autolabels.push(Label {
                     name: label.to_owned(),
                 });
