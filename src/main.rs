@@ -127,6 +127,13 @@ async fn serve_req(
             .unwrap());
     }
     if req.uri.path() == "/zulip-hook" {
+        let Some(ctx) = triagebot::zulip::ZulipContext::from_ctx(&ctx) else {
+            return Ok(Response::builder()
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .body(Body::from("zulip integration is not configured"))
+                .unwrap());
+        };
+
         let mut c = body_stream;
         let mut payload = Vec::new();
         while let Some(chunk) = c.next().await {
@@ -241,24 +248,52 @@ async fn serve_req(
 }
 
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
-    let pool = db::ClientPool::new();
-    db::run_migrations(&*pool.get().await)
+    let db = db::ClientPool::new();
+    db::run_migrations(&*db.get().await)
         .await
         .context("database migrations")?;
 
-    let gh = github::GithubClient::new_from_env();
-    let oc = octocrab::OctocrabBuilder::new()
+    let username = std::env::var("TRIAGEBOT_USERNAME").or_else(|err| match err {
+        std::env::VarError::NotPresent => Ok("rustbot".to_owned()),
+        err => Err(err),
+    })?;
+
+    let github = github::GithubClient::new_from_env();
+
+    let octocrab = octocrab::OctocrabBuilder::new()
         .personal_token(github::default_token_from_env())
         .build()
-        .expect("Failed to build octograb.");
+        .expect("Failed to build octocrab.");
+
+    let zulip = match (
+        std::env::var("ZULIP_API_TOKEN"),
+        std::env::var("ZULIP_TOKEN"),
+    ) {
+        (Ok(api_token), Ok(auth_token)) => Some(triagebot::zulip::ZulipTokens {
+            api_token,
+            auth_token,
+        }),
+        (Err(std::env::VarError::NotPresent), Err(std::env::VarError::NotPresent) | Ok(_)) => {
+            tracing::warn!(
+                "missing `ZULIP_API_TOKEN` env variable, zulip integration won't be enabled"
+            );
+            None
+        }
+        (Ok(_), Err(std::env::VarError::NotPresent)) => {
+            tracing::warn!(
+                "missing `ZULIP_TOKEN` env variable, zulip integration won't be enabled"
+            );
+            None
+        }
+        (Err(e), _) | (_, Err(e)) => Err(e)?,
+    };
+
     let ctx = Arc::new(Context {
-        username: std::env::var("TRIAGEBOT_USERNAME").or_else(|err| match err {
-            std::env::VarError::NotPresent => Ok("rustbot".to_owned()),
-            err => Err(err),
-        })?,
-        db: pool,
-        github: gh,
-        octocrab: oc,
+        username,
+        db,
+        github,
+        octocrab,
+        zulip,
     });
 
     if !is_scheduled_jobs_disabled() {

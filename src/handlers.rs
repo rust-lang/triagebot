@@ -1,5 +1,6 @@
 use crate::config::{self, Config, ConfigurationError};
 use crate::github::{Event, GithubClient, IssueCommentAction, IssuesAction, IssuesEvent};
+use crate::zulip::ZulipTokens;
 use octocrab::Octocrab;
 use parser::command::{assign::AssignCommand, Command, Input};
 use std::fmt;
@@ -291,9 +292,11 @@ command_handlers! {
     note: Note,
 }
 
+#[derive(Clone)]
 pub struct Context {
     pub github: GithubClient,
     pub db: crate::db::ClientPool,
     pub username: String,
     pub octocrab: Octocrab,
+    pub zulip: Option<ZulipTokens>,
 }

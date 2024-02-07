@@ -25,6 +25,7 @@ lazy_static::lazy_static! {
     };
 }
 
+#[derive(Clone)]
 pub struct ClientPool {
     connections: Arc<Mutex<Vec<tokio_postgres::Client>>>,
     permits: Arc<Semaphore>,

@@ -112,59 +112,63 @@ pub(super) async fn handle_input(
             event.issue.number, event.issue.html_url,
         ),
         Invocation::Rename { prev_issue } => {
-            let issue = &event.issue;
+            if let Some(ctx) = crate::zulip::ZulipContext::from_ctx(ctx) {
+                let issue = &event.issue;
 
-            let prev_topic = zulip_topic_from_issue(&prev_issue);
-            let partial_issue = issue.to_zulip_github_reference();
-            let new_topic = zulip_topic_from_issue(&partial_issue);
+                let prev_topic = zulip_topic_from_issue(&prev_issue);
+                let partial_issue = issue.to_zulip_github_reference();
+                let new_topic = zulip_topic_from_issue(&partial_issue);
 
-            let zulip_send_req = crate::zulip::MessageApiRequest {
-                recipient: crate::zulip::Recipient::Stream {
+                let zulip_send_req = crate::zulip::MessageApiRequest {
+                    recipient: crate::zulip::Recipient::Stream {
+                        id: config.zulip_stream,
+                        topic: &prev_topic,
+                    },
+                    content:
+                        "The associated GitHub issue has been renamed. Renaming this Zulip topic.",
+                };
+                let zulip_send_res = zulip_send_req
+                    .send(&ctx, &ctx.github.raw())
+                    .await
+                    .context("zulip post failed")?;
+
+                let zulip_send_res: crate::zulip::MessageApiResponse =
+                    zulip_send_res.json().await?;
+
+                let zulip_update_req = crate::zulip::UpdateMessageApiRequest {
+                    message_id: zulip_send_res.message_id,
+                    topic: Some(&new_topic),
+                    propagate_mode: Some("change_all"),
+                    content: None,
+                };
+                zulip_update_req
+                    .send(&ctx, &ctx.github.raw())
+                    .await
+                    .context("zulip message update failed")?;
+
+                // after renaming the zulip topic, post an additional comment under the old topic with a url to the new, renamed topic
+                // this is necessary due to the lack of topic permalinks, see https://github.com/zulip/zulip/issues/15290
+                let new_topic_url = crate::zulip::Recipient::Stream {
                     id: config.zulip_stream,
-                    topic: &prev_topic,
-                },
-                content: "The associated GitHub issue has been renamed. Renaming this Zulip topic.",
-            };
-            let zulip_send_res = zulip_send_req
-                .send(&ctx.github.raw())
-                .await
-                .context("zulip post failed")?;
-
-            let zulip_send_res: crate::zulip::MessageApiResponse = zulip_send_res.json().await?;
-
-            let zulip_update_req = crate::zulip::UpdateMessageApiRequest {
-                message_id: zulip_send_res.message_id,
-                topic: Some(&new_topic),
-                propagate_mode: Some("change_all"),
-                content: None,
-            };
-            zulip_update_req
-                .send(&ctx.github.raw())
-                .await
-                .context("zulip message update failed")?;
-
-            // after renaming the zulip topic, post an additional comment under the old topic with a url to the new, renamed topic
-            // this is necessary due to the lack of topic permalinks, see https://github.com/zulip/zulip/issues/15290
-            let new_topic_url = crate::zulip::Recipient::Stream {
-                id: config.zulip_stream,
-                topic: &new_topic,
-            }
-            .url();
-            let breadcrumb_comment = format!(
+                    topic: &new_topic,
+                }
+                .url();
+                let breadcrumb_comment = format!(
                 "The associated GitHub issue has been renamed. Please see the [renamed Zulip topic]({}).",
                 new_topic_url
             );
-            let zulip_send_breadcrumb_req = crate::zulip::MessageApiRequest {
-                recipient: crate::zulip::Recipient::Stream {
-                    id: config.zulip_stream,
-                    topic: &prev_topic,
-                },
-                content: &breadcrumb_comment,
-            };
-            zulip_send_breadcrumb_req
-                .send(&ctx.github.raw())
-                .await
-                .context("zulip post failed")?;
+                let zulip_send_breadcrumb_req = crate::zulip::MessageApiRequest {
+                    recipient: crate::zulip::Recipient::Stream {
+                        id: config.zulip_stream,
+                        topic: &prev_topic,
+                    },
+                    content: &breadcrumb_comment,
+                };
+                zulip_send_breadcrumb_req
+                    .send(&ctx, &ctx.github.raw())
+                    .await
+                    .context("zulip post failed")?;
+            }
 
             return Ok(());
         }
@@ -245,20 +249,21 @@ async fn handle(
 ) -> anyhow::Result<()> {
     let github_req = issue.add_labels(&ctx.github, vec![Label { name: label_to_add }]);
 
-    let partial_issue = issue.to_zulip_github_reference();
-    let zulip_topic = zulip_topic_from_issue(&partial_issue);
+    if let Some(ctx) = crate::zulip::ZulipContext::from_ctx(ctx) {
+        let partial_issue = issue.to_zulip_github_reference();
+        let zulip_topic = zulip_topic_from_issue(&partial_issue);
 
-    let zulip_req = crate::zulip::MessageApiRequest {
-        recipient: crate::zulip::Recipient::Stream {
-            id: config.zulip_stream,
-            topic: &zulip_topic,
-        },
-        content: &zulip_msg,
-    };
+        let zulip_req = crate::zulip::MessageApiRequest {
+            recipient: crate::zulip::Recipient::Stream {
+                id: config.zulip_stream,
+                topic: &zulip_topic,
+            },
+            content: &zulip_msg,
+        };
 
-    if new_proposal {
-        let topic_url = zulip_req.url();
-        let comment = format!(
+        if new_proposal {
+            let topic_url = zulip_req.url();
+            let comment = format!(
             "This issue is not meant to be used for technical discussion. \
         There is a Zulip [stream] for that. Use this issue to leave \
         procedural comments, such as volunteering to review, indicating that you \
@@ -290,17 +295,21 @@ async fn handle(
             config.open_extra_text.as_deref().unwrap_or_default(),
             topic_url
         );
-        issue
-            .post_comment(&ctx.github, &comment)
-            .await
-            .context("post major change comment")?;
+            issue
+                .post_comment(&ctx.github, &comment)
+                .await
+                .context("post major change comment")?;
+        }
+
+        let zulip_req = zulip_req.send(&ctx, &ctx.github.raw());
+
+        let (gh_res, zulip_res) = futures::join!(github_req, zulip_req);
+        zulip_res.context("zulip post failed")?;
+        gh_res.context("label setting failed")?;
+    } else {
+        github_req.await.context("label setting failed")?;
     }
 
-    let zulip_req = zulip_req.send(&ctx.github.raw());
-
-    let (gh_res, zulip_res) = futures::join!(github_req, zulip_req);
-    zulip_res.context("zulip post failed")?;
-    gh_res.context("label setting failed")?;
     Ok(())
 }
 
