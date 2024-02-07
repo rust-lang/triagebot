@@ -114,7 +114,10 @@ impl fmt::Display for EventName {
 }
 
 #[derive(Debug)]
-pub struct WebhookError(anyhow::Error);
+pub struct WebhookError(
+    #[allow(dead_code)] // Used in debug display
+    anyhow::Error,
+);
 
 impl From<anyhow::Error> for WebhookError {
     fn from(e: anyhow::Error) -> WebhookError {
