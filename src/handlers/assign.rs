@@ -58,7 +58,7 @@ const WELCOME_WITHOUT_REVIEWER: &str = "@Mark-Simulacrum (NB. this repo may be m
 const RETURNING_USER_WELCOME_MESSAGE: &str = "r? @{assignee}
 
 {bot} has assigned @{assignee}.
-They will have a look at your PR within the next two weeks and either review your PR or
+They will have a look at your PR within the next two weeks and either review your PR or \
 reassign to another reviewer.
 
 Use r? to explicitly pick a reviewer";
