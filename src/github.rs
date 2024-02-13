@@ -19,12 +19,12 @@ use tracing as log;
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct User {
     pub login: String,
-    pub id: Option<i64>,
+    pub id: Option<u64>,
 }
 
 impl GithubClient {
     async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<(Bytes, String)> {
-        const MAX_ATTEMPTS: usize = 2;
+        const MAX_ATTEMPTS: u32 = 2;
         log::debug!("send_req with {:?}", req);
         let req_dbg = format!("{:?}", req);
         let req = req
@@ -80,7 +80,7 @@ impl GithubClient {
         &self,
         req: Request,
         sleep: Duration,
-        remaining_attempts: usize,
+        remaining_attempts: u32,
     ) -> BoxFuture<Result<Response, reqwest::Error>> {
         #[derive(Debug, serde::Deserialize)]
         struct RateLimit {
@@ -203,7 +203,7 @@ impl User {
     }
 
     // Returns the ID of the given user, if the user is in the `all` team.
-    pub async fn get_id<'a>(&'a self, client: &'a GithubClient) -> anyhow::Result<Option<usize>> {
+    pub async fn get_id<'a>(&'a self, client: &'a GithubClient) -> anyhow::Result<Option<u64>> {
         let permission = crate::team_data::teams(client).await?;
         let map = permission.teams;
         Ok(map["all"]
@@ -504,7 +504,7 @@ impl Issue {
         self.state == IssueState::Open
     }
 
-    pub async fn get_comment(&self, client: &GithubClient, id: usize) -> anyhow::Result<Comment> {
+    pub async fn get_comment(&self, client: &GithubClient, id: u64) -> anyhow::Result<Comment> {
         let comment_url = format!("{}/issues/comments/{}", self.repository().url(client), id);
         let comment = client.json(client.get(&comment_url)).await?;
         Ok(comment)
@@ -540,7 +540,7 @@ impl Issue {
     pub async fn edit_comment(
         &self,
         client: &GithubClient,
-        id: usize,
+        id: u64,
         new_body: &str,
     ) -> anyhow::Result<()> {
         let comment_url = format!("{}/issues/comments/{}", self.repository().url(client), id);
@@ -1030,7 +1030,7 @@ pub fn parse_diff(diff: &str) -> Vec<FileDiff> {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct IssueSearchResult {
-    pub total_count: usize,
+    pub total_count: u64,
     pub incomplete_results: bool,
     pub items: Vec<Issue>,
 }
@@ -1049,7 +1049,7 @@ struct Ordering<'a> {
     pub sort: &'a str,
     pub direction: &'a str,
     pub per_page: &'a str,
-    pub page: usize,
+    pub page: u64,
 }
 
 impl Repository {
@@ -1136,7 +1136,7 @@ impl Repository {
                     .await
                     .with_context(|| format!("failed to list issues from {}", url))?;
                 issues.extend(result.items);
-                if issues.len() < result.total_count {
+                if (issues.len() as u64) < result.total_count {
                     ordering.page += 1;
                     continue;
                 }

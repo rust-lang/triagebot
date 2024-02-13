@@ -71,17 +71,17 @@ struct Response {
 
 pub const BOT_EMAIL: &str = "triage-rust-lang-bot@zulipchat.com";
 
-pub async fn to_github_id(client: &GithubClient, zulip_id: usize) -> anyhow::Result<Option<i64>> {
+pub async fn to_github_id(client: &GithubClient, zulip_id: u64) -> anyhow::Result<Option<u64>> {
     let map = crate::team_data::zulip_map(client).await?;
-    Ok(map.users.get(&zulip_id).map(|v| *v as i64))
+    Ok(map.users.get(&zulip_id).copied())
 }
 
-pub async fn to_zulip_id(client: &GithubClient, github_id: i64) -> anyhow::Result<Option<usize>> {
+pub async fn to_zulip_id(client: &GithubClient, github_id: u64) -> anyhow::Result<Option<u64>> {
     let map = crate::team_data::zulip_map(client).await?;
     Ok(map
         .users
         .iter()
-        .find(|(_, github)| **github == github_id as usize)
+        .find(|&(_, &github)| github == github_id)
         .map(|v| *v.0))
 }
 
@@ -113,7 +113,7 @@ async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Op
     }
 
     log::trace!("zulip hook: {:?}", req);
-    let gh_id = match to_github_id(&ctx.github, req.message.sender_id as usize).await {
+    let gh_id = match to_github_id(&ctx.github, req.message.sender_id).await {
         Ok(Some(gh_id)) => Ok(gh_id),
         Ok(None) => Err(format_err!(
             "Unknown Zulip user. Please add `zulip-id = {}` to your file in \
@@ -128,7 +128,7 @@ async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Op
 
 fn handle_command<'a>(
     ctx: &'a Context,
-    gh_id: anyhow::Result<i64>,
+    gh_id: anyhow::Result<u64>,
     words: &'a str,
     message_data: &'a Message,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Option<String>>> + Send + 'a>>
@@ -263,7 +263,7 @@ async fn execute_for_other_user(
         .find(|m| m.user_id == zulip_user_id)
         .ok_or_else(|| format_err!("Could not find Zulip user email."))?;
 
-    let output = handle_command(ctx, Ok(user_id as i64), &command, message_data)
+    let output = handle_command(ctx, Ok(user_id), &command, message_data)
         .await?
         .unwrap_or_default();
 
@@ -479,7 +479,7 @@ impl<'a> UpdateMessageApiRequest<'a> {
 
 async fn acknowledge(
     ctx: &Context,
-    gh_id: i64,
+    gh_id: u64,
     mut words: impl Iterator<Item = &str>,
 ) -> anyhow::Result<Option<String>> {
     let filter = match words.next() {
@@ -491,9 +491,9 @@ async fn acknowledge(
         }
         None => anyhow::bail!("not enough words"),
     };
-    let ident = if let Ok(number) = filter.parse::<usize>() {
+    let ident = if let Ok(number) = filter.parse::<u32>() {
         Identifier::Index(
-            std::num::NonZeroUsize::new(number)
+            std::num::NonZeroU32::new(number)
                 .ok_or_else(|| anyhow::anyhow!("index must be at least 1"))?,
         )
     } else if filter == "all" || filter == "*" {
@@ -534,7 +534,7 @@ async fn acknowledge(
 
 async fn add_notification(
     ctx: &Context,
-    gh_id: i64,
+    gh_id: u64,
     mut words: impl Iterator<Item = &str>,
 ) -> anyhow::Result<Option<String>> {
     let url = match words.next() {
@@ -572,7 +572,7 @@ async fn add_notification(
 
 async fn add_meta_notification(
     ctx: &Context,
-    gh_id: i64,
+    gh_id: u64,
     mut words: impl Iterator<Item = &str>,
 ) -> anyhow::Result<Option<String>> {
     let idx = match words.next() {
@@ -580,7 +580,7 @@ async fn add_meta_notification(
         None => anyhow::bail!("idx not present"),
     };
     let idx = idx
-        .parse::<usize>()
+        .parse::<u32>()
         .context("index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
@@ -604,7 +604,7 @@ async fn add_meta_notification(
 
 async fn move_notification(
     ctx: &Context,
-    gh_id: i64,
+    gh_id: u64,
     mut words: impl Iterator<Item = &str>,
 ) -> anyhow::Result<Option<String>> {
     let from = match words.next() {
@@ -616,12 +616,12 @@ async fn move_notification(
         None => anyhow::bail!("from idx not present"),
     };
     let from = from
-        .parse::<usize>()
+        .parse::<u32>()
         .context("from index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
     let to = to
-        .parse::<usize>()
+        .parse::<u32>()
         .context("to index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
