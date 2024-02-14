@@ -10,7 +10,7 @@ use std::collections::VecDeque;
 use std::convert::TryInto;
 use tracing as log;
 
-const BORS_GH_ID: i64 = 3372342;
+const BORS_GH_ID: u64 = 3372342;
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let body = match event.comment_body() {

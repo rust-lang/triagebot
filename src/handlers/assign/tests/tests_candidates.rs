@@ -53,6 +53,7 @@ fn convert_simplified(
             "members": serde_json::Value::Array(members),
             "alumni": [],
             "discord": [],
+            "roles": [],
         });
     }
     let teams = serde_json::value::from_value(teams_config).unwrap();

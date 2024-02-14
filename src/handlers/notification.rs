@@ -11,7 +11,7 @@ use crate::{
 };
 use anyhow::Context as _;
 use std::collections::HashSet;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use tracing as log;
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
@@ -58,7 +58,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let mut users_notified = HashSet::new();
     if let Some(from) = event.comment_from() {
         for login in parser::get_mentions(from).into_iter() {
-            if let Some((Ok(users), _)) = id_from_user(ctx, login).await? {
+            if let Some((users, _)) = id_from_user(ctx, login).await? {
                 users_notified.extend(users.into_iter().map(|user| user.id.unwrap()));
             }
         }
@@ -83,14 +83,6 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         let (users, team_name) = match id_from_user(ctx, login).await? {
             Some((users, team_name)) => (users, team_name),
             None => continue,
-        };
-
-        let users = match users {
-            Ok(users) => users,
-            Err(err) => {
-                log::error!("getting users failed: {:?}", err);
-                continue;
-            }
         };
 
         let client = ctx.db.get().await;
@@ -132,7 +124,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
 async fn id_from_user(
     ctx: &Context,
     login: &str,
-) -> anyhow::Result<Option<(anyhow::Result<Vec<github::User>>, Option<String>)>> {
+) -> anyhow::Result<Option<(Vec<github::User>, Option<String>)>> {
     if login.contains('/') {
         // This is a team ping. For now, just add it to everyone's agenda on
         // that team, but also mark it as such (i.e., a team ping) for
@@ -174,15 +166,11 @@ async fn id_from_user(
         Ok(Some((
             team.members
                 .into_iter()
-                .map(|member| {
-                    let id = i64::try_from(member.github_id)
-                        .with_context(|| format!("user id {} out of bounds", member.github_id))?;
-                    Ok(github::User {
-                        id: Some(id),
-                        login: member.github,
-                    })
+                .map(|member| github::User {
+                    id: Some(member.github_id),
+                    login: member.github,
                 })
-                .collect::<anyhow::Result<Vec<github::User>>>(),
+                .collect::<Vec<github::User>>(),
             Some(team.name),
         )))
     } else {
@@ -194,22 +182,16 @@ async fn id_from_user(
             .get_id(&ctx.github)
             .await
             .with_context(|| format!("failed to get user {} ID", user.login))?;
-        let id = match id {
-            Some(id) => id,
+        let Some(id) = id else {
             // If the user was not in the team(s) then just don't record it.
-            None => {
-                log::trace!("Skipping {} because no id found", user.login);
-                return Ok(None);
-            }
+            log::trace!("Skipping {} because no id found", user.login);
+            return Ok(None);
         };
-        let id = i64::try_from(id).with_context(|| format!("user id {} out of bounds", id));
         Ok(Some((
-            id.map(|id| {
-                vec![github::User {
-                    login: user.login.clone(),
-                    id: Some(id),
-                }]
-            }),
+            vec![github::User {
+                login: user.login.clone(),
+                id: Some(id),
+            }],
             None,
         )))
     }
