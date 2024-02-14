@@ -12,10 +12,10 @@ pub mod jobs;
 pub mod notifications;
 pub mod rustc_commits;
 
-const CERT_URL: &str = "https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem";
+const CERT_URL: &str = "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem";
 
 lazy_static::lazy_static! {
-    static ref CERTIFICATE_PEM: Vec<u8> = {
+    static ref CERTIFICATE_PEMS: Vec<u8> = {
         let client = reqwest::blocking::Client::new();
         let resp = client
             .get(CERT_URL)
@@ -94,12 +94,11 @@ impl ClientPool {
 async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
     let db_url = std::env::var("DATABASE_URL").expect("needs DATABASE_URL");
     if db_url.contains("rds.amazonaws.com") {
-        let cert = &CERTIFICATE_PEM[..];
-        let cert = Certificate::from_pem(&cert).context("made certificate")?;
-        let connector = TlsConnector::builder()
-            .add_root_certificate(cert)
-            .build()
-            .context("built TlsConnector")?;
+        let mut builder = TlsConnector::builder();
+        for cert in make_certificates() {
+            builder.add_root_certificate(cert);
+        }
+        let connector = builder.build().context("built TlsConnector")?;
         let connector = MakeTlsConnector::new(connector);
 
         let (db_client, connection) = match tokio_postgres::connect(&db_url, connector).await {
@@ -132,6 +131,24 @@ async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
 
         Ok(db_client)
     }
+}
+
+fn make_certificates() -> Vec<Certificate> {
+    use x509_cert::der::pem::LineEnding;
+    use x509_cert::der::EncodePem;
+
+    let certs = x509_cert::Certificate::load_pem_chain(&CERTIFICATE_PEMS[..]).unwrap();
+    certs
+        .into_iter()
+        .map(|cert| Certificate::from_pem(cert.to_pem(LineEnding::LF).unwrap().as_bytes()).unwrap())
+        .collect()
+}
+
+// Makes sure we successfully parse the RDS certificates and load them into native-tls compatible
+// format.
+#[test]
+fn cert() {
+    make_certificates();
 }
 
 pub async fn run_migrations(client: &DbClient) -> anyhow::Result<()> {
