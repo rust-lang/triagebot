@@ -26,7 +26,10 @@ pub(super) async fn parse_input(
     // FIXME: This will re-apply labels after a push that the user had tried to
     // remove. Not much can be done about that currently; the before/after on
     // synchronize may be straddling a rebase, which will break diff generation.
-    if event.action == IssuesAction::Opened || event.action == IssuesAction::Synchronize {
+    if matches!(
+        &event.action,
+        IssuesAction::Opened | IssuesAction::Reopened | IssuesAction::Synchronize
+    ) {
         let files = event
             .issue
             .diff(&ctx.github)
@@ -69,17 +72,28 @@ pub(super) async fn parse_input(
                         name: label.to_owned(),
                     });
                 }
-                if cfg.new_pr && event.action == IssuesAction::Opened {
-                    autolabels.push(Label {
-                        name: label.to_owned(),
-                    });
-                }
             }
 
-            if event.issue.pull_request.is_none()
-                && cfg.new_issue
-                && event.action == IssuesAction::Opened
+            if event.issue.is_pr()
+                && matches!(event.action, IssuesAction::Opened)
+                && ((cfg.new_pr && !event.issue.draft) || (cfg.new_draft_pr && event.issue.draft))
             {
+                autolabels.push(Label {
+                    name: label.to_owned(),
+                });
+            }
+
+            if event.issue.is_pr()
+                && matches!(event.action, IssuesAction::Reopened)
+                && ((cfg.reopened_pr && !event.issue.draft)
+                    || (cfg.reopened_draft_pr && event.issue.draft))
+            {
+                autolabels.push(Label {
+                    name: label.to_owned(),
+                });
+            }
+
+            if !event.issue.is_pr() && cfg.new_issue && event.action == IssuesAction::Opened {
                 autolabels.push(Label {
                     name: label.to_owned(),
                 });

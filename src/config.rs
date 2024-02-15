@@ -32,6 +32,9 @@ pub(crate) struct Config {
     pub(crate) github_releases: Option<GitHubReleasesConfig>,
     pub(crate) review_submitted: Option<ReviewSubmittedConfig>,
     pub(crate) review_requested: Option<ReviewRequestedConfig>,
+    pub(crate) converted_to_draft: Option<ConvertedToDraftConfig>,
+    pub(crate) ready_for_review: Option<ReadyForReviewConfig>,
+    pub(crate) closed_pr: Option<ClosedPrConfig>,
     pub(crate) shortcut: Option<ShortcutConfig>,
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
@@ -209,6 +212,12 @@ pub(crate) struct AutolabelLabelConfig {
     #[serde(default)]
     pub(crate) new_pr: bool,
     #[serde(default)]
+    pub(crate) new_draft_pr: bool,
+    #[serde(default)]
+    pub(crate) reopened_pr: bool,
+    #[serde(default)]
+    pub(crate) reopened_draft_pr: bool,
+    #[serde(default)]
     pub(crate) new_issue: bool,
 }
 
@@ -285,6 +294,27 @@ pub(crate) struct ReviewSubmittedConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReviewRequestedConfig {
+    pub(crate) remove_labels: Vec<String>,
+    pub(crate) add_labels: Vec<String>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ConvertedToDraftConfig {
+    pub(crate) remove_labels: Vec<String>,
+    pub(crate) add_labels: Vec<String>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ReadyForReviewConfig {
+    pub(crate) remove_labels: Vec<String>,
+    pub(crate) add_labels: Vec<String>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ClosedPrConfig {
     pub(crate) remove_labels: Vec<String>,
     pub(crate) add_labels: Vec<String>,
 }
