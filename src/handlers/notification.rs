@@ -92,7 +92,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 continue;
             }
 
-            if let Err(err) = notifications::record_username(&client, user.id.unwrap(), user.login)
+            if let Err(err) = notifications::record_username(&client, user.id.unwrap(), &user.login)
                 .await
                 .context("failed to record username")
             {

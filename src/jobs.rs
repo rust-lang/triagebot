@@ -58,12 +58,12 @@ use crate::{
     },
 };
 
-// How often new cron-based jobs will be placed in the queue.
-// This is the minimum period *between* a single cron task's executions.
+/// How often new cron-based jobs will be placed in the queue.
+/// This is the minimum period *between* a single cron task's executions.
 pub const JOB_SCHEDULING_CADENCE_IN_SECS: u64 = 1800;
 
-// How often the database is inspected for jobs which need to execute.
-// This is the granularity at which events will occur.
+/// How often the database is inspected for jobs which need to execute.
+/// This is the granularity at which events will occur.
 pub const JOB_PROCESSING_CADENCE_IN_SECS: u64 = 60;
 
 // The default jobs to schedule, repeatedly.
@@ -119,7 +119,7 @@ fn jobs_defined() {
     unique_all_job_names.dedup();
     assert_eq!(all_job_names, unique_all_job_names);
 
-    // Also ensure that our defalt jobs are release jobs
+    // Also ensure that our default jobs are release jobs
     let default_jobs = default_jobs();
     default_jobs
         .iter()

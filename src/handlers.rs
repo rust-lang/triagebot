@@ -39,6 +39,7 @@ mod notification;
 mod notify_zulip;
 mod ping;
 mod prioritize;
+pub mod pull_requests_assignment_update;
 mod relabel;
 mod review_requested;
 mod review_submitted;
