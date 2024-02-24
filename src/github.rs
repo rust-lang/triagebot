@@ -2592,6 +2592,90 @@ async fn project_items_by_status(
     Ok(all_items)
 }
 
+/// Retrieve all pull requests in status OPEN that are not drafts
+pub async fn retrieve_pull_requests(
+    repo: &Repository,
+    client: &GithubClient,
+) -> anyhow::Result<Vec<(User, i32)>> {
+    use cynic::QueryBuilder;
+    use github_graphql::pull_requests_open::{PullRequestsOpen, PullRequestsOpenVariables};
+
+    let repo_owner = repo.owner();
+    let repo_name = repo.name();
+
+    let mut prs = vec![];
+
+    let mut vars = PullRequestsOpenVariables {
+        repo_owner,
+        repo_name,
+        after: None,
+    };
+    loop {
+        let query = PullRequestsOpen::build(vars.clone());
+        let req = client.post(&client.graphql_url);
+        let req = req.json(&query);
+
+        let data: cynic::GraphQlResponse<PullRequestsOpen> = client.json(req).await?;
+        if let Some(errors) = data.errors {
+            anyhow::bail!("There were graphql errors. {:?}", errors);
+        }
+        let repository = data
+            .data
+            .ok_or_else(|| anyhow::anyhow!("No data returned."))?
+            .repository
+            .ok_or_else(|| anyhow::anyhow!("No repository."))?;
+        prs.extend(repository.pull_requests.nodes);
+
+        let page_info = repository.pull_requests.page_info;
+        if !page_info.has_next_page || page_info.end_cursor.is_none() {
+            break;
+        }
+        vars.after = page_info.end_cursor;
+    }
+
+    let mut prs_processed: Vec<_> = vec![];
+    let _: Vec<_> = prs
+        .into_iter()
+        .filter_map(|pr| {
+            if pr.is_draft {
+                return None;
+            }
+
+            // exclude rollup PRs
+            let labels = pr
+                .labels
+                .map(|l| l.nodes)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|node| node.name)
+                .collect::<Vec<_>>();
+            if labels.iter().any(|label| label == "rollup") {
+                return None;
+            }
+
+            let _: Vec<_> = pr
+                .assignees
+                .nodes
+                .iter()
+                .map(|user| {
+                    let user_id = user.database_id.expect("checked") as u64;
+                    prs_processed.push((
+                        User {
+                            login: user.login.clone(),
+                            id: Some(user_id),
+                        },
+                        pr.number,
+                    ));
+                })
+                .collect();
+            Some(true)
+        })
+        .collect();
+    prs_processed.sort_by(|a, b| a.0.id.cmp(&b.0.id));
+
+    Ok(prs_processed)
+}
+
 pub enum DesignMeetingStatus {
     Proposed,
     Scheduled,
