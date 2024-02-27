@@ -2,6 +2,7 @@ use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
 use crate::github::{self, GithubClient};
 use crate::handlers::docs_update::docs_update;
+use crate::handlers::pull_requests_assignment_update::get_review_prefs;
 use crate::handlers::Context;
 use anyhow::{format_err, Context as _};
 use std::convert::TryInto;
@@ -155,7 +156,9 @@ fn handle_command<'a>(
             Some("move") => move_notification(&ctx, gh_id, words).await
                 .map_err(|e| format_err!("Failed to parse movement, expected `move <from> <to>`: {e:?}.")),
             Some("meta") => add_meta_notification(&ctx, gh_id, words).await
-                .map_err(|e| format_err!("Failed to parse movement, expected `move <idx> <meta...>`: {e:?}.")),
+                .map_err(|e| format_err!("Failed to parse `meta` command. Synopsis: meta <num> <text>: Add <text> to your notification identified by <num> (>0)\n\nError: {e:?}")),
+            Some("work") => query_pr_assignments(&ctx, gh_id, words).await
+                                                                    .map_err(|e| format_err!("Failed to parse `work` command. Synopsis: work <show>: shows your current PRs assignment\n\nError: {e:?}")),
             _ => {
                 while let Some(word) = next {
                     if word == "@**triagebot**" {
@@ -197,6 +200,26 @@ fn handle_command<'a>(
             }
         }
     })
+}
+
+async fn query_pr_assignments(
+    ctx: &&Context,
+    gh_id: u64,
+    mut words: impl Iterator<Item = &str>,
+) -> anyhow::Result<Option<String>> {
+    let subcommand = match words.next() {
+        Some(subcommand) => subcommand,
+        None => anyhow::bail!("no subcommand provided"),
+    };
+
+    let db_client = ctx.db.get().await;
+
+    let record = match subcommand {
+        "show" => get_review_prefs(&db_client, gh_id).await?,
+        _ => anyhow::bail!("Invalid subcommand."),
+    };
+
+    Ok(Some(record.to_string()))
 }
 
 // This does two things:
