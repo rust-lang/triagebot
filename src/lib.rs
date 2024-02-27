@@ -8,6 +8,7 @@ use crate::github::PullRequestDetails;
 use anyhow::Context;
 use handlers::HandlerError;
 use interactions::ErrorComment;
+use serde::Serialize;
 use std::fmt;
 use tracing as log;
 
@@ -122,6 +123,37 @@ pub struct WebhookError(
 impl From<anyhow::Error> for WebhookError {
     fn from(e: anyhow::Error) -> WebhookError {
         WebhookError(e)
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct ReviewPrefs {
+    pub id: uuid::Uuid,
+    pub username: String,
+    pub user_id: i64,
+    pub assigned_prs: Vec<i32>,
+}
+
+impl ReviewPrefs {
+    fn to_string(&self) -> String {
+        let prs = self
+            .assigned_prs
+            .iter()
+            .map(|pr| format!("#{}", pr))
+            .collect::<Vec<String>>()
+            .join(", ");
+        format!("Username: {}\nAssigned PRs: {}", self.username, prs)
+    }
+}
+
+impl From<tokio_postgres::row::Row> for ReviewPrefs {
+    fn from(row: tokio_postgres::row::Row) -> Self {
+        Self {
+            id: row.get("id"),
+            username: row.get("username"),
+            user_id: row.get("user_id"),
+            assigned_prs: row.get("assigned_prs"),
+        }
     }
 }
 

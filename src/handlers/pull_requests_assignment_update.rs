@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::db::notifications::record_username;
 use crate::github::retrieve_pull_requests;
 use crate::jobs::Job;
+use crate::ReviewPrefs;
 use anyhow::Context as _;
 use async_trait::async_trait;
 use tokio_postgres::Client as DbClient;
@@ -69,4 +70,19 @@ WHERE review_prefs.user_id=$1";
     db.execute(q, &[&(user_id as i64), prs])
         .await
         .context("Insert DB error")
+}
+
+/// Get pull request assignments for a team member
+pub async fn get_review_prefs(db: &DbClient, user_id: u64) -> anyhow::Result<ReviewPrefs> {
+    let q = "
+SELECT username,r.*
+FROM review_prefs r
+JOIN users on r.user_id=users.user_id
+WHERE r.user_id = $1;";
+    let row = db
+        .query_one(q, &[&(user_id as i64)])
+        .await
+        .context("Error retrieving review preferences")
+        .unwrap();
+    Ok(row.into())
 }
