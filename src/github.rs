@@ -286,8 +286,11 @@ pub struct Issue {
     ///
     /// Example: `https://github.com/octocat/Hello-World/pull/1347`
     pub html_url: String,
+    // User performing an `action`
     pub user: User,
     pub labels: Vec<Label>,
+    // Users assigned to the issue/pr after `action` has been performed
+    // These are NOT the same as `IssueEvent.assignee`
     pub assignees: Vec<User>,
     /// Indicator if this is a pull request.
     ///
@@ -954,8 +957,14 @@ pub enum IssuesAction {
     Unpinned,
     Closed,
     Reopened,
-    Assigned,
-    Unassigned,
+    Assigned {
+        /// Github users assigned to the issue / pull request
+        assignee: User,
+    },
+    Unassigned {
+        /// Github users removed from the issue / pull request
+        assignee: User,
+    },
     Labeled {
         /// The label added from the issue
         label: Label,

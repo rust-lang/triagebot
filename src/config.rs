@@ -15,6 +15,10 @@ lazy_static::lazy_static! {
         RwLock::new(HashMap::new());
 }
 
+// This struct maps each possible option of the triagebot.toml.
+// See documentation of options at: https://forge.rust-lang.org/triagebot/pr-assignment.html#configuration
+// When adding a new config option to the triagebot.toml, it must be also mapped here
+// Will be used by the `issue_handlers!()` or `command_handlers!()` macros.
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
@@ -39,6 +43,7 @@ pub(crate) struct Config {
     // We want this validation to run even without the entry in the config file
     #[serde(default = "ValidateConfig::default")]
     pub(crate) validate_config: Option<ValidateConfig>,
+    pub(crate) pr_tracking: Option<ReviewPrefsConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -317,6 +322,12 @@ pub(crate) struct GitHubReleasesConfig {
     pub(crate) changelog_branch: String,
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct ReviewPrefsConfig {
+    #[serde(default)]
+    _empty: (),
+}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -463,6 +474,7 @@ mod tests {
                 mentions: None,
                 no_merges: None,
                 validate_config: Some(ValidateConfig {}),
+                pr_tracking: None,
             }
         );
     }

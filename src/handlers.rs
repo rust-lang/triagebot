@@ -38,6 +38,7 @@ mod note;
 mod notification;
 mod notify_zulip;
 mod ping;
+pub mod pr_tracking;
 mod prioritize;
 pub mod pull_requests_assignment_update;
 mod relabel;
@@ -168,6 +169,7 @@ issue_handlers! {
     no_merges,
     notify_zulip,
     review_requested,
+    pr_tracking,
     validate_config,
 }
 
