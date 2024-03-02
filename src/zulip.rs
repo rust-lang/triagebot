@@ -5,7 +5,6 @@ use crate::handlers::docs_update::docs_update;
 use crate::handlers::pull_requests_assignment_update::get_review_prefs;
 use crate::handlers::Context;
 use anyhow::{format_err, Context as _};
-use std::convert::TryInto;
 use std::env;
 use std::fmt::Write as _;
 use tracing as log;

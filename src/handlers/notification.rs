@@ -11,7 +11,6 @@ use crate::{
 };
 use anyhow::Context as _;
 use std::collections::HashSet;
-use std::convert::TryInto;
 use tracing as log;
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
