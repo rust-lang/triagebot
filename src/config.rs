@@ -39,6 +39,7 @@ pub(crate) struct Config {
     // We want this validation to run even without the entry in the config file
     #[serde(default = "ValidateConfig::default")]
     pub(crate) validate_config: Option<ValidateConfig>,
+    pub(crate) transfer: Option<TransferConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -317,6 +318,11 @@ pub(crate) struct GitHubReleasesConfig {
     pub(crate) changelog_branch: String,
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TransferConfig {}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -463,6 +469,7 @@ mod tests {
                 mentions: None,
                 no_merges: None,
                 validate_config: Some(ValidateConfig {}),
+                transfer: None,
             }
         );
     }
