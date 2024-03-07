@@ -9,7 +9,6 @@ use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
 use std::collections::{HashMap, HashSet};
-use std::convert::TryInto;
 use std::{
     fmt,
     time::{Duration, SystemTime},

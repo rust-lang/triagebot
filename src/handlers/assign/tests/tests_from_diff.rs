@@ -1,7 +1,6 @@
 //! Tests for `find_reviewers_from_diff`
 
 use super::super::*;
-use crate::config::AssignConfig;
 use crate::github::parse_diff;
 use std::fmt::Write;
 

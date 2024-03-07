@@ -7,7 +7,6 @@ use crate::{
 };
 use async_trait::async_trait;
 use std::collections::VecDeque;
-use std::convert::TryInto;
 use tracing as log;
 
 const BORS_GH_ID: u64 = 3372342;
