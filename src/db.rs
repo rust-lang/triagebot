@@ -326,22 +326,22 @@ CREATE UNIQUE INDEX jobs_name_scheduled_at_unique_index
         name, scheduled_at
     );
 ",
-"
+    "
 CREATE table review_prefs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id BIGINT REFERENCES users(user_id),
     assigned_prs INT[] NOT NULL DEFAULT array[]::INT[]
 );",
-"
+    "
 CREATE UNIQUE INDEX review_prefs_user_id ON review_prefs(user_id);
 ",
-"
+    "
 CREATE TYPE reversibility AS ENUM ('reversible', 'irreversible');
 ",
-"
+    "
 CREATE TYPE resolution AS ENUM ('hold', 'merge');
 ",
-"CREATE TABLE issue_decision_state (
+    "CREATE TABLE issue_decision_state (
     issue_id BIGINT PRIMARY KEY,
     initiator TEXT NOT NULL,
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
