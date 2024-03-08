@@ -416,7 +416,7 @@ mod tests {
 
             [shortcut]
 
-            [decision-process]
+            [decision]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -471,7 +471,7 @@ mod tests {
                 review_requested: None,
                 mentions: None,
                 no_merges: None,
-                decision: None,
+                decision: Some(DecisionConfig { _empty: () }),
                 validate_config: Some(ValidateConfig {}),
             }
         );
