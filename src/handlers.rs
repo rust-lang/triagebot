@@ -26,6 +26,7 @@ impl fmt::Display for HandlerError {
 mod assign;
 mod autolabel;
 mod close;
+mod decision;
 pub mod docs_update;
 mod github_releases;
 mod glacier;
@@ -290,6 +291,7 @@ command_handlers! {
     shortcut: Shortcut,
     close: Close,
     note: Note,
+    decision: Decision,
 }
 
 pub struct Context {

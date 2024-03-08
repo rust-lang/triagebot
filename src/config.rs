@@ -36,6 +36,7 @@ pub(crate) struct Config {
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
     pub(crate) no_merges: Option<NoMergesConfig>,
+    pub(crate) decision: Option<DecisionConfig>,
     // We want this validation to run even without the entry in the config file
     #[serde(default = "ValidateConfig::default")]
     pub(crate) validate_config: Option<ValidateConfig>,
@@ -317,6 +318,12 @@ pub(crate) struct GitHubReleasesConfig {
     pub(crate) changelog_branch: String,
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct DecisionConfig {
+    #[serde(default)]
+    _empty: (),
+}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -408,6 +415,8 @@ mod tests {
             infra = "T-infra"
 
             [shortcut]
+
+            [decision]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -462,6 +471,7 @@ mod tests {
                 review_requested: None,
                 mentions: None,
                 no_merges: None,
+                decision: Some(DecisionConfig { _empty: () }),
                 validate_config: Some(ValidateConfig {}),
             }
         );

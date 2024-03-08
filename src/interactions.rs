@@ -33,15 +33,25 @@ impl<'a> ErrorComment<'a> {
 pub struct PingComment<'a> {
     issue: &'a Issue,
     users: &'a [&'a str],
+    message: String,
 }
 
 impl<'a> PingComment<'a> {
-    pub fn new(issue: &'a Issue, users: &'a [&str]) -> PingComment<'a> {
-        PingComment { issue, users }
+    pub fn new<T>(issue: &'a Issue, users: &'a [&str], message: T) -> PingComment<'a>
+    where
+        T: Into<String>,
+    {
+        PingComment {
+            issue,
+            users,
+            message: message.into(),
+        }
     }
 
     pub async fn post(&self, client: &GithubClient) -> anyhow::Result<()> {
         let mut body = String::new();
+        writeln!(body, "{}", self.message)?;
+        writeln!(body)?;
         for user in self.users {
             write!(body, "@{} ", user)?;
         }

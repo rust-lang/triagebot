@@ -8,3 +8,8 @@ edition = "2021"
 pulldown-cmark = "0.7.0"
 log = "0.4"
 regex = "1.6.0"
+postgres-types = { version = "0.2.4", features = ["derive"] }
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
