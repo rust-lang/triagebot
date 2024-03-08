@@ -15,10 +15,10 @@ use tracing as log;
 
 pub async fn handle_job(
     ctx: &Context,
-    name: &String,
+    name: &str,
     metadata: &serde_json::Value,
 ) -> anyhow::Result<()> {
-    match name.as_str() {
+    match name {
         "docs_update" => super::docs_update::handle_job().await,
         "rustc_commits" => {
             super::rustc_commits::synchronize_commits_inner(ctx, None).await;
@@ -32,7 +32,7 @@ pub async fn handle_job(
     }
 }
 
-fn default(name: &String, metadata: &serde_json::Value) -> anyhow::Result<()> {
+fn default(name: &str, metadata: &serde_json::Value) -> anyhow::Result<()> {
     tracing::trace!(
         "handle_job fell into default case: (name={:?}, metadata={:?})",
         name,

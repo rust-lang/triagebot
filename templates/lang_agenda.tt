@@ -24,6 +24,8 @@ tags: triage-meeting
 
 {{-issues::render(issues=scheduled_meetings, indent="", empty="No pending proposals this time.")}}
 
+Edit the schedule here: https://github.com/orgs/rust-lang/projects/31/views/7.
+
 ## Announcements or custom items
 
 (Meeting attendees, feel free to add items here!)

@@ -55,11 +55,7 @@ pub(super) async fn parse_input(
     }
 
     // If we were labeled with accepted, then issue that event
-    if event.action == IssuesAction::Labeled
-        && event
-            .label
-            .as_ref()
-            .map_or(false, |l| l.name == config.accept_label)
+    if matches!(&event.action, IssuesAction::Labeled { label } if label.name == config.accept_label)
     {
         return Ok(Some(Invocation::AcceptedProposal));
     }
@@ -70,17 +66,8 @@ pub(super) async fn parse_input(
     // We want to treat reopened issues as new proposals but if the
     // issue is freshly opened, we only want to trigger once;
     // currently we do so on the label event.
-    if (event.action == IssuesAction::Reopened
-        && event
-            .issue
-            .labels()
-            .iter()
-            .any(|l| l.name == enabling_label))
-        || (event.action == IssuesAction::Labeled
-            && event
-                .label
-                .as_ref()
-                .map_or(false, |l| l.name == enabling_label))
+    if matches!(event.action, IssuesAction::Reopened if event.issue.labels().iter().any(|l| l.name == enabling_label))
+        || matches!(&event.action, IssuesAction::Labeled { label } if label.name == enabling_label)
     {
         return Ok(Some(Invocation::NewProposal));
     }
@@ -277,6 +264,27 @@ async fn handle(
         procedural comments, such as volunteering to review, indicating that you \
         second the proposal (or third, etc), or raising a concern that you would \
         like to be addressed. \
+        \n\n \
+        Concerns or objections to the proposal should be discussed on Zulip and formally registered \
+        here by adding a comment with the following syntax: \
+        \n \
+        ``` \
+        \n \
+        @rustbot concern reason-for-concern \
+        \n \
+        <description of the concern> \
+        \n \
+        ``` \
+        \n \
+        Concerns can be lifted with: \
+        \n \
+        ``` \
+        \n \
+        @rustbot resolve reason-for-concern \
+        \n \
+        ``` \
+        \n\n \
+        See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/compiler/mcp.html#what-kinds-of-comments-should-go-on-the-tracking-issue-in-compiler-team-repo) \
         \n\n{} \
         \n\n[stream]: {}",
             config.open_extra_text.as_deref().unwrap_or_default(),

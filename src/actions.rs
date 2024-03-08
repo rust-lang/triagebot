@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
 
@@ -52,6 +51,7 @@ pub struct IssueDecorator {
     pub updated_at_hts: String,
 
     pub fcp_details: Option<FCPDetails>,
+    pub mcp_details: Option<MCPDetails>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -60,6 +60,12 @@ pub struct FCPDetails {
     pub bot_tracking_comment_content: String,
     pub initiating_comment_html_url: String,
     pub initiating_comment_content: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MCPDetails {
+    pub zulip_link: String,
+    pub concerns: Option<Vec<(String, String)>>,
 }
 
 lazy_static! {
@@ -87,7 +93,7 @@ pub fn to_human(d: DateTime<Utc>) -> String {
 #[async_trait]
 impl<'a> Action for Step<'a> {
     async fn call(&self) -> anyhow::Result<String> {
-        let gh = GithubClient::new_with_default_token(Client::new());
+        let gh = GithubClient::new_from_env();
 
         // retrieve all Rust compiler meetings
         // from today for 7 days
@@ -112,6 +118,7 @@ impl<'a> Action for Step<'a> {
                     // These are unused for query.
                     default_branch: "master".to_string(),
                     fork: false,
+                    parent: None,
                 };
 
                 for QueryMap { name, kind, query } in queries {
@@ -123,8 +130,21 @@ impl<'a> Action for Step<'a> {
                     let query = query.clone();
                     handles.push(tokio::task::spawn(async move {
                         let _permit = semaphore.acquire().await?;
+                        let mcps_groups = [
+                            "mcp_new_not_seconded",
+                            "mcp_old_not_seconded",
+                            "mcp_accepted",
+                            "in_pre_fcp",
+                            "in_fcp",
+                        ];
                         let issues = query
-                            .query(&repository, name == "proposed_fcp", &gh)
+                            .query(
+                                &repository,
+                                name == "proposed_fcp",
+                                mcps_groups.contains(&name.as_str())
+                                    && repository.full_name.contains("rust-lang/compiler-team"),
+                                &gh,
+                            )
                             .await?;
                         Ok((name, kind, issues))
                     }));

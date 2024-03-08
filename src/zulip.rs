@@ -1,9 +1,10 @@
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
 use crate::github::{self, GithubClient};
+use crate::handlers::docs_update::docs_update;
+use crate::handlers::pull_requests_assignment_update::get_review_prefs;
 use crate::handlers::Context;
-use anyhow::Context as _;
-use std::convert::TryInto;
+use anyhow::{format_err, Context as _};
 use std::env;
 use std::fmt::Write as _;
 use tracing as log;
@@ -20,74 +21,106 @@ pub struct Request {
     token: String,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 struct Message {
     sender_id: u64,
+    /// A unique ID for the set of users receiving the message (either a
+    /// stream or group of users). Useful primarily for hashing.
     #[allow(unused)]
     recipient_id: u64,
-    sender_short_name: Option<String>,
     sender_full_name: String,
+    sender_email: String,
+    /// The ID of the stream.
+    ///
+    /// `None` if it is a private message.
     stream_id: Option<u64>,
-    // The topic of the incoming message. Not the stream name.
+    /// The topic of the incoming message. Not the stream name.
+    ///
+    /// Not currently set for private messages (though Zulip may change this in
+    /// the future if it adds topics to private messages).
     subject: Option<String>,
+    /// The type of the message: stream or private.
     #[allow(unused)]
     #[serde(rename = "type")]
     type_: String,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-struct Response<'a> {
-    content: &'a str,
+impl Message {
+    /// Creates a `Recipient` that will be addressed to the sender of this message.
+    fn sender_to_recipient(&self) -> Recipient<'_> {
+        match self.stream_id {
+            Some(id) => Recipient::Stream {
+                id,
+                topic: self
+                    .subject
+                    .as_ref()
+                    .expect("stream messages should have a topic"),
+            },
+            None => Recipient::Private {
+                id: self.sender_id,
+                email: &self.sender_email,
+            },
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct ResponseOwned {
+struct Response {
     content: String,
 }
 
 pub const BOT_EMAIL: &str = "triage-rust-lang-bot@zulipchat.com";
 
-pub async fn to_github_id(client: &GithubClient, zulip_id: usize) -> anyhow::Result<Option<i64>> {
+pub async fn to_github_id(client: &GithubClient, zulip_id: u64) -> anyhow::Result<Option<u64>> {
     let map = crate::team_data::zulip_map(client).await?;
-    Ok(map.users.get(&zulip_id).map(|v| *v as i64))
+    Ok(map.users.get(&zulip_id).copied())
 }
 
-pub async fn to_zulip_id(client: &GithubClient, github_id: i64) -> anyhow::Result<Option<usize>> {
+pub async fn to_zulip_id(client: &GithubClient, github_id: u64) -> anyhow::Result<Option<u64>> {
     let map = crate::team_data::zulip_map(client).await?;
     Ok(map
         .users
         .iter()
-        .find(|(_, github)| **github == github_id as usize)
+        .find(|&(_, &github)| github == github_id)
         .map(|v| *v.0))
 }
 
+/// Top-level handler for Zulip webhooks.
+///
+/// Returns a JSON response.
 pub async fn respond(ctx: &Context, req: Request) -> String {
-    let expected_token = std::env::var("ZULIP_TOKEN").expect("`ZULIP_TOKEN` set for authorization");
-
-    if !openssl::memcmp::eq(req.token.as_bytes(), expected_token.as_bytes()) {
-        return serde_json::to_string(&Response {
-            content: "Invalid authorization.",
-        })
-        .unwrap();
-    }
-
-    log::trace!("zulip hook: {:?}", req);
-    let gh_id = match to_github_id(&ctx.github, req.message.sender_id as usize).await {
-        Ok(Some(gh_id)) => Ok(gh_id),
-        Ok(None) => Err(serde_json::to_string(&Response {
-            content: &format!(
-                "Unknown Zulip user. Please add `zulip-id = {}` to your file in \
-                [rust-lang/team](https://github.com/rust-lang/team).",
-                req.message.sender_id
-            ),
-        })
-        .unwrap()),
-        Err(e) => {
-            return serde_json::to_string(&Response {
-                content: &format!("Failed to query team API: {:?}", e),
+    let content = match process_zulip_request(ctx, req).await {
+        Ok(None) => {
+            return serde_json::to_string(&ResponseNotRequired {
+                response_not_required: true,
             })
             .unwrap();
         }
+        Ok(Some(s)) => s,
+        Err(e) => format!("{:?}", e),
+    };
+    serde_json::to_string(&Response { content }).unwrap()
+}
+
+/// Processes a Zulip webhook.
+///
+/// Returns a string of the response, or None if no response is needed.
+async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Option<String>> {
+    let expected_token = std::env::var("ZULIP_TOKEN").expect("`ZULIP_TOKEN` set for authorization");
+
+    if !openssl::memcmp::eq(req.token.as_bytes(), expected_token.as_bytes()) {
+        anyhow::bail!("Invalid authorization.");
+    }
+
+    log::trace!("zulip hook: {:?}", req);
+    let gh_id = match to_github_id(&ctx.github, req.message.sender_id).await {
+        Ok(Some(gh_id)) => Ok(gh_id),
+        Ok(None) => Err(format_err!(
+            "Unknown Zulip user. Please add `zulip-id = {}` to your file in \
+                [rust-lang/team](https://github.com/rust-lang/team).",
+            req.message.sender_id
+        )),
+        Err(e) => anyhow::bail!("Failed to query team API: {e:?}"),
     };
 
     handle_command(ctx, gh_id, &req.data, &req.message).await
@@ -95,112 +128,97 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
 
 fn handle_command<'a>(
     ctx: &'a Context,
-    gh_id: Result<i64, String>,
+    gh_id: anyhow::Result<u64>,
     words: &'a str,
     message_data: &'a Message,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = String> + Send + 'a>> {
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Option<String>>> + Send + 'a>>
+{
     Box::pin(async move {
         log::trace!("handling zulip command {:?}", words);
         let mut words = words.split_whitespace();
         let mut next = words.next();
 
         if let Some("as") = next {
-            return match execute_for_other_user(&ctx, words, message_data).await {
-                Ok(r) => r,
-                Err(e) => serde_json::to_string(&Response {
-                    content: &format!(
-                        "Failed to parse; expected `as <username> <command...>`: {:?}.",
-                        e
-                    ),
-                })
-                .unwrap(),
-            };
+            return execute_for_other_user(&ctx, words, message_data)
+                .await
+                .map_err(|e| {
+                    format_err!("Failed to parse; expected `as <username> <command...>`: {e:?}.")
+                });
         }
-        let gh_id = match gh_id {
-            Ok(id) => id,
-            Err(e) => return e,
-        };
+        let gh_id = gh_id?;
 
         match next {
-            Some("acknowledge") | Some("ack") => match acknowledge(&ctx, gh_id, words).await {
-                Ok(r) => r,
-                Err(e) => serde_json::to_string(&Response {
-                    content: &format!(
-                        "Failed to parse acknowledgement, expected `(acknowledge|ack) <identifier>`: {:?}.",
-                        e
-                    ),
-                })
-                .unwrap(),
-            },
-            Some("add") => match add_notification(&ctx, gh_id, words).await {
-                Ok(r) => r,
-                Err(e) => serde_json::to_string(&Response {
-                    content: &format!(
-                        "Failed to parse description addition, expected `add <url> <description (multiple words)>`: {:?}.",
-                        e
-                    ),
-                })
-                .unwrap(),
-            },
-            Some("move") => match move_notification(&ctx, gh_id, words).await {
-                Ok(r) => r,
-                Err(e) => serde_json::to_string(&Response {
-                    content: &format!(
-                        "Failed to parse movement, expected `move <from> <to>`: {:?}.",
-                        e
-                    ),
-                })
-                .unwrap(),
-            },
-            Some("meta") => match add_meta_notification(&ctx, gh_id, words).await {
-                Ok(r) => r,
-                Err(e) => serde_json::to_string(&Response {
-                    content: &format!(
-                        "Failed to parse movement, expected `move <idx> <meta...>`: {:?}.",
-                        e
-                    ),
-                })
-                .unwrap(),
-            },
+            Some("acknowledge") | Some("ack") => acknowledge(&ctx, gh_id, words).await
+                .map_err(|e| format_err!("Failed to parse acknowledgement, expected `(acknowledge|ack) <identifier>`: {e:?}.")),
+            Some("add") => add_notification(&ctx, gh_id, words).await
+                .map_err(|e| format_err!("Failed to parse description addition, expected `add <url> <description (multiple words)>`: {e:?}.")),
+            Some("move") => move_notification(&ctx, gh_id, words).await
+                .map_err(|e| format_err!("Failed to parse movement, expected `move <from> <to>`: {e:?}.")),
+            Some("meta") => add_meta_notification(&ctx, gh_id, words).await
+                .map_err(|e| format_err!("Failed to parse `meta` command. Synopsis: meta <num> <text>: Add <text> to your notification identified by <num> (>0)\n\nError: {e:?}")),
+            Some("work") => query_pr_assignments(&ctx, gh_id, words).await
+                                                                    .map_err(|e| format_err!("Failed to parse `work` command. Synopsis: work <show>: shows your current PRs assignment\n\nError: {e:?}")),
             _ => {
                 while let Some(word) = next {
                     if word == "@**triagebot**" {
                         let next = words.next();
                         match next {
-                            Some("end-topic") | Some("await") => return match post_waiter(&ctx, message_data, WaitingMessage::end_topic()).await {
-                                Ok(r) => r,
-                                Err(e) => serde_json::to_string(&Response {
-                                    content: &format!("Failed to await at this time: {:?}", e),
-                                })
-                                .unwrap(),
-                            },
-                            Some("end-meeting") => return match post_waiter(&ctx, message_data, WaitingMessage::end_meeting()).await {
-                                Ok(r) => r,
-                                Err(e) => serde_json::to_string(&Response {
-                                    content: &format!("Failed to await at this time: {:?}", e),
-                                })
-                                .unwrap(),
-                            },
-                            Some("read") => return match post_waiter(&ctx, message_data, WaitingMessage::start_reading()).await {
-                                Ok(r) => r,
-                                Err(e) => serde_json::to_string(&Response {
-                                    content: &format!("Failed to await at this time: {:?}", e),
-                                })
-                                .unwrap(),
-                            },
+                            Some("end-topic") | Some("await") => {
+                                return post_waiter(&ctx, message_data, WaitingMessage::end_topic())
+                                    .await
+                                    .map_err(|e| {
+                                        format_err!("Failed to await at this time: {e:?}")
+                                    })
+                            }
+                            Some("end-meeting") => {
+                                return post_waiter(
+                                    &ctx,
+                                    message_data,
+                                    WaitingMessage::end_meeting(),
+                                )
+                                .await
+                                .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                            }
+                            Some("read") => {
+                                return post_waiter(
+                                    &ctx,
+                                    message_data,
+                                    WaitingMessage::start_reading(),
+                                )
+                                .await
+                                .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                            }
+                            Some("docs-update") => return trigger_docs_update(message_data),
                             _ => {}
                         }
                     }
                     next = words.next();
                 }
 
-                serde_json::to_string(&Response {
-                    content: "Unknown command.",
-                })
-                .unwrap()
-            },
+                Ok(Some(String::from("Unknown command")))
+            }
         }
     })
+}
+
+async fn query_pr_assignments(
+    ctx: &&Context,
+    gh_id: u64,
+    mut words: impl Iterator<Item = &str>,
+) -> anyhow::Result<Option<String>> {
+    let subcommand = match words.next() {
+        Some(subcommand) => subcommand,
+        None => anyhow::bail!("no subcommand provided"),
+    };
+
+    let db_client = ctx.db.get().await;
+
+    let record = match subcommand {
+        "show" => get_review_prefs(&db_client, gh_id).await?,
+        _ => anyhow::bail!("Invalid subcommand."),
+    };
+
+    Ok(Some(record.to_string()))
 }
 
 // This does two things:
@@ -211,7 +229,7 @@ async fn execute_for_other_user(
     ctx: &Context,
     mut words: impl Iterator<Item = &str>,
     message_data: &Message,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Option<String>> {
     // username is a GitHub username, not a Zulip username
     let username = match words.next() {
         Some(username) => username,
@@ -226,12 +244,7 @@ async fn execute_for_other_user(
     .context("getting ID of github user")?
     {
         Some(id) => id.try_into().unwrap(),
-        None => {
-            return Ok(serde_json::to_string(&Response {
-                content: "Can only authorize for other GitHub users.",
-            })
-            .unwrap());
-        }
+        None => anyhow::bail!("Can only authorize for other GitHub users."),
     };
     let mut command = words.fold(String::new(), |mut acc, piece| {
         acc.push_str(piece);
@@ -252,71 +265,33 @@ async fn execute_for_other_user(
         .get("https://rust-lang.zulipchat.com/api/v1/users")
         .basic_auth(BOT_EMAIL, Some(&bot_api_token))
         .send()
-        .await;
-    let members = match members {
-        Ok(members) => members,
-        Err(e) => {
-            return Ok(serde_json::to_string(&Response {
-                content: &format!("Failed to get list of zulip users: {:?}.", e),
-            })
-            .unwrap());
-        }
-    };
-    let members = members.json::<MembersApiResponse>().await;
-    let members = match members {
-        Ok(members) => members.members,
-        Err(e) => {
-            return Ok(serde_json::to_string(&Response {
-                content: &format!("Failed to get list of zulip users: {:?}.", e),
-            })
-            .unwrap());
-        }
-    };
+        .await
+        .map_err(|e| format_err!("Failed to get list of zulip users: {e:?}."))?;
+    let members = members
+        .json::<MembersApiResponse>()
+        .await
+        .map_err(|e| format_err!("Failed to get list of zulip users: {e:?}."))?;
 
     // Map GitHub `user_id` to `zulip_user_id`.
     let zulip_user_id = match to_zulip_id(&ctx.github, user_id).await {
         Ok(Some(id)) => id as u64,
-        Ok(None) => {
-            return Ok(serde_json::to_string(&Response {
-                content: &format!("Could not find Zulip ID for GitHub ID: {}", user_id),
-            })
-            .unwrap());
-        }
-        Err(e) => {
-            return Ok(serde_json::to_string(&Response {
-                content: &format!("Could not find Zulip ID for GitHub id {}: {:?}", user_id, e),
-            })
-            .unwrap());
-        }
+        Ok(None) => anyhow::bail!("Could not find Zulip ID for GitHub ID: {user_id}"),
+        Err(e) => anyhow::bail!("Could not find Zulip ID for GitHub id {user_id}: {e:?}"),
     };
 
-    let user = match members.iter().find(|m| m.user_id == zulip_user_id) {
-        Some(m) => m,
-        None => {
-            return Ok(serde_json::to_string(&Response {
-                content: &format!("Could not find Zulip user email."),
-            })
-            .unwrap());
-        }
-    };
+    let user = members
+        .members
+        .iter()
+        .find(|m| m.user_id == zulip_user_id)
+        .ok_or_else(|| format_err!("Could not find Zulip user email."))?;
 
-    let output = handle_command(ctx, Ok(user_id as i64), &command, message_data).await;
-    let output_msg: ResponseOwned =
-        serde_json::from_str(&output).expect("result should always be JSON");
-    let output_msg = output_msg.content;
+    let output = handle_command(ctx, Ok(user_id), &command, message_data)
+        .await?
+        .unwrap_or_default();
 
-    // At this point, the command has been run (FIXME: though it may have
-    // errored, it's hard to determine that currently, so we'll just give the
-    // output from the command as well as the command itself).
-
-    let sender = match &message_data.sender_short_name {
-        Some(short_name) => format!("{} ({})", message_data.sender_full_name, short_name),
-        None => message_data.sender_full_name.clone(),
-    };
-    let message = format!(
-        "{} ran `{}` with output `{}` as you.",
-        sender, command, output_msg
-    );
+    // At this point, the command has been run.
+    let sender = &message_data.sender_full_name;
+    let message = format!("{sender} ran `{command}` with output `{output}` as you.");
 
     let res = MessageApiRequest {
         recipient: Recipient::Private {
@@ -342,18 +317,18 @@ async fn execute_for_other_user(
         }
     }
 
-    Ok(output)
+    Ok(Some(output))
 }
 
 #[derive(serde::Deserialize)]
-struct MembersApiResponse {
-    members: Vec<Member>,
+pub struct MembersApiResponse {
+    pub members: Vec<Member>,
 }
 
 #[derive(serde::Deserialize)]
-struct Member {
-    email: String,
-    user_id: u64,
+pub struct Member {
+    pub email: String,
+    pub user_id: u64,
 }
 
 #[derive(serde::Serialize)]
@@ -526,9 +501,9 @@ impl<'a> UpdateMessageApiRequest<'a> {
 
 async fn acknowledge(
     ctx: &Context,
-    gh_id: i64,
+    gh_id: u64,
     mut words: impl Iterator<Item = &str>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Option<String>> {
     let filter = match words.next() {
         Some(filter) => {
             if words.next().is_some() {
@@ -538,9 +513,9 @@ async fn acknowledge(
         }
         None => anyhow::bail!("not enough words"),
     };
-    let ident = if let Ok(number) = filter.parse::<usize>() {
+    let ident = if let Ok(number) = filter.parse::<u32>() {
         Identifier::Index(
-            std::num::NonZeroUsize::new(number)
+            std::num::NonZeroU32::new(number)
                 .ok_or_else(|| anyhow::anyhow!("index must be at least 1"))?,
         )
     } else if filter == "all" || filter == "*" {
@@ -549,45 +524,41 @@ async fn acknowledge(
         Identifier::Url(filter)
     };
     let mut db = ctx.db.get().await;
-    match delete_ping(&mut *db, gh_id, ident).await {
-        Ok(deleted) => {
-            let resp = if deleted.is_empty() {
-                format!(
-                    "No notifications matched `{}`, so none were deleted.",
-                    filter
-                )
-            } else {
-                let mut resp = String::from("Acknowledged:\n");
-                for deleted in deleted {
-                    resp.push_str(&format!(
-                        " * [{}]({}){}\n",
-                        deleted
-                            .short_description
-                            .as_deref()
-                            .unwrap_or(&deleted.origin_url),
-                        deleted.origin_url,
-                        deleted
-                            .metadata
-                            .map_or(String::new(), |m| format!(" ({})", m)),
-                    ));
-                }
-                resp
-            };
+    let deleted = delete_ping(&mut *db, gh_id, ident)
+        .await
+        .map_err(|e| format_err!("Failed to acknowledge {filter}: {e:?}."))?;
 
-            Ok(serde_json::to_string(&Response { content: &resp }).unwrap())
+    let resp = if deleted.is_empty() {
+        format!(
+            "No notifications matched `{}`, so none were deleted.",
+            filter
+        )
+    } else {
+        let mut resp = String::from("Acknowledged:\n");
+        for deleted in deleted {
+            resp.push_str(&format!(
+                " * [{}]({}){}\n",
+                deleted
+                    .short_description
+                    .as_deref()
+                    .unwrap_or(&deleted.origin_url),
+                deleted.origin_url,
+                deleted
+                    .metadata
+                    .map_or(String::new(), |m| format!(" ({})", m)),
+            ));
         }
-        Err(e) => Ok(serde_json::to_string(&Response {
-            content: &format!("Failed to acknowledge {}: {:?}.", filter, e),
-        })
-        .unwrap()),
-    }
+        resp
+    };
+
+    Ok(Some(resp))
 }
 
 async fn add_notification(
     ctx: &Context,
-    gh_id: i64,
+    gh_id: u64,
     mut words: impl Iterator<Item = &str>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Option<String>> {
     let url = match words.next() {
         Some(idx) => idx,
         None => anyhow::bail!("url not present"),
@@ -616,28 +587,22 @@ async fn add_notification(
     )
     .await
     {
-        Ok(()) => Ok(serde_json::to_string(&Response {
-            content: "Created!",
-        })
-        .unwrap()),
-        Err(e) => Ok(serde_json::to_string(&Response {
-            content: &format!("Failed to create: {:?}", e),
-        })
-        .unwrap()),
+        Ok(()) => Ok(Some("Created!".to_string())),
+        Err(e) => Err(format_err!("Failed to create: {e:?}")),
     }
 }
 
 async fn add_meta_notification(
     ctx: &Context,
-    gh_id: i64,
+    gh_id: u64,
     mut words: impl Iterator<Item = &str>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Option<String>> {
     let idx = match words.next() {
         Some(idx) => idx,
         None => anyhow::bail!("idx not present"),
     };
     let idx = idx
-        .parse::<usize>()
+        .parse::<u32>()
         .context("index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
@@ -654,22 +619,16 @@ async fn add_meta_notification(
     };
     let mut db = ctx.db.get().await;
     match add_metadata(&mut db, gh_id, idx, description.as_deref()).await {
-        Ok(()) => Ok(serde_json::to_string(&Response {
-            content: "Added metadata!",
-        })
-        .unwrap()),
-        Err(e) => Ok(serde_json::to_string(&Response {
-            content: &format!("Failed to add: {:?}", e),
-        })
-        .unwrap()),
+        Ok(()) => Ok(Some("Added metadata!".to_string())),
+        Err(e) => Err(format_err!("Failed to add: {e:?}")),
     }
 }
 
 async fn move_notification(
     ctx: &Context,
-    gh_id: i64,
+    gh_id: u64,
     mut words: impl Iterator<Item = &str>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Option<String>> {
     let from = match words.next() {
         Some(idx) => idx,
         None => anyhow::bail!("from idx not present"),
@@ -679,25 +638,21 @@ async fn move_notification(
         None => anyhow::bail!("from idx not present"),
     };
     let from = from
-        .parse::<usize>()
+        .parse::<u32>()
         .context("from index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
     let to = to
-        .parse::<usize>()
+        .parse::<u32>()
         .context("to index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
     match move_indices(&mut *ctx.db.get().await, gh_id, from, to).await {
-        Ok(()) => Ok(serde_json::to_string(&Response {
+        Ok(()) => {
             // to 1-base indices
-            content: &format!("Moved {} to {}.", from + 1, to + 1),
-        })
-        .unwrap()),
-        Err(e) => Ok(serde_json::to_string(&Response {
-            content: &format!("Failed to move: {:?}.", e),
-        })
-        .unwrap()),
+            Ok(Some(format!("Moved {} to {}.", from + 1, to + 1)))
+        }
+        Err(e) => Err(format_err!("Failed to move: {e:?}.")),
     }
 }
 
@@ -769,15 +724,16 @@ async fn post_waiter(
     ctx: &Context,
     message: &Message,
     waiting: WaitingMessage<'_>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<Option<String>> {
     let posted = MessageApiRequest {
         recipient: Recipient::Stream {
-            id: message.stream_id.ok_or_else(|| {
-                anyhow::format_err!("private waiting not supported, missing stream id")
-            })?,
-            topic: message.subject.as_deref().ok_or_else(|| {
-                anyhow::format_err!("private waiting not supported, missing topic")
-            })?,
+            id: message
+                .stream_id
+                .ok_or_else(|| format_err!("private waiting not supported, missing stream id"))?,
+            topic: message
+                .subject
+                .as_deref()
+                .ok_or_else(|| format_err!("private waiting not supported, missing topic"))?,
         },
         content: waiting.primary,
     }
@@ -798,8 +754,33 @@ async fn post_waiter(
         .context("emoji reaction failed")?;
     }
 
-    Ok(serde_json::to_string(&ResponseNotRequired {
-        response_not_required: true,
-    })
-    .unwrap())
+    Ok(None)
+}
+
+fn trigger_docs_update(message: &Message) -> anyhow::Result<Option<String>> {
+    let message = message.clone();
+    // The default Zulip timeout of 10 seconds can be too short, so process in
+    // the background.
+    tokio::task::spawn(async move {
+        let response = match docs_update().await {
+            Ok(None) => "No updates found.".to_string(),
+            Ok(Some(pr)) => format!("Created docs update PR <{}>", pr.html_url),
+            Err(e) => {
+                // Don't send errors to Zulip since they may contain sensitive data.
+                log::error!("Docs update via Zulip failed: {e:?}");
+                "Docs update failed, please check the logs for more details.".to_string()
+            }
+        };
+        let recipient = message.sender_to_recipient();
+        let message = MessageApiRequest {
+            recipient,
+            content: &response,
+        };
+        if let Err(e) = message.send(&reqwest::Client::new()).await {
+            log::error!("failed to send Zulip response: {e:?}\nresponse was:\n{response}");
+        }
+    });
+    Ok(Some(
+        "Docs update in progress, I'll let you know when I'm finished.".to_string(),
+    ))
 }

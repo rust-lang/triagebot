@@ -30,7 +30,6 @@ mod decision;
 pub mod docs_update;
 mod github_releases;
 mod glacier;
-pub mod jobs;
 mod major_change;
 mod mentions;
 mod milestone_prs;
@@ -41,11 +40,15 @@ mod notification;
 mod notify_zulip;
 mod ping;
 mod prioritize;
+pub mod pull_requests_assignment_update;
 mod relabel;
+mod review_requested;
 mod review_submitted;
 mod rfc_helper;
 pub mod rustc_commits;
 mod shortcut;
+pub mod types_planning_updates;
+mod validate_config;
 
 pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo()).await;
@@ -165,6 +168,8 @@ issue_handlers! {
     mentions,
     no_merges,
     notify_zulip,
+    review_requested,
+    validate_config,
 }
 
 macro_rules! command_handlers {
@@ -177,7 +182,17 @@ macro_rules! command_handlers {
             errors: &mut Vec<HandlerError>,
         ) {
             match event {
-                Event::Issue(e) => if !matches!(e.action, IssuesAction::Opened | IssuesAction::Edited) {
+                // always handle new PRs / issues
+                Event::Issue(IssuesEvent { action: IssuesAction::Opened, .. }) => {},
+                Event::Issue(IssuesEvent { action: IssuesAction::Edited, .. }) => {
+                    // if the issue was edited, but we don't get a `changes[body]` diff, it means only the title was edited, not the body.
+                    // don't process the same commands twice.
+                    if event.comment_from().is_none() {
+                        log::debug!("skipping title-only edit event");
+                        return;
+                    }
+                },
+                Event::Issue(e) => {
                     // no change in issue's body for these events, so skip
                     log::debug!("skipping event, issue was {:?}", e.action);
                     return;

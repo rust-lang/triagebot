@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tracing as log;
 
-static CONFIG_FILE_NAME: &str = "triagebot.toml";
+pub(crate) static CONFIG_FILE_NAME: &str = "triagebot.toml";
 const REFRESH_EVERY: Duration = Duration::from_secs(2 * 60); // Every two minutes
 
 lazy_static::lazy_static! {
@@ -17,6 +17,7 @@ lazy_static::lazy_static! {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 pub(crate) struct Config {
     pub(crate) relabel: Option<RelabelConfig>,
     pub(crate) assign: Option<AssignConfig>,
@@ -30,14 +31,19 @@ pub(crate) struct Config {
     pub(crate) notify_zulip: Option<NotifyZulipConfig>,
     pub(crate) github_releases: Option<GitHubReleasesConfig>,
     pub(crate) review_submitted: Option<ReviewSubmittedConfig>,
+    pub(crate) review_requested: Option<ReviewRequestedConfig>,
     pub(crate) shortcut: Option<ShortcutConfig>,
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
     pub(crate) no_merges: Option<NoMergesConfig>,
     pub(crate) decision: Option<DecisionConfig>,
+    // We want this validation to run even without the entry in the config file
+    #[serde(default = "ValidateConfig::default")]
+    pub(crate) validate_config: Option<ValidateConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NominateConfig {
     // team name -> label
     pub(crate) teams: HashMap<String, String>,
@@ -68,6 +74,7 @@ impl PingConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct PingTeamConfig {
     pub(crate) message: String,
     #[serde(default)]
@@ -76,6 +83,7 @@ pub(crate) struct PingTeamConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct AssignConfig {
     /// If `true`, then posts a warning comment if the PR is opened against a
     /// different branch than the default (usually master or main).
@@ -91,15 +99,38 @@ pub(crate) struct AssignConfig {
     /// usernames, team names, or ad-hoc groups.
     #[serde(default)]
     pub(crate) owners: HashMap<String, Vec<String>>,
-}
-
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
-pub(crate) struct NoMergesConfig {
     #[serde(default)]
-    _empty: (),
+    pub(crate) users_on_vacation: HashSet<String>,
+}
+
+impl AssignConfig {
+    pub(crate) fn is_on_vacation(&self, user: &str) -> bool {
+        let name_lower = user.to_lowercase();
+        self.users_on_vacation
+            .iter()
+            .any(|vacationer| name_lower == vacationer.to_lowercase())
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct NoMergesConfig {
+    /// No action will be taken on PRs with these substrings in the title.
+    #[serde(default)]
+    pub(crate) exclude_titles: Vec<String>,
+    /// Set these labels on the PR when merge commits are detected.
+    #[serde(default)]
+    pub(crate) labels: Vec<String>,
+    /// Override the default message to post when merge commits are detected.
+    ///
+    /// This message will always be followed up with
+    /// "The following commits are merge commits:" and then
+    /// a list of the merge commits.
+    pub(crate) message: Option<String>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NoteConfig {
     #[serde(default)]
     _empty: (),
@@ -112,6 +143,7 @@ pub(crate) struct MentionsConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct MentionsPathConfig {
     pub(crate) message: Option<String>,
     #[serde(default)]
@@ -120,20 +152,32 @@ pub(crate) struct MentionsPathConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RelabelConfig {
     #[serde(default)]
     pub(crate) allow_unauthenticated: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ShortcutConfig {
     #[serde(default)]
     _empty: (),
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct PrioritizeConfig {
     pub(crate) label: String,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct ValidateConfig {}
+
+impl ValidateConfig {
+    fn default() -> Option<Self> {
+        Some(ValidateConfig {})
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -155,6 +199,7 @@ impl AutolabelConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct AutolabelLabelConfig {
     #[serde(default)]
     pub(crate) trigger_labels: Vec<String>,
@@ -164,6 +209,8 @@ pub(crate) struct AutolabelLabelConfig {
     pub(crate) trigger_files: Vec<String>,
     #[serde(default)]
     pub(crate) new_pr: bool,
+    #[serde(default)]
+    pub(crate) new_issue: bool,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -173,6 +220,7 @@ pub(crate) struct NotifyZulipConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) zulip_stream: u64,
     pub(crate) topic: String,
@@ -185,6 +233,7 @@ pub(crate) struct NotifyZulipLabelConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct MajorChangeConfig {
     /// A username (typically a group, e.g. T-lang) to ping on Zulip for newly
     /// opened proposals.
@@ -220,15 +269,25 @@ impl MajorChangeConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct GlacierConfig {}
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct CloseConfig {}
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ReviewSubmittedConfig {
     pub(crate) review_labels: Vec<String>,
     pub(crate) reviewed_label: String,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ReviewRequestedConfig {
+    pub(crate) remove_labels: Vec<String>,
+    pub(crate) add_labels: Vec<String>,
 }
 
 pub(crate) async fn get(
@@ -251,6 +310,7 @@ pub(crate) async fn get(
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 pub(crate) struct GitHubReleasesConfig {
     pub(crate) format: ChangelogFormat,
     pub(crate) project_name: String,
@@ -284,7 +344,8 @@ async fn get_fresh_config(
         .await
         .map_err(|e| ConfigurationError::Http(Arc::new(e)))?
         .ok_or(ConfigurationError::Missing)?;
-    let config = Arc::new(toml::from_slice::<Config>(&contents).map_err(ConfigurationError::Toml)?);
+    let contents = String::from_utf8_lossy(&*contents);
+    let config = Arc::new(toml::from_str::<Config>(&contents).map_err(ConfigurationError::Toml)?);
     log::debug!("fresh configuration for {}: {:?}", repo.full_name, config);
     Ok(config)
 }
@@ -307,10 +368,13 @@ impl fmt::Display for ConfigurationError {
                  Add a `triagebot.toml` in the root of the default branch to enable it."
             ),
             ConfigurationError::Toml(e) => {
-                write!(f, "Malformed `triagebot.toml` in default branch.\n{}", e)
+                write!(f, "Malformed `triagebot.toml` in default branch.\n{e}")
             }
-            ConfigurationError::Http(_) => {
-                write!(f, "Failed to query configuration for this repository.")
+            ConfigurationError::Http(e) => {
+                write!(
+                    f,
+                    "Failed to query configuration for this repository.\n{e:?}"
+                )
             }
         }
     }
@@ -329,6 +393,7 @@ mod tests {
             ]
 
             [assign]
+            users_on_vacation = ["jyn514"]
 
             [note]
 
@@ -387,6 +452,7 @@ mod tests {
                     contributing_url: None,
                     adhoc_groups: HashMap::new(),
                     owners: HashMap::new(),
+                    users_on_vacation: HashSet::from(["jyn514".into()]),
                 }),
                 note: Some(NoteConfig { _empty: () }),
                 ping: Some(PingConfig { teams: ping_teams }),
@@ -402,9 +468,11 @@ mod tests {
                 notify_zulip: None,
                 github_releases: None,
                 review_submitted: None,
+                review_requested: None,
                 mentions: None,
                 no_merges: None,
-                decision: None
+                decision: None,
+                validate_config: Some(ValidateConfig {}),
             }
         );
     }

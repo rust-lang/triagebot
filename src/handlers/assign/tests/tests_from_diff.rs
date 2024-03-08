@@ -1,13 +1,14 @@
 //! Tests for `find_reviewers_from_diff`
 
 use super::super::*;
-use crate::config::AssignConfig;
+use crate::github::parse_diff;
 use std::fmt::Write;
 
-fn test_from_diff(diff: &str, config: toml::Value, expected: &[&str]) {
+fn test_from_diff(diff: &str, config: toml::Table, expected: &[&str]) {
+    let files = parse_diff(diff);
     let aconfig: AssignConfig = config.try_into().unwrap();
     assert_eq!(
-        find_reviewers_from_diff(&aconfig, diff).unwrap(),
+        find_reviewers_from_diff(&aconfig, &files).unwrap(),
         expected.iter().map(|x| x.to_string()).collect::<Vec<_>>()
     );
 }

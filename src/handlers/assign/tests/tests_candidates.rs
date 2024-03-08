@@ -4,8 +4,8 @@ use super::super::*;
 
 /// Basic test function for testing `candidate_reviewers_from_names`.
 fn test_from_names(
-    teams: Option<toml::Value>,
-    config: toml::Value,
+    teams: Option<toml::Table>,
+    config: toml::Table,
     issue: serde_json::Value,
     names: &[&str],
     expected: Result<&[&str], FindReviewerError>,
@@ -32,8 +32,8 @@ fn test_from_names(
 
 /// Convert the simplified input in preparation for `candidate_reviewers_from_names`.
 fn convert_simplified(
-    teams: Option<toml::Value>,
-    config: toml::Value,
+    teams: Option<toml::Table>,
+    config: toml::Table,
     issue: serde_json::Value,
 ) -> (Teams, AssignConfig, Issue) {
     // Convert the simplified team config to a real team config.
@@ -53,6 +53,7 @@ fn convert_simplified(
             "members": serde_json::Value::Array(members),
             "alumni": [],
             "discord": [],
+            "roles": [],
         });
     }
     let teams = serde_json::value::from_value(teams_config).unwrap();
@@ -263,5 +264,35 @@ fn invalid_org_doesnt_match() {
         Err(FindReviewerError::TeamNotFound(
             "github/compiler".to_string(),
         )),
+    );
+}
+
+#[test]
+fn vacation() {
+    let teams = toml::toml!(bootstrap = ["jyn514", "Mark-Simulacrum"]);
+    let config = toml::toml!(users_on_vacation = ["jyn514"]);
+    let issue = generic_issue("octocat", "rust-lang/rust");
+
+    // Test that `r? user` falls through to assigning from the team.
+    // See `determine_assignee` - ideally we would test that function directly instead of indirectly through `find_reviewer_from_names`.
+    let err_names = vec!["jyn514".into()];
+    test_from_names(
+        Some(teams.clone()),
+        config.clone(),
+        issue.clone(),
+        &["jyn514"],
+        Err(FindReviewerError::AllReviewersFiltered {
+            initial: err_names.clone(),
+            filtered: err_names,
+        }),
+    );
+
+    // Test that `r? bootstrap` doesn't assign from users on vacation.
+    test_from_names(
+        Some(teams.clone()),
+        config.clone(),
+        issue,
+        &["bootstrap"],
+        Ok(&["Mark-Simulacrum"]),
     );
 }

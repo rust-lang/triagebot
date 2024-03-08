@@ -31,9 +31,9 @@ pub(super) async fn parse_input(
         None => return Ok(None),
     };
 
-    match event.action {
-        IssuesAction::Labeled | IssuesAction::Unlabeled => {
-            let applied_label = event.label.as_ref().expect("label").clone();
+    match &event.action {
+        IssuesAction::Labeled { label } | IssuesAction::Unlabeled { label } => {
+            let applied_label = label.clone();
             Ok(config
                 .labels
                 .get(&applied_label.name)
@@ -60,14 +60,16 @@ fn parse_label_change_input(
     }
 
     match event.action {
-        IssuesAction::Labeled if config.message_on_add.is_some() => Some(NotifyZulipInput {
+        IssuesAction::Labeled { .. } if config.message_on_add.is_some() => Some(NotifyZulipInput {
             notification_type: NotificationType::Labeled,
             label,
         }),
-        IssuesAction::Unlabeled if config.message_on_remove.is_some() => Some(NotifyZulipInput {
-            notification_type: NotificationType::Unlabeled,
-            label,
-        }),
+        IssuesAction::Unlabeled { .. } if config.message_on_remove.is_some() => {
+            Some(NotifyZulipInput {
+                notification_type: NotificationType::Unlabeled,
+                label,
+            })
+        }
         _ => None,
     }
 }

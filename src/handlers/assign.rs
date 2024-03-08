@@ -19,7 +19,7 @@
 
 use crate::{
     config::AssignConfig,
-    github::{self, Event, Issue, IssuesAction, Selection},
+    github::{self, Event, FileDiff, Issue, IssuesAction, Selection},
     handlers::{Context, GithubClient, IssuesEvent},
     interactions::EditIssueBody,
 };
@@ -39,7 +39,8 @@ mod tests {
 }
 
 const NEW_USER_WELCOME_MESSAGE: &str = "Thanks for the pull request, and welcome! \
-The Rust team is excited to review your changes, and you should hear from {who} soon.";
+The Rust team is excited to review your changes, and you should hear from {who} \
+some time within the next two weeks.";
 
 const CONTRIBUTION_MESSAGE: &str = "Please see [the contribution \
 instructions]({contributing_url}) for more information. Namely, in order to ensure the \
@@ -47,8 +48,8 @@ minimum review times lag, PR authors and assigned reviewers should ensure that t
 label (`S-waiting-on-review` and `S-waiting-on-author`) stays updated, invoking these commands \
 when appropriate:
 
-- `@rustbot author`: the review is finished, PR author should check the comments and take action accordingly
-- `@rustbot review`: the author is ready for a review, this PR will be queued again in the reviewer's queue";
+- `@{bot} author`: the review is finished, PR author should check the comments and take action accordingly
+- `@{bot} review`: the author is ready for a review, this PR will be queued again in the reviewer's queue";
 
 const WELCOME_WITH_REVIEWER: &str = "@{assignee} (or someone else)";
 
@@ -56,10 +57,16 @@ const WELCOME_WITHOUT_REVIEWER: &str = "@Mark-Simulacrum (NB. this repo may be m
 
 const RETURNING_USER_WELCOME_MESSAGE: &str = "r? @{assignee}
 
-(rustbot has picked a reviewer for you, use r? to override)";
+{bot} has assigned @{assignee}.
+They will have a look at your PR within the next two weeks and either review your PR or \
+reassign to another reviewer.
+
+Use r? to explicitly pick a reviewer";
 
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
     "@{author}: no appropriate reviewer found, use r? to override";
+
+const ON_VACATION_WARNING: &str = "{username} is on vacation. Please do not assign them to PRs.";
 
 const NON_DEFAULT_BRANCH: &str =
     "Pull requests are usually filed against the {default} branch for this repo, \
@@ -68,19 +75,21 @@ const NON_DEFAULT_BRANCH: &str =
 
 const SUBMODULE_WARNING_MSG: &str = "These commits modify **submodules**.";
 
+fn on_vacation_msg(user: &str) -> String {
+    ON_VACATION_WARNING.replace("{username}", user)
+}
+
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct AssignData {
     user: Option<String>,
 }
 
 /// Input for auto-assignment when a PR is created.
-pub(super) struct AssignInput {
-    git_diff: String,
-}
+pub(super) struct AssignInput {}
 
 /// Prepares the input when a new PR is opened.
 pub(super) async fn parse_input(
-    ctx: &Context,
+    _ctx: &Context,
     event: &IssuesEvent,
     config: Option<&AssignConfig>,
 ) -> Result<Option<AssignInput>, String> {
@@ -94,15 +103,7 @@ pub(super) async fn parse_input(
     {
         return Ok(None);
     }
-    let git_diff = match event.issue.diff(&ctx.github).await {
-        Ok(None) => return Ok(None),
-        Err(e) => {
-            log::error!("failed to fetch diff: {:?}", e);
-            return Ok(None);
-        }
-        Ok(Some(diff)) => diff,
-    };
-    Ok(Some(AssignInput { git_diff }))
+    Ok(Some(AssignInput {}))
 }
 
 /// Handles the work of setting an assignment for a new PR and posting a
@@ -111,11 +112,18 @@ pub(super) async fn handle_input(
     ctx: &Context,
     config: &AssignConfig,
     event: &IssuesEvent,
-    input: AssignInput,
+    _input: AssignInput,
 ) -> anyhow::Result<()> {
+    let Some(diff) = event.issue.diff(&ctx.github).await? else {
+        bail!(
+            "expected issue {} to be a PR, but the diff could not be determined",
+            event.issue.number
+        )
+    };
+
     // Don't auto-assign or welcome if the user manually set the assignee when opening.
     if event.issue.assignees.is_empty() {
-        let (assignee, from_comment) = determine_assignee(ctx, event, config, &input).await?;
+        let (assignee, from_comment) = determine_assignee(ctx, event, config, &diff).await?;
         if assignee.as_deref() == Some("ghost") {
             // "ghost" is GitHub's placeholder account for deleted accounts.
             // It is used here as a convenient way to prevent assignment. This
@@ -135,12 +143,18 @@ pub(super) async fn handle_input(
             let mut welcome = NEW_USER_WELCOME_MESSAGE.replace("{who}", &who_text);
             if let Some(contrib) = &config.contributing_url {
                 welcome.push_str("\n\n");
-                welcome.push_str(&CONTRIBUTION_MESSAGE.replace("{contributing_url}", contrib));
+                welcome.push_str(
+                    &CONTRIBUTION_MESSAGE
+                        .replace("{contributing_url}", contrib)
+                        .replace("{bot}", &ctx.username),
+                );
             }
             Some(welcome)
         } else if !from_comment {
             let welcome = match &assignee {
-                Some(assignee) => RETURNING_USER_WELCOME_MESSAGE.replace("{assignee}", assignee),
+                Some(assignee) => RETURNING_USER_WELCOME_MESSAGE
+                    .replace("{assignee}", assignee)
+                    .replace("{bot}", &ctx.username),
                 None => RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER
                     .replace("{author}", &event.issue.user.login),
             };
@@ -168,7 +182,7 @@ pub(super) async fn handle_input(
     if config.warn_non_default_branch {
         warnings.extend(non_default_branch(event));
     }
-    warnings.extend(modifies_submodule(&input.git_diff));
+    warnings.extend(modifies_submodule(diff));
     if !warnings.is_empty() {
         let warnings: Vec<_> = warnings
             .iter()
@@ -210,9 +224,9 @@ fn non_default_branch(event: &IssuesEvent) -> Option<String> {
 }
 
 /// Returns a message if the PR modifies a git submodule.
-fn modifies_submodule(diff: &str) -> Option<String> {
+fn modifies_submodule(diff: &[FileDiff]) -> Option<String> {
     let re = regex::Regex::new(r"\+Subproject\scommit\s").unwrap();
-    if re.is_match(diff) {
+    if diff.iter().any(|fd| re.is_match(&fd.diff)) {
         Some(SUBMODULE_WARNING_MSG.to_string())
     } else {
         None
@@ -243,8 +257,8 @@ async fn set_assignee(issue: &Issue, github: &GithubClient, username: &str) {
                 &format!(
                     "Failed to set assignee to `{username}`: {err}\n\
                      \n\
-                     > **Note**: Only org members, users with write \
-                       permissions, or people who have commented on the PR may \
+                     > **Note**: Only org members with at least the repository \"read\" role, \
+                       users with write permissions, or people who have commented on the PR may \
                        be assigned."
                 ),
             )
@@ -266,7 +280,7 @@ async fn determine_assignee(
     ctx: &Context,
     event: &IssuesEvent,
     config: &AssignConfig,
-    input: &AssignInput,
+    diff: &[FileDiff],
 ) -> anyhow::Result<(Option<String>, bool)> {
     let teams = crate::team_data::teams(&ctx.github).await?;
     if let Some(name) = find_assign_command(ctx, event) {
@@ -286,7 +300,7 @@ async fn determine_assignee(
         }
     }
     // Errors fall-through to try fallback group.
-    match find_reviewers_from_diff(config, &input.git_diff) {
+    match find_reviewers_from_diff(config, diff) {
         Ok(candidates) if !candidates.is_empty() => {
             match find_reviewer_from_names(&teams, config, &event.issue, &candidates) {
                 Ok(assignee) => return Ok((Some(assignee), false)),
@@ -295,6 +309,7 @@ async fn determine_assignee(
                     is there maybe a misconfigured group?",
                     event.issue.global_id()
                 ),
+                // TODO: post a comment on the PR if the reviewers were filtered due to being on vacation
                 Err(
                     e @ FindReviewerError::NoReviewer { .. }
                     | e @ FindReviewerError::AllReviewersFiltered { .. },
@@ -333,60 +348,61 @@ async fn determine_assignee(
 /// May return an error if the owners map is misconfigured.
 ///
 /// Beware this may return an empty list if nothing matches.
-fn find_reviewers_from_diff(config: &AssignConfig, diff: &str) -> anyhow::Result<Vec<String>> {
+fn find_reviewers_from_diff(
+    config: &AssignConfig,
+    diff: &[FileDiff],
+) -> anyhow::Result<Vec<String>> {
     // Map of `owners` path to the number of changes found in that path.
     // This weights the reviewer choice towards places where the most edits are done.
     let mut counts: HashMap<&str, u32> = HashMap::new();
-    // List of the longest `owners` patterns that match the current path. This
-    // prefers choosing reviewers from deeply nested paths over those defined
-    // for top-level paths, under the assumption that they are more
-    // specialized.
-    //
-    // This is a list to handle the situation if multiple paths of the same
-    // length match.
-    let mut longest_owner_patterns = Vec::new();
-    // Iterate over the diff, finding the start of each file. After each file
-    // is found, it counts the number of modified lines in that file, and
-    // tracks those in the `counts` map.
-    for line in diff.split('\n') {
-        if line.starts_with("diff --git ") {
-            // Start of a new file.
-            longest_owner_patterns.clear();
-            let path = line[line.find(" b/").unwrap()..]
-                .strip_prefix(" b/")
-                .unwrap();
-            // Find the longest `owners` entries that match this path.
-            let mut longest = HashMap::new();
-            for owner_pattern in config.owners.keys() {
-                let ignore = ignore::gitignore::GitignoreBuilder::new("/")
-                    .add_line(None, owner_pattern)
-                    .with_context(|| format!("owner file pattern `{owner_pattern}` is not valid"))?
-                    .build()?;
-                if ignore.matched_path_or_any_parents(path, false).is_ignore() {
-                    let owner_len = owner_pattern.split('/').count();
-                    longest.insert(owner_pattern, owner_len);
-                }
+    // Iterate over the diff, counting the number of modified lines in each
+    // file, and tracks those in the `counts` map.
+    for file_diff in diff {
+        // List of the longest `owners` patterns that match the current path. This
+        // prefers choosing reviewers from deeply nested paths over those defined
+        // for top-level paths, under the assumption that they are more
+        // specialized.
+        //
+        // This is a list to handle the situation if multiple paths of the same
+        // length match.
+        let mut longest_owner_patterns = Vec::new();
+
+        // Find the longest `owners` entries that match this path.
+        let mut longest = HashMap::new();
+        for owner_pattern in config.owners.keys() {
+            let ignore = ignore::gitignore::GitignoreBuilder::new("/")
+                .add_line(None, owner_pattern)
+                .with_context(|| format!("owner file pattern `{owner_pattern}` is not valid"))?
+                .build()?;
+            if ignore
+                .matched_path_or_any_parents(&file_diff.path, false)
+                .is_ignore()
+            {
+                let owner_len = owner_pattern.split('/').count();
+                longest.insert(owner_pattern, owner_len);
             }
-            let max_count = longest.values().copied().max().unwrap_or(0);
-            longest_owner_patterns.extend(
-                longest
-                    .iter()
-                    .filter(|(_, count)| **count == max_count)
-                    .map(|x| *x.0),
-            );
-            // Give some weight to these patterns to start. This helps with
-            // files modified without any lines changed.
-            for owner_pattern in &longest_owner_patterns {
-                *counts.entry(owner_pattern).or_default() += 1;
-            }
-            continue;
         }
-        // Check for a modified line.
-        if (!line.starts_with("+++") && line.starts_with('+'))
-            || (!line.starts_with("---") && line.starts_with('-'))
-        {
-            for owner_path in &longest_owner_patterns {
-                *counts.entry(owner_path).or_default() += 1;
+        let max_count = longest.values().copied().max().unwrap_or(0);
+        longest_owner_patterns.extend(
+            longest
+                .iter()
+                .filter(|(_, count)| **count == max_count)
+                .map(|x| *x.0),
+        );
+        // Give some weight to these patterns to start. This helps with
+        // files modified without any lines changed.
+        for owner_pattern in &longest_owner_patterns {
+            *counts.entry(owner_pattern).or_default() += 1;
+        }
+
+        // Count the modified lines.
+        for line in file_diff.diff.lines() {
+            if (!line.starts_with("+++") && line.starts_with('+'))
+                || (!line.starts_with("---") && line.starts_with('-'))
+            {
+                for owner_path in &longest_owner_patterns {
+                    *counts.entry(owner_path).or_default() += 1;
+                }
             }
         }
     }
@@ -438,7 +454,19 @@ pub(super) async fn handle_command(
         }
         let username = match cmd {
             AssignCommand::Own => event.user().login.clone(),
-            AssignCommand::User { username } => username,
+            AssignCommand::User { username } => {
+                // Allow users on vacation to assign themselves to a PR, but not anyone else.
+                if config.is_on_vacation(&username)
+                    && event.user().login.to_lowercase() != username.to_lowercase()
+                {
+                    // This is a comment, so there must already be a reviewer assigned. No need to assign anyone else.
+                    issue
+                        .post_comment(&ctx.github, &on_vacation_msg(&username))
+                        .await?;
+                    return Ok(());
+                }
+                username
+            }
             AssignCommand::Release => {
                 log::trace!(
                     "ignoring release on PR {:?}, must always have assignee",
@@ -468,7 +496,25 @@ pub(super) async fn handle_command(
                     name.to_string()
                 } else {
                     let teams = crate::team_data::teams(&ctx.github).await?;
-                    match find_reviewer_from_names(&teams, config, issue, &[name]) {
+                    // remove "t-" or "T-" prefixes before checking if it's a team name
+                    let team_name = name.trim_start_matches("t-").trim_start_matches("T-");
+                    // Determine if assignee is a team. If yes, add the corresponding GH label.
+                    if teams.teams.get(team_name).is_some() {
+                        let t_label = format!("T-{}", &team_name);
+                        if let Err(err) = issue
+                            .add_labels(&ctx.github, vec![github::Label { name: t_label }])
+                            .await
+                        {
+                            if let Some(github::UnknownLabels { .. }) = err.downcast_ref() {
+                                log::warn!("Error assigning label: {}", err);
+                            } else {
+                                return Err(err);
+                            }
+                        }
+                    }
+
+                    match find_reviewer_from_names(&teams, config, issue, &[team_name.to_string()])
+                    {
                         Ok(assignee) => assignee,
                         Err(e) => {
                             issue.post_comment(&ctx.github, &e.to_string()).await?;
@@ -604,7 +650,7 @@ impl fmt::Display for FindReviewerError {
                 write!(
                     f,
                     "Could not assign reviewer from: `{}`.\n\
-                     User(s) `{}` are either the PR author or are already assigned, \
+                     User(s) `{}` are either the PR author, already assigned, or on vacation, \
                      and there are no other candidates.\n\
                      Use r? to specify someone else to assign.",
                     initial.join(","),
@@ -680,6 +726,7 @@ fn candidate_reviewers_from_names<'a>(
     let mut filter = |name: &&str| -> bool {
         let name_lower = name.to_lowercase();
         let ok = name_lower != issue.user.login.to_lowercase()
+            && !config.is_on_vacation(name)
             && !issue
                 .assignees
                 .iter()

@@ -160,8 +160,12 @@ fn match_pattern(pattern: &str, label: &str) -> anyhow::Result<MatchPatternResul
     } else {
         (pattern, false)
     };
+
     let glob = glob::Pattern::new(pattern)?;
-    Ok(match (glob.matches(label), inverse) {
+    let mut matchopts = glob::MatchOptions::default();
+    matchopts.case_sensitive = false;
+
+    Ok(match (glob.matches_with(label, matchopts), inverse) {
         (true, false) => MatchPatternResult::Allow,
         (true, true) => MatchPatternResult::Deny,
         (false, _) => MatchPatternResult::NoMatch,
@@ -179,6 +183,10 @@ mod tests {
     fn test_match_pattern() -> anyhow::Result<()> {
         assert_eq!(
             match_pattern("I-*", "I-nominated")?,
+            MatchPatternResult::Allow
+        );
+        assert_eq!(
+            match_pattern("i-*", "I-nominated")?,
             MatchPatternResult::Allow
         );
         assert_eq!(

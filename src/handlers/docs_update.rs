@@ -1,13 +1,11 @@
 //! A scheduled job to post a PR to update the documentation on rust-lang/rust.
 
-use crate::db::jobs::JobSchedule;
-use crate::github::{self, GitTreeEntry, GithubClient, Repository};
+use crate::github::{self, GitTreeEntry, GithubClient, Issue, Repository};
+use crate::jobs::Job;
 use anyhow::Context;
 use anyhow::Result;
-use cron::Schedule;
-use reqwest::Client;
+use async_trait::async_trait;
 use std::fmt::Write;
-use std::str::FromStr;
 
 /// This is the repository where the commits will be created.
 const WORK_REPO: &str = "rustbot/rust";
@@ -28,53 +26,57 @@ const SUBMODULES: &[&str] = &[
 
 const TITLE: &str = "Update books";
 
-pub fn job() -> JobSchedule {
-    JobSchedule {
-        name: "docs_update".to_string(),
-        // Around 9am Pacific time on every Monday.
-        schedule: Schedule::from_str("0 00 17 * * Mon *").unwrap(),
-        metadata: serde_json::Value::Null,
+pub struct DocsUpdateJob;
+
+#[async_trait]
+impl Job for DocsUpdateJob {
+    fn name(&self) -> &'static str {
+        "docs_update"
+    }
+
+    async fn run(
+        &self,
+        _ctx: &super::Context,
+        _metadata: &serde_json::Value,
+    ) -> anyhow::Result<()> {
+        // Only run every other week. Doing it every week can be a bit noisy, and
+        // (rarely) a PR can take longer than a week to merge (like if there are
+        // CI issues). `Schedule` does not allow expressing this, so check it
+        // manually.
+        //
+        // This is set to run the first week after a release, and the week just
+        // before a release. That allows getting the latest changes in the next
+        // release, accounting for possibly taking a few days for the PR to land.
+        let today = chrono::Utc::today().naive_utc();
+        let base = chrono::naive::NaiveDate::from_ymd(2015, 12, 10);
+        let duration = today.signed_duration_since(base);
+        let weeks = duration.num_weeks();
+        if weeks % 2 != 0 {
+            tracing::trace!("skipping job, this is an odd week");
+            return Ok(());
+        }
+
+        tracing::trace!("starting docs-update");
+        docs_update()
+            .await
+            .context("failed to process docs update")?;
+        Ok(())
     }
 }
 
-pub async fn handle_job() -> Result<()> {
-    // Only run every other week. Doing it every week can be a bit noisy, and
-    // (rarely) a PR can take longer than a week to merge (like if there are
-    // CI issues). `Schedule` does not allow expressing this, so check it
-    // manually.
-    //
-    // This is set to run the first week after a release, and the week just
-    // before a release. That allows getting the latest changes in the next
-    // release, accounting for possibly taking a few days for the PR to land.
-    let today = chrono::Utc::today().naive_utc();
-    let base = chrono::naive::NaiveDate::from_ymd(2015, 12, 10);
-    let duration = today.signed_duration_since(base);
-    let weeks = duration.num_weeks();
-    if weeks % 2 != 0 {
-        tracing::trace!("skipping job, this is an odd week");
-        return Ok(());
-    }
-
-    tracing::trace!("starting docs-update");
-    docs_update().await.context("failed to process docs update")
-}
-
-async fn docs_update() -> Result<()> {
-    let gh = GithubClient::new_with_default_token(Client::new());
+pub async fn docs_update() -> Result<Option<Issue>> {
+    let gh = GithubClient::new_from_env();
+    let dest_repo = gh.repository(DEST_REPO).await?;
     let work_repo = gh.repository(WORK_REPO).await?;
-    work_repo
-        .merge_upstream(&gh, &work_repo.default_branch)
-        .await?;
 
-    let updates = get_submodule_updates(&gh, &work_repo).await?;
+    let updates = get_submodule_updates(&gh, &dest_repo).await?;
     if updates.is_empty() {
         tracing::trace!("no updates this week?");
-        return Ok(());
+        return Ok(None);
     }
 
-    create_commit(&gh, &work_repo, &updates).await?;
-    create_pr(&gh, &updates).await?;
-    Ok(())
+    create_commit(&gh, &dest_repo, &work_repo, &updates).await?;
+    Ok(Some(create_pr(&gh, &dest_repo, &updates).await?))
 }
 
 struct Update {
@@ -156,11 +158,12 @@ async fn generate_pr_body(
 
 async fn create_commit(
     gh: &GithubClient,
+    dest_repo: &Repository,
     rust_repo: &Repository,
     updates: &[Update],
 ) -> Result<()> {
-    let master_ref = rust_repo
-        .get_reference(gh, &format!("heads/{}", rust_repo.default_branch))
+    let master_ref = dest_repo
+        .get_reference(gh, &format!("heads/{}", dest_repo.default_branch))
         .await?;
     let master_commit = rust_repo.git_commit(gh, &master_ref.object.sha).await?;
     let tree_entries: Vec<_> = updates
@@ -184,8 +187,7 @@ async fn create_commit(
     Ok(())
 }
 
-async fn create_pr(gh: &GithubClient, updates: &[Update]) -> Result<()> {
-    let dest_repo = gh.repository(DEST_REPO).await?;
+async fn create_pr(gh: &GithubClient, dest_repo: &Repository, updates: &[Update]) -> Result<Issue> {
     let mut body = String::new();
     for update in updates {
         write!(body, "{}\n", update.pr_body).unwrap();
@@ -197,5 +199,5 @@ async fn create_pr(gh: &GithubClient, updates: &[Update]) -> Result<()> {
         .new_pr(gh, TITLE, &head, &dest_repo.default_branch, &body)
         .await?;
     tracing::debug!("created PR {}", pr.html_url);
-    Ok(())
+    Ok(pr)
 }

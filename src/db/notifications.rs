@@ -4,7 +4,7 @@ use tokio_postgres::Client as DbClient;
 use tracing as log;
 
 pub struct Notification {
-    pub user_id: i64,
+    pub user_id: u64,
     pub origin_url: String,
     pub origin_html: String,
     pub short_description: Option<String>,
@@ -15,10 +15,11 @@ pub struct Notification {
     pub team_name: Option<String>,
 }
 
-pub async fn record_username(db: &DbClient, user_id: i64, username: String) -> anyhow::Result<()> {
+/// Add a new user (if not existing)
+pub async fn record_username(db: &DbClient, user_id: u64, username: &str) -> anyhow::Result<()> {
     db.execute(
         "INSERT INTO users (user_id, username) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-        &[&user_id, &username],
+        &[&(user_id as i64), &username],
     )
     .await
     .context("inserting user id / username")?;
@@ -31,7 +32,7 @@ pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::
             $1, $2, $3, $4, $5, $6,
             (SELECT max(notifications.idx) + 1 from notifications where notifications.user_id = $1)
         )",
-        &[&notification.user_id, &notification.origin_url, &notification.origin_html, &notification.time, &notification.short_description, &notification.team_name],
+        &[&(notification.user_id as i64), &notification.origin_url, &notification.origin_html, &notification.time, &notification.short_description, &notification.team_name],
         ).await.context("inserting notification")?;
 
     Ok(())
@@ -40,14 +41,14 @@ pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::
 #[derive(Copy, Clone)]
 pub enum Identifier<'a> {
     Url(&'a str),
-    Index(std::num::NonZeroUsize),
+    Index(std::num::NonZeroU32),
     /// Glob identifier (`all` or `*`).
     All,
 }
 
 pub async fn delete_ping(
     db: &mut DbClient,
-    user_id: i64,
+    user_id: u64,
     identifier: Identifier<'_>,
 ) -> anyhow::Result<Vec<NotificationData>> {
     match identifier {
@@ -56,7 +57,7 @@ pub async fn delete_ping(
                 .query(
                     "DELETE FROM notifications WHERE user_id = $1 and origin_url = $2
                     RETURNING origin_html, time, short_description, metadata",
-                    &[&user_id, &origin_url],
+                    &[&(user_id as i64), &origin_url],
                 )
                 .await
                 .context("delete notification query")?;
@@ -91,13 +92,13 @@ pub async fn delete_ping(
                     from notifications
                     where user_id = $1
                     order by idx asc nulls last;",
-                    &[&user_id],
+                    &[&(user_id as i64)],
                 )
                 .await
                 .context("failed to get ordering")?;
 
             let notification_id: i64 = notifications
-                .get(idx.get() - 1)
+                .get((idx.get() - 1) as usize)
                 .ok_or_else(|| anyhow::anyhow!("No such notification with index {}", idx.get()))?
                 .get(0);
 
@@ -144,7 +145,7 @@ pub async fn delete_ping(
                 .query(
                     "DELETE FROM notifications WHERE user_id = $1
                         RETURNING origin_url, origin_html, time, short_description, metadata",
-                    &[&user_id],
+                    &[&(user_id as i64)],
                 )
                 .await
                 .context("delete all notifications query")?;
@@ -180,10 +181,12 @@ pub struct NotificationData {
 
 pub async fn move_indices(
     db: &mut DbClient,
-    user_id: i64,
-    from: usize,
-    to: usize,
+    user_id: u64,
+    from: u32,
+    to: u32,
 ) -> anyhow::Result<()> {
+    let from = usize::try_from(from)?;
+    let to = usize::try_from(to)?;
     loop {
         let t = db
             .build_transaction()
@@ -198,7 +201,7 @@ pub async fn move_indices(
         from notifications
         where user_id = $1
         order by idx asc nulls last;",
-                &[&user_id],
+                &[&(user_id as i64)],
             )
             .await
             .context("failed to get initial ordering")?;
@@ -257,10 +260,11 @@ pub async fn move_indices(
 
 pub async fn add_metadata(
     db: &mut DbClient,
-    user_id: i64,
-    idx: usize,
+    user_id: u64,
+    idx: u32,
     metadata: Option<&str>,
 ) -> anyhow::Result<()> {
+    let idx = usize::try_from(idx)?;
     loop {
         let t = db
             .build_transaction()
@@ -275,7 +279,7 @@ pub async fn add_metadata(
         from notifications
         where user_id = $1
         order by idx asc nulls last;",
-                &[&user_id],
+                &[&(user_id as i64)],
             )
             .await
             .context("failed to get initial ordering")?;

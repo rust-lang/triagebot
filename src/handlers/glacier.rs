@@ -33,7 +33,7 @@ pub(super) async fn handle_command(
 
     let octocrab = &ctx.octocrab;
 
-    let fork = octocrab.repos("rustbot", "glacier");
+    let fork = octocrab.repos(&ctx.username, "glacier");
     let base = octocrab.repos("rust-lang", "glacier");
 
     let master = base
@@ -65,7 +65,7 @@ pub(super) async fn handle_command(
         .pulls("rust-lang", "glacier")
         .create(
             format!("ICE - rust-lang/rust#{}", number),
-            format!("rustbot:triagebot-ice-{}", number),
+            format!("{}:triagebot-ice-{}", ctx.username, number),
             "master",
         )
         .body(format!(

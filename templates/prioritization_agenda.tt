@@ -3,6 +3,8 @@
 
 ---
 tags: weekly, rustc
+type: docs
+note_id: xxx
 ---
 
 # T-compiler Meeting Agenda YYYY-MM-DD
@@ -11,7 +13,7 @@ tags: weekly, rustc
 
 - (TIP) add here non-recurrent scheduled meetings, [check the schedule calendar](https://calendar.google.com/calendar/htmlembed?src=6u5rrtce6lrtv07pfi3damgjus%40group.calendar.google.com)
 - (TIP) mention upcoming Rust stable releases, [check the release calendar](https://calendar.google.com/calendar/htmlembed?src=l1b1gkqvfbgunjs18nemq4c580%40group.calendar.google.com)
-- Reminder: if you see a PR/issue that seems like there might be legal implications due to copyright/IP/etc, please let the Core team know (or at least message @_**pnkfelix** or @_**Wesley Wiser** so we can pass it along).
+- Reminder: if you see a PR/issue that seems like there might be legal implications due to copyright/IP/etc, please let us know (or at least message @_**davidtwco** or @_**Wesley Wiser** so we can pass it along).
 
 ### Other WG meetings ([calendar link](https://calendar.google.com/calendar/embed?src=6u5rrtce6lrtv07pfi3damgjus%40group.calendar.google.com))
 
@@ -39,34 +41,52 @@ tags: weekly, rustc
 (TIP) pick from [here](https://rust-lang.github.io/compiler-team/about/triage-meeting/#working-group-check-in)
 
 @*WG-X* checkin by @**person1** ([previous checkin](https://hackmd.io/team/rust-compiler-team?nav=overview)):
-> Checkin text
+  > Checkin text
 
 @*WG-Y* checkin by @**person2** ([previous checkin](https://hackmd.io/team/rust-compiler-team?nav=overview)):
-> Checkin text
+  > Checkin text
 
 ## Backport nominations
 
-[T-compiler stable](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-compiler) / [T-compiler beta](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-compiler)
+[T-compiler beta](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-compiler) / [T-compiler stable](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-compiler)
 {{-issues::render(issues=beta_nominated_t_compiler, branch=":beta:", empty="No beta nominations for `T-compiler` this time.")}}
+<!--
+/poll Approve beta backport of #12345?
+approve
+decline
+don't know
+-->
 {{-issues::render(issues=stable_nominated_t_compiler, branch=":stable:", empty="No stable nominations for `T-compiler` this time.")}}
+<!--
+/poll Approve stable backport of #12345?
+approve
+approve but does not justify new dot release
+decline
+don't know
+-->
 
-[T-rustdoc stable](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-rustdoc) / [T-rustdoc beta](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-rustdoc)
-{{-issues::render(issues=beta_nominated_t_rustdoc, branch=":beta:", empty="No beta nominations for `T-rustdoc` this time.")}}
-{{-issues::render(issues=stable_nominated_t_rustdoc, branch=":stable:", empty="No stable nominations for `T-rustdoc` this time.")}}
-
-:back: / :shrug: / :hand:
+[T-types stable](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-types) / [T-types beta](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-types)
+{{-issues::render(issues=beta_nominated_t_types, branch=":beta:", empty="No beta nominations for `T-types` this time.")}}
+<!--
+/poll Approve beta backport of #12345?
+approve
+decline
+don't know
+-->
+{{-issues::render(issues=stable_nominated_t_types, branch=":stable:", empty="No stable nominations for `T-types` this time.")}}
+<!--
+/poll Approve stable backport of #12345?
+approve
+approve but does not justify new dot release
+decline
+don't know
+-->
 
 ## PRs S-waiting-on-team
 
 [T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+label%3AS-waiting-on-team+label%3AT-compiler)
 {{-issues::render(issues=prs_waiting_on_team_t_compiler, empty="No PRs waiting on `T-compiler` this time.")}}
-
-### Oldest PRs waiting for review
-
-(TIP) Curate this list before the meeting
-
-[T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Apr+is%3Aopen+sort%3Aupdated-asc+label%3AS-waiting-on-review+draft%3Afalse+label%3AT-compiler)
-{{-issues::render(issues=top_unreviewed_prs, with_age=true, empty="No unreviewed PRs on `T-compiler` this time.")}}
+- Other issues [in progress or waiting on other teams](https://hackmd.io/XYr1BrOWSiqCrl8RCWXRaQ)
 
 ## Issues of Note
 
@@ -83,13 +103,10 @@ tags: weekly, rustc
 ### P-critical
 
 [T-compiler](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AP-critical+label%3AT-compiler)
-{{-issues::render(issues=p_critical_t_compiler, empty="No `P-critical` issues for `T-compiler` at this time.")}}
+{{-issues::render(issues=p_critical_t_compiler, empty="No `P-critical` issues for `T-compiler` this time.")}}
 
 [T-types](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AP-critical+label%3AT-types)
-{{-issues::render(issues=p_critical_t_types, empty="No `P-critical` issues for `T-types` at this time.")}}
-
-[T-rustdoc](https://github.com/rust-lang/rust/issues?q=is%3Aopen+label%3AP-critical+label%3AT-rustdoc)
-{{-issues::render(issues=p_critical_t_rustdoc, empty="No `P-critical` issues for `T-rustdoc` at this time.")}}
+{{-issues::render(issues=p_critical_t_types, empty="No `P-critical` issues for `T-types` this time.")}}
 
 ### P-high regressions
 
@@ -111,7 +128,16 @@ tags: weekly, rustc
 [RFC](https://github.com/rust-lang/rfcs/issues?q=is%3Aopen+label%3AI-compiler-nominated)
 {{-issues::render(issues=nominated_rfcs_t_compiler, empty="No I-compiler-nominated RFCs this time.")}}
 
+### Oldest PRs waiting for review
+
+(TIP) Curate this list before the meeting
+
+[T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Apr+is%3Aopen+sort%3Aupdated-asc+label%3AS-waiting-on-review+draft%3Afalse+label%3AT-compiler)
+{{-issues::render(issues=top_unreviewed_prs, with_age=true, empty="No unreviewed PRs on `T-compiler` this time.")}}
+
 ## Next week's WG checkins
 
 - @*WG-X* checkin by @**person1**
 - @*WG-X* checkin by @**person2**
+
+Next meetings' agenda draft: [hackmd link](#)

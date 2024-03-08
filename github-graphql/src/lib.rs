@@ -3,18 +3,19 @@
 //! See <https://docs.github.com/en/graphql> for more GitHub's GraphQL API.
 
 // This schema can be downloaded from https://docs.github.com/public/schema.docs.graphql
-#[cynic::schema_for_derives(file = "src/github.graphql", module = "schema")]
 pub mod queries {
     use super::schema;
 
+    pub type Date = chrono::NaiveDate;
     pub type DateTime = chrono::DateTime<chrono::Utc>;
 
+    cynic::impl_scalar!(Date, schema::Date);
     cynic::impl_scalar!(DateTime, schema::DateTime);
 
     #[derive(cynic::QueryVariables, Debug, Clone)]
-    pub struct LeastRecentlyReviewedPullRequestsArguments {
-        pub repository_owner: String,
-        pub repository_name: String,
+    pub struct LeastRecentlyReviewedPullRequestsArguments<'a> {
+        pub repository_owner: &'a str,
+        pub repository_name: &'a str,
         pub after: Option<String>,
     }
 
@@ -88,6 +89,7 @@ pub mod queries {
     #[derive(cynic::QueryFragment, Debug)]
     pub struct User {
         pub login: String,
+        pub database_id: Option<i32>,
     }
 
     #[derive(cynic::QueryFragment, Debug)]
@@ -130,16 +132,15 @@ pub mod queries {
     pub struct Uri(pub String);
 }
 
-#[cynic::schema_for_derives(file = "src/github.graphql", module = "schema")]
 pub mod docs_update_queries {
     use super::queries::{DateTime, PageInfo};
     use super::schema;
 
     #[derive(cynic::QueryVariables, Clone, Debug)]
-    pub struct RecentCommitsArguments {
-        pub branch: String,
-        pub name: String,
-        pub owner: String,
+    pub struct RecentCommitsArguments<'a> {
+        pub branch: &'a str,
+        pub name: &'a str,
+        pub owner: &'a str,
         pub after: Option<String>,
     }
 
@@ -266,14 +267,11 @@ pub mod docs_update_queries {
     pub struct GitObjectID(pub String);
 }
 
-#[allow(non_snake_case, non_camel_case_types)]
-mod schema {
-    cynic::use_schema!("src/github.graphql");
-}
+#[cynic::schema("github")]
+mod schema {}
 
-#[cynic::schema_for_derives(file = "src/github.graphql", module = "schema")]
-pub mod project_items_by_status {
-    use super::queries::{PageInfo, Uri};
+pub mod project_items {
+    use super::queries::{Date, PageInfo, Uri};
     use super::schema;
 
     #[derive(cynic::QueryVariables, Debug, Clone)]
@@ -312,13 +310,29 @@ pub mod project_items_by_status {
     #[derive(cynic::QueryFragment, Debug)]
     pub struct ProjectV2Item {
         pub content: Option<ProjectV2ItemContent>,
+
+        // Currently we hard code the field names we care about here.
+        #[cynic(rename = "fieldValueByName")]
         #[arguments(name = "Status")]
-        pub field_value_by_name: Option<ProjectV2ItemFieldValue>,
+        pub status: Option<ProjectV2ItemFieldValue>,
+        #[cynic(rename = "fieldValueByName")]
+        #[arguments(name = "Date")]
+        pub date: Option<ProjectV2ItemFieldValue>,
     }
 
     impl ProjectV2Item {
-        pub fn status(&self) -> &Option<ProjectV2ItemFieldValue> {
-            &self.field_value_by_name
+        pub fn status(&self) -> Option<&str> {
+            let Some(ref status) = self.status else {
+                return None;
+            };
+            status.as_str()
+        }
+
+        pub fn date(&self) -> Option<Date> {
+            let Some(ref date) = self.date else {
+                return None;
+            };
+            date.as_date()
         }
     }
 
@@ -333,6 +347,7 @@ pub mod project_items_by_status {
     #[derive(cynic::InlineFragments, Debug)]
     pub enum ProjectV2ItemFieldValue {
         ProjectV2ItemFieldSingleSelectValue(ProjectV2ItemFieldSingleSelectValue),
+        ProjectV2ItemFieldDateValue(ProjectV2ItemFieldDateValue),
 
         #[cynic(fallback)]
         Other,
@@ -344,6 +359,13 @@ pub mod project_items_by_status {
                 Self::ProjectV2ItemFieldSingleSelectValue(val) => val.name.as_deref()?,
                 _ => return None,
             })
+        }
+
+        pub fn as_date(&self) -> Option<Date> {
+            match self {
+                Self::ProjectV2ItemFieldDateValue(val) => val.date,
+                _ => None,
+            }
         }
     }
 
@@ -357,5 +379,51 @@ pub mod project_items_by_status {
     #[derive(cynic::QueryFragment, Debug)]
     pub struct ProjectV2ItemFieldSingleSelectValue {
         pub name: Option<String>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    pub struct ProjectV2ItemFieldDateValue {
+        pub date: Option<Date>,
+    }
+}
+
+/// Retrieve all pull requests waiting on review from T-compiler
+/// GraphQL query: see file github-graphql/PullRequestsOpen.gql
+pub mod pull_requests_open {
+    use crate::queries::{LabelConnection, PullRequestConnection, UserConnection};
+
+    use super::queries::DateTime;
+    use super::schema;
+
+    #[derive(cynic::QueryVariables, Clone, Debug)]
+    pub struct PullRequestsOpenVariables<'a> {
+        pub repo_owner: &'a str,
+        pub repo_name: &'a str,
+        pub after: Option<String>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(graphql_type = "Query", variables = "PullRequestsOpenVariables")]
+    pub struct PullRequestsOpen {
+        #[arguments(owner: $repo_owner, name: $repo_name)]
+        pub repository: Option<Repository>,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    #[cynic(variables = "PullRequestsOpenVariables")]
+    pub struct Repository {
+        #[arguments(first: 100, after: $after, states: "OPEN")]
+        pub pull_requests: PullRequestConnection,
+    }
+
+    #[derive(cynic::QueryFragment, Debug)]
+    pub struct PullRequest {
+        pub number: i32,
+        pub updated_at: DateTime,
+        pub created_at: DateTime,
+        #[arguments(first: 10)]
+        pub assignees: UserConnection,
+        #[arguments(first: 5, orderBy: { direction: "DESC", field: "NAME" })]
+        pub labels: Option<LabelConnection>,
     }
 }

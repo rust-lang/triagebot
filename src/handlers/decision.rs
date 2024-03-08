@@ -11,7 +11,7 @@ use parser::command::decision::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-pub const DECISION_PROCESS_JOB_NAME: &str = "decision_process_action";
+pub const _DECISION_PROCESS_JOB_NAME: &str = "decision_process_action";
 
 #[derive(Serialize, Deserialize)]
 pub struct DecisionProcessActionMetadata {

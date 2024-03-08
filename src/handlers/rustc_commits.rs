@@ -1,17 +1,15 @@
-use crate::db::jobs::JobSchedule;
 use crate::db::rustc_commits;
 use crate::db::rustc_commits::get_missing_commits;
+use crate::jobs::Job;
 use crate::{
     github::{self, Event},
     handlers::Context,
 };
-use cron::Schedule;
+use async_trait::async_trait;
 use std::collections::VecDeque;
-use std::convert::TryInto;
-use std::str::FromStr;
 use tracing as log;
 
-const BORS_GH_ID: i64 = 3372342;
+const BORS_GH_ID: u64 = 3372342;
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let body = match event.comment_body() {
@@ -153,12 +151,17 @@ pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u
     }
 }
 
-pub fn job() -> JobSchedule {
-    JobSchedule {
-        name: "rustc_commits".to_string(),
-        // Every 30 minutes...
-        schedule: Schedule::from_str("* 0,30 * * * * *").unwrap(),
-        metadata: serde_json::Value::Null,
+pub struct RustcCommitsJob;
+
+#[async_trait]
+impl Job for RustcCommitsJob {
+    fn name(&self) -> &'static str {
+        "rustc_commits"
+    }
+
+    async fn run(&self, ctx: &super::Context, _metadata: &serde_json::Value) -> anyhow::Result<()> {
+        synchronize_commits_inner(ctx, None).await;
+        Ok(())
     }
 }
 

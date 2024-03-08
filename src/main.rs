@@ -4,14 +4,16 @@ use anyhow::Context as _;
 use futures::future::FutureExt;
 use futures::StreamExt;
 use hyper::{header, Body, Request, Response, Server, StatusCode};
-use reqwest::Client;
 use route_recognizer::Router;
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::{task, time};
 use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
-use triagebot::jobs::{jobs, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS};
+use triagebot::handlers::pull_requests_assignment_update::PullRequestAssignmentUpdate;
+use triagebot::jobs::{
+    default_jobs, Job, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS,
+};
 use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
 
 async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
@@ -20,6 +22,9 @@ async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
     }
     if req == "/agenda/lang/planning" {
         return triagebot::agenda::lang_planning().call().await;
+    }
+    if req == "/agenda/types/planning" {
+        return triagebot::agenda::types_planning().call().await;
     }
 
     anyhow::bail!("Unknown agenda; see /agenda for index.")
@@ -53,7 +58,10 @@ async fn serve_req(
             .body(Body::from(triagebot::agenda::INDEX))
             .unwrap());
     }
-    if req.uri.path() == "/agenda/lang/triage" || req.uri.path() == "/agenda/lang/planning" {
+    if req.uri.path() == "/agenda/lang/triage"
+        || req.uri.path() == "/agenda/lang/planning"
+        || req.uri.path() == "/agenda/types/planning"
+    {
         match agenda
             .ready()
             .await
@@ -239,76 +247,33 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .await
         .context("database migrations")?;
 
-    // spawning a background task that will schedule the jobs
-    // every JOB_SCHEDULING_CADENCE_IN_SECS
-    task::spawn(async move {
-        loop {
-            let res = task::spawn(async move {
-                let pool = db::ClientPool::new();
-                let mut interval =
-                    time::interval(time::Duration::from_secs(JOB_SCHEDULING_CADENCE_IN_SECS));
-
-                loop {
-                    interval.tick().await;
-                    db::schedule_jobs(&*pool.get().await, jobs())
-                        .await
-                        .context("database schedule jobs")
-                        .unwrap();
-                }
-            });
-
-            match res.await {
-                Err(err) if err.is_panic() => {
-                    /* handle panic in above task, re-launching */
-                    tracing::trace!("schedule_jobs task died (error={})", err);
-                }
-                _ => unreachable!(),
-            }
-        }
-    });
-
-    let client = Client::new();
-    let gh = github::GithubClient::new_with_default_token(client.clone());
+    let gh = github::GithubClient::new_from_env();
     let oc = octocrab::OctocrabBuilder::new()
         .personal_token(github::default_token_from_env())
         .build()
         .expect("Failed to build octograb.");
     let ctx = Arc::new(Context {
-        username: String::from("rustbot"),
+        username: std::env::var("TRIAGEBOT_USERNAME").or_else(|err| match err {
+            std::env::VarError::NotPresent => Ok("rustbot".to_owned()),
+            err => Err(err),
+        })?,
         db: pool,
         github: gh,
         octocrab: oc,
     });
 
-    // spawning a background task that will run the scheduled jobs
-    // every JOB_PROCESSING_CADENCE_IN_SECS
-    let ctx2 = ctx.clone();
-    task::spawn(async move {
-        loop {
-            let ctx = ctx2.clone();
-            let res = task::spawn(async move {
-                let pool = db::ClientPool::new();
-                let mut interval =
-                    time::interval(time::Duration::from_secs(JOB_PROCESSING_CADENCE_IN_SECS));
+    // Run all jobs that don't have a schedule (one-off jobs)
+    // TODO: Ideally JobSchedule.schedule should become an `Option<Schedule>`
+    // and here we run all those with schedule=None
+    if !is_scheduled_jobs_disabled() {
+        spawn_job_oneoffs(ctx.clone()).await;
+    }
 
-                loop {
-                    interval.tick().await;
-                    db::run_scheduled_jobs(&ctx, &*pool.get().await)
-                        .await
-                        .context("run database scheduled jobs")
-                        .unwrap();
-                }
-            });
-
-            match res.await {
-                Err(err) if err.is_panic() => {
-                    /* handle panic in above task, re-launching */
-                    tracing::trace!("run_scheduled_jobs task died (error={})", err);
-                }
-                _ => unreachable!(),
-            }
-        }
-    });
+    // Run all jobs that have a schedule (recurring jobs)
+    if !is_scheduled_jobs_disabled() {
+        spawn_job_scheduler();
+        spawn_job_runner(ctx.clone());
+    }
 
     let agenda = tower::ServiceBuilder::new()
         .buffer(10)
@@ -318,7 +283,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
                     input,
                     tower::limit::rate::Rate::new(2, std::time::Duration::from_secs(60)),
                 )),
-                |_| anyhow::anyhow!("Rate limit of 2 request / 60 seconds exceeded"),
+                |e| {
+                    tracing::error!("agenda request failed: {:?}", e);
+                    anyhow::anyhow!("Rate limit of 2 request / 60 seconds exceeded")
+                },
             )
         })
         .service_fn(handle_agenda_request);
@@ -349,6 +317,114 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 
     serve_future.await?;
     Ok(())
+}
+
+/// Spawns a background tokio task which runs all jobs having no schedule
+/// i.e. manually executed at the end of the triagebot startup
+// - jobs are not guaranteed to start in sequence (care is to be taken to ensure thet are completely independent one from the other)
+// - the delay between jobs start is not guaranteed to be precise
+async fn spawn_job_oneoffs(ctx: Arc<Context>) {
+    let jobs: Vec<Box<dyn Job + Send + Sync>> = vec![Box::new(PullRequestAssignmentUpdate)];
+
+    for (idx, job) in jobs.into_iter().enumerate() {
+        let ctx = ctx.clone();
+        task::spawn(async move {
+            // Allow some spacing between starting jobs
+            let delay = idx as u64 * 2;
+            time::sleep(time::Duration::from_secs(delay)).await;
+            match job.run(&ctx, &serde_json::Value::Null).await {
+                Ok(_) => {
+                    log::trace!("job successfully executed (name={})", &job.name());
+                }
+                Err(e) => {
+                    log::error!(
+                        "job failed on execution (name={:?}, error={:?})",
+                        job.name(),
+                        e
+                    );
+                }
+            }
+        });
+    }
+}
+
+/// Spawns a background tokio task which runs continuously to queue up jobs
+/// to be run by the job runner.
+///
+/// The scheduler wakes up every `JOB_SCHEDULING_CADENCE_IN_SECS` seconds to
+/// check if there are any jobs ready to run. Jobs get inserted into the the
+/// database which acts as a queue.
+fn spawn_job_scheduler() {
+    task::spawn(async move {
+        loop {
+            let res = task::spawn(async move {
+                let pool = db::ClientPool::new();
+                let mut interval =
+                    time::interval(time::Duration::from_secs(JOB_SCHEDULING_CADENCE_IN_SECS));
+
+                loop {
+                    interval.tick().await;
+                    db::schedule_jobs(&*pool.get().await, default_jobs())
+                        .await
+                        .context("database schedule jobs")
+                        .unwrap();
+                }
+            });
+
+            match res.await {
+                Err(err) if err.is_panic() => {
+                    /* handle panic in above task, re-launching */
+                    tracing::error!("schedule_jobs task died (error={err})");
+                    tokio::time::sleep(std::time::Duration::new(5, 0)).await;
+                }
+                _ => unreachable!(),
+            }
+        }
+    });
+}
+
+/// Spawns a background tokio task which runs continuously to run scheduled
+/// jobs.
+///
+/// The runner wakes up every `JOB_PROCESSING_CADENCE_IN_SECS` seconds to
+/// check if any jobs have been put into the queue by the scheduler. They
+/// will get popped off the queue and run if any are found.
+fn spawn_job_runner(ctx: Arc<Context>) {
+    task::spawn(async move {
+        loop {
+            let ctx = ctx.clone();
+            let res = task::spawn(async move {
+                let pool = db::ClientPool::new();
+                let mut interval =
+                    time::interval(time::Duration::from_secs(JOB_PROCESSING_CADENCE_IN_SECS));
+
+                loop {
+                    interval.tick().await;
+                    db::run_scheduled_jobs(&ctx, &*pool.get().await)
+                        .await
+                        .context("run database scheduled jobs")
+                        .unwrap();
+                }
+            });
+
+            match res.await {
+                Err(err) if err.is_panic() => {
+                    /* handle panic in above task, re-launching */
+                    tracing::error!("run_scheduled_jobs task died (error={err})");
+                    tokio::time::sleep(std::time::Duration::new(5, 0)).await;
+                }
+                _ => unreachable!(),
+            }
+        }
+    });
+}
+
+/// Determines whether or not background scheduled jobs should be disabled for
+/// the purpose of testing.
+///
+/// This helps avoid having random jobs run while testing other things.
+fn is_scheduled_jobs_disabled() -> bool {
+    env::var_os("TRIAGEBOT_TEST_DISABLE_JOBS").is_some()
 }
 
 #[tokio::main(flavor = "current_thread")]
