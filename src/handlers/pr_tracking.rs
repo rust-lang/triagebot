@@ -10,6 +10,7 @@ use crate::{
     db::notifications::record_username,
     github::{IssuesAction, IssuesEvent},
     handlers::Context,
+    ReviewPrefs,
 };
 use anyhow::Context as _;
 use tokio_postgres::Client as DbClient;
@@ -66,16 +67,37 @@ pub(super) async fn handle_input<'a>(
     if matches!(event.action, IssuesAction::Unassigned { .. }) {
         delete_pr_from_workqueue(&db_client, assignee.id.unwrap(), event.issue.number)
             .await
-            .context("Failed to remove PR from workqueue")?;
+            .context("Failed to remove PR from workq ueue")?;
     }
 
-    if matches!(event.action, IssuesAction::Assigned { .. }) {
-        upsert_pr_into_workqueue(&db_client, assignee.id.unwrap(), event.issue.number)
-            .await
-            .context("Failed to add PR to workqueue")?;
+    let user_work_queue = get_user_workqueue(&db_client, assignee)
+        .await
+        .context("Failed to retrieve user work queue")?;
+    tracing::debug!("User wor queue: {:?}", user_work_queue);
+
+    if user_work_queue.has_capacity() {
+        if matches!(event.action, IssuesAction::Assigned { .. }) {
+            upsert_pr_into_workqueue(&db_client, assignee.id.unwrap(), event.issue.number)
+                .await
+                .context("Failed to add PR to work queue")?;
+        }
     }
 
     Ok(())
+}
+
+async fn get_user_workqueue(
+    db: &crate::db::PooledClient,
+    assignee: &crate::github::User,
+) -> anyhow::Result<ReviewPrefs, anyhow::Error> {
+    let q = "
+SELECT u.username,* FROM review_prefs
+WHERE r.user_id = $1;";
+    let record = db
+        .query_one(q, &[&(assignee.id.unwrap() as i64)])
+        .await
+        .context("Upsert DB error")?;
+    Ok(record.into())
 }
 
 /// Add a PR to the workqueue of a team member.

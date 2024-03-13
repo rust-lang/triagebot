@@ -280,7 +280,7 @@ macro_rules! command_handlers {
 //
 // This is for handlers for commands parsed by the `parser` crate.
 // Each variant of `parser::command::Command` must be in this list,
-// preceded by the module containing the coresponding `handle_command` function
+// preceded by the module containing the corresponding `handle_command` function
 command_handlers! {
     assign: Assign,
     glacier: Glacier,

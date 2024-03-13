@@ -132,17 +132,36 @@ pub struct ReviewPrefs {
     pub username: String,
     pub user_id: i64,
     pub assigned_prs: Vec<i32>,
+    pub max_assigned_prs: Option<i32>,
 }
 
 impl ReviewPrefs {
     fn to_string(&self) -> String {
+        let capacity = if self.max_assigned_prs.is_some() {
+            format!("{}", self.max_assigned_prs.unwrap())
+        } else {
+            String::from("Not set (i.e. unlimited)")
+        };
         let prs = self
             .assigned_prs
             .iter()
             .map(|pr| format!("#{}", pr))
             .collect::<Vec<String>>()
             .join(", ");
-        format!("Username: {}\nAssigned PRs: {}", self.username, prs)
+        format!(
+            "Username: {}\nAssigned PRs: {}\nReview capacity: {}",
+            self.username, prs, capacity
+        )
+    }
+
+    // The requested reviewer can take this PR if they have capacity
+    // or they didn't yet set one
+    fn has_capacity(&self) -> bool {
+        if let Some(capacity) = self.max_assigned_prs {
+            capacity as usize > self.assigned_prs.len()
+        } else {
+            true
+        }
     }
 }
 
@@ -153,6 +172,7 @@ impl From<tokio_postgres::row::Row> for ReviewPrefs {
             username: row.get("username"),
             user_id: row.get("user_id"),
             assigned_prs: row.get("assigned_prs"),
+            max_assigned_prs: row.get("max_assigned_prs"),
         }
     }
 }
