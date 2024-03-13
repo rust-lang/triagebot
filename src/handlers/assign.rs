@@ -282,8 +282,14 @@ async fn determine_assignee(
     config: &AssignConfig,
     diff: &[FileDiff],
 ) -> anyhow::Result<(Option<String>, bool)> {
+    let db_client = ctx.db.get().await;
+
+    // XXX: do we need to add a check for the max_assigned_prs?
+    // if yes, here?
+
     let teams = crate::team_data::teams(&ctx.github).await?;
     if let Some(name) = find_assign_command(ctx, event) {
+        // XXX: need to check also here?
         if is_self_assign(&name, &event.issue.user.login) {
             return Ok((Some(name.to_string()), true));
         }
@@ -524,7 +530,11 @@ pub(super) async fn handle_command(
                 }
             }
         };
+        // NOTE: this will not handle PR assignment requested from the web Github UI
+        // that case is handled in the pr_tracking module
         set_assignee(issue, &ctx.github, &username).await;
+        // This PR will be registered in the reviewer's work queue using a `IssuesAction::Assigned`
+        // and handled by handlers::pr_tracking
         return Ok(());
     }
 
