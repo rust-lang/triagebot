@@ -33,8 +33,12 @@ note_id: xxx
 {{-issues::render(issues=in_fcp, indent="  ", empty="No FCP requests this time.")}}
 - Accepted MCPs
 {{-issues::render(issues=mcp_accepted, indent="  ", empty="No new accepted proposals this time.")}}
+- MCPs blocked on unresolved concerns
+  - <Here group MCPs blocked on unresolved concerns>
 - Finalized FCPs (disposition merge)
-{{-issues::render(issues=fcp_finished, indent="  ", empty="No new finished FCP (disposition merge) this time.")}}
+{{-issues::render(issues=fcp_finished_tcompiler, indent="  ", empty="No new finished FCP (disposition merge) this time.")}}
+- Other teams finalized FCPs
+{{-issues::render(issues=fcp_finished_not_tcompiler, indent="  ", empty="No new finished FCP (disposition merge) this time.")}}
 
 ### WG checkins
 
@@ -86,7 +90,7 @@ don't know
 
 [T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+label%3AS-waiting-on-team+label%3AT-compiler)
 {{-issues::render(issues=prs_waiting_on_team_t_compiler, empty="No PRs waiting on `T-compiler` this time.")}}
-- Other issues [in progress or waiting on other teams](https://hackmd.io/XYr1BrOWSiqCrl8RCWXRaQ)
+- [Issues in progress or waiting on other teams](https://hackmd.io/XYr1BrOWSiqCrl8RCWXRaQ)
 
 ## Issues of Note
 
