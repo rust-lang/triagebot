@@ -24,10 +24,16 @@ pub struct Review {
     pub approved: bool,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Concern {
+    pub name: String,
+    pub comment: StatusComment,
+    pub reviewer: Reviewer,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FCPIssue {
     pub id: u32,
     pub number: u32,
-    pub fk_milestone: Option<String>,
+    pub fk_milestone: Option<u32>,
     pub fk_user: u32,
     pub fk_assignee: Option<u32>,
     pub open: bool,
@@ -57,6 +63,7 @@ pub struct StatusComment {
 pub struct FullFCP {
     pub fcp: FCP,
     pub reviews: Vec<Review>,
+    pub concerns: Vec<Concern>,
     pub issue: FCPIssue,
     pub status_comment: StatusComment,
 }
