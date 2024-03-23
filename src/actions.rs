@@ -9,6 +9,7 @@ use tera::{Context, Tera};
 use crate::{
     github::{self, GithubClient, Repository},
     http_client::{CompilerMeeting, HttpClient},
+    rfcbot,
 };
 
 #[async_trait]
@@ -55,11 +56,21 @@ pub struct IssueDecorator {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct FCPConcernDetails {
+    pub name: String,
+    pub reviewer_login: String,
+    pub concern_url: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct FCPDetails {
     pub bot_tracking_comment_html_url: String,
     pub bot_tracking_comment_content: String,
     pub initiating_comment_html_url: String,
     pub initiating_comment_content: String,
+    pub disposition: String,
+    pub pending_reviewers: Vec<rfcbot::Reviewer>,
+    pub concerns: Vec<FCPConcernDetails>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -130,6 +141,7 @@ impl<'a> Action for Step<'a> {
                     let query = query.clone();
                     handles.push(tokio::task::spawn(async move {
                         let _permit = semaphore.acquire().await?;
+                        let fcps_groups = ["proposed_fcp", "in_pre_fcp", "in_fcp"];
                         let mcps_groups = [
                             "mcp_new_not_seconded",
                             "mcp_old_not_seconded",
@@ -140,7 +152,7 @@ impl<'a> Action for Step<'a> {
                         let issues = query
                             .query(
                                 &repository,
-                                name == "proposed_fcp",
+                                fcps_groups.contains(&name.as_str()),
                                 mcps_groups.contains(&name.as_str())
                                     && repository.full_name.contains("rust-lang/compiler-team"),
                                 &gh,

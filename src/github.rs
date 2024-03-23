@@ -1712,7 +1712,9 @@ impl<'q> IssuesQuery for Query<'q> {
             .with_context(|| "Unable to get issues.")?;
 
         let fcp_map = if include_fcp_details {
-            crate::rfcbot::get_all_fcps().await?
+            crate::rfcbot::get_all_fcps()
+                .await
+                .with_context(|| "Unable to get all fcps from rfcbot.")?
         } else {
             HashMap::new()
         };
@@ -1750,6 +1752,29 @@ impl<'q> IssuesQuery for Query<'q> {
                         bot_tracking_comment_content,
                         initiating_comment_html_url: init_comment.html_url.clone(),
                         initiating_comment_content: quote_reply(&init_comment.body),
+                        disposition: fcp
+                            .fcp
+                            .disposition
+                            .as_deref()
+                            .unwrap_or("<unknown>")
+                            .to_string(),
+                        pending_reviewers: fcp
+                            .reviews
+                            .iter()
+                            .filter_map(|r| (!r.approved).then(|| r.reviewer.clone()))
+                            .collect(),
+                        concerns: fcp
+                            .concerns
+                            .iter()
+                            .map(|c| crate::actions::FCPConcernDetails {
+                                name: c.name.clone(),
+                                reviewer_login: c.reviewer.login.clone(),
+                                concern_url: format!(
+                                    "{}#issuecomment-{}",
+                                    issue.html_url, c.comment.id
+                                ),
+                            })
+                            .collect(),
                     })
                 } else {
                     None
