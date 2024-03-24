@@ -15,7 +15,7 @@ pub struct FCP {
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Reviewer {
-    pub id: u32,
+    pub id: u64,
     pub login: String,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]

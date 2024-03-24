@@ -1719,6 +1719,12 @@ impl<'q> IssuesQuery for Query<'q> {
             HashMap::new()
         };
 
+        let zulip_map = if include_fcp_details {
+            Some(crate::team_data::zulip_map(client).await?)
+        } else {
+            None
+        };
+
         let mut issues_decorator = Vec::new();
         let re = regex::Regex::new("https://github.com/rust-lang/|/").unwrap();
         let re_zulip_link = regex::Regex::new(r"\[stream\]:\s").unwrap();
@@ -1761,7 +1767,20 @@ impl<'q> IssuesQuery for Query<'q> {
                         pending_reviewers: fcp
                             .reviews
                             .iter()
-                            .filter_map(|r| (!r.approved).then(|| r.reviewer.clone()))
+                            .filter_map(|r| {
+                                (!r.approved).then(|| crate::actions::FCPReviewerDetails {
+                                    github_login: r.reviewer.login.clone(),
+                                    zulip_id: zulip_map
+                                        .as_ref()
+                                        .map(|map| {
+                                            map.users
+                                                .iter()
+                                                .find(|&(_, &github)| github == r.reviewer.id)
+                                                .map(|v| *v.0)
+                                        })
+                                        .flatten(),
+                                })
+                            })
                             .collect(),
                         concerns: fcp
                             .concerns

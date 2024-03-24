@@ -9,7 +9,6 @@ use tera::{Context, Tera};
 use crate::{
     github::{self, GithubClient, Repository},
     http_client::{CompilerMeeting, HttpClient},
-    rfcbot,
 };
 
 #[async_trait]
@@ -63,13 +62,19 @@ pub struct FCPConcernDetails {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct FCPReviewerDetails {
+    pub github_login: String,
+    pub zulip_id: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct FCPDetails {
     pub bot_tracking_comment_html_url: String,
     pub bot_tracking_comment_content: String,
     pub initiating_comment_html_url: String,
     pub initiating_comment_content: String,
     pub disposition: String,
-    pub pending_reviewers: Vec<rfcbot::Reviewer>,
+    pub pending_reviewers: Vec<FCPReviewerDetails>,
     pub concerns: Vec<FCPConcernDetails>,
 }
 
