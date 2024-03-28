@@ -74,6 +74,7 @@ pub struct FCPDetails {
     pub initiating_comment_html_url: String,
     pub initiating_comment_content: String,
     pub disposition: String,
+    pub should_mention: bool,
     pub pending_reviewers: Vec<FCPReviewerDetails>,
     pub concerns: Vec<FCPConcernDetails>,
 }
