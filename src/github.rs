@@ -361,6 +361,8 @@ pub struct Comment {
     pub html_url: String,
     pub user: User,
     #[serde(alias = "submitted_at")] // for pull request reviews
+    pub created_at: chrono::DateTime<Utc>,
+    #[serde(alias = "submitted_at")] // for pull request reviews
     pub updated_at: chrono::DateTime<Utc>,
     #[serde(default, rename = "state")]
     pub pr_review_state: Option<PullRequestReviewState>,
@@ -1712,9 +1714,17 @@ impl<'q> IssuesQuery for Query<'q> {
             .with_context(|| "Unable to get issues.")?;
 
         let fcp_map = if include_fcp_details {
-            crate::rfcbot::get_all_fcps().await?
+            crate::rfcbot::get_all_fcps()
+                .await
+                .with_context(|| "Unable to get all fcps from rfcbot.")?
         } else {
             HashMap::new()
+        };
+
+        let zulip_map = if include_fcp_details {
+            Some(crate::team_data::zulip_map(client).await?)
+        } else {
+            None
         };
 
         let mut issues_decorator = Vec::new();
@@ -1745,11 +1755,59 @@ impl<'q> IssuesQuery for Query<'q> {
                         .get_comment(&client, fk_initiating_comment.try_into()?)
                         .await?;
 
+                    // To avoid constant (and counter-productive) pings.
+                    // We will only ping when
+                    //  - we are 2 weeks into the FCP
+                    //  - or when there are no concerns and we are at least 4 weeks into the FCP.
+                    let should_ping = {
+                        let now = chrono::offset::Utc::now();
+                        let time_diff = now - init_comment.created_at;
+                        time_diff.num_weeks() == 2
+                            || (time_diff.num_weeks() >= 4 && fcp.concerns.is_empty())
+                    };
+
                     Some(crate::actions::FCPDetails {
                         bot_tracking_comment_html_url,
                         bot_tracking_comment_content,
                         initiating_comment_html_url: init_comment.html_url.clone(),
                         initiating_comment_content: quote_reply(&init_comment.body),
+                        disposition: fcp
+                            .fcp
+                            .disposition
+                            .as_deref()
+                            .unwrap_or("<unknown>")
+                            .to_string(),
+                        should_ping,
+                        pending_reviewers: fcp
+                            .reviews
+                            .iter()
+                            .filter_map(|r| {
+                                (!r.approved).then(|| crate::actions::FCPReviewerDetails {
+                                    github_login: r.reviewer.login.clone(),
+                                    zulip_id: zulip_map
+                                        .as_ref()
+                                        .map(|map| {
+                                            map.users
+                                                .iter()
+                                                .find(|&(_, &github)| github == r.reviewer.id)
+                                                .map(|v| *v.0)
+                                        })
+                                        .flatten(),
+                                })
+                            })
+                            .collect(),
+                        concerns: fcp
+                            .concerns
+                            .iter()
+                            .map(|c| crate::actions::FCPConcernDetails {
+                                name: c.name.clone(),
+                                reviewer_login: c.reviewer.login.clone(),
+                                concern_url: format!(
+                                    "{}#issuecomment-{}",
+                                    issue.html_url, c.comment.id
+                                ),
+                            })
+                            .collect(),
                     })
                 } else {
                     None
