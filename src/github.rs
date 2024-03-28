@@ -361,6 +361,8 @@ pub struct Comment {
     pub html_url: String,
     pub user: User,
     #[serde(alias = "submitted_at")] // for pull request reviews
+    pub created_at: chrono::DateTime<Utc>,
+    #[serde(alias = "submitted_at")] // for pull request reviews
     pub updated_at: chrono::DateTime<Utc>,
     #[serde(default, rename = "state")]
     pub pr_review_state: Option<PullRequestReviewState>,
@@ -1753,6 +1755,17 @@ impl<'q> IssuesQuery for Query<'q> {
                         .get_comment(&client, fk_initiating_comment.try_into()?)
                         .await?;
 
+                    // To avoid constant (and counter-productive) pings.
+                    // We will only ping when
+                    //  - we are 2 weeks into the FCP
+                    //  - or when there are no concerns and we are at least 4 weeks into the FCP.
+                    let should_ping = {
+                        let now = chrono::offset::Utc::now();
+                        let time_diff = now - init_comment.created_at;
+                        time_diff.num_weeks() == 2
+                            || (time_diff.num_weeks() >= 4 && fcp.concerns.is_empty())
+                    };
+
                     Some(crate::actions::FCPDetails {
                         bot_tracking_comment_html_url,
                         bot_tracking_comment_content,
@@ -1764,6 +1777,7 @@ impl<'q> IssuesQuery for Query<'q> {
                             .as_deref()
                             .unwrap_or("<unknown>")
                             .to_string(),
+                        should_ping,
                         pending_reviewers: fcp
                             .reviews
                             .iter()
