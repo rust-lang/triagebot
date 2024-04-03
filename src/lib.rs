@@ -137,10 +137,9 @@ pub struct ReviewPrefs {
 
 impl ReviewPrefs {
     fn to_string(&self) -> String {
-        let capacity = if self.max_assigned_prs.is_some() {
-            format!("{}", self.max_assigned_prs.expect("This can't fail"))
-        } else {
-            String::from("Not set (i.e. unlimited)")
+        let capacity = match self.max_assigned_prs {
+            Some(max) => format!("{}", max),
+            None => String::from("Not set (i.e. unlimited)"),
         };
         let prs = self
             .assigned_prs
