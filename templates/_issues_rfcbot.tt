@@ -7,8 +7,8 @@
 {{indent}}{{indent}}-{% for reviewer in issue.fcp_details.pending_reviewers %} @{% if issue.fcp_details.should_mention %}{% else %}_{% endif %}**|{{reviewer.zulip_id}}**{%else%} no pending checkboxs{% endfor %}
 {{indent}}{{indent}}-{% for concern in issue.fcp_details.concerns %} [{{concern.name}} (by {{concern.reviewer_login}})]({{concern.concern_url}}){%else%} no pending concerns{% endfor -%}
 {% else %}
-{{indent}}- "{{issue.title}}" {{issue.repo_name}}#{{issue.number}}
-{%endif-%}
+{{indent}}- {{issue::render(issue=issue)}}
+{%- endif -%}
 {%else%}
 {{empty}}
 {%endfor-%}
