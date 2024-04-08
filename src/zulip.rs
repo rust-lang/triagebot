@@ -214,7 +214,13 @@ async fn query_pr_assignments(
     let db_client = ctx.db.get().await;
 
     let record = match subcommand {
-        "show" => get_review_prefs(&db_client, gh_id).await?,
+        "show" => {
+            let rec = get_review_prefs(&db_client, gh_id).await;
+            if rec.is_err() {
+                anyhow::bail!("No preferences set.")
+            }
+            rec?
+        }
         _ => anyhow::bail!("Invalid subcommand."),
     };
 
