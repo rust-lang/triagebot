@@ -84,3 +84,22 @@ WHERE r.user_id = $1;";
         .unwrap();
     Ok(row.into())
 }
+
+pub async fn set_review_prefs(
+    db: &DbClient,
+    user_id: u64,
+    max: u32,
+) -> anyhow::Result<ReviewPrefs> {
+    let q = "
+UPDATE review_prefs r
+SET max_assigned_prs = $2
+FROM users u
+WHERE r.user_id=$1 AND u.user_id=r.user_id
+RETURNING u.username, r.*";
+    let row = db
+        .query_one(q, &[&(max as i32), &(user_id as i64)])
+        .await
+        .context("Error retrieving review preferences")
+        .unwrap();
+    Ok(row.into())
+}
