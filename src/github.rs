@@ -1755,18 +1755,9 @@ impl<'q> IssuesQuery for Query<'q> {
                         .get_comment(&client, fk_initiating_comment.try_into()?)
                         .await?;
 
-                    // To avoid constant (and counter-productive) pings we will only ping when
-                    //  - we are 2 weeks into the FCP
-                    //  - or when there are no concerns and we are at least 4 weeks into the FCP.
-                    //
-                    // FIXME: This should get T-compiler approval before being enabled by default
-                    let should_mention = std::env::var("TRIAGEBOT_COMPILER_MENTION").is_ok() && {
-                        let now = chrono::offset::Utc::now();
-                        let time_diff = now - init_comment.created_at;
-                        time_diff.num_weeks() == 2
-                            || (time_diff.num_weeks() >= 4 && fcp.concerns.is_empty())
-                    };
-
+                    // TODO: agree with the team(s) a policy to emit actual mentions to remind FCP
+                    // voting member to cast their vote
+                    let should_mention = false;
                     Some(crate::actions::FCPDetails {
                         bot_tracking_comment_html_url,
                         bot_tracking_comment_content,
