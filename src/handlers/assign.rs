@@ -7,9 +7,6 @@
 //! * `@rustbot release-assignment`: Removes the commenter's assignment.
 //! * `r? @user`: Assigns to the given user (PRs only).
 //!
-//! Note: this module does not handle review assignments issued from the
-//! GitHub "Assignees" dropdown menu
-//!
 //! This is capable of assigning to any user, even if they do not have write
 //! access to the repo. It does this by fake-assigning the bot and adding a
 //! "claimed by" section to the top-level comment.
@@ -23,7 +20,7 @@
 use crate::{
     config::AssignConfig,
     github::{self, Event, FileDiff, Issue, IssuesAction, Selection},
-    handlers::{pr_tracking::has_user_capacity, Context, GithubClient, IssuesEvent},
+    handlers::{Context, GithubClient, IssuesEvent},
     interactions::EditIssueBody,
 };
 use anyhow::{bail, Context as _};
@@ -33,7 +30,6 @@ use rand::seq::IteratorRandom;
 use rust_team_data::v1::Teams;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use tokio_postgres::Client as DbClient;
 use tracing as log;
 
 #[cfg(test)]
@@ -78,27 +74,6 @@ const NON_DEFAULT_BRANCH: &str =
      Please double check that you specified the right target!";
 
 const SUBMODULE_WARNING_MSG: &str = "These commits modify **submodules**.";
-
-pub const SELF_ASSIGN_HAS_NO_CAPACITY: &str = "
-You have insufficient capacity to be assigned the pull request at this time. PR assignment has been reverted.
-
-Please choose another assignee or increase your assignment limit.
-
-(see [documentation](https://forge.rust-lang.org/triagebot/pr-assignment-tracking.html))";
-
-pub const REVIEWER_HAS_NO_CAPACITY: &str = "
-`{username}` has insufficient capacity to be assigned the pull request at this time. PR assignment has been reverted.
-
-Please choose another assignee.
-
-(see [documentation](https://forge.rust-lang.org/triagebot/pr-assignment-tracking.html))";
-
-const NO_REVIEWER_HAS_CAPACITY: &str = "
-Could not find a reviewer with enough capacity to be assigned at this time. This is a problem.
-
-Please contact us on [#t-infra](https://rust-lang.zulipchat.com/#narrow/stream/242791-t-infra) on Zulip.
-
-cc: @jackh726 @apiraino";
 
 fn on_vacation_msg(user: &str) -> String {
     ON_VACATION_WARNING.replace("{username}", user)
@@ -297,8 +272,6 @@ async fn set_assignee(issue: &Issue, github: &GithubClient, username: &str) {
 /// Determines who to assign the PR to based on either an `r?` command, or
 /// based on which files were modified.
 ///
-/// Will also check if candidates have capacity in their work queue.
-///
 /// Returns `(assignee, from_comment)` where `assignee` is who to assign to
 /// (or None if no assignee could be found). `from_comment` is a boolean
 /// indicating if the assignee came from an `r?` command (it is false if
@@ -309,14 +282,13 @@ async fn determine_assignee(
     config: &AssignConfig,
     diff: &[FileDiff],
 ) -> anyhow::Result<(Option<String>, bool)> {
-    let db_client = ctx.db.get().await;
     let teams = crate::team_data::teams(&ctx.github).await?;
     if let Some(name) = find_assign_command(ctx, event) {
         if is_self_assign(&name, &event.issue.user.login) {
             return Ok((Some(name.to_string()), true));
         }
         // User included `r?` in the opening PR body.
-        match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &[name]).await {
+        match find_reviewer_from_names(&teams, config, &event.issue, &[name]) {
             Ok(assignee) => return Ok((Some(assignee), true)),
             Err(e) => {
                 event
@@ -330,9 +302,7 @@ async fn determine_assignee(
     // Errors fall-through to try fallback group.
     match find_reviewers_from_diff(config, diff) {
         Ok(candidates) if !candidates.is_empty() => {
-            match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &candidates)
-                .await
-            {
+            match find_reviewer_from_names(&teams, config, &event.issue, &candidates) {
                 Ok(assignee) => return Ok((Some(assignee), false)),
                 Err(FindReviewerError::TeamNotFound(team)) => log::warn!(
                     "team {team} not found via diff from PR {}, \
@@ -342,9 +312,7 @@ async fn determine_assignee(
                 // TODO: post a comment on the PR if the reviewers were filtered due to being on vacation
                 Err(
                     e @ FindReviewerError::NoReviewer { .. }
-                    | e @ FindReviewerError::AllReviewersFiltered { .. }
-                    | e @ FindReviewerError::NoReviewerHasCapacity
-                    | e @ FindReviewerError::ReviewerHasNoCapacity { .. },
+                    | e @ FindReviewerError::AllReviewersFiltered { .. },
                 ) => log::trace!(
                     "no reviewer could be determined for PR {}: {e}",
                     event.issue.global_id()
@@ -362,7 +330,7 @@ async fn determine_assignee(
     }
 
     if let Some(fallback) = config.adhoc_groups.get("fallback") {
-        match find_reviewer_from_names(&db_client, &teams, config, &event.issue, fallback).await {
+        match find_reviewer_from_names(&teams, config, &event.issue, fallback) {
             Ok(assignee) => return Ok((Some(assignee), false)),
             Err(e) => {
                 log::trace!(
@@ -524,20 +492,7 @@ pub(super) async fn handle_command(
                     // welcome message).
                     return Ok(());
                 }
-                let db_client = ctx.db.get().await;
                 if is_self_assign(&name, &event.user().login) {
-                    match has_user_capacity(&db_client, &name).await {
-                        Ok(work_queue) => work_queue.username,
-                        Err(_) => {
-                            issue
-                                .post_comment(
-                                    &ctx.github,
-                                    &REVIEWER_HAS_NO_CAPACITY.replace("{username}", &name),
-                                )
-                                .await?;
-                            return Ok(());
-                        }
-                    };
                     name.to_string()
                 } else {
                     let teams = crate::team_data::teams(&ctx.github).await?;
@@ -557,14 +512,8 @@ pub(super) async fn handle_command(
                             }
                         }
                     }
-                    match find_reviewer_from_names(
-                        &db_client,
-                        &teams,
-                        config,
-                        issue,
-                        &[team_name.to_string()],
-                    )
-                    .await
+
+                    match find_reviewer_from_names(&teams, config, issue, &[team_name.to_string()])
                     {
                         Ok(assignee) => assignee,
                         Err(e) => {
@@ -575,11 +524,7 @@ pub(super) async fn handle_command(
                 }
             }
         };
-
-        // This user is validated and can accept the PR
         set_assignee(issue, &ctx.github, &username).await;
-        // This PR will now be registered in the reviewer's work queue
-        // by the `pr_tracking` handler
         return Ok(());
     }
 
@@ -637,7 +582,6 @@ pub(super) async fn handle_command(
 
     e.apply(&ctx.github, String::new(), &data).await?;
 
-    // Assign the PR: user's work queue has been checked and can accept this PR
     match issue.set_assignee(&ctx.github, &to_assign).await {
         Ok(()) => return Ok(()), // we are done
         Err(github::AssignmentError::InvalidAssignee) => {
@@ -659,7 +603,7 @@ pub(super) async fn handle_command(
 }
 
 #[derive(PartialEq, Debug)]
-pub enum FindReviewerError {
+enum FindReviewerError {
     /// User specified something like `r? foo/bar` where that team name could
     /// not be found.
     TeamNotFound(String),
@@ -677,11 +621,6 @@ pub enum FindReviewerError {
         initial: Vec<String>,
         filtered: Vec<String>,
     },
-    /// No reviewer has capacity to accept a pull request assignment at this time
-    NoReviewerHasCapacity,
-    /// The requested reviewer has no capacity to accept a pull request
-    /// assignment at this time
-    ReviewerHasNoCapacity { username: String },
 }
 
 impl std::error::Error for FindReviewerError {}
@@ -711,22 +650,12 @@ impl fmt::Display for FindReviewerError {
                 write!(
                     f,
                     "Could not assign reviewer from: `{}`.\n\
-                     User(s) `{}` are either the PR author, already assigned, or on vacation. \
-                     If it's a team, we could not find any candidates.\n\
-                     Please use `r?` to specify someone else to assign.",
+                     User(s) `{}` are either the PR author, already assigned, or on vacation, \
+                     and there are no other candidates.\n\
+                     Use `r?` to specify someone else to assign.",
                     initial.join(","),
                     filtered.join(","),
                 )
-            }
-            FindReviewerError::ReviewerHasNoCapacity { username } => {
-                write!(
-                    f,
-                    "{}",
-                    REVIEWER_HAS_NO_CAPACITY.replace("{username}", username)
-                )
-            }
-            FindReviewerError::NoReviewerHasCapacity => {
-                write!(f, "{}", NO_REVIEWER_HAS_CAPACITY)
             }
         }
     }
@@ -738,8 +667,7 @@ impl fmt::Display for FindReviewerError {
 /// `@octocat`, or names from the owners map. It can contain GitHub usernames,
 /// auto-assign groups, or rust-lang team names. It must have at least one
 /// entry.
-async fn find_reviewer_from_names(
-    db: &DbClient,
+fn find_reviewer_from_names(
     teams: &Teams,
     config: &AssignConfig,
     issue: &Issue,
@@ -765,64 +693,14 @@ async fn find_reviewer_from_names(
     //
     // These are all ideas for improving the selection here. However, I'm not
     // sure they are really worth the effort.
-
-    // If we are trying to assign to the ghost GitHub user, bypass every check
-    let mut filtered_candidates: HashSet<String> = HashSet::new();
-    if candidates.contains("ghost") {
-        filtered_candidates.insert("ghost".to_string());
-    } else {
-        // filter out team members without capacity
-        filtered_candidates = filter_by_capacity(db, &candidates)
-            .await
-            .expect("Error while filtering out team members");
-
-        if filtered_candidates.is_empty() {
-            return Err(FindReviewerError::AllReviewersFiltered {
-                initial: names.to_vec(),
-                filtered: names.to_vec(),
-            });
-        }
-    }
-
-    log::debug!("Filtered list of candidates: {:?}", filtered_candidates);
-
-    Ok(filtered_candidates
+    Ok(candidates
         .into_iter()
         .choose(&mut rand::thread_rng())
-        .expect("candidate_reviewers_from_names should return at least one entry")
+        .expect("candidate_reviewers_from_names always returns at least one entry")
         .to_string())
 }
 
-// FIXME: this query probably needs to take into account when max_assigned_prs is null
-/// Filter out candidates not having review capacity
-async fn filter_by_capacity(
-    db: &DbClient,
-    candidates: &HashSet<&str>,
-) -> anyhow::Result<HashSet<String>> {
-    let usernames = candidates
-        .iter()
-        .map(|c| *c)
-        .collect::<Vec<&str>>()
-        .join(",");
-
-    let q = format!(
-        "
-SELECT username
-FROM review_prefs r
-JOIN users on users.user_id=r.user_id
-AND username = ANY('{{ {} }}')
-AND ARRAY_LENGTH(r.assigned_prs, 1) < max_assigned_prs",
-        usernames
-    );
-    let result = db.query(&q, &[]).await.context("Select DB error")?;
-    let mut candidates: HashSet<String> = HashSet::new();
-    for row in result {
-        candidates.insert(row.get("username"));
-    }
-    Ok(candidates)
-}
-
-/// returns a list of candidate usernames (from relevant teams) to choose as a reviewer.
+/// Returns a list of candidate usernames to choose as a reviewer.
 fn candidate_reviewers_from_names<'a>(
     teams: &'a Teams,
     config: &'a AssignConfig,
