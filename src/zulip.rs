@@ -337,7 +337,7 @@ pub struct Member {
     pub user_id: u64,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Copy, Clone, serde::Serialize)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum Recipient<'a> {

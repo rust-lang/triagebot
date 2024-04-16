@@ -228,10 +228,26 @@ pub(crate) struct NotifyZulipConfig {
 pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) zulip_stream: u64,
     pub(crate) topic: String,
-    pub(crate) message_on_add: Option<String>,
-    pub(crate) message_on_remove: Option<String>,
-    pub(crate) message_on_close: Option<String>,
-    pub(crate) message_on_reopen: Option<String>,
+    #[serde(rename = "message_on_add", default, deserialize_with = "string_or_seq")]
+    pub(crate) messages_on_add: Vec<String>,
+    #[serde(
+        rename = "message_on_remove",
+        default,
+        deserialize_with = "string_or_seq"
+    )]
+    pub(crate) messages_on_remove: Vec<String>,
+    #[serde(
+        rename = "message_on_close",
+        default,
+        deserialize_with = "string_or_seq"
+    )]
+    pub(crate) messages_on_close: Vec<String>,
+    #[serde(
+        rename = "message_on_reopen",
+        default,
+        deserialize_with = "string_or_seq"
+    )]
+    pub(crate) messages_on_reopen: Vec<String>,
     #[serde(default)]
     pub(crate) required_labels: Vec<String>,
 }
@@ -382,6 +398,35 @@ impl fmt::Display for ConfigurationError {
             }
         }
     }
+}
+
+fn string_or_seq<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct Visitor;
+
+    impl<'de> serde::de::Visitor<'de> for Visitor {
+        type Value = Vec<String>;
+
+        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("string or sequence of strings")
+        }
+
+        fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+            Ok(Vec::new())
+        }
+
+        fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
+            Ok(vec![value.to_owned()])
+        }
+
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(self, seq: A) -> Result<Self::Value, A::Error> {
+            serde::Deserialize::deserialize(serde::de::value::SeqAccessDeserializer::new(seq))
+        }
+    }
+
+    deserializer.deserialize_any(Visitor)
 }
 
 #[cfg(test)]

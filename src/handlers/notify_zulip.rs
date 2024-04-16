@@ -60,11 +60,13 @@ fn parse_label_change_input(
     }
 
     match event.action {
-        IssuesAction::Labeled { .. } if config.message_on_add.is_some() => Some(NotifyZulipInput {
-            notification_type: NotificationType::Labeled,
-            label,
-        }),
-        IssuesAction::Unlabeled { .. } if config.message_on_remove.is_some() => {
+        IssuesAction::Labeled { .. } if !config.messages_on_add.is_empty() => {
+            Some(NotifyZulipInput {
+                notification_type: NotificationType::Labeled,
+                label,
+            })
+        }
+        IssuesAction::Unlabeled { .. } if !config.messages_on_remove.is_empty() => {
             Some(NotifyZulipInput {
                 notification_type: NotificationType::Unlabeled,
                 label,
@@ -96,13 +98,13 @@ fn parse_close_reopen_input(
             }
 
             match event.action {
-                IssuesAction::Closed if config.message_on_close.is_some() => {
+                IssuesAction::Closed if !config.messages_on_close.is_empty() => {
                     Some(NotifyZulipInput {
                         notification_type: NotificationType::Closed,
                         label,
                     })
                 }
-                IssuesAction::Reopened if config.message_on_reopen.is_some() => {
+                IssuesAction::Reopened if !config.messages_on_reopen.is_empty() => {
                     Some(NotifyZulipInput {
                         notification_type: NotificationType::Reopened,
                         label,
@@ -140,9 +142,9 @@ pub(super) async fn handle_input<'a>(
     for input in inputs {
         let config = &config.labels[&input.label.name];
 
-        let mut topic = config.topic.clone();
-        topic = topic.replace("{number}", &event.issue.number.to_string());
-        topic = topic.replace("{title}", &event.issue.title);
+        let topic = &config.topic;
+        let topic = topic.replace("{number}", &event.issue.number.to_string());
+        let mut topic = topic.replace("{title}", &event.issue.title);
         // Truncate to 60 chars (a Zulip limitation)
         let mut chars = topic.char_indices().skip(59);
         if let (Some((len, _)), Some(_)) = (chars.next(), chars.next()) {
@@ -150,24 +152,29 @@ pub(super) async fn handle_input<'a>(
             topic.push('…');
         }
 
-        let mut msg = match input.notification_type {
-            NotificationType::Labeled => config.message_on_add.as_ref().unwrap().clone(),
-            NotificationType::Unlabeled => config.message_on_remove.as_ref().unwrap().clone(),
-            NotificationType::Closed => config.message_on_close.as_ref().unwrap().clone(),
-            NotificationType::Reopened => config.message_on_reopen.as_ref().unwrap().clone(),
+        let msgs = match input.notification_type {
+            NotificationType::Labeled => &config.messages_on_add,
+            NotificationType::Unlabeled => &config.messages_on_remove,
+            NotificationType::Closed => &config.messages_on_close,
+            NotificationType::Reopened => &config.messages_on_reopen,
         };
 
-        msg = msg.replace("{number}", &event.issue.number.to_string());
-        msg = msg.replace("{title}", &event.issue.title);
-
-        let zulip_req = crate::zulip::MessageApiRequest {
-            recipient: crate::zulip::Recipient::Stream {
-                id: config.zulip_stream,
-                topic: &topic,
-            },
-            content: &msg,
+        let recipient = crate::zulip::Recipient::Stream {
+            id: config.zulip_stream,
+            topic: &topic,
         };
-        zulip_req.send(&ctx.github.raw()).await?;
+
+        for msg in msgs {
+            let msg = msg.replace("{number}", &event.issue.number.to_string());
+            let msg = msg.replace("{title}", &event.issue.title);
+
+            crate::zulip::MessageApiRequest {
+                recipient,
+                content: &msg,
+            }
+            .send(&ctx.github.raw())
+            .await?;
+        }
     }
 
     Ok(())
