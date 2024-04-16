@@ -159,7 +159,7 @@ macro_rules! issue_handlers {
 
 // Handle events that happened on issues
 //
-// This is for events that happen only on issues (e.g. label changes).
+// This is for events that happen only on issues or pull requests (e.g. label changes or assignments).
 // Each module in the list must contain the functions `parse_input` and `handle_input`.
 issue_handlers! {
     assign,
@@ -280,7 +280,7 @@ macro_rules! command_handlers {
 //
 // This is for handlers for commands parsed by the `parser` crate.
 // Each variant of `parser::command::Command` must be in this list,
-// preceded by the module containing the coresponding `handle_command` function
+// preceded by the module containing the corresponding `handle_command` function
 command_handlers! {
     assign: Assign,
     glacier: Glacier,
