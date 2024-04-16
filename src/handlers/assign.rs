@@ -766,16 +766,22 @@ async fn find_reviewer_from_names(
     // These are all ideas for improving the selection here. However, I'm not
     // sure they are really worth the effort.
 
-    // filter out team members without capacity
-    let filtered_candidates = filter_by_capacity(db, &candidates)
-        .await
-        .expect("Error while filtering out team members");
+    // If we are trying to assign to the ghost GitHub user, bypass every check
+    let mut filtered_candidates: HashSet<String> = HashSet::new();
+    if candidates.contains("ghost") {
+        filtered_candidates.insert("ghost".to_string());
+    } else {
+        // filter out team members without capacity
+        filtered_candidates = filter_by_capacity(db, &candidates)
+            .await
+            .expect("Error while filtering out team members");
 
-    if filtered_candidates.is_empty() {
-        return Err(FindReviewerError::AllReviewersFiltered {
-            initial: names.to_vec(),
-            filtered: names.to_vec(),
-        });
+        if filtered_candidates.is_empty() {
+            return Err(FindReviewerError::AllReviewersFiltered {
+                initial: names.to_vec(),
+                filtered: names.to_vec(),
+            });
+        }
     }
 
     log::debug!("Filtered list of candidates: {:?}", filtered_candidates);
@@ -787,6 +793,7 @@ async fn find_reviewer_from_names(
         .to_string())
 }
 
+// FIXME: this query probably needs to take into account when max_assigned_prs is null
 /// Filter out candidates not having review capacity
 async fn filter_by_capacity(
     db: &DbClient,
