@@ -332,7 +332,11 @@ CREATE table review_prefs (
     assigned_prs INT[] NOT NULL DEFAULT array[]::INT[]
 );",
     "
-CREATE EXTENSION intarray;
-CREATE UNIQUE INDEX review_prefs_user_id ON review_prefs(user_id);
+CREATE EXTENSION IF NOT EXISTS intarray;",
+    "
+CREATE UNIQUE INDEX IF NOT EXISTS review_prefs_user_id ON review_prefs(user_id);
  ",
+    "
+ALTER TABLE review_prefs ADD COLUMN IF NOT EXISTS max_assigned_prs INTEGER DEFAULT NULL;
+",
 ];
