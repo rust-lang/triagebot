@@ -32,7 +32,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    if event.comment.user.id != Some(BORS_GH_ID) {
+    if event.comment.user.id != BORS_GH_ID {
         log::trace!("Ignoring non-bors comment, user: {:?}", event.comment.user);
         return Ok(());
     }

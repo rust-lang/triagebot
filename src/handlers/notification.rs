@@ -5,6 +5,7 @@
 //! Parsing is done in the `parser::command::ping` module.
 
 use crate::db::notifications;
+use crate::github::get_id_for_username;
 use crate::{
     github::{self, Event},
     handlers::Context,
@@ -58,7 +59,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     if let Some(from) = event.comment_from() {
         for login in parser::get_mentions(from).into_iter() {
             if let Some((users, _)) = id_from_user(ctx, login).await? {
-                users_notified.extend(users.into_iter().map(|user| user.id.unwrap()));
+                users_notified.extend(users.into_iter().map(|user| user.id));
             }
         }
     };
@@ -68,7 +69,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     //
     // If the user intended to ping themselves, they can add the GitHub comment
     // via the Zulip interface.
-    match event.user().get_id(&ctx.github).await {
+    match get_id_for_username(&ctx.github, &event.user().login).await {
         Ok(Some(id)) => {
             users_notified.insert(id.try_into().unwrap());
         }
@@ -86,12 +87,12 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
 
         let client = ctx.db.get().await;
         for user in users {
-            if !users_notified.insert(user.id.unwrap()) {
+            if !users_notified.insert(user.id) {
                 // Skip users already associated with this event.
                 continue;
             }
 
-            if let Err(err) = notifications::record_username(&client, user.id.unwrap(), &user.login)
+            if let Err(err) = notifications::record_username(&client, user.id, &user.login)
                 .await
                 .context("failed to record username")
             {
@@ -101,7 +102,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             if let Err(err) = notifications::record_ping(
                 &client,
                 &notifications::Notification {
-                    user_id: user.id.unwrap(),
+                    user_id: user.id,
                     origin_url: event.html_url().unwrap().to_owned(),
                     origin_html: body.to_owned(),
                     time: event.time().unwrap(),
@@ -166,30 +167,25 @@ async fn id_from_user(
             team.members
                 .into_iter()
                 .map(|member| github::User {
-                    id: Some(member.github_id),
+                    id: member.github_id,
                     login: member.github,
                 })
                 .collect::<Vec<github::User>>(),
             Some(team.name),
         )))
     } else {
-        let user = github::User {
-            login: login.to_owned(),
-            id: None,
-        };
-        let id = user
-            .get_id(&ctx.github)
+        let id = get_id_for_username(&ctx.github, login)
             .await
-            .with_context(|| format!("failed to get user {} ID", user.login))?;
+            .with_context(|| format!("failed to get user {} ID", login))?;
         let Some(id) = id else {
             // If the user was not in the team(s) then just don't record it.
-            log::trace!("Skipping {} because no id found", user.login);
+            log::trace!("Skipping {} because no id found", login);
             return Ok(None);
         };
         Ok(Some((
             vec![github::User {
-                login: user.login.clone(),
-                id: Some(id),
+                login: login.to_string(),
+                id,
             }],
             None,
         )))
