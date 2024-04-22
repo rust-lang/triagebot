@@ -18,7 +18,7 @@ use tracing as log;
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct User {
     pub login: String,
-    pub id: Option<u64>,
+    pub id: u64,
 }
 
 impl GithubClient {
@@ -200,17 +200,20 @@ impl User {
         );
         Ok(in_all || is_triager || is_pri_member || is_async_member)
     }
+}
 
-    // Returns the ID of the given user, if the user is in the `all` team.
-    pub async fn get_id<'a>(&'a self, client: &'a GithubClient) -> anyhow::Result<Option<u64>> {
-        let permission = crate::team_data::teams(client).await?;
-        let map = permission.teams;
-        Ok(map["all"]
-            .members
-            .iter()
-            .find(|g| g.github == self.login)
-            .map(|u| u.github_id))
-    }
+// Returns the ID of the given user, if the user is in the `all` team.
+pub async fn get_id_for_username<'a>(
+    client: &'a GithubClient,
+    login: &str,
+) -> anyhow::Result<Option<u64>> {
+    let permission = crate::team_data::teams(client).await?;
+    let map = permission.teams;
+    Ok(map["all"]
+        .members
+        .iter()
+        .find(|g| g.github == login)
+        .map(|u| u.github_id))
 }
 
 pub async fn get_team(
@@ -2670,7 +2673,7 @@ pub async fn retrieve_pull_requests(
                     prs_processed.push((
                         User {
                             login: user.login.clone(),
-                            id: Some(user_id),
+                            id: user_id,
                         },
                         pr.number,
                     ));

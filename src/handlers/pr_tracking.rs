@@ -59,18 +59,18 @@ pub(super) async fn handle_input<'a>(
     };
 
     // ensure the team member object of this action exists in the `users` table
-    record_username(&db_client, assignee.id.unwrap(), &assignee.login)
+    record_username(&db_client, assignee.id, &assignee.login)
         .await
         .context("failed to record username")?;
 
     if matches!(event.action, IssuesAction::Unassigned { .. }) {
-        delete_pr_from_workqueue(&db_client, assignee.id.unwrap(), event.issue.number)
+        delete_pr_from_workqueue(&db_client, assignee.id, event.issue.number)
             .await
             .context("Failed to remove PR from workqueue")?;
     }
 
     if matches!(event.action, IssuesAction::Assigned { .. }) {
-        upsert_pr_into_workqueue(&db_client, assignee.id.unwrap(), event.issue.number)
+        upsert_pr_into_workqueue(&db_client, assignee.id, event.issue.number)
             .await
             .context("Failed to add PR to workqueue")?;
     }
