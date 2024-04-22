@@ -2035,6 +2035,12 @@ impl RequestSend for RequestBuilder {
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
 pub fn default_token_from_env() -> String {
+    match std::env::var("GITHUB_TOKEN") {
+        Ok(v) => return v,
+        Err(_) => (),
+    }
+
+    // kept for retrocompatibility but usage is discouraged and will be deprecated
     match std::env::var("GITHUB_API_TOKEN") {
         Ok(v) => return v,
         Err(_) => (),
@@ -2045,7 +2051,7 @@ pub fn default_token_from_env() -> String {
         Err(_) => (),
     }
 
-    panic!("could not find token in GITHUB_API_TOKEN or .gitconfig/github.oath-token")
+    panic!("could not find token in GITHUB_TOKEN, GITHUB_API_TOKEN or .gitconfig/github.oath-token")
 }
 
 fn get_token_from_git_config() -> anyhow::Result<String> {
