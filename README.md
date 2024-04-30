@@ -40,7 +40,7 @@ The general overview of what you will need to do:
 4. Configure the `.env` file:
 
    1. Copy `.env.sample` to `.env`
-   2. `GITHUB_API_TOKEN`: This is a token needed for Triagebot to send requests to GitHub. Go to GitHub Settings > Developer Settings > Personal Access Token, and create a new token. The `repo` permission should be sufficient.
+   2. `GITHUB_TOKEN`: This is a token needed for Triagebot to send requests to GitHub. Go to GitHub Settings > Developer Settings > Personal Access Token, and create a new token. The `repo` permission should be sufficient.
       If this is not set, Triagebot will also look in `~/.gitconfig` in the `github.oauth-token` setting.
    3. `DATABASE_URL`: This is the URL to the database. See [Configuring a database](#configuring-a-database).
    4. `GITHUB_WEBHOOK_SECRET`: Enter the secret you entered in the webhook above.
