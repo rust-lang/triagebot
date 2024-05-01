@@ -185,7 +185,7 @@ pub async fn webhook(
             payload.pull_request.pull_request = Some(PullRequestDetails::new());
 
             // Treat pull request review comments exactly like pull request
-            // review comments.
+            // comments.
             github::Event::IssueComment(github::IssueCommentEvent {
                 action: match payload.action {
                     github::PullRequestReviewAction::Submitted => {
