@@ -124,6 +124,7 @@ async fn milestone_cargo(
 
     // Get all of the git commits in the cargo repo.
     let cargo_repo = gh.repository("rust-lang/cargo").await?;
+    log::info!("loading cargo changes {cargo_start_hash}...{cargo_end_hash}");
     let commits = cargo_repo
         .commits_in_range(gh, cargo_start_hash, cargo_end_hash)
         .await?;
@@ -141,6 +142,11 @@ async fn milestone_cargo(
     let merge_re = Regex::new("(?:Auto merge of|Merge pull request) #([0-9]+)").unwrap();
 
     let pr_nums = commits.iter().filter_map(|commit| {
+        log::info!(
+            "getting PR number for cargo commit {} (len={})",
+            commit.sha,
+            commit.commit.message.len()
+        );
         merge_re.captures(&commit.commit.message).map(|cap| {
             cap.get(1)
                 .unwrap()
@@ -153,6 +159,7 @@ async fn milestone_cargo(
         .get_or_create_milestone(gh, release_version, "closed")
         .await?;
     for pr_num in pr_nums {
+        log::info!("setting cargo milestone {milestone:?} for {pr_num}");
         cargo_repo.set_milestone(gh, &milestone, pr_num).await?;
     }
 
