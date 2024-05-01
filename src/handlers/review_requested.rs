@@ -15,7 +15,10 @@ pub(crate) async fn parse_input(
         return Ok(None);
     }
 
-    let IssuesAction::ReviewRequested { requested_reviewer } = &event.action else {
+    let IssuesAction::ReviewRequested {
+        requested_reviewer: Some(requested_reviewer),
+    } = &event.action
+    else {
         return Ok(None);
     };
 

@@ -163,6 +163,7 @@ pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::R
     match res {
         Ok(r) => Ok(r),
         Err(e) => {
+            log::error!("failed to deserialize webhook payload: {v}");
             let ctx = format!("at {:?}", e.path());
             Err(e.into_inner()).context(ctx)
         }
