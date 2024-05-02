@@ -4,6 +4,7 @@
 
 use crate::{
     config::{ValidateConfig, CONFIG_FILE_NAME},
+    github::IssuesAction,
     handlers::{Context, IssuesEvent},
 };
 use tracing as log;
@@ -13,6 +14,12 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     _config: Option<&ValidateConfig>,
 ) -> Result<Option<()>, String> {
+    if !matches!(
+        event.action,
+        IssuesAction::Opened | IssuesAction::Reopened | IssuesAction::Synchronize
+    ) {
+        return Ok(None);
+    }
     // All processing needs to be done in parse_input (instead of
     // handle_input) because we want this to *always* run. handle_input
     // requires the config to exist in triagebot.toml, but we want this to run
