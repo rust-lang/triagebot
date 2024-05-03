@@ -363,9 +363,9 @@ pub struct Comment {
     pub body: String,
     pub html_url: String,
     pub user: User,
-    #[serde(alias = "submitted_at")] // for pull request reviews
+    #[serde(default, alias = "submitted_at")] // for pull request reviews
     pub created_at: chrono::DateTime<Utc>,
-    #[serde(alias = "submitted_at")] // for pull request reviews
+    #[serde(default, alias = "submitted_at")] // for pull request reviews
     pub updated_at: chrono::DateTime<Utc>,
     #[serde(default, rename = "state")]
     pub pr_review_state: Option<PullRequestReviewState>,
@@ -983,7 +983,9 @@ pub enum IssuesAction {
     Demilestoned,
     ReviewRequested {
         /// The person requested to review the pull request
-        requested_reviewer: User,
+        ///
+        /// This can be `None` when a review is requested for a team.
+        requested_reviewer: Option<User>,
     },
     ReviewRequestRemoved,
     ReadyForReview,
@@ -991,6 +993,8 @@ pub enum IssuesAction {
     ConvertedToDraft,
     AutoMergeEnabled,
     AutoMergeDisabled,
+    Enqueued,
+    Dequeued,
 }
 
 #[derive(Debug, serde::Deserialize)]
