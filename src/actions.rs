@@ -193,7 +193,7 @@ impl<'a> Action for Step<'a> {
             context.insert(name, issues);
         }
 
-        let date = chrono::Utc::today().format("%Y-%m-%d").to_string();
+        let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
         context.insert("CURRENT_DATE", &date);
 
         // populate T-compiler meetings
