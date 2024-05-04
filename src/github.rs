@@ -877,6 +877,63 @@ impl Issue {
         ));
         Ok(client.json(req).await?)
     }
+
+    /// Returns the GraphQL ID of this issue.
+    async fn graphql_issue_id(&self, client: &GithubClient) -> anyhow::Result<String> {
+        let repo = self.repository();
+        let mut issue_id = client
+            .graphql_query(
+                "query($owner:String!, $repo:String!, $issueNum:Int!) {
+                    repository(owner: $owner, name: $repo) {
+                        issue(number: $issueNum) {
+                            id
+                        }
+                    }
+                }
+                ",
+                serde_json::json!({
+                    "owner": repo.organization,
+                    "repo": repo.repository,
+                    "issueNum": self.number,
+                }),
+            )
+            .await?;
+        let serde_json::Value::String(issue_id) =
+            issue_id["data"]["repository"]["issue"]["id"].take()
+        else {
+            anyhow::bail!("expected issue id, got {issue_id}");
+        };
+        Ok(issue_id)
+    }
+
+    /// Transfers this issue to the given repository.
+    pub async fn transfer(
+        &self,
+        client: &GithubClient,
+        owner: &str,
+        repo: &str,
+    ) -> anyhow::Result<()> {
+        let issue_id = self.graphql_issue_id(client).await?;
+        let repo_id = client.graphql_repo_id(owner, repo).await?;
+        client
+            .graphql_query(
+                "mutation ($issueId: ID!, $repoId: ID!) {
+                  transferIssue(
+                    input: {createLabelsIfMissing: true, issueId: $issueId, repositoryId: $repoId}
+                  ) {
+                    issue {
+                      id
+                    }
+                  }
+                }",
+                serde_json::json!({
+                    "issueId": issue_id,
+                    "repoId": repo_id,
+                }),
+            )
+            .await?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -2203,11 +2260,17 @@ impl GithubClient {
     }
 
     /// Issues an ad-hoc GraphQL query.
-    pub async fn graphql_query<T: serde::de::DeserializeOwned>(
+    ///
+    /// You are responsible for checking the `errors` array when calling this
+    /// function to determine if there is an error. Only use this if you are
+    /// looking for specific error codes, or don't care about errors. Use
+    /// [`GithubClient::graphql_query`] if you would prefer to have a generic
+    /// error message.
+    pub async fn graphql_query_with_errors(
         &self,
         query: &str,
         vars: serde_json::Value,
-    ) -> anyhow::Result<T> {
+    ) -> anyhow::Result<serde_json::Value> {
         self.json(self.post(&self.graphql_url).json(&serde_json::json!({
             "query": query,
             "variables": vars,
@@ -2215,12 +2278,32 @@ impl GithubClient {
         .await
     }
 
+    /// Issues an ad-hoc GraphQL query.
+    ///
+    /// See [`GithubClient::graphql_query_with_errors`] if you need to check
+    /// for specific errors.
+    pub async fn graphql_query(
+        &self,
+        query: &str,
+        vars: serde_json::Value,
+    ) -> anyhow::Result<serde_json::Value> {
+        let result: serde_json::Value = self.graphql_query_with_errors(query, vars).await?;
+        if let Some(errors) = result["errors"].as_array() {
+            let messages: Vec<_> = errors
+                .iter()
+                .map(|err| err["message"].as_str().unwrap_or_default())
+                .collect();
+            anyhow::bail!("error: {}", messages.join("\n"));
+        }
+        Ok(result)
+    }
+
     /// Returns the object ID of the given user.
     ///
     /// Returns `None` if the user doesn't exist.
     pub async fn user_object_id(&self, user: &str) -> anyhow::Result<Option<String>> {
         let user_info: serde_json::Value = self
-            .graphql_query(
+            .graphql_query_with_errors(
                 "query($user:String!) {
                     user(login:$user) {
                         id
@@ -2273,7 +2356,7 @@ impl GithubClient {
         // work on forks. This GraphQL query seems to work fairly reliably,
         // and seems to cost only 1 point.
         match self
-            .graphql_query::<serde_json::Value>(
+            .graphql_query_with_errors(
                 "query($repository_owner:String!, $repository_name:String!, $user_id:ID!) {
                         repository(owner: $repository_owner, name: $repository_name) {
                             defaultBranchRef {
@@ -2397,6 +2480,27 @@ impl GithubClient {
         .await
         .with_context(|| format!("failed to set milestone for {url} to milestone {milestone:?}"))?;
         Ok(())
+    }
+
+    /// Returns the GraphQL ID of the given repository.
+    async fn graphql_repo_id(&self, owner: &str, repo: &str) -> anyhow::Result<String> {
+        let mut repo_id = self
+            .graphql_query(
+                "query($owner:String!, $repo:String!) {
+                    repository(owner: $owner, name: $repo) {
+                        id
+                    }
+                }",
+                serde_json::json!({
+                    "owner": owner,
+                    "repo": repo,
+                }),
+            )
+            .await?;
+        let serde_json::Value::String(repo_id) = repo_id["data"]["repository"]["id"].take() else {
+            anyhow::bail!("expected repo id, got {repo_id}");
+        };
+        Ok(repo_id)
     }
 }
 

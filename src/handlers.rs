@@ -47,6 +47,7 @@ mod review_submitted;
 mod rfc_helper;
 pub mod rustc_commits;
 mod shortcut;
+mod transfer;
 pub mod types_planning_updates;
 mod validate_config;
 
@@ -292,6 +293,7 @@ command_handlers! {
     shortcut: Shortcut,
     close: Close,
     note: Note,
+    transfer: Transfer,
 }
 
 pub struct Context {
