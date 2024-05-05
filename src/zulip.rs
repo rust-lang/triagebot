@@ -1,6 +1,6 @@
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
-use crate::github::{self, GithubClient};
+use crate::github::{get_id_for_username, GithubClient};
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pull_requests_assignment_update::get_review_prefs;
 use crate::handlers::Context;
@@ -214,7 +214,13 @@ async fn query_pr_assignments(
     let db_client = ctx.db.get().await;
 
     let record = match subcommand {
-        "show" => get_review_prefs(&db_client, gh_id).await?,
+        "show" => {
+            let rec = get_review_prefs(&db_client, gh_id).await;
+            if rec.is_err() {
+                anyhow::bail!("No preferences set.")
+            }
+            rec?
+        }
         _ => anyhow::bail!("Invalid subcommand."),
     };
 
@@ -235,13 +241,9 @@ async fn execute_for_other_user(
         Some(username) => username,
         None => anyhow::bail!("no username provided"),
     };
-    let user_id = match (github::User {
-        login: username.to_owned(),
-        id: None,
-    })
-    .get_id(&ctx.github)
-    .await
-    .context("getting ID of github user")?
+    let user_id = match get_id_for_username(&ctx.github, username)
+        .await
+        .context("getting ID of github user")?
     {
         Some(id) => id.try_into().unwrap(),
         None => anyhow::bail!("Can only authorize for other GitHub users."),
@@ -331,7 +333,7 @@ pub struct Member {
     pub user_id: u64,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Copy, Clone, serde::Serialize)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum Recipient<'a> {

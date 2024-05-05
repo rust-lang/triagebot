@@ -39,6 +39,7 @@ mod note;
 mod notification;
 mod notify_zulip;
 mod ping;
+pub mod pr_tracking;
 mod prioritize;
 pub mod pull_requests_assignment_update;
 mod relabel;
@@ -47,6 +48,7 @@ mod review_submitted;
 mod rfc_helper;
 pub mod rustc_commits;
 mod shortcut;
+mod transfer;
 pub mod types_planning_updates;
 mod validate_config;
 
@@ -169,6 +171,7 @@ issue_handlers! {
     no_merges,
     notify_zulip,
     review_requested,
+    pr_tracking,
     validate_config,
 }
 
@@ -291,6 +294,7 @@ command_handlers! {
     shortcut: Shortcut,
     close: Close,
     note: Note,
+    transfer: Transfer,
     decision: Decision,
 }
 

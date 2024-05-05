@@ -15,6 +15,10 @@ lazy_static::lazy_static! {
         RwLock::new(HashMap::new());
 }
 
+// This struct maps each possible option of the triagebot.toml.
+// See documentation of options at: https://forge.rust-lang.org/triagebot/pr-assignment.html#configuration
+// When adding a new config option to the triagebot.toml, it must be also mapped here
+// Will be used by the `issue_handlers!()` or `command_handlers!()` macros.
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
@@ -40,6 +44,8 @@ pub(crate) struct Config {
     // We want this validation to run even without the entry in the config file
     #[serde(default = "ValidateConfig::default")]
     pub(crate) validate_config: Option<ValidateConfig>,
+    pub(crate) pr_tracking: Option<ReviewPrefsConfig>,
+    pub(crate) transfer: Option<TransferConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -224,10 +230,26 @@ pub(crate) struct NotifyZulipConfig {
 pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) zulip_stream: u64,
     pub(crate) topic: String,
-    pub(crate) message_on_add: Option<String>,
-    pub(crate) message_on_remove: Option<String>,
-    pub(crate) message_on_close: Option<String>,
-    pub(crate) message_on_reopen: Option<String>,
+    #[serde(rename = "message_on_add", default, deserialize_with = "string_or_seq")]
+    pub(crate) messages_on_add: Vec<String>,
+    #[serde(
+        rename = "message_on_remove",
+        default,
+        deserialize_with = "string_or_seq"
+    )]
+    pub(crate) messages_on_remove: Vec<String>,
+    #[serde(
+        rename = "message_on_close",
+        default,
+        deserialize_with = "string_or_seq"
+    )]
+    pub(crate) messages_on_close: Vec<String>,
+    #[serde(
+        rename = "message_on_reopen",
+        default,
+        deserialize_with = "string_or_seq"
+    )]
+    pub(crate) messages_on_reopen: Vec<String>,
     #[serde(default)]
     pub(crate) required_labels: Vec<String>,
 }
@@ -319,10 +341,21 @@ pub(crate) struct GitHubReleasesConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct ReviewPrefsConfig {
+    #[serde(default)]
+    _empty: (),
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct DecisionConfig {
     #[serde(default)]
     _empty: (),
 }
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TransferConfig {}
 
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
@@ -378,6 +411,35 @@ impl fmt::Display for ConfigurationError {
             }
         }
     }
+}
+
+fn string_or_seq<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct Visitor;
+
+    impl<'de> serde::de::Visitor<'de> for Visitor {
+        type Value = Vec<String>;
+
+        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("string or sequence of strings")
+        }
+
+        fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+            Ok(Vec::new())
+        }
+
+        fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
+            Ok(vec![value.to_owned()])
+        }
+
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(self, seq: A) -> Result<Self::Value, A::Error> {
+            serde::Deserialize::deserialize(serde::de::value::SeqAccessDeserializer::new(seq))
+        }
+    }
+
+    deserializer.deserialize_any(Visitor)
 }
 
 #[cfg(test)]
@@ -473,6 +535,8 @@ mod tests {
                 no_merges: None,
                 decision: Some(DecisionConfig { _empty: () }),
                 validate_config: Some(ValidateConfig {}),
+                pr_tracking: None,
+                transfer: None,
             }
         );
     }

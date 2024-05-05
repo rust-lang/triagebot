@@ -108,7 +108,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         }),
                     },
                     QueryMap {
-                        name: "fcp_finished",
+                        name: "fcp_finished_tcompiler",
                         kind: QueryKind::List,
                         query: Arc::new(github::Query {
                             filters: vec![("state", "all")],
@@ -117,7 +117,26 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                                 "disposition-merge",
                                 "to-announce",
                             ],
-                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
+                            exclude_labels: vec![
+                                "t-libs",
+                                "t-libs-api",
+                                "t-rustdoc",
+                                "t-lang",
+                                "t-style",
+                            ],
+                        }),
+                    },
+                    QueryMap {
+                        name: "fcp_finished_not_tcompiler",
+                        kind: QueryKind::List,
+                        query: Arc::new(github::Query {
+                            filters: vec![("state", "all")],
+                            include_labels: vec![
+                                "finished-final-comment-period",
+                                "disposition-merge",
+                                "to-announce",
+                            ],
+                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc", "t-compiler"],
                         }),
                     },
                 ],

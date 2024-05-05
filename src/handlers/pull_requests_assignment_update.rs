@@ -30,16 +30,14 @@ impl Job for PullRequestAssignmentUpdate {
 
         // aggregate by user first
         let aggregated = prs.into_iter().fold(HashMap::new(), |mut acc, (user, pr)| {
-            let (_, prs) = acc
-                .entry(user.id.unwrap())
-                .or_insert_with(|| (user, Vec::new()));
+            let (_, prs) = acc.entry(user.id).or_insert_with(|| (user, Vec::new()));
             prs.push(pr);
             acc
         });
 
         // populate the table
         for (_user_id, (assignee, prs)) in &aggregated {
-            let assignee_id = assignee.id.expect("checked");
+            let assignee_id = assignee.id;
             let _ = record_username(&db, assignee_id, &assignee.login).await;
             create_team_member_workqueue(&db, assignee_id, &prs).await?;
         }

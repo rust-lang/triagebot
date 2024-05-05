@@ -14,6 +14,7 @@ pub mod prioritize;
 pub mod relabel;
 pub mod second;
 pub mod shortcut;
+pub mod transfer;
 
 #[derive(Debug, PartialEq)]
 pub enum Command<'a> {
@@ -27,6 +28,7 @@ pub enum Command<'a> {
     Shortcut(Result<shortcut::ShortcutCommand, Error<'a>>),
     Close(Result<close::CloseCommand, Error<'a>>),
     Note(Result<note::NoteCommand, Error<'a>>),
+    Transfer(Result<transfer::TransferCommand, Error<'a>>),
     Decision(Result<decision::DecisionCommand, Error<'a>>),
 }
 
@@ -135,6 +137,11 @@ impl<'a> Input<'a> {
             &original_tokenizer,
         ));
         success.extend(parse_single_command(
+            transfer::TransferCommand::parse,
+            Command::Transfer,
+            &original_tokenizer,
+        ));
+        success.extend(parse_single_command(
             decision::DecisionCommand::parse,
             Command::Decision,
             &original_tokenizer,
@@ -214,6 +221,7 @@ impl<'a> Command<'a> {
             Command::Shortcut(r) => r.is_ok(),
             Command::Close(r) => r.is_ok(),
             Command::Note(r) => r.is_ok(),
+            Command::Transfer(r) => r.is_ok(),
             Command::Decision(r) => r.is_ok(),
         }
     }

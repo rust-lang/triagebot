@@ -18,7 +18,7 @@ use tracing as log;
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct User {
     pub login: String,
-    pub id: Option<u64>,
+    pub id: u64,
 }
 
 impl GithubClient {
@@ -200,17 +200,20 @@ impl User {
         );
         Ok(in_all || is_triager || is_pri_member || is_async_member)
     }
+}
 
-    // Returns the ID of the given user, if the user is in the `all` team.
-    pub async fn get_id<'a>(&'a self, client: &'a GithubClient) -> anyhow::Result<Option<u64>> {
-        let permission = crate::team_data::teams(client).await?;
-        let map = permission.teams;
-        Ok(map["all"]
-            .members
-            .iter()
-            .find(|g| g.github == self.login)
-            .map(|u| u.github_id))
-    }
+// Returns the ID of the given user, if the user is in the `all` team.
+pub async fn get_id_for_username<'a>(
+    client: &'a GithubClient,
+    login: &str,
+) -> anyhow::Result<Option<u64>> {
+    let permission = crate::team_data::teams(client).await?;
+    let map = permission.teams;
+    Ok(map["all"]
+        .members
+        .iter()
+        .find(|g| g.github == login)
+        .map(|u| u.github_id))
 }
 
 pub async fn get_team(
@@ -285,8 +288,11 @@ pub struct Issue {
     ///
     /// Example: `https://github.com/octocat/Hello-World/pull/1347`
     pub html_url: String,
+    // User performing an `action`
     pub user: User,
     pub labels: Vec<Label>,
+    // Users assigned to the issue/pr after `action` has been performed
+    // These are NOT the same as `IssueEvent.assignee`
     pub assignees: Vec<User>,
     /// Indicator if this is a pull request.
     ///
@@ -357,7 +363,9 @@ pub struct Comment {
     pub body: String,
     pub html_url: String,
     pub user: User,
-    #[serde(alias = "submitted_at")] // for pull request reviews
+    #[serde(default, alias = "submitted_at")] // for pull request reviews
+    pub created_at: chrono::DateTime<Utc>,
+    #[serde(default, alias = "submitted_at")] // for pull request reviews
     pub updated_at: chrono::DateTime<Utc>,
     #[serde(default, rename = "state")]
     pub pr_review_state: Option<PullRequestReviewState>,
@@ -869,6 +877,63 @@ impl Issue {
         ));
         Ok(client.json(req).await?)
     }
+
+    /// Returns the GraphQL ID of this issue.
+    async fn graphql_issue_id(&self, client: &GithubClient) -> anyhow::Result<String> {
+        let repo = self.repository();
+        let mut issue_id = client
+            .graphql_query(
+                "query($owner:String!, $repo:String!, $issueNum:Int!) {
+                    repository(owner: $owner, name: $repo) {
+                        issue(number: $issueNum) {
+                            id
+                        }
+                    }
+                }
+                ",
+                serde_json::json!({
+                    "owner": repo.organization,
+                    "repo": repo.repository,
+                    "issueNum": self.number,
+                }),
+            )
+            .await?;
+        let serde_json::Value::String(issue_id) =
+            issue_id["data"]["repository"]["issue"]["id"].take()
+        else {
+            anyhow::bail!("expected issue id, got {issue_id}");
+        };
+        Ok(issue_id)
+    }
+
+    /// Transfers this issue to the given repository.
+    pub async fn transfer(
+        &self,
+        client: &GithubClient,
+        owner: &str,
+        repo: &str,
+    ) -> anyhow::Result<()> {
+        let issue_id = self.graphql_issue_id(client).await?;
+        let repo_id = client.graphql_repo_id(owner, repo).await?;
+        client
+            .graphql_query(
+                "mutation ($issueId: ID!, $repoId: ID!) {
+                  transferIssue(
+                    input: {createLabelsIfMissing: true, issueId: $issueId, repositoryId: $repoId}
+                  ) {
+                    issue {
+                      id
+                    }
+                  }
+                }",
+                serde_json::json!({
+                    "issueId": issue_id,
+                    "repoId": repo_id,
+                }),
+            )
+            .await?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -953,8 +1018,14 @@ pub enum IssuesAction {
     Unpinned,
     Closed,
     Reopened,
-    Assigned,
-    Unassigned,
+    Assigned {
+        /// Github users assigned to the issue / pull request
+        assignee: User,
+    },
+    Unassigned {
+        /// Github users removed from the issue / pull request
+        assignee: User,
+    },
     Labeled {
         /// The label added from the issue
         label: Label,
@@ -969,7 +1040,9 @@ pub enum IssuesAction {
     Demilestoned,
     ReviewRequested {
         /// The person requested to review the pull request
-        requested_reviewer: User,
+        ///
+        /// This can be `None` when a review is requested for a team.
+        requested_reviewer: Option<User>,
     },
     ReviewRequestRemoved,
     ReadyForReview,
@@ -977,6 +1050,8 @@ pub enum IssuesAction {
     ConvertedToDraft,
     AutoMergeEnabled,
     AutoMergeDisabled,
+    Enqueued,
+    Dequeued,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -1703,9 +1778,17 @@ impl<'q> IssuesQuery for Query<'q> {
             .with_context(|| "Unable to get issues.")?;
 
         let fcp_map = if include_fcp_details {
-            crate::rfcbot::get_all_fcps().await?
+            crate::rfcbot::get_all_fcps()
+                .await
+                .with_context(|| "Unable to get all fcps from rfcbot.")?
         } else {
             HashMap::new()
+        };
+
+        let zulip_map = if include_fcp_details {
+            Some(crate::team_data::zulip_map(client).await?)
+        } else {
+            None
         };
 
         let mut issues_decorator = Vec::new();
@@ -1736,11 +1819,51 @@ impl<'q> IssuesQuery for Query<'q> {
                         .get_comment(&client, fk_initiating_comment.try_into()?)
                         .await?;
 
+                    // TODO: agree with the team(s) a policy to emit actual mentions to remind FCP
+                    // voting member to cast their vote
+                    let should_mention = false;
                     Some(crate::actions::FCPDetails {
                         bot_tracking_comment_html_url,
                         bot_tracking_comment_content,
                         initiating_comment_html_url: init_comment.html_url.clone(),
                         initiating_comment_content: quote_reply(&init_comment.body),
+                        disposition: fcp
+                            .fcp
+                            .disposition
+                            .as_deref()
+                            .unwrap_or("<unknown>")
+                            .to_string(),
+                        should_mention,
+                        pending_reviewers: fcp
+                            .reviews
+                            .iter()
+                            .filter_map(|r| {
+                                (!r.approved).then(|| crate::actions::FCPReviewerDetails {
+                                    github_login: r.reviewer.login.clone(),
+                                    zulip_id: zulip_map
+                                        .as_ref()
+                                        .map(|map| {
+                                            map.users
+                                                .iter()
+                                                .find(|&(_, &github)| github == r.reviewer.id)
+                                                .map(|v| *v.0)
+                                        })
+                                        .flatten(),
+                                })
+                            })
+                            .collect(),
+                        concerns: fcp
+                            .concerns
+                            .iter()
+                            .map(|c| crate::actions::FCPConcernDetails {
+                                name: c.name.clone(),
+                                reviewer_login: c.reviewer.login.clone(),
+                                concern_url: format!(
+                                    "{}#issuecomment-{}",
+                                    issue.html_url, c.comment.id
+                                ),
+                            })
+                            .collect(),
                     })
                 } else {
                     None
@@ -1973,6 +2096,12 @@ impl RequestSend for RequestBuilder {
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
 pub fn default_token_from_env() -> String {
+    match std::env::var("GITHUB_TOKEN") {
+        Ok(v) => return v,
+        Err(_) => (),
+    }
+
+    // kept for retrocompatibility but usage is discouraged and will be deprecated
     match std::env::var("GITHUB_API_TOKEN") {
         Ok(v) => return v,
         Err(_) => (),
@@ -1983,7 +2112,7 @@ pub fn default_token_from_env() -> String {
         Err(_) => (),
     }
 
-    panic!("could not find token in GITHUB_API_TOKEN or .gitconfig/github.oath-token")
+    panic!("could not find token in GITHUB_TOKEN, GITHUB_API_TOKEN or .gitconfig/github.oath-token")
 }
 
 fn get_token_from_git_config() -> anyhow::Result<String> {
@@ -2131,11 +2260,17 @@ impl GithubClient {
     }
 
     /// Issues an ad-hoc GraphQL query.
-    pub async fn graphql_query<T: serde::de::DeserializeOwned>(
+    ///
+    /// You are responsible for checking the `errors` array when calling this
+    /// function to determine if there is an error. Only use this if you are
+    /// looking for specific error codes, or don't care about errors. Use
+    /// [`GithubClient::graphql_query`] if you would prefer to have a generic
+    /// error message.
+    pub async fn graphql_query_with_errors(
         &self,
         query: &str,
         vars: serde_json::Value,
-    ) -> anyhow::Result<T> {
+    ) -> anyhow::Result<serde_json::Value> {
         self.json(self.post(&self.graphql_url).json(&serde_json::json!({
             "query": query,
             "variables": vars,
@@ -2143,12 +2278,32 @@ impl GithubClient {
         .await
     }
 
+    /// Issues an ad-hoc GraphQL query.
+    ///
+    /// See [`GithubClient::graphql_query_with_errors`] if you need to check
+    /// for specific errors.
+    pub async fn graphql_query(
+        &self,
+        query: &str,
+        vars: serde_json::Value,
+    ) -> anyhow::Result<serde_json::Value> {
+        let result: serde_json::Value = self.graphql_query_with_errors(query, vars).await?;
+        if let Some(errors) = result["errors"].as_array() {
+            let messages: Vec<_> = errors
+                .iter()
+                .map(|err| err["message"].as_str().unwrap_or_default())
+                .collect();
+            anyhow::bail!("error: {}", messages.join("\n"));
+        }
+        Ok(result)
+    }
+
     /// Returns the object ID of the given user.
     ///
     /// Returns `None` if the user doesn't exist.
     pub async fn user_object_id(&self, user: &str) -> anyhow::Result<Option<String>> {
         let user_info: serde_json::Value = self
-            .graphql_query(
+            .graphql_query_with_errors(
                 "query($user:String!) {
                     user(login:$user) {
                         id
@@ -2201,7 +2356,7 @@ impl GithubClient {
         // work on forks. This GraphQL query seems to work fairly reliably,
         // and seems to cost only 1 point.
         match self
-            .graphql_query::<serde_json::Value>(
+            .graphql_query_with_errors(
                 "query($repository_owner:String!, $repository_name:String!, $user_id:ID!) {
                         repository(owner: $repository_owner, name: $repository_name) {
                             defaultBranchRef {
@@ -2325,6 +2480,27 @@ impl GithubClient {
         .await
         .with_context(|| format!("failed to set milestone for {url} to milestone {milestone:?}"))?;
         Ok(())
+    }
+
+    /// Returns the GraphQL ID of the given repository.
+    async fn graphql_repo_id(&self, owner: &str, repo: &str) -> anyhow::Result<String> {
+        let mut repo_id = self
+            .graphql_query(
+                "query($owner:String!, $repo:String!) {
+                    repository(owner: $owner, name: $repo) {
+                        id
+                    }
+                }",
+                serde_json::json!({
+                    "owner": owner,
+                    "repo": repo,
+                }),
+            )
+            .await?;
+        let serde_json::Value::String(repo_id) = repo_id["data"]["repository"]["id"].take() else {
+            anyhow::bail!("expected repo id, got {repo_id}");
+        };
+        Ok(repo_id)
     }
 }
 
@@ -2661,7 +2837,7 @@ pub async fn retrieve_pull_requests(
                     prs_processed.push((
                         User {
                             login: user.login.clone(),
-                            id: Some(user_id),
+                            id: user_id,
                         },
                         pr.number,
                     ));
