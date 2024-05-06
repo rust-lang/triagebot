@@ -88,7 +88,7 @@ so these commits will need to be removed for this pull request to be merged.
 You can start a rebase with the following commands:
 ```shell-session
 $ # rebase
-$ git rebase -i master
+$ git pull --rebase https://github.com/rust-lang/rust.git master
 $ # delete any merge commits in the editor that appears
 $ git push --force-with-lease
 ```
@@ -228,7 +228,7 @@ There are merge commits (commits with multiple parents) in your changes. We have
 You can start a rebase with the following commands:
 ```shell-session
 $ # rebase
-$ git rebase -i master
+$ git pull --rebase https://github.com/rust-lang/rust.git master
 $ # delete any merge commits in the editor that appears
 $ git push --force-with-lease
 ```
