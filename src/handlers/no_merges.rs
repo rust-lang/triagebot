@@ -80,7 +80,9 @@ pub(super) async fn parse_input(
     Ok(Some(NoMergesInput { merge_commits }))
 }
 
-const DEFAULT_MESSAGE: &str = "
+fn get_default_message(repository_name: &str, default_branch: &str) -> String {
+    format!(
+        "
 There are merge commits (commits with multiple parents) in your changes. We have a \
 [no merge policy](https://rustc-dev-guide.rust-lang.org/git.html#no-merge-policy) \
 so these commits will need to be removed for this pull request to be merged.
@@ -88,12 +90,13 @@ so these commits will need to be removed for this pull request to be merged.
 You can start a rebase with the following commands:
 ```shell-session
 $ # rebase
-$ git rebase -i master
-$ # delete any merge commits in the editor that appears
+$ git pull --rebase https://github.com/{repository_name}.git {default_branch}
 $ git push --force-with-lease
 ```
 
-";
+"
+    )
+}
 
 pub(super) async fn handle_input(
     ctx: &Context,
@@ -135,7 +138,10 @@ pub(super) async fn handle_input(
     let mut message = config
         .message
         .as_deref()
-        .unwrap_or(DEFAULT_MESSAGE)
+        .unwrap_or(&get_default_message(
+            &event.repository.full_name,
+            &event.repository.default_branch,
+        ))
         .to_string();
 
     let since_last_posted = if first_time {
@@ -212,7 +218,7 @@ mod test {
 
     #[test]
     fn message() {
-        let mut message = DEFAULT_MESSAGE.to_string();
+        let mut message = get_default_message("foo/bar", "baz").to_string();
 
         writeln!(message, "The following commits are merge commits:").unwrap();
 
@@ -228,8 +234,7 @@ There are merge commits (commits with multiple parents) in your changes. We have
 You can start a rebase with the following commands:
 ```shell-session
 $ # rebase
-$ git rebase -i master
-$ # delete any merge commits in the editor that appears
+$ git pull --rebase https://github.com/foo/bar.git baz
 $ git push --force-with-lease
 ```
 
