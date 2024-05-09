@@ -1331,6 +1331,19 @@ impl Repository {
                 .json(client.get(&url))
                 .await
                 .with_context(|| format!("failed to fetch commits for {url}"))?;
+            // This is a temporary debugging measure to investigate why the
+            // `/commits` endpoint is not returning the expected values in
+            // production.
+            let v: String = this_page
+                .iter()
+                .map(|commit| {
+                    format!(
+                        "({}, {}, {:?}) ",
+                        commit.sha, commit.commit.author.date, commit.parents
+                    )
+                })
+                .collect();
+            log::info!("page {page}: {v}");
             if let Some(idx) = this_page.iter().position(|commit| commit.sha == start) {
                 this_page.truncate(idx);
                 commits.extend(this_page);
