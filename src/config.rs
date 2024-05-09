@@ -40,6 +40,7 @@ pub(crate) struct Config {
     pub(crate) note: Option<NoteConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
     pub(crate) no_merges: Option<NoMergesConfig>,
+    pub(crate) decision: Option<DecisionConfig>,
     // We want this validation to run even without the entry in the config file
     #[serde(default = "ValidateConfig::default")]
     pub(crate) validate_config: Option<ValidateConfig>,
@@ -346,6 +347,12 @@ pub(crate) struct ReviewPrefsConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct DecisionConfig {
+    #[serde(default)]
+    _empty: (),
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TransferConfig {}
@@ -470,6 +477,8 @@ mod tests {
             infra = "T-infra"
 
             [shortcut]
+
+            [decision]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -524,6 +533,7 @@ mod tests {
                 review_requested: None,
                 mentions: None,
                 no_merges: None,
+                decision: Some(DecisionConfig { _empty: () }),
                 validate_config: Some(ValidateConfig {}),
                 pr_tracking: None,
                 transfer: None,
