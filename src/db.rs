@@ -272,6 +272,9 @@ async fn handle_job(
     Ok(())
 }
 
+// Important notes when adding migrations:
+// - Each DB change is an element in this array and must be a single SQL instruction
+// - The total # of items in this array must be equal to the value of `database_versions.migration_counter`
 static MIGRATIONS: &[&str] = &[
     "
 CREATE TABLE notifications (
@@ -332,7 +335,8 @@ CREATE table review_prefs (
     assigned_prs INT[] NOT NULL DEFAULT array[]::INT[]
 );",
     "
-CREATE EXTENSION intarray;
-CREATE UNIQUE INDEX review_prefs_user_id ON review_prefs(user_id);
+CREATE EXTENSION IF NOT EXISTS intarray;",
+    "
+CREATE UNIQUE INDEX IF NOT EXISTS review_prefs_user_id ON review_prefs(user_id);
  ",
 ];
