@@ -167,6 +167,7 @@ pub(super) async fn handle_input<'a>(
         for msg in msgs {
             let msg = msg.replace("{number}", &event.issue.number.to_string());
             let msg = msg.replace("{title}", &event.issue.title);
+            let msg = replace_team_to_be_nominated(&event.issue.labels, msg);
 
             crate::zulip::MessageApiRequest {
                 recipient,
@@ -178,4 +179,67 @@ pub(super) async fn handle_input<'a>(
     }
 
     Ok(())
+}
+
+fn replace_team_to_be_nominated(labels: &[Label], msg: String) -> String {
+    let teams = labels
+        .iter()
+        .map(|label| &label.name)
+        .filter_map(|label| label.strip_prefix("T-"))
+        .collect::<Vec<&str>>();
+
+    // - If a single team label is found, replace the placeholder with that one
+    // - If multiple team labels are found and one of them is "compiler", pick that one
+    //   (currently the only team handling these Zulip notification)
+    // - else, do nothing
+    if let [team] = &*teams {
+        msg.replace("{team}", team)
+    } else if teams.contains(&"compiler") {
+        msg.replace("{team}", "compiler")
+    } else {
+        msg
+    }
+}
+
+#[test]
+fn test_notification() {
+    let mut msg = replace_team_to_be_nominated(&[], "Needs `I-{team}-nominated`?".to_string());
+    assert!(msg.contains("Needs `I-{team}-nominated`?"), "{}", msg);
+
+    msg = replace_team_to_be_nominated(
+        &[Label {
+            name: "T-cooks".to_string(),
+        }],
+        "Needs `I-{team}-nominated`?".to_string(),
+    );
+    assert!(msg.contains("I-cooks-nominated"), "{}", msg);
+
+    msg = replace_team_to_be_nominated(
+        &[
+            Label {
+                name: "T-compiler".to_string(),
+            },
+            Label {
+                name: "T-libs".to_string(),
+            },
+            Label {
+                name: "T-cooks".to_string(),
+            },
+        ],
+        "Needs `I-{team}-nominated`?".to_string(),
+    );
+    assert!(msg.contains("I-compiler-nominated"), "{}", msg);
+
+    msg = replace_team_to_be_nominated(
+        &[
+            Label {
+                name: "T-libs".to_string(),
+            },
+            Label {
+                name: "T-cooks".to_string(),
+            },
+        ],
+        "Needs `I-{team}-nominated`?".to_string(),
+    );
+    assert!(msg.contains("Needs `I-{team}-nominated`?"), "{}", msg);
 }
