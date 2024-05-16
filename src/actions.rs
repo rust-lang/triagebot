@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -6,10 +6,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
 
-use crate::{
-    github::{self, GithubClient, Repository},
-    http_client::{CompilerMeeting, HttpClient},
-};
+use crate::github::{self, GithubClient, Repository};
 
 #[async_trait]
 pub trait Action {
@@ -112,15 +109,6 @@ impl<'a> Action for Step<'a> {
     async fn call(&self) -> anyhow::Result<String> {
         let gh = GithubClient::new_from_env();
 
-        // retrieve all Rust compiler meetings
-        // from today for 7 days
-        let today: chrono::DateTime<chrono::Local> = chrono::Local::now();
-        let tcompiler_meetings: Vec<CompilerMeeting> =
-            CompilerMeeting::get_meetings(today, today + Duration::days(7))
-                .await
-                .map_err(|e| format!("Meetings couldn't be retrieved: {:?}", e))
-                .unwrap_or_default();
-
         let mut context = Context::new();
         let mut results = HashMap::new();
 
@@ -195,9 +183,6 @@ impl<'a> Action for Step<'a> {
 
         let date = chrono::Utc::today().format("%Y-%m-%d").to_string();
         context.insert("CURRENT_DATE", &date);
-
-        // populate T-compiler meetings
-        context.insert("meetings_tcompiler", &tcompiler_meetings);
 
         Ok(TEMPLATES
             .render(&format!("{}.tt", self.name), &context)
