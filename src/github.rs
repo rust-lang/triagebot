@@ -288,7 +288,7 @@ pub struct Issue {
     ///
     /// Example: `https://github.com/octocat/Hello-World/pull/1347`
     pub html_url: String,
-    // User performing an `action`
+    // User performing an `action` (or PR/issue author)
     pub user: User,
     pub labels: Vec<Label>,
     // Users assigned to the issue/pr after `action` has been performed
@@ -1923,6 +1923,7 @@ impl<'q> IssuesQuery for Query<'q> {
                     .map(|u| u.login.as_ref())
                     .collect::<Vec<_>>()
                     .join(", "),
+                author: issue.user.login,
                 updated_at_hts: crate::actions::to_human(issue.updated_at),
                 fcp_details,
                 mcp_details,
@@ -2690,6 +2691,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                     comments.last().map(|t| t.1).unwrap_or(pr.created_at),
                 );
                 let assignees = assignees.join(", ");
+                let author = pr.author.expect("checked");
 
                 Some((
                     updated_at,
@@ -2698,6 +2700,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                     pr.url.0,
                     repository_name,
                     labels,
+                    author.login,
                     assignees,
                 ))
             })
@@ -2708,7 +2711,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
             .into_iter()
             .take(50)
             .map(
-                |(updated_at, number, title, html_url, repo_name, labels, assignees)| {
+                |(updated_at, number, title, html_url, repo_name, labels, author, assignees)| {
                     let updated_at_hts = crate::actions::to_human(updated_at);
 
                     crate::actions::IssueDecorator {
@@ -2717,6 +2720,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                         html_url,
                         repo_name: repo_name.to_string(),
                         labels,
+                        author,
                         assignees,
                         updated_at_hts,
                         fcp_details: None,
@@ -2905,6 +2909,7 @@ impl IssuesQuery for DesignMeetings {
             .flat_map(|item| match item.content {
                 Some(ProjectV2ItemContent::Issue(issue)) => Some(crate::actions::IssueDecorator {
                     assignees: String::new(),
+                    author: String::new(),
                     number: issue.number.try_into().unwrap(),
                     fcp_details: None,
                     mcp_details: None,
