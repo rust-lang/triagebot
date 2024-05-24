@@ -53,6 +53,7 @@ pub mod queries {
     #[derive(cynic::QueryFragment, Debug)]
     pub struct PullRequest {
         pub number: i32,
+        pub author: Option<Actor>,
         pub created_at: DateTime,
         pub url: Uri,
         pub title: String,
