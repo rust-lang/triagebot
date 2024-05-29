@@ -35,13 +35,19 @@ impl GithubClient {
             resp = self.retry(req, sleep, MAX_ATTEMPTS).await?;
         }
         let maybe_err = resp.error_for_status_ref().err();
+        let status = resp.status();
         let body = resp
             .bytes()
             .await
             .with_context(|| format!("failed to read response body {req_dbg}"))?;
         if let Some(e) = maybe_err {
             return Err(anyhow::Error::new(e))
-                .with_context(|| format!("response: {}", String::from_utf8_lossy(&body)));
+                .with_context(|| format!("response {status}: {}", String::from_utf8_lossy(&body)));
+        }
+        if !status.is_success() {
+            // This is here to debug some unexpected behavior on the live server.
+            // Is this perhaps a 304?
+            log::warn!("unexpected status code {status}: {req_dbg}");
         }
 
         Ok((body, req_dbg))
@@ -832,6 +838,9 @@ impl Issue {
                     .await
                     .with_context(|| format!("failed to fetch diff comparison for {url}"))?;
                 let body = String::from_utf8_lossy(&diff);
+                // Trying to debug an issue on the live site where the diff
+                // does not seem to be working.
+                log::info!("diff {url} body len is {}", body.len());
                 Ok(parse_diff(&body))
             })
             .await?;
