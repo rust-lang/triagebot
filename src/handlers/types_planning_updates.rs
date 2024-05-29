@@ -20,7 +20,7 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
 
     async fn run(&self, ctx: &super::Context, _metadata: &serde_json::Value) -> anyhow::Result<()> {
         // On the last week of the month, we open a thread on zulip for the next Monday
-        let today = chrono::Utc::now().date().naive_utc();
+        let today = chrono::Utc::now().date_naive();
         let first_monday = today + chrono::Duration::days(7);
         // We actually schedule for every Monday, so first check if this is the last Monday of the month
         if first_monday.month() == today.month() {
@@ -43,10 +43,10 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
         // Then, we want to schedule the next Thursday after this
         let mut thursday = today;
         while thursday.weekday().num_days_from_monday() != 3 {
-            thursday = thursday.succ();
+            thursday = thursday.succ_opt().unwrap();
         }
-        let thursday_at_noon =
-            Utc.from_utc_datetime(&thursday.and_time(NaiveTime::from_hms(12, 0, 0)));
+        let noon = NaiveTime::from_hms_opt(12, 0, 0).unwrap();
+        let thursday_at_noon = Utc.from_utc_datetime(&thursday.and_time(noon));
         let metadata = serde_json::value::to_value(PlanningMeetingUpdatesPingMetadata {
             date_string: meeting_date_string,
         })

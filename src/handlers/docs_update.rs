@@ -47,8 +47,8 @@ impl Job for DocsUpdateJob {
         // This is set to run the first week after a release, and the week just
         // before a release. That allows getting the latest changes in the next
         // release, accounting for possibly taking a few days for the PR to land.
-        let today = chrono::Utc::today().naive_utc();
-        let base = chrono::naive::NaiveDate::from_ymd(2015, 12, 10);
+        let today = chrono::Utc::now().date_naive();
+        let base = chrono::naive::NaiveDate::from_ymd_opt(2015, 12, 10).unwrap();
         let duration = today.signed_duration_since(base);
         let weeks = duration.num_weeks();
         if weeks % 2 != 0 {
