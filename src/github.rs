@@ -31,8 +31,10 @@ impl GithubClient {
             .with_context(|| format!("building reqwest {}", req_dbg))?;
 
         let mut resp = self.client.execute(req.try_clone().unwrap()).await?;
-        if let Some(sleep) = Self::needs_retry(&resp).await {
-            resp = self.retry(req, sleep, MAX_ATTEMPTS).await?;
+        if self.retry_rate_limit {
+            if let Some(sleep) = Self::needs_retry(&resp).await {
+                resp = self.retry(req, sleep, MAX_ATTEMPTS).await?;
+            }
         }
         let maybe_err = resp.error_for_status_ref().err();
         let body = resp
@@ -2146,6 +2148,8 @@ pub struct GithubClient {
     api_url: String,
     graphql_url: String,
     raw_url: String,
+    /// If `true`, requests will sleep if it hits GitHub's rate limit.
+    retry_rate_limit: bool,
 }
 
 impl GithubClient {
@@ -2156,6 +2160,7 @@ impl GithubClient {
             api_url,
             graphql_url,
             raw_url,
+            retry_rate_limit: false,
         }
     }
 
@@ -2169,6 +2174,14 @@ impl GithubClient {
             std::env::var("GITHUB_RAW_URL")
                 .unwrap_or_else(|_| "https://raw.githubusercontent.com".to_string()),
         )
+    }
+
+    /// Sets whether or not this client will retry when it hits GitHub's rate limit.
+    ///
+    /// Just beware that the retry may take a long time (like 30 minutes,
+    /// depending on various factors).
+    pub fn set_retry_rate_limit(&mut self, retry: bool) {
+        self.retry_rate_limit = retry;
     }
 
     pub fn raw(&self) -> &Client {
