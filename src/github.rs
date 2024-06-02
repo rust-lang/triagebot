@@ -51,19 +51,16 @@ impl GithubClient {
         const REMAINING: &str = "X-RateLimit-Remaining";
         const RESET: &str = "X-RateLimit-Reset";
 
-        if resp.status().is_success() {
+        if !matches!(
+            resp.status(),
+            StatusCode::FORBIDDEN | StatusCode::TOO_MANY_REQUESTS
+        ) {
             return None;
         }
 
         let headers = resp.headers();
         if !(headers.contains_key(REMAINING) && headers.contains_key(RESET)) {
             return None;
-        }
-
-        // Weird github api behavior. It asks us to retry but also has a remaining count above 1
-        // Try again immediately and hope for the best...
-        if headers[REMAINING] != "0" {
-            return Some(Duration::from_secs(0));
         }
 
         let reset_time = headers[RESET].to_str().unwrap().parse::<u64>().unwrap();
