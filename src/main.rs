@@ -298,13 +298,20 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             Ok::<_, hyper::Error>(hyper::service::service_fn(move |req| {
                 let uuid = uuid::Uuid::new_v4();
                 let span = tracing::span!(tracing::Level::INFO, "request", ?uuid);
+                // Only log the webhook responses at INFO level to avoid flooding the
+                // logs with huge responses. Other responses are at DEBUG.
+                let log_info_response = matches!(req.uri().path(), "/github-hook" | "/zulip-hook");
                 serve_req(req, ctx.clone(), agenda.clone())
                     .map(move |mut resp| {
                         if let Ok(resp) = &mut resp {
                             resp.headers_mut()
                                 .insert("X-Request-Id", uuid.to_string().parse().unwrap());
                         }
-                        log::info!("response = {:?}", resp);
+                        if log_info_response {
+                            log::info!("response = {resp:?}");
+                        } else {
+                            log::debug!("response = {resp:?}");
+                        }
                         resp
                     })
                     .instrument(span)
