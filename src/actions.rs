@@ -108,7 +108,8 @@ pub fn to_human(d: DateTime<Utc>) -> String {
 #[async_trait]
 impl<'a> Action for Step<'a> {
     async fn call(&self) -> anyhow::Result<String> {
-        let gh = GithubClient::new_from_env();
+        let mut gh = GithubClient::new_from_env();
+        gh.set_retry_rate_limit(true);
 
         let mut context = Context::new();
         let mut results = HashMap::new();
