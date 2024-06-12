@@ -510,7 +510,7 @@ impl Issue {
         self.state == IssueState::Open
     }
 
-    pub async fn get_comment(&self, client: &GithubClient, id: u64) -> anyhow::Result<Comment> {
+    pub async fn get_comment(&self, client: &GithubClient, id: i32) -> anyhow::Result<Comment> {
         let comment_url = format!("{}/issues/comments/{}", self.repository().url(client), id);
         let comment = client.json(client.get(&comment_url)).await?;
         Ok(comment)
@@ -1825,11 +1825,25 @@ impl<'q> IssuesQuery for Query<'q> {
                         issue.html_url, fcp.fcp.fk_bot_tracking_comment
                     );
                     let bot_tracking_comment_content = quote_reply(&fcp.status_comment.body);
-
                     let fk_initiating_comment = fcp.fcp.fk_initiating_comment;
-                    let init_comment = issue
-                        .get_comment(&client, fk_initiating_comment.try_into()?)
-                        .await?;
+                    let (initiating_comment_html_url, initiating_comment_content) =
+                        if u32::try_from(fk_initiating_comment).is_err() {
+                            // We blew out the GH comment incremental counter (a i32 on their end)
+                            // See: https://rust-lang.zulipchat.com/#narrow/stream/242791-t-infra/topic/rfcbot.20asleep
+                            log::debug!("Ignoring overflowed comment id from GitHub");
+                            ("".to_string(), "".to_string())
+                        } else {
+                            let comment = issue
+                                .get_comment(&client, fk_initiating_comment.try_into()?)
+                                .await
+                                .with_context(|| {
+                                    format!(
+                                        "failed to get first comment id={} for fcp={}",
+                                        fk_initiating_comment, fcp.fcp.id
+                                    )
+                                })?;
+                            (comment.html_url, quote_reply(&comment.body))
+                        };
 
                     // TODO: agree with the team(s) a policy to emit actual mentions to remind FCP
                     // voting member to cast their vote
@@ -1837,8 +1851,8 @@ impl<'q> IssuesQuery for Query<'q> {
                     Some(crate::actions::FCPDetails {
                         bot_tracking_comment_html_url,
                         bot_tracking_comment_content,
-                        initiating_comment_html_url: init_comment.html_url.clone(),
-                        initiating_comment_content: quote_reply(&init_comment.body),
+                        initiating_comment_html_url,
+                        initiating_comment_content,
                         disposition: fcp
                             .fcp
                             .disposition
