@@ -243,7 +243,7 @@ async fn serve_req(
 
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     let pool = db::ClientPool::new();
-    db::run_migrations(&*pool.get().await)
+    db::run_migrations(&mut *pool.get().await)
         .await
         .context("database migrations")?;
 

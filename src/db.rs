@@ -151,7 +151,7 @@ fn cert() {
     make_certificates();
 }
 
-pub async fn run_migrations(client: &DbClient) -> anyhow::Result<()> {
+pub async fn run_migrations(client: &mut DbClient) -> anyhow::Result<()> {
     client
         .execute(
             "CREATE TABLE IF NOT EXISTS database_versions (
@@ -182,17 +182,22 @@ pub async fn run_migrations(client: &DbClient) -> anyhow::Result<()> {
 
     for (idx, migration) in MIGRATIONS.iter().enumerate() {
         if idx >= migration_idx {
-            client
-                .execute(*migration, &[])
+            let tx = client
+                .transaction()
+                .await
+                .context("Cannot create migration transactin")?;
+            tx.execute(*migration, &[])
                 .await
                 .with_context(|| format!("executing {}th migration", idx))?;
-            client
-                .execute(
-                    "UPDATE database_versions SET migration_counter = $1",
-                    &[&(idx as i32 + 1)],
-                )
+            tx.execute(
+                "UPDATE database_versions SET migration_counter = $1",
+                &[&(idx as i32 + 1)],
+            )
+            .await
+            .with_context(|| format!("updating migration counter to {}", idx))?;
+            tx.commit()
                 .await
-                .with_context(|| format!("updating migration counter to {}", idx))?;
+                .context("Cannot commit migration transaction")?;
         }
     }
 
