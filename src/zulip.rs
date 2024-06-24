@@ -189,13 +189,19 @@ fn handle_command<'a>(
                                 .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
                             }
                             Some("docs-update") => return trigger_docs_update(message_data),
-                            _ => {}
+                            _ => {
+                                return Ok(Some(
+                                    String::from(
+                                        "Unknown command, check triagebot's documentation at https://forge.rust-lang.org/triagebot/index.html#common-command-summary"
+                                    )
+                                ))
+                            }
                         }
                     }
                     next = words.next();
                 }
 
-                Ok(Some(String::from("Unknown command")))
+                Ok(Some(String::from("Unknown command, check triagebot's documentation at https://forge.rust-lang.org/triagebot/index.html")))
             }
         }
     })
