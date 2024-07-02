@@ -2,7 +2,7 @@ use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
 use crate::github::{get_id_for_username, GithubClient};
 use crate::handlers::docs_update::docs_update;
-use crate::handlers::pull_requests_assignment_update::get_review_prefs;
+use crate::handlers::pull_requests_assignment_update::{get_review_prefs, set_review_prefs};
 use crate::handlers::Context;
 use anyhow::{format_err, Context as _};
 use std::env;
@@ -157,7 +157,7 @@ fn handle_command<'a>(
             Some("meta") => add_meta_notification(&ctx, gh_id, words).await
                 .map_err(|e| format_err!("Failed to parse `meta` command. Synopsis: meta <num> <text>: Add <text> to your notification identified by <num> (>0)\n\nError: {e:?}")),
             Some("work") => query_pr_assignments(&ctx, gh_id, words).await
-                                                                    .map_err(|e| format_err!("Failed to parse `work` command. Synopsis: work <show>: shows your current PRs assignment\n\nError: {e:?}")),
+                                                                    .map_err(|e| format_err!("Failed to parse `work` command. Synopsis:\nwork <show>: shows your current PRs assignment\nwork set <max>: set your max number of assigned PRs to review\n\nError: {e:?}")),
             _ => {
                 while let Some(word) = next {
                     if word == "@**triagebot**" {
@@ -206,6 +206,22 @@ async fn query_pr_assignments(
     gh_id: u64,
     mut words: impl Iterator<Item = &str>,
 ) -> anyhow::Result<Option<String>> {
+    let testers = [
+        1825894,  // michaelwoerister
+        3161395,  // jhpratt
+        5910697,  // nadriel
+        6098822,  // apiraino
+        20113453, // matthewjasper
+        31162821, // jackh726
+        39484203, // jieyouxu
+        43851243, // fee1-dead
+        74931857, // albertlarsan68
+    ];
+
+    if !testers.contains(&gh_id) {
+        anyhow::bail!("Sorry, this feature is currently restricted to testers.")
+    }
+
     let subcommand = match words.next() {
         Some(subcommand) => subcommand,
         None => anyhow::bail!("no subcommand provided"),
@@ -220,6 +236,22 @@ async fn query_pr_assignments(
                 anyhow::bail!("No preferences set.")
             }
             rec?
+        }
+        "set" => {
+            let max = match words.next() {
+                Some(max_value) => {
+                    if words.next().is_some() {
+                        anyhow::bail!("Too many parameters.");
+                    }
+                    max_value
+                        .parse::<u32>()
+                        .context("Wrong parameter format. Must be a positive integer.")?
+                }
+                None => anyhow::bail!("Missing parameter."),
+            };
+            set_review_prefs(&db_client, gh_id, max)
+                .await
+                .context("Error occurred while setting review preferences.")?
         }
         _ => anyhow::bail!("Invalid subcommand."),
     };
