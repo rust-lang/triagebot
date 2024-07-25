@@ -48,6 +48,8 @@ pub async fn ping_project_goals_owners(gh: &GithubClient, dry_run: bool) -> anyh
         .with_context(|| "Unable to get issues.")?;
 
     for issue in issues {
+        let comments = issue.comments.unwrap_or(0);
+
         // Find the time of the last comment posted.
         let days_since_last_comment = (Utc::now() - issue.updated_at).num_days();
 
@@ -57,9 +59,9 @@ pub async fn ping_project_goals_owners(gh: &GithubClient, dry_run: bool) -> anyh
             "issue #{}: days_since_last_comment = {} days, number of comments = {}",
             issue.number,
             days_since_last_comment,
-            issue.comments,
+            comments,
         );
-        if days_since_last_comment > 21 && issue.comments > 1 {
+        if days_since_last_comment > 21 && comments > 1 {
             continue;
         }
 
@@ -73,7 +75,7 @@ pub async fn ping_project_goals_owners(gh: &GithubClient, dry_run: bool) -> anyh
             .replace("$OWNERS", &zulip_owners)
             .replace(
                 "$DAYS",
-                &if issue.comments <= 1 {
+                &if comments <= 1 {
                     "∞".to_string()
                 } else {
                     days_since_last_comment.to_string()
