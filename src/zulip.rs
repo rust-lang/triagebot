@@ -2,6 +2,7 @@ use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
 use crate::github::{get_id_for_username, GithubClient};
 use crate::handlers::docs_update::docs_update;
+use crate::handlers::project_goals::ping_project_goals_owners;
 use crate::handlers::pull_requests_assignment_update::get_review_prefs;
 use crate::handlers::Context;
 use anyhow::{format_err, Context as _};
@@ -187,6 +188,12 @@ fn handle_command<'a>(
                                 )
                                 .await
                                 .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                            }
+                            Some("ping-goals") => {
+                                ping_project_goals_owners(&ctx.github, false)
+                                    .await
+                                    .map_err(|e| format_err!("Failed to await at this time: {e:?}"))?;
+                                return Ok(None);
                             }
                             Some("docs-update") => return trigger_docs_update(message_data),
                             _ => {}

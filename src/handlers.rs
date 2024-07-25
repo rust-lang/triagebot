@@ -40,6 +40,7 @@ mod notify_zulip;
 mod ping;
 pub mod pr_tracking;
 mod prioritize;
+pub mod project_goals;
 pub mod pull_requests_assignment_update;
 mod relabel;
 mod review_requested;

@@ -273,7 +273,7 @@ pub struct Issue {
     pub number: u64,
     #[serde(deserialize_with = "opt_string")]
     pub body: String,
-    created_at: chrono::DateTime<Utc>,
+    pub created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
     /// The SHA for a merge commit.
     ///
@@ -304,6 +304,10 @@ pub struct Issue {
     pub merged: bool,
     #[serde(default)]
     pub draft: bool,
+
+    /// Number of comments
+    pub comments: i32,
+
     /// The API URL for discussion comments.
     ///
     /// Example: `https://api.github.com/repos/octocat/Hello-World/issues/1347/comments`
