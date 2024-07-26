@@ -66,7 +66,7 @@ pub async fn ping_project_goals_owners(gh: &GithubClient, dry_run: bool) -> anyh
             days_since_last_comment,
             comments,
         );
-        if days_since_last_comment > 21 && comments > 1 {
+        if days_since_last_comment < 21 && comments > 1 {
             continue;
         }
 
