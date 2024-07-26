@@ -12,7 +12,7 @@ const RUST_PROJECT_GOALS_REPO: &'static str = "rust-lang/rust-project-goals";
 const GOALS_STREAM: u64 = 435869; // #project-goals
 
 const MESSAGE: &str = r#"
-Dear $OWNERS, it's been $DAYS days since the last update to your goal *$GOAL* (goals#$GOALNUM). Please provide an update at your earliest convenience. Thanks! <3
+Dear $OWNERS, it's been $DAYS days since the last update to your goal *$GOAL*. Please comment on the github tracking issue goals#$GOALNUM with an update at your earliest convenience. Thanks! <3
 
 Here is a suggested template for updates (feel free to drop the items that don't apply):
 
