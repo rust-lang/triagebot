@@ -1,5 +1,7 @@
-use crate::github::Issue;
-use crate::github::{self, GithubClient, User};
+use crate::github::{
+    self, GithubClient, IssueCommentAction, IssueCommentEvent, IssuesAction, IssuesEvent, User,
+};
+use crate::github::{Event, Issue};
 use crate::jobs::Job;
 use crate::zulip::to_zulip_id;
 use anyhow::Context as _;
@@ -7,9 +9,12 @@ use async_trait::async_trait;
 use chrono::Utc;
 use tracing::{self as log};
 
+use super::Context;
+
 const MAX_ZULIP_TOPIC: usize = 60;
 const RUST_PROJECT_GOALS_REPO: &'static str = "rust-lang/rust-project-goals";
 const GOALS_STREAM: u64 = 435869; // #project-goals
+const C_TRACKING_ISSUE: &str = "C-tracking-issue";
 
 const MESSAGE: &str = r#"
 Dear $OWNERS, it's been $DAYS days since the last update to your goal *$GOAL*. Please comment on the github tracking issue goals#$GOALNUM with an update at your earliest convenience. Thanks! <3
@@ -151,5 +156,98 @@ async fn owner_string(gh: &GithubClient, assignee: &User) -> anyhow::Result<Stri
             "@{login} ([register your zulip-id here to get a real ping!](https://github.com/rust-lang/team/tree/master/people/{login}.toml))",
             login = assignee.login,
         ))
+    }
+}
+
+pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
+    let gh = &ctx.github;
+
+    if event.repo().full_name != RUST_PROJECT_GOALS_REPO {
+        return Ok(());
+    }
+
+    match event {
+        // When a new issue is opened that is tagged as a tracking issue,
+        // automatically create a Zulip topic for it and post a comment to the issue.
+        Event::Issue(IssuesEvent {
+            action: IssuesAction::Opened,
+            issue,
+            ..
+        }) => {
+            if issue.labels.iter().any(|l| l.name == C_TRACKING_ISSUE) {
+                return Ok(());
+            }
+            let zulip_topic_name = zulip_topic_name(issue);
+            let zulip_owners = match zulip_owners(gh, issue).await? {
+                Some(names) => names,
+                None => format!("(no owners assigned)"),
+            };
+            let title = &issue.title;
+            let goalnum = issue.number;
+            let zulip_req = crate::zulip::MessageApiRequest {
+                recipient: crate::zulip::Recipient::Stream {
+                    id: GOALS_STREAM,
+                    topic: &zulip_topic_name,
+                },
+                content: &format!(
+                    r#"New tracking issue goals#{goalnum}.\n* Goal title: {title}\n* Goal owners: {zulip_owners}"#
+                ),
+            };
+            zulip_req.send(&gh.raw()).await?;
+            Ok(())
+        }
+
+        // When a new comment is posted on a tracking issue, post it to Zulip.
+        Event::IssueComment(IssueCommentEvent {
+            action,
+            issue,
+            comment,
+            ..
+        }) => {
+            let number = issue.number;
+            let action_str = match action {
+                IssueCommentAction::Created => "posted",
+                IssueCommentAction::Edited => "edited",
+                IssueCommentAction::Deleted => "deleted",
+            };
+            let zulip_topic_name = zulip_topic_name(issue);
+            let url = &comment.html_url;
+            let text = &comment.body;
+            let zulip_author = owner_string(gh, &comment.user).await?;
+
+            let mut ticks = "````".to_string();
+            while text.contains(&ticks) {
+                ticks.push('`');
+            }
+
+            match action {
+                IssueCommentAction::Created | IssueCommentAction::Edited => {
+                    let zulip_req = crate::zulip::MessageApiRequest {
+                        recipient: crate::zulip::Recipient::Stream {
+                            id: GOALS_STREAM,
+                            topic: &zulip_topic_name,
+                        },
+                        content: &format!(
+                            r#"[Comment {action_str}]({url}) on goals#{number} by {zulip_author}:\n\
+                            {ticks}quote\n\
+                            {text}\n\
+                            {ticks}"#
+                        ),
+                    };
+                    zulip_req.send(&gh.raw()).await?;
+                }
+
+                IssueCommentAction::Deleted => {
+                    // Do we really care?
+                }
+            }
+
+            Ok(())
+        }
+
+        _ => {
+            /* No action for other cases */
+            Ok(())
+        }
     }
 }

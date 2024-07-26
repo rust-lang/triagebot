@@ -67,6 +67,14 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
         handle_command(ctx, event, &config, body, &mut errors).await;
     }
 
+    if let Err(e) = project_goals::handle(ctx, event).await {
+        log::error!(
+            "failed to process event {:?} with `project_goals` handler: {:?}",
+            event,
+            e
+        );
+    }
+
     if let Err(e) = notification::handle(ctx, event).await {
         log::error!(
             "failed to process event {:?} with notification handler: {:?}",
