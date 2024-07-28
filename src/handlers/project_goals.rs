@@ -39,6 +39,18 @@ impl Job for ProjectGoalsUpdateJob {
     }
 }
 
+/// Returns true if the user with the given github id is allowed to ping all group people
+/// and do other "project group adminstrative" tasks.
+pub async fn check_project_goal_acl(_gh: &GithubClient, gh_id: u64) -> anyhow::Result<bool> {
+    /// Github ID of the user allowed to ping all group people.
+    ///
+    /// FIXME: We should create a team for the person/people managing the goals program
+    /// and check that the zulip person is on it, but I'm too
+    const GOAL_OWNER_GH_ID: u64 = 155238; // nikomatsakis
+
+    Ok(gh_id == GOAL_OWNER_GH_ID)
+}
+
 pub async fn ping_project_goals_owners(gh: &GithubClient, dry_run: bool) -> anyhow::Result<()> {
     let goals_repo = gh.repository(&RUST_PROJECT_GOALS_REPO).await?;
 
