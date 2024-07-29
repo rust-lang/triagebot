@@ -240,10 +240,10 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                             topic: &zulip_topic_name,
                         },
                         content: &format!(
-                            r#"[Comment {action_str}]({url}) on goals#{number} by {zulip_author}:\n\
+                            "[Comment {action_str}]({url}) on goals#{number} by {zulip_author}:\n\
                             {ticks}quote\n\
                             {text}\n\
-                            {ticks}"#
+                            {ticks}"
                         ),
                     };
                     zulip_req.send(&gh.raw()).await?;
