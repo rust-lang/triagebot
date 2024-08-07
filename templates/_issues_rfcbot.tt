@@ -9,7 +9,6 @@
 {% else %}
 {{indent}}- {{issue::render(issue=issue)}}
 {%- endif -%}
-{%else%}
-{{empty}}
-{%endfor-%}
+{% else %}
+{{indent}}- {{empty}}{%endfor-%}
 {% endmacro %}

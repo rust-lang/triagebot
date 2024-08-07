@@ -2,6 +2,6 @@
 
 {% macro render(issues, indent="", backport_branch="", with_age=false, empty="No issues at this time.") %}
 {%- for issue in issues %}
-{{indent}}- {{ backport_branch }} {{issue::render(issue=issue, with_age=with_age, backport_branch=backport_branch)}}{% else %}
+{{indent}}- {{ backport_branch }}{{issue::render(issue=issue, with_age=with_age, backport_branch=backport_branch)}}{% else %}
 {{indent}}- {{empty}}{% endfor -%}
 {% endmacro %}
