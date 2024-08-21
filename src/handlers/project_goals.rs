@@ -216,11 +216,17 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             comment,
             ..
         }) => {
+            // Only comments on tracking issues should be forwarded to Zulip.
+            if !issue.labels.iter().any(|l| l.name == C_TRACKING_ISSUE) {
+                return Ok(());
+            }
+
             let number = issue.number;
             let action_str = match action {
                 IssueCommentAction::Created => "posted",
-                IssueCommentAction::Edited => "edited",
-                IssueCommentAction::Deleted => "deleted",
+
+                // Don't spam for updates, deletes
+                _ => return Ok(()),
             };
             let zulip_topic_name = zulip_topic_name(issue);
             let url = &comment.html_url;
