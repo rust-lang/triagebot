@@ -28,9 +28,7 @@ struct RelnotesState {
 }
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
-    let e = if let Event::Issue(e) = event {
-        e
-    } else {
+    let Event::Issue(e) = event else {
         return Ok(());
     };
 
