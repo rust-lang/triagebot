@@ -166,6 +166,33 @@ impl GithubClient {
         let (body, _req_dbg) = self.send_req(req).await?;
         Ok(serde_json::from_slice(&body)?)
     }
+
+    pub(crate) async fn new_issue(
+        &self,
+        repo: &IssueRepository,
+        title: &str,
+        body: &str,
+        labels: Vec<String>,
+    ) -> anyhow::Result<NewIssueResponse> {
+        #[derive(serde::Serialize)]
+        struct NewIssue<'a> {
+            title: &'a str,
+            body: &'a str,
+            labels: Vec<String>,
+        }
+        self.json(self.client.post(repo.url(&self)).json(&NewIssue {
+            title,
+            body,
+            labels,
+        }))
+        .await
+        .context("failed to create issue")
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct NewIssueResponse {
+    pub number: u64,
 }
 
 impl User {
@@ -327,6 +354,7 @@ pub struct Issue {
     pub head: Option<CommitBase>,
     /// Whether it is open or closed.
     pub state: IssueState,
+    pub milestone: Option<Milestone>,
 }
 
 #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
@@ -2509,7 +2537,7 @@ impl GithubClient {
     }
 
     /// Set the milestone of an issue or PR.
-    async fn set_milestone(
+    pub async fn set_milestone(
         &self,
         full_repo_name: &str,
         milestone: &Milestone,
