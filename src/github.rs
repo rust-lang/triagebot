@@ -180,7 +180,8 @@ impl GithubClient {
             body: &'a str,
             labels: Vec<String>,
         }
-        self.json(self.client.post(repo.url(&self)).json(&NewIssue {
+        let url = format!("{}/issues", repo.url(&self));
+        self.json(self.post(&url).json(&NewIssue {
             title,
             body,
             labels,
