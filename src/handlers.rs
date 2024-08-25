@@ -43,6 +43,7 @@ mod prioritize;
 pub mod project_goals;
 pub mod pull_requests_assignment_update;
 mod relabel;
+mod relnotes;
 mod review_requested;
 mod review_submitted;
 mod rfc_helper;
@@ -102,6 +103,14 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
     if let Err(e) = rfc_helper::handle(ctx, event).await {
         log::error!(
             "failed to process event {:?} with rfc_helper handler: {:?}",
+            event,
+            e
+        );
+    }
+
+    if let Err(e) = relnotes::handle(ctx, event).await {
+        log::error!(
+            "failed to process event {:?} with relnotes handler: {:?}",
             event,
             e
         );
