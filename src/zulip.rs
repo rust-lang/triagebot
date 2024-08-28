@@ -211,7 +211,7 @@ fn handle_command<'a>(
                                 let Some(next_update) = words.next() else {
                                     return usage_err("expected date of next update");
                                 };
-                                
+
                                 if project_goals::check_project_goal_acl(&ctx.github, gh_id).await? {
                                     ping_project_goals_owners(&ctx.github, false, threshold, &format!("on {next_update}"))
                                         .await

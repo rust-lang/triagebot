@@ -27,7 +27,8 @@ async fn main() -> anyhow::Result<()> {
         opt.dry_run,
         opt.days_threshold,
         &opt.next_meeting_date,
-    )    .await?;
+    )
+    .await?;
 
     Ok(())
 }
