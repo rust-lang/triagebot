@@ -6,7 +6,7 @@ use crate::jobs::Job;
 use crate::zulip::to_zulip_id;
 use anyhow::Context as _;
 use async_trait::async_trait;
-use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{Datelike, NaiveDate, Utc};
 use tracing::{self as log};
 
 use super::Context;

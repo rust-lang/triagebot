@@ -1,24 +1,33 @@
+use structopt::StructOpt;
 use triagebot::{github::GithubClient, handlers::project_goals};
+
+/// A basic example
+#[derive(StructOpt, Debug)]
+struct Opt {
+    /// If specified, no messages are sent.
+    #[structopt(long)]
+    dry_run: bool,
+
+    /// Goals with an updated within this threshold will not be pinged.
+    days_threshold: i64,
+
+    /// A string like "on Sep-5" when the update blog post will be written.
+    next_meeting_date: String,
+}
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let mut dry_run = false;
-
-    for arg in std::env::args().skip(1) {
-        match arg.as_str() {
-            "--dry-run" => dry_run = true,
-            _ => {
-                eprintln!("Usage: project_goals [--dry-run]");
-                std::process::exit(1);
-            }
-        }
-    }
-
+    let opt = Opt::from_args();
     let gh = GithubClient::new_from_env();
-    project_goals::ping_project_goals_owners(&gh, dry_run).await?;
+    project_goals::ping_project_goals_owners(
+        &gh,
+        opt.dry_run,
+        opt.days_threshold,
+        &opt.next_meeting_date,
+    )    .await?;
 
     Ok(())
 }
