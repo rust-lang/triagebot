@@ -6,7 +6,7 @@ use crate::jobs::Job;
 use crate::zulip::to_zulip_id;
 use anyhow::Context as _;
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use tracing::{self as log};
 
 use super::Context;
@@ -17,7 +17,11 @@ const GOALS_STREAM: u64 = 435869; // #project-goals
 const C_TRACKING_ISSUE: &str = "C-tracking-issue";
 
 const MESSAGE: &str = r#"
-Dear $OWNERS, it's been $DAYS days since the last update to your goal *$GOAL*. Please comment on the github tracking issue goals#$GOALNUM with an update at your earliest convenience. Thanks! <3
+Dear $OWNERS, it's been $DAYS days since the last update to your goal *$GOAL*.
+
+We will begin drafting the next blog post collecting goal updates $NEXT_UPDATE.
+
+Please comment on the github tracking issue goals#$GOALNUM before then. Thanks! <3
 
 Here is a suggested template for updates (feel free to drop the items that don't apply):
 
@@ -35,7 +39,7 @@ impl Job for ProjectGoalsUpdateJob {
     }
 
     async fn run(&self, ctx: &super::Context, _metadata: &serde_json::Value) -> anyhow::Result<()> {
-        ping_project_goals_owners(&ctx.github, false).await
+        ping_project_goals_owners_automatically(&ctx.github).await
     }
 }
 
@@ -51,7 +55,40 @@ pub async fn check_project_goal_acl(_gh: &GithubClient, gh_id: u64) -> anyhow::R
     Ok(gh_id == GOAL_OWNER_GH_ID)
 }
 
-pub async fn ping_project_goals_owners(gh: &GithubClient, dry_run: bool) -> anyhow::Result<()> {
+async fn ping_project_goals_owners_automatically(gh: &GithubClient) -> anyhow::Result<()> {
+    // Predicted schedule is to author a blog post on the 3rd week of the month.
+    // We start pinging when the month starts until we see an update in this month
+    // or the last 7 days of previous month.
+    //
+    // Therefore, we compute:
+    // * Days since start of this month -- threshold will be this number of days + 7.
+    // * Date of the 3rd Monday in the month -- this will be the next update (e.g., `on Sep-5`).
+    let now = Utc::now();
+
+    // We want to ping people unless they've written an update since the last week of the previous month.
+    let days_threshold = now.day() + 7;
+
+    // Format the 3rd Monday of the month, e.g. "on Sep-5", for inclusion.
+    let third_monday =
+        NaiveDate::from_weekday_of_month_opt(now.year(), now.month(), chrono::Weekday::Mon, 3)
+            .unwrap()
+            .format("on %b-%d")
+            .to_string();
+
+    ping_project_goals_owners(gh, false, days_threshold as i64, &third_monday).await
+}
+
+/// Sends a ping message to all project goal owners if
+/// they have not posted an update in the last `days_threshold` days.
+///
+/// `next_update` is a human readable description of when the next update
+/// will be drafted (e.g., `"on Sep 5"`).
+pub async fn ping_project_goals_owners(
+    gh: &GithubClient,
+    dry_run: bool,
+    days_threshold: i64,
+    next_update: &str,
+) -> anyhow::Result<()> {
     let goals_repo = gh.repository(&RUST_PROJECT_GOALS_REPO).await?;
 
     let tracking_issues_query = github::Query {
@@ -78,7 +115,7 @@ pub async fn ping_project_goals_owners(gh: &GithubClient, dry_run: bool) -> anyh
             days_since_last_comment,
             comments,
         );
-        if days_since_last_comment < 21 && comments > 1 {
+        if days_since_last_comment < days_threshold && comments > 1 {
             continue;
         }
 
@@ -99,7 +136,8 @@ pub async fn ping_project_goals_owners(gh: &GithubClient, dry_run: bool) -> anyh
                 },
             )
             .replace("$GOALNUM", &issue.number.to_string())
-            .replace("$GOAL", &issue.title);
+            .replace("$GOAL", &issue.title)
+            .replace("$NEXT_UPDATE", next_update);
 
         let zulip_req = crate::zulip::MessageApiRequest {
             recipient: crate::zulip::Recipient::Stream {
