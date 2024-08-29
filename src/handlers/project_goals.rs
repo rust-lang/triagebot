@@ -153,7 +153,9 @@ pub async fn ping_project_goals_owners(
         if !dry_run {
             zulip_req.send(&gh.raw()).await?;
         } else {
-            log::debug!("skipping zulip send because dry run");
+            eprintln!();
+            eprintln!("-- Dry Run ------------------------------------");
+            eprintln!("Would send to {zulip_topic_name}: {}", zulip_req.content);
         }
     }
 
