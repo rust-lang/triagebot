@@ -8,6 +8,7 @@ use crate::handlers::Context;
 use anyhow::{format_err, Context as _};
 use std::env;
 use std::fmt::Write as _;
+use std::str::FromStr;
 use tracing as log;
 
 #[derive(Debug, serde::Deserialize)]
@@ -190,8 +191,29 @@ fn handle_command<'a>(
                                 .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
                             }
                             Some("ping-goals") => {
+                                let usage_err = |description: &str| Err(format_err!(
+                                    "Error: {description}\n\
+                                    \n\
+                                    Usage: triagebot ping-goals D N, where:\n\
+                                    \n\
+                                     * D is the number of days before an update is considered stale\n\
+                                     * N is the date of next update, like \"Sep-5\"\n",
+                                ));
+
+                                let Some(threshold) = words.next() else {
+                                    return usage_err("expected number of days");
+                                };
+                                let threshold = match i64::from_str(threshold) {
+                                    Ok(v) => v,
+                                    Err(e) => return usage_err(&format!("ill-formed number of days, {e}")),
+                                };
+
+                                let Some(next_update) = words.next() else {
+                                    return usage_err("expected date of next update");
+                                };
+
                                 if project_goals::check_project_goal_acl(&ctx.github, gh_id).await? {
-                                    ping_project_goals_owners(&ctx.github, false)
+                                    ping_project_goals_owners(&ctx.github, false, threshold, &format!("on {next_update}"))
                                         .await
                                         .map_err(|e| format_err!("Failed to await at this time: {e:?}"))?;
                                     return Ok(None);
