@@ -64,7 +64,9 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     }
 
     if let IssuesAction::Labeled { label } = &e.action {
-        if label.name == "relnotes" || label.name == "relnotes-perf" {
+        if ["relnotes", "relnotes-perf", "finished-final-comment-period"]
+            .contains(&label.name.as_str())
+        {
             let title = format!(
                 "Tracking issue for release notes of #{}: {}",
                 e.issue.number, e.issue.title
@@ -73,28 +75,36 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 "
 This issue tracks the release notes text for #{}.
 
-- [ ] Issue is nominated for the responsible team (and T-release nomination is removed).
-- [ ] Proposed text is drafted by team responsible for underlying change.
+- [ ] Proposed text is drafted by PR author (or team) making the noteworthy change.
 - [ ] Issue is nominated for release team review of clarity for wider audience.
 - [ ] Release team includes text in release notes/blog posts.
 
 Release notes text:
 
-The section title will be de-duplicated by the release team with other release notes issues.
-Prefer to use the standard titles from [previous releases](https://doc.rust-lang.org/nightly/releases.html).
-More than one section can be included if needed.
+The responsible team for the underlying change should edit this section to replace the
+automatically generated link with a succinct description of what changed, drawing upon text
+proposed by the author (either in discussion or through direct editing). If the change is notable
+enough for inclusion in the blog post, add content to the blog section below.
 
 ```markdown
-# Compatibility Notes
+# Pick a category...
 - [{}]({})
 ```
+
+Note: The section title will be de-duplicated by the release team with other release notes issues.
+Please use a standard title from [previous releases](https://doc.rust-lang.org/nightly/releases.html).
+More than one section can be included if needed.
 
 Release blog section (if any, leave blank if no section is expected):
 
 ```markdown
 ```
+
+cc {} -- origin issue/PR authors and assignees for starting to draft text
 ",
                 e.issue.number, e.issue.title, e.issue.html_url,
+                [&e.issue.user].into_iter().chain(e.issue.assignees.iter())
+                    .map(|v| format!("@{}", v.login)).collect::<Vec<_>>().join(", ")
             );
             let resp = ctx
                 .github
@@ -102,7 +112,7 @@ Release blog section (if any, leave blank if no section is expected):
                     &e.issue.repository(),
                     &title,
                     &body,
-                    vec!["relnotes".to_owned(), "I-release-nominated".to_owned()],
+                    vec!["relnotes".to_owned(), "relnotes-tracking-issue".to_owned()],
                 )
                 .await?;
             state.data.relnotes_issue = Some(resp.number);
