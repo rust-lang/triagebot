@@ -11,22 +11,24 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     };
 
     let repo = e.issue.repository();
-    if !(repo.organization == "rust-lang" && repo.repository == "rfcs") {
-        return Ok(());
-    }
+    let prefix = match (&*repo.organization, &*repo.repository) {
+        ("rust-lang", "rfcs") => "text/",
+        ("rust-lang", "blog.rust-lang.org") => "posts/",
+        _ => return Ok(()),
+    };
 
-    if let Err(e) = add_rendered_link(&ctx, &e).await {
+    if let Err(e) = add_rendered_link(&ctx, &e, prefix).await {
         tracing::error!("Error adding rendered link: {:?}", e);
     }
 
     Ok(())
 }
 
-async fn add_rendered_link(ctx: &Context, e: &IssuesEvent) -> anyhow::Result<()> {
+async fn add_rendered_link(ctx: &Context, e: &IssuesEvent, prefix: &str) -> anyhow::Result<()> {
     if e.action == IssuesAction::Opened {
         let files = e.issue.files(&ctx.github).await?;
 
-        if let Some(file) = files.iter().find(|f| f.filename.starts_with("text/")) {
+        if let Some(file) = files.iter().find(|f| f.filename.starts_with(prefix)) {
             if !e.issue.body.contains("[Rendered]") {
                 // This URL should be stable while the PR is open, even if the
                 // user pushes new commits.
