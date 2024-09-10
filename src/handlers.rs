@@ -44,9 +44,9 @@ pub mod project_goals;
 pub mod pull_requests_assignment_update;
 mod relabel;
 mod relnotes;
+mod rendered_link;
 mod review_requested;
 mod review_submitted;
-mod rfc_helper;
 pub mod rustc_commits;
 mod shortcut;
 mod transfer;
@@ -100,9 +100,9 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
         );
     }
 
-    if let Err(e) = rfc_helper::handle(ctx, event).await {
+    if let Err(e) = rendered_link::handle(ctx, event).await {
         log::error!(
-            "failed to process event {:?} with rfc_helper handler: {:?}",
+            "failed to process event {:?} with rendered_link handler: {:?}",
             event,
             e
         );
