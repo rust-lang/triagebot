@@ -166,6 +166,34 @@ impl GithubClient {
         let (body, _req_dbg) = self.send_req(req).await?;
         Ok(serde_json::from_slice(&body)?)
     }
+
+    pub(crate) async fn new_issue(
+        &self,
+        repo: &IssueRepository,
+        title: &str,
+        body: &str,
+        labels: Vec<String>,
+    ) -> anyhow::Result<NewIssueResponse> {
+        #[derive(serde::Serialize)]
+        struct NewIssue<'a> {
+            title: &'a str,
+            body: &'a str,
+            labels: Vec<String>,
+        }
+        let url = format!("{}/issues", repo.url(&self));
+        self.json(self.post(&url).json(&NewIssue {
+            title,
+            body,
+            labels,
+        }))
+        .await
+        .context("failed to create issue")
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct NewIssueResponse {
+    pub number: u64,
 }
 
 impl User {
@@ -273,7 +301,7 @@ pub struct Issue {
     pub number: u64,
     #[serde(deserialize_with = "opt_string")]
     pub body: String,
-    created_at: chrono::DateTime<Utc>,
+    pub created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
     /// The SHA for a merge commit.
     ///
@@ -304,6 +332,10 @@ pub struct Issue {
     pub merged: bool,
     #[serde(default)]
     pub draft: bool,
+
+    /// Number of comments
+    pub comments: Option<i32>,
+
     /// The API URL for discussion comments.
     ///
     /// Example: `https://api.github.com/repos/octocat/Hello-World/issues/1347/comments`
@@ -323,6 +355,7 @@ pub struct Issue {
     pub head: Option<CommitBase>,
     /// Whether it is open or closed.
     pub state: IssueState,
+    pub milestone: Option<Milestone>,
 }
 
 #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
@@ -510,7 +543,7 @@ impl Issue {
         self.state == IssueState::Open
     }
 
-    pub async fn get_comment(&self, client: &GithubClient, id: u64) -> anyhow::Result<Comment> {
+    pub async fn get_comment(&self, client: &GithubClient, id: i32) -> anyhow::Result<Comment> {
         let comment_url = format!("{}/issues/comments/{}", self.repository().url(client), id);
         let comment = client.json(client.get(&comment_url)).await?;
         Ok(comment)
@@ -1825,11 +1858,25 @@ impl<'q> IssuesQuery for Query<'q> {
                         issue.html_url, fcp.fcp.fk_bot_tracking_comment
                     );
                     let bot_tracking_comment_content = quote_reply(&fcp.status_comment.body);
-
                     let fk_initiating_comment = fcp.fcp.fk_initiating_comment;
-                    let init_comment = issue
-                        .get_comment(&client, fk_initiating_comment.try_into()?)
-                        .await?;
+                    let (initiating_comment_html_url, initiating_comment_content) =
+                        if u32::try_from(fk_initiating_comment).is_err() {
+                            // We blew out the GH comment incremental counter (a i32 on their end)
+                            // See: https://rust-lang.zulipchat.com/#narrow/stream/242791-t-infra/topic/rfcbot.20asleep
+                            log::debug!("Ignoring overflowed comment id from GitHub");
+                            ("".to_string(), "".to_string())
+                        } else {
+                            let comment = issue
+                                .get_comment(&client, fk_initiating_comment.try_into()?)
+                                .await
+                                .with_context(|| {
+                                    format!(
+                                        "failed to get first comment id={} for fcp={}",
+                                        fk_initiating_comment, fcp.fcp.id
+                                    )
+                                })?;
+                            (comment.html_url, quote_reply(&comment.body))
+                        };
 
                     // TODO: agree with the team(s) a policy to emit actual mentions to remind FCP
                     // voting member to cast their vote
@@ -1837,8 +1884,8 @@ impl<'q> IssuesQuery for Query<'q> {
                     Some(crate::actions::FCPDetails {
                         bot_tracking_comment_html_url,
                         bot_tracking_comment_content,
-                        initiating_comment_html_url: init_comment.html_url.clone(),
-                        initiating_comment_content: quote_reply(&init_comment.body),
+                        initiating_comment_html_url,
+                        initiating_comment_content,
                         disposition: fcp
                             .fcp
                             .disposition
@@ -2491,7 +2538,7 @@ impl GithubClient {
     }
 
     /// Set the milestone of an issue or PR.
-    async fn set_milestone(
+    pub async fn set_milestone(
         &self,
         full_repo_name: &str,
         milestone: &Milestone,

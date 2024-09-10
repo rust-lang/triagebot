@@ -66,7 +66,15 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let files = e.issue.diff(&ctx.github).await?;
     if let Some(files) = files {
         if let Some(cargo) = files.iter().find(|fd| fd.path == "src/tools/cargo") {
-            milestone_cargo(&ctx.github, &version, &cargo.diff).await?;
+            // The webhook timeout of 10 seconds can be too short, so process in
+            // the background.
+            let diff = cargo.diff.clone();
+            tokio::task::spawn(async move {
+                let gh = GithubClient::new_from_env();
+                if let Err(e) = milestone_cargo(&gh, &version, &diff).await {
+                    log::error!("failed to milestone cargo: {e:?}");
+                }
+            });
         }
     }
 

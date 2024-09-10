@@ -7,9 +7,9 @@ pub struct FCP {
     pub id: u32,
     pub fk_issue: u32,
     pub fk_initiator: u32,
-    pub fk_initiating_comment: u32,
+    pub fk_initiating_comment: i32,
     pub disposition: Option<String>,
-    pub fk_bot_tracking_comment: u32,
+    pub fk_bot_tracking_comment: i32,
     pub fcp_start: Option<String>,
     pub fcp_closed: bool,
 }
@@ -50,7 +50,7 @@ pub struct FCPIssue {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StatusComment {
-    pub id: u64,
+    pub id: i32,
     pub fk_issue: u32,
     pub fk_user: u32,
     pub body: String,
