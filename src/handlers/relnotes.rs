@@ -115,6 +115,11 @@ cc {} -- origin issue/PR authors and assignees for starting to draft text
                     vec!["relnotes".to_owned(), "relnotes-tracking-issue".to_owned()],
                 )
                 .await?;
+            if let Some(milestone) = &e.issue.milestone {
+                ctx.github
+                    .set_milestone(&e.issue.repository().to_string(), &milestone, resp.number)
+                    .await?;
+            }
             state.data.relnotes_issue = Some(resp.number);
             state.save().await?;
         }
