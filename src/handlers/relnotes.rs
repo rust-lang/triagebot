@@ -75,27 +75,31 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 "
 This issue tracks the release notes text for #{}.
 
+### Steps
+
 - [ ] Proposed text is drafted by PR author (or team) making the noteworthy change.
 - [ ] Issue is nominated for release team review of clarity for wider audience.
 - [ ] Release team includes text in release notes/blog posts.
 
-Release notes text:
+### Release notes text
 
-The responsible team for the underlying change should edit this section to replace the
-automatically generated link with a succinct description of what changed, drawing upon text
-proposed by the author (either in discussion or through direct editing). If the change is notable
-enough for inclusion in the blog post, add content to the blog section below.
+The responsible team for the underlying change should edit this section to replace the automatically generated link with a succinct description of what changed, drawing upon text proposed by the author (either in discussion or through direct editing).
 
 ```markdown
-# Pick a category...
+# Category (e.g. Language, Compiler, Libraries, Compatibility notes, ...)
 - [{}]({})
 ```
 
-Note: The section title will be de-duplicated by the release team with other release notes issues.
-Please use a standard title from [previous releases](https://doc.rust-lang.org/nightly/releases.html).
-More than one section can be included if needed.
+> [!TIP]
+> Use the [previous releases](https://doc.rust-lang.org/nightly/releases.html) categories to help choose which one(s) to use.
+> The category will be de-duplicated with all the other ones by the release team.
+>
+> *More than one section can be included if needed.*
 
-Release blog section (if any, leave blank if no section is expected):
+### Release blog section
+
+If the change is notable enough for inclusion in the blog post, the responsible team should add content to this section.
+*Otherwise leave it empty.*
 
 ```markdown
 ```
