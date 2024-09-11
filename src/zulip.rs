@@ -264,34 +264,33 @@ async fn query_pr_assignments(
 
     let db_client = ctx.db.get().await;
 
-    let record = match subcommand {
+    let reply = match subcommand {
         "show" => {
-            let rec = get_review_prefs(&db_client, gh_id).await;
-            if rec.is_err() {
-                anyhow::bail!("No preferences set.")
-            }
-            rec?
+            let rec = get_review_prefs(&db_client, gh_id)
+                .await
+                .context("Could not query review preferences")?;
+            rec.to_string()
         }
         "set" => {
-            let max = match words.next() {
+            let pref_max_prs = match words.next() {
                 Some(max_value) => {
                     if words.next().is_some() {
                         anyhow::bail!("Too many parameters.");
                     }
-                    max_value
-                        .parse::<u32>()
-                        .context("Wrong parameter format. Must be a positive integer.")?
+                    max_value.parse::<u32>().context(
+                        "Wrong parameter format. Must be a positive integer (and fit a u32).",
+                    )?
                 }
                 None => anyhow::bail!("Missing parameter."),
             };
-            set_review_prefs(&db_client, gh_id, max)
+            set_review_prefs(&db_client, gh_id, pref_max_prs)
                 .await
-                .context("Error occurred while setting review preferences.")?
+                .context("Could not set review preferences")?;
+            format!("Review capacity set to {}", pref_max_prs)
         }
         _ => anyhow::bail!("Invalid subcommand."),
     };
-
-    Ok(Some(record.to_string()))
+    Ok(Some(reply))
 }
 
 // This does two things:
