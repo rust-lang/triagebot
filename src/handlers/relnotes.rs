@@ -116,7 +116,18 @@ cc {} -- origin issue/PR authors and assignees for starting to draft text
                     &e.issue.repository(),
                     &title,
                     &body,
-                    vec!["relnotes".to_owned(), "relnotes-tracking-issue".to_owned()],
+                    ["relnotes", "relnotes-tracking-issue"]
+                        .into_iter()
+                        .chain(e.issue.labels.iter().map(|l| &*l.name).filter(|l| {
+                            l.starts_with("A-") // A-* (area)
+                            || l.starts_with("F-") // F-* (feature)
+                            || l.starts_with("L-") // L-* (lint)
+                            || l.starts_with("O-") // O-* (OS)
+                            || l.starts_with("T-") // T-* (team)
+                            || l.starts_with("WG-") // WG-* (working group)
+                        }))
+                        .map(ToOwned::to_owned)
+                        .collect::<Vec<_>>(),
                 )
                 .await?;
             if let Some(milestone) = &e.issue.milestone {
