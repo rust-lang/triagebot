@@ -226,7 +226,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             issue,
             ..
         }) => {
-            if issue.labels.iter().any(|l| l.name == C_TRACKING_ISSUE) {
+            if !issue.labels.iter().any(|l| l.name == C_TRACKING_ISSUE) {
                 return Ok(());
             }
             let zulip_topic_name = zulip_topic_name(issue);
