@@ -119,12 +119,24 @@ pub async fn get_jobs_to_execute(db: &DbClient) -> Result<Vec<Job>> {
 }
 
 fn deserialize_job(row: &tokio_postgres::row::Row) -> Result<Job> {
-    let id: Uuid = row.try_get(0)?;
-    let name: String = row.try_get(1)?;
-    let scheduled_at: DateTime<Utc> = row.try_get(2)?;
-    let metadata: serde_json::Value = row.try_get(3)?;
-    let executed_at: Option<DateTime<Utc>> = row.try_get(4)?;
-    let error_message: Option<String> = row.try_get(5)?;
+    let id: Uuid = row
+        .try_get(0)
+        .context("Failed to deserialize 'id' field in Job")?;
+    let name: String = row
+        .try_get(1)
+        .context("Failed to deserialize 'name' field in Job")?;
+    let scheduled_at: DateTime<Utc> = row
+        .try_get(2)
+        .context("Failed to deserialize 'scheduled_at' field in Job")?;
+    let metadata: serde_json::Value = row
+        .try_get(3)
+        .context("Failed to deserialize 'metadata' field in Job")?;
+    let executed_at: Option<DateTime<Utc>> = row
+        .try_get(4)
+        .context("Failed to deserialize 'executed_at' field in Job")?;
+    let error_message: Option<String> = row
+        .try_get(5)
+        .context("Failed to deserialize 'error_message' field in Job")?;
 
     Ok(Job {
         id,
