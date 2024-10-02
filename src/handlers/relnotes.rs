@@ -85,10 +85,10 @@ This issue tracks the release notes text for #{}.
 
 The responsible team for the underlying change should edit this section to replace the automatically generated link with a succinct description of what changed, drawing upon text proposed by the author (either in discussion or through direct editing).
 
-```markdown
+````markdown
 # Category (e.g. Language, Compiler, Libraries, Compatibility notes, ...)
 - [{}]({})
-```
+````
 
 > [!TIP]
 > Use the [previous releases](https://doc.rust-lang.org/nightly/releases.html) categories to help choose which one(s) to use.
@@ -101,8 +101,8 @@ The responsible team for the underlying change should edit this section to repla
 If the change is notable enough for inclusion in the blog post, the responsible team should add content to this section.
 *Otherwise leave it empty.*
 
-```markdown
-```
+````markdown
+````
 
 cc {} -- origin issue/PR authors and assignees for starting to draft text
 ",
