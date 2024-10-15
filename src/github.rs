@@ -391,6 +391,8 @@ impl ZulipGitHubReference {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Comment {
+    pub id: u64,
+    pub node_id: String,
     #[serde(deserialize_with = "opt_string")]
     pub body: String,
     pub html_url: String,
@@ -581,24 +583,24 @@ impl Issue {
         client: &GithubClient,
         id: u64,
         new_body: &str,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Comment> {
         let comment_url = format!("{}/issues/comments/{}", self.repository().url(client), id);
         #[derive(serde::Serialize)]
         struct NewComment<'a> {
             body: &'a str,
         }
-        client
-            .send_req(
+        let comment = client
+            .json(
                 client
                     .patch(&comment_url)
                     .json(&NewComment { body: new_body }),
             )
             .await
             .context("failed to edit comment")?;
-        Ok(())
+        Ok(comment)
     }
 
-    pub async fn post_comment(&self, client: &GithubClient, body: &str) -> anyhow::Result<()> {
+    pub async fn post_comment(&self, client: &GithubClient, body: &str) -> anyhow::Result<Comment> {
         #[derive(serde::Serialize)]
         struct PostComment<'a> {
             body: &'a str,
@@ -608,11 +610,11 @@ impl Issue {
             .strip_prefix("https://api.github.com")
             .expect("expected api host");
         let comments_url = format!("{}{comments_path}", client.api_url);
-        client
-            .send_req(client.post(&comments_url).json(&PostComment { body }))
+        let comment = client
+            .json(client.post(&comments_url).json(&PostComment { body }))
             .await
             .context("failed to post comment")?;
-        Ok(())
+        Ok(comment)
     }
 
     pub async fn remove_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<()> {
