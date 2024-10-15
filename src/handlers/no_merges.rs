@@ -4,7 +4,7 @@
 use crate::{
     config::NoMergesConfig,
     db::issue_data::IssueData,
-    github::{IssuesAction, IssuesEvent, Label},
+    github::{IssuesAction, IssuesEvent, Label, ReportedContentClassifiers},
     handlers::Context,
 };
 use anyhow::Context as _;
@@ -24,6 +24,9 @@ pub(super) struct NoMergesInput {
 struct NoMergesState {
     /// Hashes of merge commits that have already been mentioned by triagebot in a comment.
     mentioned_merge_commits: HashSet<String>,
+    /// List of all the no_merge comments as GitHub GraphQL NodeId.
+    #[serde(default)]
+    no_merge_comments: Vec<String>,
     /// Labels that the bot added as part of the no-merges check.
     #[serde(default)]
     added_labels: Vec<String>,
@@ -124,10 +127,22 @@ pub(super) async fn handle_input(
                 .context("failed to remove label")?;
         }
 
-        // FIXME: Minimize prior no_merges comments.
+        // Minimize prior no_merges comments.
+        for node_id in state.data.no_merge_comments.iter() {
+            event
+                .issue
+                .hide_comment(
+                    &ctx.github,
+                    node_id.as_str(),
+                    ReportedContentClassifiers::Resolved,
+                )
+                .await
+                .context("failed to hide previous merge commit comment")?;
+        }
 
         // Clear from state.
         state.data.mentioned_merge_commits.clear();
+        state.data.no_merge_comments.clear();
         state.data.added_labels.clear();
         state.save().await?;
         return Ok(());
@@ -202,11 +217,13 @@ pub(super) async fn handle_input(
             .context("failed to set no_merges labels")?;
 
         // Post comment
-        event
+        let comment = event
             .issue
             .post_comment(&ctx.github, &message)
             .await
             .context("failed to post no_merges comment")?;
+
+        state.data.no_merge_comments.push(comment.node_id);
         state.save().await?;
     }
     Ok(())
