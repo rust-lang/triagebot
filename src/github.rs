@@ -405,6 +405,17 @@ pub struct Comment {
     pub pr_review_state: Option<PullRequestReviewState>,
 }
 
+#[derive(Debug, serde::Deserialize, serde::Serialize, Eq, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ReportedContentClassifiers {
+    Abuse,
+    Duplicate,
+    OffTopic,
+    Outdated,
+    Resolved,
+    Spam,
+}
+
 #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum PullRequestReviewState {
@@ -615,6 +626,28 @@ impl Issue {
             .await
             .context("failed to post comment")?;
         Ok(comment)
+    }
+
+    pub async fn hide_comment(
+        &self,
+        client: &GithubClient,
+        node_id: &str,
+        reason: ReportedContentClassifiers,
+    ) -> anyhow::Result<()> {
+        client
+            .graphql_query(
+                "mutation($node_id: ID!, $reason: ReportedContentClassifiers!) {
+                    minimizeComment(input: {subjectId: $node_id, classifier: $reason}) {
+                        __typename
+                    }
+                }",
+                serde_json::json!({
+                    "node_id": node_id,
+                    "reason": reason,
+                }),
+            )
+            .await?;
+        Ok(())
     }
 
     pub async fn remove_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<()> {
