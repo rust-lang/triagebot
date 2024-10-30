@@ -34,6 +34,7 @@ async fn add_rendered_link(ctx: &Context, e: &IssuesEvent, prefix: &str) -> anyh
     if e.action == IssuesAction::Opened
         || e.action == IssuesAction::Closed
         || e.action == IssuesAction::Reopened
+        || e.action == IssuesAction::Synchronize
     {
         let files = e.issue.files(&ctx.github).await?;
 
