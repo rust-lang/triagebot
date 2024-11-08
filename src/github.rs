@@ -356,6 +356,8 @@ pub struct Issue {
     /// Whether it is open or closed.
     pub state: IssueState,
     pub milestone: Option<Milestone>,
+    /// Whether a PR has merge conflicts.
+    pub mergeable: Option<bool>,
 }
 
 #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
@@ -1826,6 +1828,101 @@ impl Repository {
             .await
             .with_context(|| format!("{} failed to get issue {issue_num}", self.full_name))
     }
+
+    /// Fetches information about merge conflicts on open PRs.
+    pub async fn get_merge_conflict_prs(
+        &self,
+        client: &GithubClient,
+    ) -> anyhow::Result<Vec<MergeConflictInfo>> {
+        let mut prs = Vec::new();
+        let mut after = None;
+        loop {
+            let mut data = client
+                .graphql_query(
+                    "query($owner:String!, $repo:String!, $after:String) {
+                       repository(owner: $owner, name: $repo) {
+                         pullRequests(states: OPEN, first: 100, after: $after) {
+                           edges {
+                             node {
+                               number
+                               mergeable
+                               baseRefName
+                             }
+                           }
+                           pageInfo {
+                             hasNextPage
+                             endCursor
+                           }
+                         }
+                       }
+                    }",
+                    serde_json::json!({
+                        "owner": self.owner(),
+                        "repo": self.name(),
+                        "after": after,
+                    }),
+                )
+                .await?;
+            let edges = data["data"]["repository"]["pullRequests"]["edges"].take();
+            let serde_json::Value::Array(edges) = edges else {
+                anyhow::bail!("expected array edges, got {edges:?}");
+            };
+            let this_page = edges
+                .into_iter()
+                .map(|mut edge| {
+                    serde_json::from_value(edge["node"].take())
+                        .with_context(|| "failed to deserialize merge conflicts")
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            prs.extend(this_page);
+            if !data["data"]["repository"]["pullRequests"]["pageInfo"]["hasNextPage"]
+                .as_bool()
+                .unwrap_or(false)
+            {
+                break;
+            }
+            after = Some(
+                data["data"]["repository"]["pullRequests"]["pageInfo"]["endCursor"]
+                    .as_str()
+                    .expect("endCursor is string")
+                    .to_string(),
+            );
+        }
+        Ok(prs)
+    }
+
+    /// Returns a list of PRs "associated" with a commit.
+    pub async fn pulls_for_commit(
+        &self,
+        client: &GithubClient,
+        sha: &str,
+    ) -> anyhow::Result<Vec<Issue>> {
+        let url = format!("{}/commits/{sha}/pulls", self.url(client));
+        client
+            .json(client.get(&url))
+            .await
+            .with_context(|| format!("{} failed to get pulls for commit {sha}", self.full_name))
+    }
+}
+
+/// Information about a merge conflict on a PR.
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeConflictInfo {
+    /// Pull request number.
+    pub number: u64,
+    /// Whether this pull can be merged.
+    pub mergeable: MergeableState,
+    /// The branch name where this PR is requesting to be merged to.
+    pub base_ref_name: String,
+}
+
+#[derive(Debug, serde::Deserialize, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MergeableState {
+    Conflicting,
+    Mergeable,
+    Unknown,
 }
 
 pub struct Query<'a> {
@@ -2081,9 +2178,14 @@ pub struct CreateEvent {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct PushEvent {
+    /// The SHA of the most recent commit on `ref` after the push.
+    pub after: String,
+    /// The full git ref that was pushed.
+    ///
+    /// Example: `refs/heads/main` or `refs/tags/v3.14.1`.
     #[serde(rename = "ref")]
     pub git_ref: String,
-    repository: Repository,
+    pub repository: Repository,
     sender: User,
 }
 

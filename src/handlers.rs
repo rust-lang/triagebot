@@ -31,6 +31,7 @@ mod github_releases;
 mod glacier;
 mod major_change;
 mod mentions;
+mod merge_conflict;
 mod milestone_prs;
 mod no_merges;
 mod nominate;
@@ -138,6 +139,16 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
         if let Err(e) = github_releases::handle(ctx, event, ghr_config).await {
             log::error!(
                 "failed to process event {:?} with github_releases handler: {:?}",
+                event,
+                e
+            );
+        }
+    }
+
+    if let Some(conflict_config) = config.as_ref().ok().and_then(|c| c.merge_conflict.as_ref()) {
+        if let Err(e) = merge_conflict::handle(ctx, event, conflict_config).await {
+            log::error!(
+                "failed to process event {:?} with merge_conflict handler: {:?}",
                 event,
                 e
             );
