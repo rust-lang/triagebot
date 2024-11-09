@@ -221,7 +221,17 @@ pub(crate) struct AutolabelLabelConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct NotifyZulipConfig {
     #[serde(flatten)]
-    pub(crate) labels: HashMap<String, NotifyZulipLabelConfig>,
+    pub(crate) labels: HashMap<String, NotifyZulipNameConfig>,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct NotifyZulipNameConfig {
+    // This keeps the default configuration for the label, e.g. `[notify-zulip."beta-nominated"]`
+    #[serde(flatten)]
+    pub(crate) default: Option<NotifyZulipLabelConfig>,
+    // This keeps other named configurations for the label, e.g. `[notify-zulip."beta-nominated".compiler]`
+    #[serde(flatten)]
+    pub(crate) others: Option<HashMap<String, NotifyZulipLabelConfig>>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]

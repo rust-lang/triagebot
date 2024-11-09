@@ -1,5 +1,5 @@
 use crate::{
-    config::{NotifyZulipConfig, NotifyZulipLabelConfig},
+    config::{NotifyZulipConfig, NotifyZulipLabelConfig, NotifyZulipNameConfig},
     github::{Issue, IssuesAction, IssuesEvent, Label},
     handlers::Context,
 };
@@ -12,6 +12,8 @@ pub(super) struct NotifyZulipInput {
     /// For example, if an `I-prioritize` issue is closed,
     /// this field will be `I-prioritize`.
     label: Label,
+    is_default_valid: bool,
+    names: Vec<String>,
 }
 
 pub(super) enum NotificationType {
@@ -52,26 +54,71 @@ pub(super) async fn parse_input(
 fn parse_label_change_input(
     event: &IssuesEvent,
     label: Label,
-    config: &NotifyZulipLabelConfig,
+    config: &NotifyZulipNameConfig,
 ) -> Option<NotifyZulipInput> {
-    if !has_all_required_labels(&event.issue, config) {
-        // Issue misses a required label, ignore this event
+    let mut is_default_valid = false;
+    let mut names: Vec<String> = vec![];
+
+    match &config.default {
+        Some(label_config) => {
+            if has_all_required_labels(&event.issue, &label_config) {
+                match event.action {
+                    IssuesAction::Labeled { .. } if !label_config.messages_on_add.is_empty() => {
+                        is_default_valid = true;
+                    }
+                    IssuesAction::Unlabeled { .. }
+                        if !label_config.messages_on_remove.is_empty() =>
+                    {
+                        is_default_valid = true;
+                    }
+                    _ => (),
+                }
+            }
+        }
+        None => (),
+    }
+
+    match &config.others {
+        Some(other_configs) => {
+            for (name, label_config) in other_configs {
+                if has_all_required_labels(&event.issue, &label_config) {
+                    match event.action {
+                        IssuesAction::Labeled { .. }
+                            if !label_config.messages_on_add.is_empty() =>
+                        {
+                            names.push(name.to_string());
+                        }
+                        IssuesAction::Unlabeled { .. }
+                            if !label_config.messages_on_remove.is_empty() =>
+                        {
+                            names.push(name.to_string());
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
+        None => (),
+    }
+
+    if !is_default_valid && names.is_empty() {
+        // It seems that there is no match between this event and any notify-zulip config, ignore this event
         return None;
     }
 
     match event.action {
-        IssuesAction::Labeled { .. } if !config.messages_on_add.is_empty() => {
-            Some(NotifyZulipInput {
-                notification_type: NotificationType::Labeled,
-                label,
-            })
-        }
-        IssuesAction::Unlabeled { .. } if !config.messages_on_remove.is_empty() => {
-            Some(NotifyZulipInput {
-                notification_type: NotificationType::Unlabeled,
-                label,
-            })
-        }
+        IssuesAction::Labeled { .. } => Some(NotifyZulipInput {
+            notification_type: NotificationType::Labeled,
+            label,
+            is_default_valid,
+            names,
+        }),
+        IssuesAction::Unlabeled { .. } => Some(NotifyZulipInput {
+            notification_type: NotificationType::Unlabeled,
+            label,
+            is_default_valid,
+            names,
+        }),
         _ => None,
     }
 }
@@ -92,24 +139,69 @@ fn parse_close_reopen_input(
                 .map(|config| (label, config))
         })
         .flat_map(|(label, config)| {
-            if !has_all_required_labels(&event.issue, config) {
-                // Issue misses a required label, ignore this event
+            let mut is_default_valid = false;
+            let mut names: Vec<String> = vec![];
+
+            match &config.default {
+                Some(label_config) => {
+                    if has_all_required_labels(&event.issue, &label_config) {
+                        match event.action {
+                            IssuesAction::Closed if !label_config.messages_on_close.is_empty() => {
+                                is_default_valid = true;
+                            }
+                            IssuesAction::Reopened
+                                if !label_config.messages_on_reopen.is_empty() =>
+                            {
+                                is_default_valid = true;
+                            }
+                            _ => (),
+                        }
+                    }
+                }
+                None => (),
+            }
+
+            match &config.others {
+                Some(other_configs) => {
+                    for (name, label_config) in other_configs {
+                        if has_all_required_labels(&event.issue, &label_config) {
+                            match event.action {
+                                IssuesAction::Closed
+                                    if !label_config.messages_on_close.is_empty() =>
+                                {
+                                    names.push(name.to_string());
+                                }
+                                IssuesAction::Reopened
+                                    if !label_config.messages_on_reopen.is_empty() =>
+                                {
+                                    names.push(name.to_string());
+                                }
+                                _ => (),
+                            }
+                        }
+                    }
+                }
+                None => (),
+            }
+
+            if !is_default_valid && names.is_empty() {
+                // It seems that there is no match between this event and any notify-zulip config, ignore this event
                 return None;
             }
 
             match event.action {
-                IssuesAction::Closed if !config.messages_on_close.is_empty() => {
-                    Some(NotifyZulipInput {
-                        notification_type: NotificationType::Closed,
-                        label,
-                    })
-                }
-                IssuesAction::Reopened if !config.messages_on_reopen.is_empty() => {
-                    Some(NotifyZulipInput {
-                        notification_type: NotificationType::Reopened,
-                        label,
-                    })
-                }
+                IssuesAction::Closed => Some(NotifyZulipInput {
+                    notification_type: NotificationType::Closed,
+                    label,
+                    is_default_valid,
+                    names,
+                }),
+                IssuesAction::Reopened => Some(NotifyZulipInput {
+                    notification_type: NotificationType::Reopened,
+                    label,
+                    is_default_valid,
+                    names,
+                }),
                 _ => None,
             }
         })
@@ -140,41 +232,54 @@ pub(super) async fn handle_input<'a>(
     inputs: Vec<NotifyZulipInput>,
 ) -> anyhow::Result<()> {
     for input in inputs {
-        let config = &config.labels[&input.label.name];
+        let name_config = &config.labels[&input.label.name];
 
-        let topic = &config.topic;
-        let topic = topic.replace("{number}", &event.issue.number.to_string());
-        let mut topic = topic.replace("{title}", &event.issue.title);
-        // Truncate to 60 chars (a Zulip limitation)
-        let mut chars = topic.char_indices().skip(59);
-        if let (Some((len, _)), Some(_)) = (chars.next(), chars.next()) {
-            topic.truncate(len);
-            topic.push('…');
+        // Get valid label configs
+        let mut label_configs: Vec<&NotifyZulipLabelConfig> = vec![];
+        if input.is_default_valid {
+            label_configs.push(name_config.default.as_ref().unwrap());
+        }
+        for name in input.names {
+            label_configs.push(&name_config.others.as_ref().unwrap()[&name]);
         }
 
-        let msgs = match input.notification_type {
-            NotificationType::Labeled => &config.messages_on_add,
-            NotificationType::Unlabeled => &config.messages_on_remove,
-            NotificationType::Closed => &config.messages_on_close,
-            NotificationType::Reopened => &config.messages_on_reopen,
-        };
+        for label_config in label_configs {
+            let config = label_config;
 
-        let recipient = crate::zulip::Recipient::Stream {
-            id: config.zulip_stream,
-            topic: &topic,
-        };
-
-        for msg in msgs {
-            let msg = msg.replace("{number}", &event.issue.number.to_string());
-            let msg = msg.replace("{title}", &event.issue.title);
-            let msg = replace_team_to_be_nominated(&event.issue.labels, msg);
-
-            crate::zulip::MessageApiRequest {
-                recipient,
-                content: &msg,
+            let topic = &config.topic;
+            let topic = topic.replace("{number}", &event.issue.number.to_string());
+            let mut topic = topic.replace("{title}", &event.issue.title);
+            // Truncate to 60 chars (a Zulip limitation)
+            let mut chars = topic.char_indices().skip(59);
+            if let (Some((len, _)), Some(_)) = (chars.next(), chars.next()) {
+                topic.truncate(len);
+                topic.push('…');
             }
-            .send(&ctx.github.raw())
-            .await?;
+
+            let msgs = match input.notification_type {
+                NotificationType::Labeled => &config.messages_on_add,
+                NotificationType::Unlabeled => &config.messages_on_remove,
+                NotificationType::Closed => &config.messages_on_close,
+                NotificationType::Reopened => &config.messages_on_reopen,
+            };
+
+            let recipient = crate::zulip::Recipient::Stream {
+                id: config.zulip_stream,
+                topic: &topic,
+            };
+
+            for msg in msgs {
+                let msg = msg.replace("{number}", &event.issue.number.to_string());
+                let msg = msg.replace("{title}", &event.issue.title);
+                let msg = replace_team_to_be_nominated(&event.issue.labels, msg);
+
+                crate::zulip::MessageApiRequest {
+                    recipient,
+                    content: &msg,
+                }
+                .send(&ctx.github.raw())
+                .await?;
+            }
         }
     }
 
