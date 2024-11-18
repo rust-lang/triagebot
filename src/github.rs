@@ -416,6 +416,18 @@ pub enum ReportedContentClassifiers {
     Spam,
 }
 
+#[derive(Debug, serde::Deserialize, serde::Serialize, Eq, PartialEq)]
+pub enum LockReason {
+    #[serde(rename = "off-topic")]
+    OffTopic,
+    #[serde(rename = "too heated")]
+    TooHeated,
+    #[serde(rename = "resolved")]
+    Resolved,
+    #[serde(rename = "spam")]
+    Spam,
+}
+
 #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum PullRequestReviewState {
@@ -852,6 +864,36 @@ impl Issue {
         client
             .set_milestone(&full_repo_name, &milestone, self.number)
             .await?;
+        Ok(())
+    }
+
+    /// Lock an issue with an optional reason.
+    pub async fn lock(
+        &self,
+        client: &GithubClient,
+        reason: Option<LockReason>,
+    ) -> anyhow::Result<()> {
+        let lock_url = format!(
+            "{}/issues/{}/lock",
+            self.repository().url(client),
+            self.number
+        );
+        #[derive(serde::Serialize)]
+        struct LockReasonIssue {
+            lock_reason: LockReason,
+        }
+        client
+            .send_req({
+                let req = client.put(&lock_url);
+
+                if let Some(lock_reason) = reason {
+                    req.json(&LockReasonIssue { lock_reason })
+                } else {
+                    req
+                }
+            })
+            .await
+            .context("failed to lock issue")?;
         Ok(())
     }
 
