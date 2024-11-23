@@ -91,9 +91,9 @@ async fn handle_branch_push(
     let repo = push.repository.clone();
     let db = ctx.db.get().await;
     // Spawn since this can trigger a lot of work.
+    let gh = ctx.github.clone();
     tokio::task::spawn(async move {
         // See module note about locking.
-        let gh = GithubClient::new_from_env();
         if let Err(e) = scan_prs(&gh, db, &config, repo, &branch_name, &push_sha).await {
             log::error!("failed to scan PRs for merge conflicts: {e:?}");
         }
@@ -118,10 +118,10 @@ async fn handle_pr(
             let pr_number = issue.number;
             let db = ctx.db.get().await;
             let config = config.clone();
+            let gh = ctx.github.clone();
             tokio::task::spawn(async move {
                 // See module note about locking.
                 tokio::time::sleep(UNKNOWN_RESCAN_DELAY).await;
-                let gh = GithubClient::new_from_env();
                 if let Err(e) = rescan_pr(&gh, db, &config, repo, pr_number).await {
                     log::error!("failed to rescan PR for merge conflicts: {e:?}");
                 }
@@ -210,10 +210,10 @@ async fn scan_prs(
     }
     if !unknowns.is_empty() {
         let config = config.clone();
+        let gh = gh.clone();
         tokio::task::spawn(async move {
             // See module note about locking.
             tokio::time::sleep(UNKNOWN_RESCAN_DELAY).await;
-            let gh = GithubClient::new_from_env();
             // NOTE: The `possibly` here is even less likely to be correct due
             // to the risk that another push happened while we were waiting.
             // May want to consider changing it to `None` if it regularly
