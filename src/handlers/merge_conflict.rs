@@ -43,7 +43,7 @@ const MERGE_CONFLICT_KEY: &str = "merge-conflict";
 /// don't particularly want to loop to avoid hitting GitHub too hard, and this
 /// conflict notification is not that important to be perfect. If it is too
 /// unreliable, then we could add a loop that will try one or two more times.
-const UNKNOWN_RESCAN_DELAY: Duration = Duration::new(60, 0);
+const UNKNOWN_RESCAN_DELAY: Duration = Duration::from_secs(60);
 
 /// State stored in the database for a PR.
 #[derive(Debug, Default, Deserialize, Serialize)]
