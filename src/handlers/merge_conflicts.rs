@@ -31,7 +31,7 @@ use tokio_postgres::Client as DbClient;
 use tracing as log;
 
 /// Key for the database.
-const MERGE_CONFLICT_KEY: &str = "merge-conflict";
+const MERGE_CONFLICTS_KEY: &str = "merge-conflicts";
 
 /// The amount of time to wait before scanning an unknown mergeable status.
 ///
@@ -262,7 +262,7 @@ async fn maybe_add_comment(
     possibly: Option<&str>,
 ) -> anyhow::Result<()> {
     let mut state: IssueData<'_, MergeConflictState> =
-        IssueData::load(db, issue, MERGE_CONFLICT_KEY).await?;
+        IssueData::load(db, issue, MERGE_CONFLICTS_KEY).await?;
     if state.data.last_warned_comment.is_some() {
         // There was already an unresolved notification, don't warn again.
         return Ok(());
@@ -308,7 +308,7 @@ async fn maybe_hide_comment(
     issue: &Issue,
 ) -> anyhow::Result<()> {
     let mut state: IssueData<'_, MergeConflictState> =
-        IssueData::load(db, issue, MERGE_CONFLICT_KEY).await?;
+        IssueData::load(db, issue, MERGE_CONFLICTS_KEY).await?;
     let Some(comment_id) = &state.data.last_warned_comment else {
         return Ok(());
     };

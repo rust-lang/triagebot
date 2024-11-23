@@ -45,7 +45,7 @@ pub(crate) struct Config {
     pub(crate) validate_config: Option<ValidateConfig>,
     pub(crate) pr_tracking: Option<ReviewPrefsConfig>,
     pub(crate) transfer: Option<TransferConfig>,
-    pub(crate) merge_conflict: Option<MergeConflictConfig>,
+    pub(crate) merge_conflicts: Option<MergeConflictConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -540,7 +540,7 @@ mod tests {
                 validate_config: Some(ValidateConfig {}),
                 pr_tracking: None,
                 transfer: None,
-                merge_conflict: None,
+                merge_conflicts: None,
             }
         );
     }
