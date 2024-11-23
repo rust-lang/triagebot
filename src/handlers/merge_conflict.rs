@@ -11,8 +11,7 @@
 //!
 //! In general, multiple pushes happening quickly should be rare. And when it
 //! does happen, hopefully the state in the database will prevent duplicate
-//! messages. However, the database check itself is racey without a lock (see
-//! `maybe_add_comment`).
+//! messages.
 
 use crate::{
     config::MergeConflictConfig,
@@ -262,11 +261,6 @@ async fn maybe_add_comment(
     issue: &Issue,
     possibly: Option<&str>,
 ) -> anyhow::Result<()> {
-    // Note: This database access is racey. Preferably there would be a
-    // row-lock held between the time it is loaded and the save call below.
-    // The `post_comment` call should normally be pretty fast, so races should
-    // be rare. If they happen too often, consider adding some locking
-    // mechanism here.
     let mut state: IssueData<'_, MergeConflictState> =
         IssueData::load(db, issue, MERGE_CONFLICT_KEY).await?;
     if state.data.last_warned_comment.is_some() {
