@@ -45,6 +45,7 @@ pub(crate) struct Config {
     pub(crate) validate_config: Option<ValidateConfig>,
     pub(crate) pr_tracking: Option<ReviewPrefsConfig>,
     pub(crate) transfer: Option<TransferConfig>,
+    pub(crate) merge_conflicts: Option<MergeConflictConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -350,6 +351,18 @@ pub(crate) struct ReviewPrefsConfig {
 #[serde(deny_unknown_fields)]
 pub(crate) struct TransferConfig {}
 
+#[derive(Clone, PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MergeConflictConfig {
+    #[serde(default)]
+    pub remove: HashSet<String>,
+    #[serde(default)]
+    pub add: HashSet<String>,
+    #[serde(default)]
+    pub unless: HashSet<String>,
+}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -527,6 +540,7 @@ mod tests {
                 validate_config: Some(ValidateConfig {}),
                 pr_tracking: None,
                 transfer: None,
+                merge_conflicts: None,
             }
         );
     }
