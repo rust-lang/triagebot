@@ -158,12 +158,6 @@ async fn milestone_cargo(
             // * Cargo's PR never got merged as fast-forward / rebase / squash merge.
             commit.parents.len() == 2)
         .filter_map(|commit| {
-            log::info!(
-                "getting PR number for cargo commit {} (len={})",
-                commit.sha,
-                commit.commit.message.len()
-            );
-
             let first = commit
                 .commit
                 .message
