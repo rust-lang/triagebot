@@ -158,12 +158,7 @@ async fn milestone_cargo(
             // * Cargo's PR never got merged as fast-forward / rebase / squash merge.
             commit.parents.len() == 2)
         .filter_map(|commit| {
-            let first = commit
-                .commit
-                .message
-                .lines()
-                .next()
-                .expect("commit message");
+            let first = commit.commit.message.lines().next().unwrap_or_default();
             merge_re.captures(first).map(|cap| {
                 cap.get(1)
                     .or_else(|| cap.get(2))
