@@ -270,7 +270,7 @@ async fn handle(
         \n \
         ``` \
         \n \
-        @rustbot concern reason-for-concern \
+        @rfcbot concern reason-for-concern \
         \n \
         <description of the concern> \
         \n \
@@ -280,7 +280,7 @@ async fn handle(
         \n \
         ``` \
         \n \
-        @rustbot resolve reason-for-concern \
+        @rfcbot resolve reason-for-concern \
         \n \
         ``` \
         \n\n \
