@@ -91,10 +91,10 @@ pub(crate) struct PingTeamConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AssignConfig {
-    /// If `true`, then posts a warning comment if the PR is opened against a
+    /// If enabled, then posts a warning comment if the PR is opened against a
     /// different branch than the default (usually master or main).
     #[serde(default)]
-    pub(crate) warn_non_default_branch: bool,
+    pub(crate) warn_non_default_branch: WarnNonDefaultBranchConfig,
     /// A URL to include in the welcome message.
     pub(crate) contributing_url: Option<String>,
     /// Ad-hoc groups that can be referred to in `owners`.
@@ -115,6 +115,45 @@ impl AssignConfig {
         self.users_on_vacation
             .iter()
             .any(|vacationer| name_lower == vacationer.to_lowercase())
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(untagged)]
+pub(crate) enum WarnNonDefaultBranchConfig {
+    Simple(bool),
+    Extended {
+        enable: bool,
+        /// List of exceptions that have a different default branch
+        #[serde(default)]
+        exceptions: Vec<WarnNonDefaultBranchException>,
+    },
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WarnNonDefaultBranchException {
+    /// Substring in the title that match this exception
+    pub(crate) title: String,
+    /// The actual branch that should be associated with the issue
+    pub(crate) branch: String,
+}
+
+impl Default for WarnNonDefaultBranchConfig {
+    fn default() -> WarnNonDefaultBranchConfig {
+        WarnNonDefaultBranchConfig::Simple(false)
+    }
+}
+
+impl WarnNonDefaultBranchConfig {
+    pub(crate) fn enabled_and_exceptions(&self) -> Option<&[WarnNonDefaultBranchException]> {
+        match self {
+            WarnNonDefaultBranchConfig::Simple(enable) => enable.then(|| &[] as &[_]),
+            WarnNonDefaultBranchConfig::Extended { enable, exceptions } => {
+                enable.then(|| exceptions.as_slice())
+            }
+        }
     }
 }
 
@@ -514,7 +553,7 @@ mod tests {
                     allow_unauthenticated: vec!["C-*".into()],
                 }),
                 assign: Some(AssignConfig {
-                    warn_non_default_branch: false,
+                    warn_non_default_branch: WarnNonDefaultBranchConfig::Simple(false),
                     contributing_url: None,
                     adhoc_groups: HashMap::new(),
                     owners: HashMap::new(),
@@ -526,6 +565,67 @@ mod tests {
                     teams: nominate_teams
                 }),
                 shortcut: Some(ShortcutConfig { _empty: () }),
+                prioritize: None,
+                major_change: None,
+                glacier: None,
+                close: None,
+                autolabel: None,
+                notify_zulip: None,
+                github_releases: None,
+                review_submitted: None,
+                review_requested: None,
+                mentions: None,
+                no_merges: None,
+                validate_config: Some(ValidateConfig {}),
+                pr_tracking: None,
+                transfer: None,
+                merge_conflicts: None,
+            }
+        );
+    }
+
+    #[test]
+    fn warn_non_default_branch() {
+        let config = r#"
+            [assign]
+            warn_non_default_branch.enable = true
+
+            [[assign.warn_non_default_branch.exceptions]]
+            title = "[beta"
+            branch = "beta"
+
+            [[assign.warn_non_default_branch.exceptions]]
+            title = "[stable"
+            branch = "stable"
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        assert_eq!(
+            config,
+            Config {
+                relabel: None,
+                assign: Some(AssignConfig {
+                    warn_non_default_branch: WarnNonDefaultBranchConfig::Extended {
+                        enable: true,
+                        exceptions: vec![
+                            WarnNonDefaultBranchException {
+                                title: "[beta".to_string(),
+                                branch: "beta".to_string()
+                            },
+                            WarnNonDefaultBranchException {
+                                title: "[stable".to_string(),
+                                branch: "stable".to_string()
+                            },
+                        ],
+                    },
+                    contributing_url: None,
+                    adhoc_groups: HashMap::new(),
+                    owners: HashMap::new(),
+                    users_on_vacation: HashSet::new(),
+                }),
+                note: None,
+                ping: None,
+                nominate: None,
+                shortcut: None,
                 prioritize: None,
                 major_change: None,
                 glacier: None,

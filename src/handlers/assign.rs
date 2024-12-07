@@ -18,7 +18,7 @@
 //! the PR modifies.
 
 use crate::{
-    config::AssignConfig,
+    config::{AssignConfig, WarnNonDefaultBranchException},
     github::{self, Event, FileDiff, Issue, IssuesAction, Selection},
     handlers::{Context, GithubClient, IssuesEvent},
     interactions::EditIssueBody,
@@ -71,6 +71,11 @@ const ON_VACATION_WARNING: &str = "{username} is on vacation. Please do not assi
 const NON_DEFAULT_BRANCH: &str =
     "Pull requests are usually filed against the {default} branch for this repo, \
      but this one is against {target}. \
+     Please double check that you specified the right target!";
+
+const NON_DEFAULT_BRANCH_EXCEPTION: &str =
+    "Pull requests targetting the {default} branch are usually filed against the {default} \
+     branch, but this one is against {target}. \
      Please double check that you specified the right target!";
 
 const SUBMODULE_WARNING_MSG: &str = "These commits modify **submodules**.";
@@ -179,8 +184,8 @@ pub(super) async fn handle_input(
 
     // Compute some warning messages to post to new PRs.
     let mut warnings = Vec::new();
-    if config.warn_non_default_branch {
-        warnings.extend(non_default_branch(event));
+    if let Some(exceptions) = config.warn_non_default_branch.enabled_and_exceptions() {
+        warnings.extend(non_default_branch(exceptions, event));
     }
     warnings.extend(modifies_submodule(diff));
     if !warnings.is_empty() {
@@ -209,15 +214,25 @@ fn is_self_assign(assignee: &str, pr_author: &str) -> bool {
     assignee.to_lowercase() == pr_author.to_lowercase()
 }
 
-/// Returns a message if the PR is opened against the non-default branch.
-fn non_default_branch(event: &IssuesEvent) -> Option<String> {
+/// Returns a message if the PR is opened against the non-default branch (or the exception branch
+/// if it's an exception).
+fn non_default_branch(
+    exceptions: &[WarnNonDefaultBranchException],
+    event: &IssuesEvent,
+) -> Option<String> {
     let target_branch = &event.issue.base.as_ref().unwrap().git_ref;
-    let default_branch = &event.repository.default_branch;
+    let (default_branch, warn_msg) = exceptions
+        .iter()
+        .find(|e| event.issue.title.contains(&e.title))
+        .map_or_else(
+            || (&event.repository.default_branch, NON_DEFAULT_BRANCH),
+            |e| (&e.branch, NON_DEFAULT_BRANCH_EXCEPTION),
+        );
     if target_branch == default_branch {
         return None;
     }
     Some(
-        NON_DEFAULT_BRANCH
+        warn_msg
             .replace("{default}", default_branch)
             .replace("{target}", target_branch),
     )
