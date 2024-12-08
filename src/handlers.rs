@@ -25,6 +25,7 @@ impl fmt::Display for HandlerError {
 
 mod assign;
 mod autolabel;
+mod bot_pull_requests;
 mod close;
 pub mod docs_update;
 mod github_releases;
@@ -115,6 +116,16 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
             event,
             e
         );
+    }
+
+    if config.as_ref().is_ok_and(|c| c.bot_pull_requests.is_some()) {
+        if let Err(e) = bot_pull_requests::handle(ctx, event).await {
+            log::error!(
+                "failed to process event {:?} with bot_pull_requests handler: {:?}",
+                event,
+                e
+            )
+        }
     }
 
     if let Some(config) = config

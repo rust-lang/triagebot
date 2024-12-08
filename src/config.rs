@@ -46,6 +46,7 @@ pub(crate) struct Config {
     pub(crate) pr_tracking: Option<ReviewPrefsConfig>,
     pub(crate) transfer: Option<TransferConfig>,
     pub(crate) merge_conflicts: Option<MergeConflictConfig>,
+    pub(crate) bot_pull_requests: Option<BotPullRequests>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -402,6 +403,11 @@ pub(crate) struct MergeConflictConfig {
     pub unless: HashSet<String>,
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct BotPullRequests {}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -580,6 +586,7 @@ mod tests {
                 pr_tracking: None,
                 transfer: None,
                 merge_conflicts: None,
+                bot_pull_requests: None,
             }
         );
     }
@@ -641,6 +648,7 @@ mod tests {
                 pr_tracking: None,
                 transfer: None,
                 merge_conflicts: None,
+                bot_pull_requests: None,
             }
         );
     }
