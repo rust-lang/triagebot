@@ -189,6 +189,31 @@ impl GithubClient {
         .await
         .context("failed to create issue")
     }
+
+    pub(crate) async fn set_pr_state(
+        &self,
+        repo: &IssueRepository,
+        number: u64,
+        state: PrState,
+    ) -> anyhow::Result<()> {
+        #[derive(serde::Serialize)]
+        struct Update {
+            state: PrState,
+        }
+        let url = format!("{}/pulls/{number}", repo.url(&self));
+        self.send_req(self.patch(&url).json(&Update { state }))
+            .await
+            .context("failed to update pr state")?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, serde::Serialize)]
+pub(crate) enum PrState {
+    #[serde(rename = "open")]
+    Open,
+    #[serde(rename = "closed")]
+    Closed,
 }
 
 #[derive(Debug, serde::Deserialize)]
