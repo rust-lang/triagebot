@@ -189,6 +189,31 @@ impl GithubClient {
         .await
         .context("failed to create issue")
     }
+
+    pub(crate) async fn set_pr_status(
+        &self,
+        repo: &IssueRepository,
+        number: u64,
+        status: PrStatus,
+    ) -> anyhow::Result<()> {
+        #[derive(serde::Serialize)]
+        struct Update {
+            status: PrStatus,
+        }
+        let url = format!("{}/pulls/{number}", repo.url(&self));
+        self.send_req(self.post(&url).json(&Update { status }))
+            .await
+            .context("failed to update pr state")?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, serde::Serialize)]
+pub(crate) enum PrStatus {
+    #[serde(rename = "open")]
+    Open,
+    #[serde(rename = "closed")]
+    Closed,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -463,7 +488,7 @@ impl fmt::Display for AssignmentError {
 
 impl std::error::Error for AssignmentError {}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub struct IssueRepository {
     pub organization: String,
     pub repository: String,
