@@ -21,7 +21,7 @@ pub(crate) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
 
     // If it's not the github-actions bot, we don't expect this handler to be needed. Skip the
     // event.
-    if event.sender.login != "app/github-actions" {
+    if event.sender.login != "github-actions[bot]" {
         return Ok(());
     }
 
