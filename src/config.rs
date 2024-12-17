@@ -47,6 +47,7 @@ pub(crate) struct Config {
     pub(crate) transfer: Option<TransferConfig>,
     pub(crate) merge_conflicts: Option<MergeConflictConfig>,
     pub(crate) bot_pull_requests: Option<BotPullRequests>,
+    pub(crate) rendered_link: Option<RenderedLinkConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -408,6 +409,13 @@ pub(crate) struct MergeConflictConfig {
 #[serde(deny_unknown_fields)]
 pub(crate) struct BotPullRequests {}
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RenderedLinkConfig {
+    pub(crate) trigger_files: Vec<String>,
+}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -528,6 +536,9 @@ mod tests {
             infra = "T-infra"
 
             [shortcut]
+
+            [rendered-link]
+            trigger-files = ["posts/"]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -587,6 +598,9 @@ mod tests {
                 transfer: None,
                 merge_conflicts: None,
                 bot_pull_requests: None,
+                rendered_link: Some(RenderedLinkConfig {
+                    trigger_files: vec!["posts/".to_string()]
+                })
             }
         );
     }
@@ -649,6 +663,7 @@ mod tests {
                 transfer: None,
                 merge_conflicts: None,
                 bot_pull_requests: None,
+                rendered_link: None,
             }
         );
     }
