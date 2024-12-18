@@ -1,4 +1,4 @@
-use pulldown_cmark::{Event, Parser, Tag};
+use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use std::ops::Range;
 
 #[derive(Debug)]
@@ -14,18 +14,18 @@ impl IgnoreBlocks {
             if let Event::Start(Tag::CodeBlock(_)) = event {
                 let start = range.start;
                 while let Some((event, range)) = parser.next() {
-                    if let Event::End(Tag::CodeBlock(_)) = event {
+                    if let Event::End(TagEnd::CodeBlock) = event {
                         ignore.push(start..range.end);
                         break;
                     }
                 }
-            } else if let Event::Start(Tag::BlockQuote) = event {
+            } else if let Event::Start(Tag::BlockQuote(_)) = event {
                 let start = range.start;
                 let mut count = 1;
                 while let Some((event, range)) = parser.next() {
-                    if let Event::Start(Tag::BlockQuote) = event {
+                    if let Event::Start(Tag::BlockQuote(_)) = event {
                         count += 1;
-                    } else if let Event::End(Tag::BlockQuote) = event {
+                    } else if let Event::End(TagEnd::BlockQuote(_)) = event {
                         count -= 1;
                         if count == 0 {
                             ignore.push(start..range.end);
