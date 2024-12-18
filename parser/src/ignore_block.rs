@@ -1,4 +1,4 @@
-use pulldown_cmark::{Event, Parser, Tag};
+use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use std::ops::Range;
 
 #[derive(Debug)]
@@ -14,18 +14,18 @@ impl IgnoreBlocks {
             if let Event::Start(Tag::CodeBlock(_)) = event {
                 let start = range.start;
                 while let Some((event, range)) = parser.next() {
-                    if let Event::End(Tag::CodeBlock(_)) = event {
+                    if let Event::End(TagEnd::CodeBlock) = event {
                         ignore.push(start..range.end);
                         break;
                     }
                 }
-            } else if let Event::Start(Tag::BlockQuote) = event {
+            } else if let Event::Start(Tag::BlockQuote(_)) = event {
                 let start = range.start;
                 let mut count = 1;
                 while let Some((event, range)) = parser.next() {
-                    if let Event::Start(Tag::BlockQuote) = event {
+                    if let Event::Start(Tag::BlockQuote(_)) = event {
                         count += 1;
-                    } else if let Event::End(Tag::BlockQuote) = event {
+                    } else if let Event::End(TagEnd::BlockQuote(_)) = event {
                         count -= 1;
                         if count == 0 {
                             ignore.push(start..range.end);
@@ -33,6 +33,16 @@ impl IgnoreBlocks {
                         }
                     }
                 }
+            } else if let Event::Start(Tag::HtmlBlock) = event {
+                let start = range.start;
+                while let Some((event, range)) = parser.next() {
+                    if let Event::End(TagEnd::HtmlBlock) = event {
+                        ignore.push(start..range.end);
+                        break;
+                    }
+                }
+            } else if let Event::InlineHtml(_) = event {
+                ignore.push(range);
             } else if let Event::Code(_) = event {
                 ignore.push(range);
             }
@@ -92,7 +102,13 @@ fn cbs_1() {
 fn cbs_2() {
     assert_eq!(
         bodies("`hey you` <b>me too</b>"),
-        [Ignore::Yes("`hey you`"), Ignore::No(" <b>me too</b>")]
+        [
+            Ignore::Yes("`hey you`"),
+            Ignore::No(" "),
+            Ignore::Yes("<b>"),
+            Ignore::No("me too"),
+            Ignore::Yes("</b>")
+        ]
     );
 }
 
@@ -100,7 +116,13 @@ fn cbs_2() {
 fn cbs_3() {
     assert_eq!(
         bodies(r"`hey you\` <b>`me too</b>"),
-        [Ignore::Yes(r"`hey you\`"), Ignore::No(" <b>`me too</b>")]
+        [
+            Ignore::Yes("`hey you\\`"),
+            Ignore::No(" "),
+            Ignore::Yes("<b>"),
+            Ignore::No("`me too"),
+            Ignore::Yes("</b>")
+        ]
     );
 }
 
@@ -236,6 +258,27 @@ fn cbs_11() {
         [
             Ignore::No("\n"),
             Ignore::Yes("> some\n> > nested\n> citations\n"),
+        ],
+    );
+}
+
+#[test]
+fn cbs_12() {
+    assert_eq!(
+        bodies(
+            "
+Test
+
+<!-- Test -->
+<!--
+This is an HTML comment.
+-->
+"
+        ),
+        [
+            Ignore::No("\nTest\n\n"),
+            Ignore::Yes("<!-- Test -->\n"),
+            Ignore::Yes("<!--\nThis is an HTML comment.\n-->\n")
         ],
     );
 }

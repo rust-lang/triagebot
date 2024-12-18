@@ -350,7 +350,13 @@ fn review_errors() {
 #[test]
 fn review_ignored() {
     // Checks for things that shouldn't be detected.
-    for input in ["r", "reviewer? abc", "r foo"] {
+    for input in [
+        "r",
+        "reviewer? abc",
+        "r foo",
+        "<a>\n r? @bot\n</a>",
+        "<!--\nr? foo\n-->",
+    ] {
         let mut input = Input::new(input, vec!["bot"]);
         assert_eq!(input.next(), None);
     }
