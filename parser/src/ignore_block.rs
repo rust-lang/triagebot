@@ -33,6 +33,14 @@ impl IgnoreBlocks {
                         }
                     }
                 }
+            } else if let Event::Start(Tag::HtmlBlock) = event {
+                let start = range.start;
+                while let Some((event, range)) = parser.next() {
+                    if let Event::End(TagEnd::HtmlBlock) = event {
+                        ignore.push(start..range.end);
+                        break;
+                    }
+                }
             } else if let Event::InlineHtml(_) = event {
                 ignore.push(range);
             } else if let Event::Code(_) = event {
@@ -250,6 +258,27 @@ fn cbs_11() {
         [
             Ignore::No("\n"),
             Ignore::Yes("> some\n> > nested\n> citations\n"),
+        ],
+    );
+}
+
+#[test]
+fn cbs_12() {
+    assert_eq!(
+        bodies(
+            "
+Test
+
+<!-- Test -->
+<!--
+This is an HTML comment.
+-->
+"
+        ),
+        [
+            Ignore::No("\nTest\n\n"),
+            Ignore::Yes("<!-- Test -->\n"),
+            Ignore::Yes("<!--\nThis is an HTML comment.\n-->\n")
         ],
     );
 }
