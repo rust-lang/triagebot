@@ -33,6 +33,8 @@ impl IgnoreBlocks {
                         }
                     }
                 }
+            } else if let Event::InlineHtml(_) = event {
+                ignore.push(range);
             } else if let Event::Code(_) = event {
                 ignore.push(range);
             }
@@ -92,7 +94,13 @@ fn cbs_1() {
 fn cbs_2() {
     assert_eq!(
         bodies("`hey you` <b>me too</b>"),
-        [Ignore::Yes("`hey you`"), Ignore::No(" <b>me too</b>")]
+        [
+            Ignore::Yes("`hey you`"),
+            Ignore::No(" "),
+            Ignore::Yes("<b>"),
+            Ignore::No("me too"),
+            Ignore::Yes("</b>")
+        ]
     );
 }
 
@@ -100,7 +108,13 @@ fn cbs_2() {
 fn cbs_3() {
     assert_eq!(
         bodies(r"`hey you\` <b>`me too</b>"),
-        [Ignore::Yes(r"`hey you\`"), Ignore::No(" <b>`me too</b>")]
+        [
+            Ignore::Yes("`hey you\\`"),
+            Ignore::No(" "),
+            Ignore::Yes("<b>"),
+            Ignore::No("`me too"),
+            Ignore::Yes("</b>")
+        ]
     );
 }
 
