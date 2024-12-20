@@ -9,7 +9,14 @@ use anyhow::{format_err, Context as _};
 use std::env;
 use std::fmt::Write as _;
 use std::str::FromStr;
+use std::sync::LazyLock;
 use tracing as log;
+
+static ZULIP_URL: LazyLock<String> =
+    LazyLock::new(|| env::var("ZULIP_URL").unwrap_or("https://rust-lang.zulipchat.com".into()));
+static ZULIP_BOT_EMAIL: LazyLock<String> = LazyLock::new(|| {
+    env::var("ZULIP_BOT_EMAIL").unwrap_or("triage-rust-lang-bot@zulipchat.com".into())
+});
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Request {
@@ -70,8 +77,6 @@ impl Message {
 struct Response {
     content: String,
 }
-
-pub const BOT_EMAIL: &str = "triage-rust-lang-bot@zulipchat.com";
 
 pub async fn to_github_id(client: &GithubClient, zulip_id: u64) -> anyhow::Result<Option<u64>> {
     let map = crate::team_data::zulip_map(client).await?;
@@ -299,8 +304,8 @@ async fn execute_for_other_user(
     let members = ctx
         .github
         .raw()
-        .get("https://rust-lang.zulipchat.com/api/v1/users")
-        .basic_auth(BOT_EMAIL, Some(&bot_api_token))
+        .get(format!("{}/api/v1/users", *ZULIP_URL))
+        .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
         .send()
         .await
         .map_err(|e| format_err!("Failed to get list of zulip users: {e:?}."))?;
@@ -414,7 +419,7 @@ impl Recipient<'_> {
     }
 
     pub fn url(&self) -> String {
-        format!("https://rust-lang.zulipchat.com/#narrow/{}", self.narrow())
+        format!("{}/#narrow/{}", *ZULIP_URL, self.narrow())
     }
 }
 
@@ -470,8 +475,8 @@ impl<'a> MessageApiRequest<'a> {
         }
 
         Ok(client
-            .post("https://rust-lang.zulipchat.com/api/v1/messages")
-            .basic_auth(BOT_EMAIL, Some(&bot_api_token))
+            .post(format!("{}/api/v1/messages", *ZULIP_URL))
+            .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
             .form(&SerializedApi {
                 type_: match self.recipient {
                     Recipient::Stream { .. } => "stream",
@@ -522,10 +527,10 @@ impl<'a> UpdateMessageApiRequest<'a> {
 
         Ok(client
             .patch(&format!(
-                "https://rust-lang.zulipchat.com/api/v1/messages/{}",
-                self.message_id
+                "{}/api/v1/messages/{}",
+                *ZULIP_URL, self.message_id
             ))
-            .basic_auth(BOT_EMAIL, Some(&bot_api_token))
+            .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
             .form(&SerializedApi {
                 topic: self.topic,
                 propagate_mode: self.propagate_mode,
@@ -715,10 +720,10 @@ impl<'a> AddReaction<'a> {
 
         Ok(client
             .post(&format!(
-                "https://rust-lang.zulipchat.com/api/v1/messages/{}/reactions",
-                self.message_id
+                "{}/api/v1/messages/{}/reactions",
+                *ZULIP_URL, self.message_id
             ))
-            .basic_auth(BOT_EMAIL, Some(&bot_api_token))
+            .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
             .form(&self)
             .send()
             .await?)
