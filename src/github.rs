@@ -1055,7 +1055,7 @@ impl Issue {
             .graphql_query(
                 "mutation ($issueId: ID!, $repoId: ID!) {
                   transferIssue(
-                    input: {createLabelsIfMissing: true, issueId: $issueId, repositoryId: $repoId}
+                    input: {createLabelsIfMissing: false, issueId: $issueId, repositoryId: $repoId}
                   ) {
                     issue {
                       id
