@@ -131,17 +131,27 @@ pub struct ReviewPrefs {
     pub username: String,
     pub user_id: i64,
     pub assigned_prs: Vec<i32>,
+    pub max_assigned_prs: Option<u32>,
 }
 
-impl ReviewPrefs {
-    fn to_string(&self) -> String {
+impl fmt::Display for ReviewPrefs {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let prs = self
             .assigned_prs
             .iter()
             .map(|pr| format!("#{}", pr))
             .collect::<Vec<String>>()
             .join(", ");
-        format!("Username: {}\nAssigned PRs: {}", self.username, prs)
+        let max = if self.max_assigned_prs.is_none() {
+            "<not set>"
+        } else {
+            &format!("{}", self.max_assigned_prs.expect("NaN"))
+        };
+        write!(
+            f,
+            "Username: {}\nAssigned PRs: {}\nCurrent review capacity: {}",
+            self.username, prs, max
+        )
     }
 }
 
@@ -152,6 +162,7 @@ impl From<tokio_postgres::row::Row> for ReviewPrefs {
             username: row.get("username"),
             user_id: row.get("user_id"),
             assigned_prs: row.get("assigned_prs"),
+            max_assigned_prs: row.get("max_assigned_prs"),
         }
     }
 }
