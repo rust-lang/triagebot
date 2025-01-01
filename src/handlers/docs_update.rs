@@ -21,7 +21,6 @@ const SUBMODULES: &[&str] = &[
     "src/doc/nomicon",
     "src/doc/reference",
     "src/doc/rust-by-example",
-    "src/doc/rustc-dev-guide",
 ];
 
 const TITLE: &str = "Update books";
