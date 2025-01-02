@@ -102,12 +102,15 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
         );
     }
 
-    if let Err(e) = rendered_link::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with rendered_link handler: {:?}",
-            event,
-            e
-        );
+    if let Some(rendered_link_config) = config.as_ref().ok().and_then(|c| c.rendered_link.as_ref())
+    {
+        if let Err(e) = rendered_link::handle(ctx, event, rendered_link_config).await {
+            log::error!(
+                "failed to process event {:?} with rendered_link handler: {:?}",
+                event,
+                e
+            );
+        }
     }
 
     if let Err(e) = relnotes::handle(ctx, event).await {
