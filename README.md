@@ -95,6 +95,10 @@ gh webhook forward --repo=ehuss/triagebot-test --events=* \
 
 Where the value in `--secret` is the secret value you place in `GITHUB_WEBHOOK_SECRET` in the `.env` file, and `--repo` is the repo you want to test against.
 
+### Zulip testing
+
+If you are modifying code that sends message to Zulip and want to test your changes, you can register a [new free Zulip instance](https://zulip.com/new/). Before launching the triagebot locally, set the Zulip env vars to connect to your test instance (see example in `.env.sample`).
+
 #### ngrok
 
 The following is an example of using <https://ngrok.com/> to provide webhook forwarding.
