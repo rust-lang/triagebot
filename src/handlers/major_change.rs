@@ -294,10 +294,6 @@ async fn handle(
             .post_comment(&ctx.github, &comment)
             .await
             .context("post major change comment")?;
-        issue
-            .lock(&ctx.github, None)
-            .await
-            .context("lock major change issue")?;
     }
 
     let zulip_req = zulip_req.send(&ctx.github.raw());
