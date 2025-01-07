@@ -728,7 +728,6 @@ impl fmt::Display for FindReviewerError {
                     f,
                     "Could not assign reviewer from: `{}`.\n\
                      User(s) `{}` are either the PR author, already assigned, or on vacation. \
-                     If it's a team, we could not find any candidates.\n\
                      Please use `r?` to specify someone else to assign.",
                     initial.join(","),
                     filtered.join(","),
@@ -820,14 +819,11 @@ SELECT username
 FROM review_prefs r
 JOIN users on users.user_id=r.user_id
 AND username = ANY('{{ {} }}')
-AND ARRAY_LENGTH(r.assigned_prs, 1) < max_assigned_prs",
+AND CARDINALITY(r.assigned_prs) < LEAST(COALESCE(r.max_assigned_prs,1000000))",
         usernames
     );
     let result = db.query(&q, &[]).await.context("Select DB error")?;
-    let mut candidates: HashSet<String> = HashSet::new();
-    for row in result {
-        candidates.insert(row.get("username"));
-    }
+    let candidates: HashSet<String> = result.iter().map(|row| row.get("username")).collect();
     Ok(candidates)
 }
 
