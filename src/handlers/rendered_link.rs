@@ -3,14 +3,17 @@ use std::borrow::Cow;
 use anyhow::bail;
 
 use crate::{
+    config::RenderedLinkConfig,
     github::{Event, IssuesAction, IssuesEvent},
     handlers::Context,
 };
 
-pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
-    let e = if let Event::Issue(e) = event {
-        e
-    } else {
+pub async fn handle(
+    ctx: &Context,
+    event: &Event,
+    config: &RenderedLinkConfig,
+) -> anyhow::Result<()> {
+    let Event::Issue(e) = event else {
         return Ok(());
     };
 
@@ -18,21 +21,18 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let repo = e.issue.repository();
-    let prefix = match (&*repo.organization, &*repo.repository) {
-        ("rust-lang", "rfcs") => "text/",
-        ("rust-lang", "blog.rust-lang.org") => "posts/",
-        _ => return Ok(()),
-    };
-
-    if let Err(e) = add_rendered_link(&ctx, &e, prefix).await {
+    if let Err(e) = add_rendered_link(&ctx, &e, config).await {
         tracing::error!("Error adding rendered link: {:?}", e);
     }
 
     Ok(())
 }
 
-async fn add_rendered_link(ctx: &Context, e: &IssuesEvent, prefix: &str) -> anyhow::Result<()> {
+async fn add_rendered_link(
+    ctx: &Context,
+    e: &IssuesEvent,
+    config: &RenderedLinkConfig,
+) -> anyhow::Result<()> {
     if e.action == IssuesAction::Opened
         || e.action == IssuesAction::Closed
         || e.action == IssuesAction::Reopened
@@ -42,7 +42,12 @@ async fn add_rendered_link(ctx: &Context, e: &IssuesEvent, prefix: &str) -> anyh
 
         let rendered_link = files
             .iter()
-            .find(|f| f.filename.starts_with(prefix))
+            .find(|f| {
+                config
+                    .trigger_files
+                    .iter()
+                    .any(|tf| f.filename.starts_with(tf))
+            })
             .map(|file| {
                 let head = e.issue.head.as_ref().unwrap();
                 let base = e.issue.base.as_ref().unwrap();
