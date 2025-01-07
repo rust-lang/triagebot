@@ -32,7 +32,7 @@ pub(super) async fn parse_input(
     };
 
     match &event.action {
-        IssuesAction::Labeled { label } | IssuesAction::Unlabeled { label } => {
+        IssuesAction::Labeled { label } | IssuesAction::Unlabeled { label: Some(label) } => {
             let applied_label = label.clone();
             Ok(config
                 .labels
