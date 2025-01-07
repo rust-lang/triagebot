@@ -1,18 +1,22 @@
 //! This module updates the PR workqueue of the Rust project contributors
+//! Runs after a PR has been assigned or unassigned
 //!
 //! Purpose:
 //!
-//! - Adds the PR to the workqueue of one team member (when the PR has been assigned)
-//! - Removes the PR from the workqueue of one team member (when the PR is unassigned or closed)
+//! - Adds the PR to the workqueue of one team member (after the PR has been assigned)
+//! - Removes the PR from the workqueue of one team member (after the PR has been unassigned or closed)
 
 use crate::{
     config::ReviewPrefsConfig,
     db::notifications::record_username,
     github::{IssuesAction, IssuesEvent},
     handlers::Context,
+    ReviewPrefs,
 };
 use anyhow::Context as _;
 use tokio_postgres::Client as DbClient;
+
+use super::assign::{FindReviewerError, REVIEWER_HAS_NO_CAPACITY, SELF_ASSIGN_HAS_NO_CAPACITY};
 
 pub(super) struct ReviewPrefsInput {}
 
@@ -49,7 +53,7 @@ pub(super) async fn handle_input<'a>(
 ) -> anyhow::Result<()> {
     let db_client = ctx.db.get().await;
 
-    // extract the assignee matching the assignment or unassignment enum variants or return and ignore this handler
+    // extract the assignee or ignore this handler and return
     let IssuesEvent {
         action: IssuesAction::Assigned { assignee } | IssuesAction::Unassigned { assignee },
         ..
@@ -66,16 +70,58 @@ pub(super) async fn handle_input<'a>(
     if matches!(event.action, IssuesAction::Unassigned { .. }) {
         delete_pr_from_workqueue(&db_client, assignee.id, event.issue.number)
             .await
-            .context("Failed to remove PR from workqueue")?;
+            .context("Failed to remove PR from workq ueue")?;
     }
 
+    // This handler is reached also when assigning a PR using the Github UI
+    // (i.e. from the "Assignees" dropdown menu).
+    // We need to also check assignee availability here.
     if matches!(event.action, IssuesAction::Assigned { .. }) {
+        let work_queue = has_user_capacity(&db_client, &assignee.login)
+            .await
+            .context("Failed to retrieve user work queue");
+
+        // if user has no capacity, revert the PR assignment (GitHub has already assigned it)
+        // and post a comment suggesting what to do
+        if let Err(_) = work_queue {
+            event
+                .issue
+                .remove_assignees(&ctx.github, crate::github::Selection::One(&assignee.login))
+                .await?;
+
+            let msg = if assignee.login.to_lowercase() == event.issue.user.login.to_lowercase() {
+                SELF_ASSIGN_HAS_NO_CAPACITY.replace("{username}", &assignee.login)
+            } else {
+                REVIEWER_HAS_NO_CAPACITY.replace("{username}", &assignee.login)
+            };
+            event.issue.post_comment(&ctx.github, &msg).await?;
+        }
+
         upsert_pr_into_workqueue(&db_client, assignee.id, event.issue.number)
             .await
-            .context("Failed to add PR to workqueue")?;
+            .context("Failed to add PR to work queue")?;
     }
 
     Ok(())
+}
+
+pub async fn has_user_capacity(
+    db: &crate::db::PooledClient,
+    assignee: &str,
+) -> anyhow::Result<ReviewPrefs, FindReviewerError> {
+    let q = "
+SELECT username, r.*
+FROM review_prefs r
+JOIN users ON users.user_id = r.user_id
+WHERE username = $1
+AND CARDINALITY(r.assigned_prs) < max_assigned_prs;";
+    let rec = db.query_one(q, &[&assignee]).await;
+    if let Err(_) = rec {
+        return Err(FindReviewerError::ReviewerHasNoCapacity {
+            username: assignee.to_string(),
+        });
+    }
+    Ok(rec.unwrap().into())
 }
 
 /// Add a PR to the workqueue of a team member.
