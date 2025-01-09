@@ -1168,7 +1168,9 @@ pub enum IssuesAction {
     },
     Unlabeled {
         /// The label removed from the issue
-        label: Label,
+        ///
+        /// The `label` is `None` when a label is deleted from the repository.
+        label: Option<Label>,
     },
     Locked,
     Unlocked,
