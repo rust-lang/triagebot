@@ -781,6 +781,11 @@ async fn find_reviewer_from_names(
     // These are all ideas for improving the selection here. However, I'm not
     // sure they are really worth the effort.
 
+    // Special case user "ghost", we always skip filtering
+    if candidates.contains("ghost") {
+        return Ok("ghost".to_string());
+    }
+
     // filter out team members without capacity
     let filtered_candidates = filter_by_capacity(db, &candidates)
         .await
