@@ -11,8 +11,8 @@
 approve
 {%- if backport_branch is containing("stable") %}
 approve but does not justify new dot release
-decline
 {%- endif %}
+decline
 don't know
 -->
 {%- endif %}{% endmacro %}
