@@ -781,6 +781,8 @@ async fn find_reviewer_from_names(
     // These are all ideas for improving the selection here. However, I'm not
     // sure they are really worth the effort.
 
+    log::info!("Initial list of candidates: {:?}", candidates);
+
     // Special case user "ghost", we always skip filtering
     if candidates.contains("ghost") {
         return Ok("ghost".to_string());
@@ -798,7 +800,7 @@ async fn find_reviewer_from_names(
         });
     }
 
-    log::debug!("Filtered list of candidates: {:?}", filtered_candidates);
+    log::info!("Filtered list of candidates: {:?}", filtered_candidates);
 
     Ok(filtered_candidates
         .into_iter()
