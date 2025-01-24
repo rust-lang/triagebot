@@ -28,6 +28,7 @@ lazy_static::lazy_static! {
 pub struct ClientPool {
     connections: Arc<Mutex<Vec<tokio_postgres::Client>>>,
     permits: Arc<Semaphore>,
+    db_url: String,
 }
 
 pub struct PooledClient {
@@ -59,10 +60,11 @@ impl std::ops::DerefMut for PooledClient {
 }
 
 impl ClientPool {
-    pub fn new() -> ClientPool {
+    pub fn new(db_url: String) -> ClientPool {
         ClientPool {
             connections: Arc::new(Mutex::new(Vec::with_capacity(16))),
             permits: Arc::new(Semaphore::new(16)),
+            db_url,
         }
     }
 
@@ -84,15 +86,14 @@ impl ClientPool {
         }
 
         PooledClient {
-            client: Some(make_client().await.unwrap()),
+            client: Some(make_client(&self.db_url).await.unwrap()),
             permit,
             pool: self.connections.clone(),
         }
     }
 }
 
-async fn make_client() -> anyhow::Result<tokio_postgres::Client> {
-    let db_url = std::env::var("DATABASE_URL").expect("needs DATABASE_URL");
+async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client> {
     if db_url.contains("rds.amazonaws.com") {
         let mut builder = TlsConnector::builder();
         for cert in make_certificates() {

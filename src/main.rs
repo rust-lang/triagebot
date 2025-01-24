@@ -242,7 +242,8 @@ async fn serve_req(
 }
 
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
-    let pool = db::ClientPool::new();
+    let db_url = std::env::var("DATABASE_URL").expect("needs DATABASE_URL");
+    let pool = db::ClientPool::new(db_url.clone());
     db::run_migrations(&mut *pool.get().await)
         .await
         .context("database migrations")?;
@@ -271,7 +272,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 
     // Run all jobs that have a schedule (recurring jobs)
     if !is_scheduled_jobs_disabled() {
-        spawn_job_scheduler();
+        spawn_job_scheduler(db_url);
         spawn_job_runner(ctx.clone());
     }
 
@@ -361,11 +362,12 @@ async fn spawn_job_oneoffs(ctx: Arc<Context>) {
 /// The scheduler wakes up every `JOB_SCHEDULING_CADENCE_IN_SECS` seconds to
 /// check if there are any jobs ready to run. Jobs get inserted into the the
 /// database which acts as a queue.
-fn spawn_job_scheduler() {
+fn spawn_job_scheduler(db_url: String) {
     task::spawn(async move {
         loop {
+            let db_url = db_url.clone();
             let res = task::spawn(async move {
-                let pool = db::ClientPool::new();
+                let pool = db::ClientPool::new(db_url);
                 let mut interval =
                     time::interval(time::Duration::from_secs(JOB_SCHEDULING_CADENCE_IN_SECS));
 
