@@ -401,13 +401,12 @@ fn spawn_job_runner(ctx: Arc<Context>) {
         loop {
             let ctx = ctx.clone();
             let res = task::spawn(async move {
-                let pool = db::ClientPool::new();
                 let mut interval =
                     time::interval(time::Duration::from_secs(JOB_PROCESSING_CADENCE_IN_SECS));
 
                 loop {
                     interval.tick().await;
-                    db::run_scheduled_jobs(&ctx, &*pool.get().await)
+                    db::run_scheduled_jobs(&ctx)
                         .await
                         .context("run database scheduled jobs")
                         .unwrap();

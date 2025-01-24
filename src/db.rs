@@ -235,8 +235,9 @@ pub async fn schedule_job(
     Ok(())
 }
 
-pub async fn run_scheduled_jobs(ctx: &Context, db: &DbClient) -> anyhow::Result<()> {
-    let jobs = get_jobs_to_execute(&db).await.unwrap();
+pub async fn run_scheduled_jobs(ctx: &Context) -> anyhow::Result<()> {
+    let db = &ctx.db.get().await;
+    let jobs = get_jobs_to_execute(&db).await?;
     tracing::trace!("jobs to execute: {:#?}", jobs);
 
     for job in jobs.iter() {
