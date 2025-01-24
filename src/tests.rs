@@ -1,5 +1,6 @@
 use crate::db;
 use crate::db::make_client;
+use crate::db::notifications::record_username;
 use std::future::Future;
 use tokio_postgres::Config;
 
@@ -48,6 +49,16 @@ impl TestContext {
             original_db_url: db_url.to_string(),
             conn_handle,
         }
+    }
+
+    pub fn db_client(&self) -> &tokio_postgres::Client {
+        &self.client
+    }
+
+    pub async fn add_user(&self, name: &str, id: u64) {
+        record_username(&self.client, id, name)
+            .await
+            .expect("Cannot create user");
     }
 
     async fn finish(self) {
