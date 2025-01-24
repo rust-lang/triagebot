@@ -820,13 +820,21 @@ async fn filter_by_capacity(
         .collect::<Vec<&str>>()
         .join(",");
 
+    // We need to select everyone from the users database here, even if
+    // they might be missing in the review_prefs table.
+    // Therefore, we use a LEFT JOIN to get ALL users plus their associated data
+    // from the review_prefs, if there are any.
+    //
+    // Then we filter users whose assigned PRs are large enough.
+    // The final WHERE clause filters only users from the input list.
     let q = format!(
         "
-SELECT username
-FROM review_prefs r
-JOIN users on users.user_id=r.user_id
-AND username = ANY('{{ {} }}')
-AND CARDINALITY(r.assigned_prs) < LEAST(COALESCE(r.max_assigned_prs,1000000))",
+SELECT u.username AS username
+FROM users AS u
+LEFT JOIN review_prefs AS r ON u.user_id = r.user_id
+    AND COALESCE(CARDINALITY(r.assigned_prs), 0) < COALESCE(r.max_assigned_prs, 100000)
+WHERE u.username = ANY('{{ {} }}')
+",
         usernames
     );
     let result = db.query(&q, &[]).await.context("Select DB error")?;
