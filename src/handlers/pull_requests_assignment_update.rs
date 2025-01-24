@@ -80,7 +80,6 @@ WHERE r.user_id = $1;";
     let row = db
         .query_one(q, &[&(user_id as i64)])
         .await
-        .context("Error retrieving review preferences")
-        .unwrap();
+        .context("Error retrieving review preferences")?;
     Ok(row.into())
 }
