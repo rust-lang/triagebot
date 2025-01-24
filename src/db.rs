@@ -93,7 +93,7 @@ impl ClientPool {
     }
 }
 
-async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client> {
+pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client> {
     if db_url.contains("rds.amazonaws.com") {
         let mut builder = TlsConnector::builder();
         for cert in make_certificates() {
