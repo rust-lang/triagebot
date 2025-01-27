@@ -806,7 +806,7 @@ async fn find_reviewer_from_names(
         // });
     }
 
-    log::debug!("Filtered list of candidates: {:?}", filtered_candidates);
+    log::info!("Filtered list of candidates: {:?}", filtered_candidates);
 
     // Return unfiltered list of candidates
     Ok(candidates
