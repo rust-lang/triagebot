@@ -105,7 +105,6 @@ pub(super) async fn handle_input<'a>(
     Ok(())
 }
 
-// TODO: we should just fetch the number of assigned prs and max assigned prs. The caller should do the check.
 pub async fn has_user_capacity(
     db: &crate::db::PooledClient,
     assignee: &str,

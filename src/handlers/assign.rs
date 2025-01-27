@@ -541,18 +541,17 @@ pub(super) async fn handle_command(
                 }
                 let db_client = ctx.db.get().await;
                 if is_self_assign(&name, &event.user().login) {
-                    match has_user_capacity(&db_client, &name).await {
-                        Ok(work_queue) => work_queue.username,
-                        Err(_) => {
-                            issue
-                                .post_comment(
-                                    &ctx.github,
-                                    &REVIEWER_HAS_NO_CAPACITY.replace("{username}", &name),
-                                )
-                                .await?;
-                            return Ok(());
-                        }
-                    };
+                    let work_queue = has_user_capacity(&db_client, &name).await;
+                    if work_queue.is_err() {
+                        issue
+                            .post_comment(
+                                &ctx.github,
+                                &REVIEWER_HAS_NO_CAPACITY.replace("{username}", &name),
+                            )
+                            .await?;
+                        return Ok(());
+                    }
+
                     name.to_string()
                 } else {
                     let teams = crate::team_data::teams(&ctx.github).await?;
