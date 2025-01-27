@@ -39,6 +39,7 @@ use tracing as log;
 #[cfg(test)]
 mod tests {
     mod tests_candidates;
+    mod tests_db;
     mod tests_from_diff;
 }
 

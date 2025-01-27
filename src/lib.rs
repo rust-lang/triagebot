@@ -29,6 +29,9 @@ mod team_data;
 pub mod triage;
 pub mod zulip;
 
+#[cfg(test)]
+mod tests;
+
 /// The name of a webhook event.
 #[derive(Debug)]
 pub enum EventName {
