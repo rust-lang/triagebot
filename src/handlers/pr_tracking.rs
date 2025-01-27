@@ -15,6 +15,7 @@ use crate::{
 };
 use anyhow::Context as _;
 use tokio_postgres::Client as DbClient;
+use tracing as log;
 
 use super::assign::{FindReviewerError, REVIEWER_HAS_NO_CAPACITY, SELF_ASSIGN_HAS_NO_CAPACITY};
 
@@ -84,17 +85,22 @@ pub(super) async fn handle_input<'a>(
         // if user has no capacity, revert the PR assignment (GitHub has already assigned it)
         // and post a comment suggesting what to do
         if let Err(_) = work_queue {
-            event
-                .issue
-                .remove_assignees(&ctx.github, crate::github::Selection::One(&assignee.login))
-                .await?;
+            log::info!(
+                "DB reported that user {} has no review capacity. Ignoring.",
+                &assignee.login
+            );
 
-            let msg = if assignee.login.to_lowercase() == event.issue.user.login.to_lowercase() {
-                SELF_ASSIGN_HAS_NO_CAPACITY.replace("{username}", &assignee.login)
-            } else {
-                REVIEWER_HAS_NO_CAPACITY.replace("{username}", &assignee.login)
-            };
-            event.issue.post_comment(&ctx.github, &msg).await?;
+            // NOTE: disabled for now, just log
+            // event
+            //     .issue
+            //     .remove_assignees(&ctx.github, crate::github::Selection::One(&assignee.login))
+            //     .await?;
+            // let msg = if assignee.login.to_lowercase() == event.issue.user.login.to_lowercase() {
+            //     SELF_ASSIGN_HAS_NO_CAPACITY.replace("{username}", &assignee.login)
+            // } else {
+            //     REVIEWER_HAS_NO_CAPACITY.replace("{username}", &assignee.login)
+            // };
+            // event.issue.post_comment(&ctx.github, &msg).await?;
         }
 
         upsert_pr_into_workqueue(&db_client, assignee.id, event.issue.number)
@@ -105,7 +111,8 @@ pub(super) async fn handle_input<'a>(
     Ok(())
 }
 
-// TODO: we should just fetch the number of assigned prs and max assigned prs. The caller should do the check.
+// Check user review capacity.
+// Returns error if SQL query fails or user has no capacity
 pub async fn has_user_capacity(
     db: &crate::db::PooledClient,
     assignee: &str,

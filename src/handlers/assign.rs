@@ -541,18 +541,22 @@ pub(super) async fn handle_command(
                 }
                 let db_client = ctx.db.get().await;
                 if is_self_assign(&name, &event.user().login) {
-                    match has_user_capacity(&db_client, &name).await {
-                        Ok(work_queue) => work_queue.username,
-                        Err(_) => {
-                            issue
-                                .post_comment(
-                                    &ctx.github,
-                                    &REVIEWER_HAS_NO_CAPACITY.replace("{username}", &name),
-                                )
-                                .await?;
-                            return Ok(());
-                        }
-                    };
+                    let work_queue = has_user_capacity(&db_client, &name).await;
+                    if work_queue.is_err() {
+                        // NOTE: disabled for now, just log
+                        log::info!(
+                            "DB reported that user {} has no review capacity. Ignoring.",
+                            name
+                        );
+                        // issue
+                        //     .post_comment(
+                        //         &ctx.github,
+                        //         &REVIEWER_HAS_NO_CAPACITY.replace("{username}", &name),
+                        //     )
+                        //     .await?;
+                        // return Ok(());
+                    }
+
                     name.to_string()
                 } else {
                     let teams = crate::team_data::teams(&ctx.github).await?;
@@ -781,7 +785,7 @@ async fn find_reviewer_from_names(
     // These are all ideas for improving the selection here. However, I'm not
     // sure they are really worth the effort.
 
-    log::info!("Initial list of candidates: {:?}", candidates);
+    log::info!("Initial unfiltered list of candidates: {:?}", candidates);
 
     // Special case user "ghost", we always skip filtering
     if candidates.contains("ghost") {
@@ -794,15 +798,18 @@ async fn find_reviewer_from_names(
         .expect("Error while filtering out team members");
 
     if filtered_candidates.is_empty() {
-        return Err(FindReviewerError::AllReviewersFiltered {
-            initial: names.to_vec(),
-            filtered: names.to_vec(),
-        });
+        // NOTE: disabled for now, just log
+        log::info!("Filtered list of PR assignee is empty");
+        // return Err(FindReviewerError::AllReviewersFiltered {
+        //     initial: names.to_vec(),
+        //     filtered: names.to_vec(),
+        // });
     }
 
     log::info!("Filtered list of candidates: {:?}", filtered_candidates);
 
-    Ok(filtered_candidates
+    // Return unfiltered list of candidates
+    Ok(candidates
         .into_iter()
         .choose(&mut rand::thread_rng())
         .expect("candidate_reviewers_from_names should return at least one entry")
@@ -831,6 +838,7 @@ AND CARDINALITY(r.assigned_prs) < LEAST(COALESCE(r.max_assigned_prs,1000000))",
     );
     let result = db.query(&q, &[]).await.context("Select DB error")?;
     let candidates: HashSet<String> = result.iter().map(|row| row.get("username")).collect();
+    log::info!("DB returned these candidates: {:?}", candidates);
     Ok(candidates)
 }
 
