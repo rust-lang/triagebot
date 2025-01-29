@@ -70,7 +70,9 @@ Use `r?` to explicitly pick a reviewer";
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
     "@{author}: no appropriate reviewer found, use `r?` to override";
 
-const ON_VACATION_WARNING: &str = "{username} is on vacation. Please do not assign them to PRs.";
+const ON_VACATION_WARNING: &str = "{username} is on vacation.
+
+Please choose another assignee.";
 
 const NON_DEFAULT_BRANCH: &str =
     "Pull requests are usually filed against the {default} branch for this repo, \
@@ -508,7 +510,10 @@ pub(super) async fn handle_command(
                 {
                     // This is a comment, so there must already be a reviewer assigned. No need to assign anyone else.
                     issue
-                        .post_comment(&ctx.github, &on_vacation_msg(&username))
+                        .post_comment(
+                            &ctx.github,
+                            &ON_VACATION_WARNING.replace("{username}", &username),
+                        )
                         .await?;
                     return Ok(());
                 }
