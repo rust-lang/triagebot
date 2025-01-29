@@ -549,8 +549,9 @@ pub(super) async fn handle_command(
                     let work_queue = has_user_capacity(&db_client, &name).await;
                     if work_queue.is_err() {
                         // NOTE: disabled for now, just log
-                        log::info!(
-                            "DB reported that user {} has no review capacity. Ignoring.",
+                        log::warn!(
+                            "[#{}] PR self-assign failed, DB reported that user {} has no review capacity. Ignoring.",
+                            issue.number,
                             name
                         );
                         // issue
@@ -790,7 +791,11 @@ async fn find_reviewer_from_names(
     // These are all ideas for improving the selection here. However, I'm not
     // sure they are really worth the effort.
 
-    log::info!("Initial unfiltered list of candidates: {:?}", candidates);
+    log::info!(
+        "[#{}] Initial unfiltered list of candidates: {:?}",
+        issue.number,
+        candidates
+    );
 
     // Special case user "ghost", we always skip filtering
     if candidates.contains("ghost") {
@@ -804,14 +809,18 @@ async fn find_reviewer_from_names(
 
     if filtered_candidates.is_empty() {
         // NOTE: disabled for now, just log
-        log::info!("Filtered list of PR assignee is empty");
+        log::info!("[#{}] Filtered list of PR assignee is empty", issue.number);
         // return Err(FindReviewerError::AllReviewersFiltered {
         //     initial: names.to_vec(),
         //     filtered: names.to_vec(),
         // });
     }
 
-    log::info!("Filtered list of candidates: {:?}", filtered_candidates);
+    log::info!(
+        "[#{}] Filtered list of candidates: {:?}",
+        issue.number,
+        filtered_candidates
+    );
 
     // Return unfiltered list of candidates
     Ok(candidates
@@ -939,6 +948,12 @@ fn candidate_reviewers_from_names<'a>(
         if filtered.is_empty() {
             Err(FindReviewerError::NoReviewer { initial })
         } else {
+            log::warn!(
+                "[#{}] Initial list of candidates {:?}, filtered-out with reasons: {:?}",
+                issue.number,
+                initial,
+                filtered_debug
+            );
             Err(FindReviewerError::AllReviewersFiltered { initial, filtered })
         }
     } else {
