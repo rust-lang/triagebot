@@ -107,9 +107,14 @@ Please contact us on [#t-infra](https://rust-lang.zulipchat.com/#narrow/stream/2
 
 cc: @jackh726 @apiraino";
 
-fn on_vacation_msg(user: &str) -> String {
-    ON_VACATION_WARNING.replace("{username}", user)
-}
+const REVIEWER_IS_PR_AUTHOR: &str = "Pull request author cannot be assigned as reviewer.
+
+Please choose another assignee.";
+
+const REVIEWER_ALREADY_ASSIGNED: &str =
+    "Requested reviewer is already assigned to this pull request.
+
+Please choose another assignee.";
 
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct AssignData {
@@ -356,16 +361,24 @@ async fn determine_assignee(
                     is there maybe a misconfigured group?",
                     event.issue.global_id()
                 ),
-                // TODO: post a comment on the PR if the reviewers were filtered due to being on vacation
                 Err(
                     e @ FindReviewerError::NoReviewer { .. }
                     | e @ FindReviewerError::AllReviewersFiltered { .. }
                     | e @ FindReviewerError::NoReviewerHasCapacity
-                    | e @ FindReviewerError::ReviewerHasNoCapacity { .. },
+                    | e @ FindReviewerError::ReviewerHasNoCapacity { .. }
+                    | e @ FindReviewerError::ReviewerIsPrAuthor { .. }
+                    | e @ FindReviewerError::ReviewerAlreadyAssigned { .. },
                 ) => log::trace!(
                     "no reviewer could be determined for PR {}: {e}",
                     event.issue.global_id()
                 ),
+                Err(e @ FindReviewerError::ReviewerOnVacation { .. }) => {
+                    // TODO: post a comment on the PR if the reviewer(s) were filtered due to being on vacation
+                    log::trace!(
+                        "no reviewer could be determined for PR {}: {e}",
+                        event.issue.global_id()
+                    )
+                }
             }
         }
         // If no owners matched the diff, fall-through.
@@ -708,6 +721,13 @@ pub enum FindReviewerError {
     /// The requested reviewer has no capacity to accept a pull request
     /// assignment at this time
     ReviewerHasNoCapacity { username: String },
+    /// Requested reviewer is on vacation
+    /// (i.e. username is in [users_on_vacation] in the triagebot.toml)
+    ReviewerOnVacation { username: String },
+    /// Requested reviewer is PR author
+    ReviewerIsPrAuthor { username: String },
+    /// Requested reviewer is already assigned to that PR
+    ReviewerAlreadyAssigned { username: String },
 }
 
 impl std::error::Error for FindReviewerError {}
@@ -752,6 +772,23 @@ impl fmt::Display for FindReviewerError {
             }
             FindReviewerError::NoReviewerHasCapacity => {
                 write!(f, "{}", NO_REVIEWER_HAS_CAPACITY)
+            }
+            FindReviewerError::ReviewerOnVacation { username } => {
+                write!(f, "{}", ON_VACATION_WARNING.replace("{username}", username))
+            }
+            FindReviewerError::ReviewerIsPrAuthor { username } => {
+                write!(
+                    f,
+                    "{}",
+                    REVIEWER_IS_PR_AUTHOR.replace("{username}", username)
+                )
+            }
+            FindReviewerError::ReviewerAlreadyAssigned { username } => {
+                write!(
+                    f,
+                    "{}",
+                    REVIEWER_ALREADY_ASSIGNED.replace("{username}", username)
+                )
             }
         }
     }
@@ -876,21 +913,45 @@ fn candidate_reviewers_from_names<'a>(
     let mut group_expansion: Vec<&str> = names.iter().map(|n| n.as_str()).collect();
     // Keep track of which users get filtered out for a better error message.
     let mut filtered = Vec::new();
+    // For debugging purposes, keep track about /why/ candidates were filtered out
+    let mut filtered_debug: HashMap<String, Option<FindReviewerError>> = HashMap::new();
     let repo = issue.repository();
     let org_prefix = format!("{}/", repo.organization);
     // Don't allow groups or teams to include the current author or assignee.
     let mut filter = |name: &&str| -> bool {
         let name_lower = name.to_lowercase();
-        let ok = name_lower != issue.user.login.to_lowercase()
-            && !config.is_on_vacation(name)
-            && !issue
-                .assignees
-                .iter()
-                .any(|assignee| name_lower == assignee.login.to_lowercase());
-        if !ok {
+        let is_pr_author = name_lower == issue.user.login.to_lowercase();
+        let is_on_vacation = config.is_on_vacation(name);
+        let is_already_assigned = issue
+            .assignees
+            .iter()
+            .any(|assignee| name_lower == assignee.login.to_lowercase());
+
+        // Record the reason why the candidate was filtered out
+        let reason = {
+            if is_pr_author {
+                Some(FindReviewerError::ReviewerIsPrAuthor {
+                    username: name.to_string(),
+                })
+            } else if is_on_vacation {
+                Some(FindReviewerError::ReviewerOnVacation {
+                    username: name.to_string(),
+                })
+            } else if is_already_assigned {
+                Some(FindReviewerError::ReviewerAlreadyAssigned {
+                    username: name.to_string(),
+                })
+            } else {
+                None
+            }
+        };
+
+        let can_be_assigned = !is_pr_author && !is_on_vacation && !is_already_assigned;
+        if !can_be_assigned {
             filtered.push(name.to_string());
+            filtered_debug.insert(name.to_string(), reason);
         }
-        ok
+        can_be_assigned
     };
 
     // Loop over groups to recursively expand them.
