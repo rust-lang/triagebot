@@ -85,8 +85,9 @@ pub(super) async fn handle_input<'a>(
         // if user has no capacity, revert the PR assignment (GitHub has already assigned it)
         // and post a comment suggesting what to do
         if let Err(_) = work_queue {
-            log::info!(
-                "DB reported that user {} has no review capacity. Ignoring.",
+            log::warn!(
+                "[#{}] DB reported that user {} has no review capacity. Ignoring.",
+                event.issue.number,
                 &assignee.login
             );
 
