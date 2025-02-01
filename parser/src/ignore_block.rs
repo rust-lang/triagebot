@@ -54,7 +54,8 @@ impl IgnoreBlocks {
     pub fn overlaps_ignore(&self, region: Range<usize>) -> Option<Range<usize>> {
         for ignore in &self.ignore {
             // See https://stackoverflow.com/questions/3269434.
-            if ignore.start <= region.end && region.start <= ignore.end {
+            // We have strictly < because `end` is not included in our ranges.
+            if ignore.start < region.end && region.start < ignore.end {
                 return Some(ignore.clone());
             }
         }
@@ -77,13 +78,16 @@ fn bodies(s: &str) -> Vec<Ignore<'_>> {
     for range in &cbs.ignore {
         let range = range.clone();
         if previous.end != range.start {
+            assert!(cbs.overlaps_ignore(previous.end..range.start).is_none());
             bodies.push(Ignore::No(&s[previous.end..range.start]));
         }
+        assert!(cbs.overlaps_ignore(range.clone()).is_some());
         bodies.push(Ignore::Yes(&s[range.clone()]));
         previous = range.clone();
     }
     if let Some(range) = cbs.ignore.last() {
         if range.end != s.len() {
+            assert!(cbs.overlaps_ignore(range.end..s.len()).is_none());
             bodies.push(Ignore::No(&s[range.end..]));
         }
     }
@@ -279,6 +283,17 @@ This is an HTML comment.
             Ignore::No("\nTest\n\n"),
             Ignore::Yes("<!-- Test -->\n"),
             Ignore::Yes("<!--\nThis is an HTML comment.\n-->\n")
+        ],
+    );
+}
+
+#[test]
+fn cbs_13() {
+    assert_eq!(
+        bodies("<!-- q -->\n@rustbot label +F-trait_upcasting"),
+        [
+            Ignore::Yes("<!-- q -->\n"),
+            Ignore::No("@rustbot label +F-trait_upcasting")
         ],
     );
 }
