@@ -39,12 +39,12 @@ The general overview of what you will need to do:
 3. [Configure webhook forwarding](#configure-webhook-forwarding)
 4. Configure the `.env` file:
 
-   1. Copy `.env.sample` to `.env`
-   2. `GITHUB_TOKEN`: This is a token needed for Triagebot to send requests to GitHub. Go to GitHub Settings > Developer Settings > Personal Access Token, and create a new token. The `repo` permission should be sufficient.
-      If this is not set, Triagebot will also look in `~/.gitconfig` in the `github.oauth-token` setting.
-   3. `DATABASE_URL`: This is the URL to the database. See [Configuring a database](#configuring-a-database).
-   4. `GITHUB_WEBHOOK_SECRET`: Enter the secret you entered in the webhook above.
-   5. `RUST_LOG`: Set this to `debug`.
+    1. Copy `.env.sample` to `.env`
+    2. `GITHUB_TOKEN`: This is a token needed for Triagebot to send requests to GitHub. Go to GitHub Settings > Developer Settings > Personal Access Token, and create a new token. The `repo` permission should be sufficient.
+       If this is not set, Triagebot will also look in `~/.gitconfig` in the `github.oauth-token` setting.
+    3. `DATABASE_URL`: This is the URL to the database. See [Configuring a database](#configuring-a-database).
+    4. `GITHUB_WEBHOOK_SECRET`: Enter the secret you entered in the webhook above.
+    5. `RUST_LOG`: Set this to `debug`.
 
 5. Run `cargo run --bin triagebot`. This starts the http server listening for webhooks on port 8000.
 6. Add a `triagebot.toml` file to the main branch of your GitHub repo with whichever services you want to try out.
@@ -109,15 +109,28 @@ You need to sign up for a free account, and also deal with configuring the GitHu
 3. Configure GitHub webhooks in the test repo you created.
    In short:
 
-   1. Go to the settings page for your GitHub repo.
-   2. Go to the webhook section.
-   3. Click "Add webhook"
-   4. Include the settings:
+    1. Go to the settings page for your GitHub repo.
+    2. Go to the webhook section.
+    3. Click "Add webhook"
+    4. Include the settings:
 
-      * Payload URL: This is the URL to your Triagebot server, for example http://7e9ea9dc.ngrok.io/github-hook. This URL is displayed when you ran the `ngrok` command above.
-      * Content type: application/json
-      * Secret: Enter a shared secret (some longish random text)
-      * Events: "Send me everything"
+        * Payload URL: This is the URL to your Triagebot server, for example http://7e9ea9dc.ngrok.io/github-hook. This URL is displayed when you ran the `ngrok` command above.
+        * Content type: application/json
+        * Secret: Enter a shared secret (some longish random text)
+        * Events: "Send me everything"
+
+### Cargo tests
+
+You can run Cargo tests using `cargo test`. If you also want to run tests that access a Postgres database, you can specify an environment variables `TEST_DB_URL`, which should contain a connection string pointing to a running Postgres database instance:
+
+```bash
+$ docker run --rm -it -p5432:5432 \
+  -e POSTGRES_USER=triagebot \
+  -e POSTGRES_PASSWORD=triagebot \
+  -e POSTGRES_DB=triagebot \
+  postgres:14
+$ TEST_DB_URL=postgres://triagebot:triagebot@localhost:5432/triagebot cargo test
+```
 
 ## License
 
