@@ -2,18 +2,16 @@ use crate::changelogs::ChangelogFormat;
 use crate::github::{GithubClient, Repository};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, LazyLock, RwLock};
 use std::time::{Duration, Instant};
 use tracing as log;
 
 pub(crate) static CONFIG_FILE_NAME: &str = "triagebot.toml";
 const REFRESH_EVERY: Duration = Duration::from_secs(2 * 60); // Every two minutes
 
-lazy_static::lazy_static! {
-    static ref CONFIG_CACHE:
-        RwLock<HashMap<String, (Result<Arc<Config>, ConfigurationError>, Instant)>> =
-        RwLock::new(HashMap::new());
-}
+static CONFIG_CACHE: LazyLock<
+    RwLock<HashMap<String, (Result<Arc<Config>, ConfigurationError>, Instant)>>,
+> = LazyLock::new(|| RwLock::new(HashMap::new()));
 
 // This struct maps each possible option of the triagebot.toml.
 // See documentation of options at: https://forge.rust-lang.org/triagebot/pr-assignment.html#configuration
