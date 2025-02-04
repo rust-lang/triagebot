@@ -48,6 +48,7 @@ pub(crate) struct Config {
     pub(crate) merge_conflicts: Option<MergeConflictConfig>,
     pub(crate) bot_pull_requests: Option<BotPullRequests>,
     pub(crate) rendered_link: Option<RenderedLinkConfig>,
+    pub(crate) relink: Option<RelinkConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -416,6 +417,11 @@ pub(crate) struct RenderedLinkConfig {
     pub(crate) trigger_files: Vec<String>,
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RelinkConfig {}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -537,6 +543,8 @@ mod tests {
 
             [shortcut]
 
+            [relink]
+
             [rendered-link]
             trigger-files = ["posts/"]
         "#;
@@ -600,7 +608,8 @@ mod tests {
                 bot_pull_requests: None,
                 rendered_link: Some(RenderedLinkConfig {
                     trigger_files: vec!["posts/".to_string()]
-                })
+                }),
+                relink: Some(RelinkConfig {}),
             }
         );
     }
@@ -664,6 +673,7 @@ mod tests {
                 merge_conflicts: None,
                 bot_pull_requests: None,
                 rendered_link: None,
+                relink: None
             }
         );
     }
