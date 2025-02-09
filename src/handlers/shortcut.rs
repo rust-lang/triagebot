@@ -29,7 +29,7 @@ pub(super) async fn handle_command(
     let waiting_on_review = "S-waiting-on-review";
     let waiting_on_author = "S-waiting-on-author";
     let blocked = "S-blocked";
-    let status_labels = [waiting_on_review, waiting_on_author, blocked];
+    let status_labels = [waiting_on_review, waiting_on_author, blocked, "S-inactive"];
 
     let add = match input {
         ShortcutCommand::Ready => waiting_on_review,
