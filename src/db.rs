@@ -3,7 +3,7 @@ use anyhow::Context as _;
 use chrono::Utc;
 use native_tls::{Certificate, TlsConnector};
 use postgres_native_tls::MakeTlsConnector;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_postgres::Client as DbClient;
 
@@ -14,16 +14,11 @@ pub mod rustc_commits;
 
 const CERT_URL: &str = "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem";
 
-lazy_static::lazy_static! {
-    static ref CERTIFICATE_PEMS: Vec<u8> = {
-        let client = reqwest::blocking::Client::new();
-        let resp = client
-            .get(CERT_URL)
-            .send()
-            .expect("failed to get RDS cert");
-         resp.bytes().expect("failed to get RDS cert body").to_vec()
-    };
-}
+static CERTIFICATE_PEMS: LazyLock<Vec<u8>> = LazyLock::new(|| {
+    let client = reqwest::blocking::Client::new();
+    let resp = client.get(CERT_URL).send().expect("failed to get RDS cert");
+    resp.bytes().expect("failed to get RDS cert body").to_vec()
+});
 
 pub struct ClientPool {
     connections: Arc<Mutex<Vec<tokio_postgres::Client>>>,

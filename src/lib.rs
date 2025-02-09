@@ -1,8 +1,5 @@
 #![allow(clippy::new_without_default)]
 
-#[macro_use]
-extern crate lazy_static;
-
 use crate::github::PullRequestDetails;
 
 use anyhow::Context;
