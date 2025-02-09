@@ -135,7 +135,10 @@ pub(super) async fn parse_input(
         None => return Ok(None),
     };
     if config.owners.is_empty()
-        || !matches!(event.action, IssuesAction::Opened)
+        || !matches!(
+            event.action,
+            IssuesAction::Opened | IssuesAction::Synchronize
+        )
         || !event.issue.is_pr()
     {
         return Ok(None);
@@ -159,7 +162,7 @@ pub(super) async fn handle_input(
     };
 
     // Don't auto-assign or welcome if the user manually set the assignee when opening.
-    if event.issue.assignees.is_empty() {
+    if matches!(event.action, IssuesAction::Opened) && event.issue.assignees.is_empty() {
         let (assignee, from_comment) = determine_assignee(ctx, event, config, &diff).await?;
         if assignee.as_deref() == Some("ghost") {
             // "ghost" is GitHub's placeholder account for deleted accounts.
@@ -214,7 +217,7 @@ pub(super) async fn handle_input(
         }
     }
 
-    // Compute some warning messages to post to new PRs.
+    // Compute some warning messages to post to new (and old) PRs.
     let mut warnings = Vec::new();
     if let Some(exceptions) = config.warn_non_default_branch.enabled_and_exceptions() {
         warnings.extend(non_default_branch(exceptions, event));
@@ -228,6 +231,7 @@ pub(super) async fn handle_input(
         let warning = format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"));
         event.issue.post_comment(&ctx.github, &warning).await?;
     };
+
     Ok(())
 }
 
