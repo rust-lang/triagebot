@@ -22,7 +22,8 @@
 
 use crate::{
     config::{AssignConfig, WarnNonDefaultBranchException},
-    github::{self, Event, FileDiff, Issue, IssuesAction, Selection},
+    db::issue_data::IssueData,
+    github::{self, Event, FileDiff, Issue, IssuesAction, ReportedContentClassifiers, Selection},
     handlers::{pr_tracking::has_user_capacity, Context, GithubClient, IssuesEvent},
     interactions::EditIssueBody,
 };
@@ -115,6 +116,18 @@ const REVIEWER_ALREADY_ASSIGNED: &str =
     "Requested reviewer is already assigned to this pull request.
 
 Please choose another assignee.";
+
+/// Key for teh state in the database
+const PULL_REQUEST_WARNINGS_KEY: &str = "pr-warnings";
+
+/// State stored in the database for a PR.
+#[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
+struct PullRequestWarningsState {
+    /// List of the last warnings in the most recent comment.
+    last_warnings: Vec<String>,
+    /// ID of the most recent warning comment.
+    last_warned_comment: Option<String>,
+}
 
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct AssignData {
@@ -217,20 +230,65 @@ pub(super) async fn handle_input(
         }
     }
 
+    // Get the state of the warnings for this issue in the database
+    let mut db = ctx.db.get().await;
+    let mut state: IssueData<'_, PullRequestWarningsState> =
+        IssueData::load(&mut db, &event.issue, PULL_REQUEST_WARNINGS_KEY).await?;
+
     // Compute some warning messages to post to new (and old) PRs.
     let mut warnings = Vec::new();
     if let Some(exceptions) = config.warn_non_default_branch.enabled_and_exceptions() {
         warnings.extend(non_default_branch(exceptions, event));
     }
     warnings.extend(modifies_submodule(diff));
-    if !warnings.is_empty() {
+
+    // Add, hide or hide&add a comment with the warnings.
+    //
+    // We only post a new comment when we haven't posted one with the same warnings before.
+    if !warnings.is_empty() && state.data.last_warnings != warnings {
+        // New set of warnings, let's post them.
+
+        // Hide a previous warnings comment if there was one.
+        if let Some(last_warned_comment_id) = state.data.last_warned_comment {
+            event
+                .issue
+                .hide_comment(
+                    &ctx.github,
+                    &last_warned_comment_id,
+                    ReportedContentClassifiers::Resolved,
+                )
+                .await?;
+        }
+
+        // Format the warnings for user consumption on Github
         let warnings: Vec<_> = warnings
             .iter()
             .map(|warning| format!("* {warning}"))
             .collect();
         let warning = format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"));
-        event.issue.post_comment(&ctx.github, &warning).await?;
-    };
+        let comment = event.issue.post_comment(&ctx.github, &warning).await?;
+
+        // Save new state in the database
+        state.data.last_warnings = warnings;
+        state.data.last_warned_comment = Some(comment.node_id);
+        state.save().await?;
+    } else if warnings.is_empty() {
+        // No warnings to be shown, let's hide a previous comment, if there was one.
+        if let Some(last_warned_comment_id) = state.data.last_warned_comment {
+            event
+                .issue
+                .hide_comment(
+                    &ctx.github,
+                    &last_warned_comment_id,
+                    ReportedContentClassifiers::Resolved,
+                )
+                .await?;
+
+            state.data.last_warnings = Vec::new();
+            state.data.last_warned_comment = None;
+            state.save().await?;
+        }
+    }
 
     Ok(())
 }
