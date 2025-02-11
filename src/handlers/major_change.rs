@@ -259,8 +259,9 @@ async fn handle(
     if new_proposal {
         let topic_url = zulip_req.url();
         let comment = format!(
-            "This issue is not meant to be used for technical discussion. \
-        There is a Zulip [stream] for that. Use this issue to leave \
+            "> [!IMPORTANT] \n\
+        > This issue is *not meant to be used for technical discussion*. \
+        There is a **Zulip [stream]** for that. Use this issue to leave \
         procedural comments, such as volunteering to review, indicating that you \
         second the proposal (or third, etc), or raising a concern that you would \
         like to be addressed. \
