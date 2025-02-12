@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -83,17 +83,13 @@ pub struct MCPDetails {
     pub concerns: Option<Vec<(String, String)>>,
 }
 
-lazy_static! {
-    pub static ref TEMPLATES: Tera = {
-        match Tera::new("templates/*") {
-            Ok(t) => t,
-            Err(e) => {
-                println!("Parsing error(s): {}", e);
-                ::std::process::exit(1);
-            }
-        }
-    };
-}
+pub static TEMPLATES: LazyLock<Tera> = LazyLock::new(|| match Tera::new("templates/*") {
+    Ok(t) => t,
+    Err(e) => {
+        println!("Parsing error(s): {}", e);
+        ::std::process::exit(1);
+    }
+});
 
 pub fn to_human(d: DateTime<Utc>) -> String {
     let d1 = chrono::Utc::now() - d;
