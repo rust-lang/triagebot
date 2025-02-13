@@ -53,5 +53,23 @@ pub(super) async fn handle_command(
             .await?;
     }
 
+    // We add a small reminder for the author to the `@bot ready` when ready
+    if matches!(input, ShortcutCommand::Author) {
+        if let Event::IssueComment(issue_comment) = event {
+            let new_comment_body = format!(
+                "{}\n\n*Use `@{bot} ready` when the PR is ready for another round of review.*",
+                issue_comment.comment.body,
+                bot = &ctx.username
+            );
+            issue
+                .edit_comment(
+                    &ctx.github,
+                    issue_comment.comment.id,
+                    new_comment_body.as_str(),
+                )
+                .await?;
+        }
+    }
+
     Ok(())
 }
