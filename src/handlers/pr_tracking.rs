@@ -164,3 +164,145 @@ WHERE r.user_id = $1;";
         .await
         .context("Update DB error")
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::config::Config;
+    use crate::db::notifications::record_username;
+    use crate::github::{Issue, IssuesAction, IssuesEvent, Repository, User};
+    use crate::handlers::pr_tracking::{handle_input, parse_input, upsert_pr_into_workqueue};
+    use crate::tests::github::{default_test_user, issue, pull_request, user};
+    use crate::tests::{run_test, TestContext};
+    use tokio_postgres::GenericClient;
+
+    #[tokio::test]
+    async fn add_pr_to_workqueue_on_assign() {
+        run_test(|ctx| async move {
+            let user = user("Martin", 2);
+
+            run_handler(
+                &ctx,
+                IssuesAction::Assigned {
+                    assignee: user.clone(),
+                },
+                pull_request().number(10).call(),
+            )
+            .await;
+
+            check_assigned_prs(&ctx, &user, &[10]).await;
+
+            Ok(ctx)
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn remove_pr_from_workqueue_on_assign() {
+        run_test(|ctx| async move {
+            let user = user("Martin", 2);
+            set_assigned_prs(&ctx, &user, &[10]).await;
+
+            run_handler(
+                &ctx,
+                IssuesAction::Unassigned {
+                    assignee: user.clone(),
+                },
+                pull_request().number(10).call(),
+            )
+            .await;
+
+            check_assigned_prs(&ctx, &user, &[]).await;
+
+            Ok(ctx)
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn ignore_issue_assignments() {
+        run_test(|ctx| async move {
+            let user = user("Martin", 2);
+
+            run_handler(
+                &ctx,
+                IssuesAction::Assigned {
+                    assignee: user.clone(),
+                },
+                issue().number(10).call(),
+            )
+            .await;
+
+            check_assigned_prs(&ctx, &user, &[]).await;
+
+            Ok(ctx)
+        })
+        .await;
+    }
+
+    async fn check_assigned_prs(ctx: &TestContext, user: &User, expected_prs: &[i32]) {
+        let results = ctx
+            .db_client()
+            .await
+            .query(
+                "SELECT assigned_prs FROM review_prefs WHERE user_id = $1",
+                &[&(user.id as i64)],
+            )
+            .await
+            .unwrap();
+        assert!(results.len() < 2);
+        let assigned = results
+            .get(0)
+            .map(|row| row.get::<_, Vec<i32>>(0))
+            .unwrap_or_default();
+        assert_eq!(assigned, expected_prs);
+    }
+
+    async fn set_assigned_prs(ctx: &TestContext, user: &User, prs: &[i32]) {
+        let client = ctx.db_client().await;
+        let client = client.client();
+
+        record_username(client, user.id, &user.login).await.unwrap();
+        for &pr in prs {
+            upsert_pr_into_workqueue(&ctx.db_client().await.client(), user.id, pr as u64)
+                .await
+                .unwrap();
+        }
+        check_assigned_prs(&ctx, user, prs).await;
+    }
+
+    async fn run_handler(ctx: &TestContext, action: IssuesAction, issue: Issue) {
+        let handler_ctx = ctx.handler_ctx();
+        let config = create_config().pr_tracking;
+
+        let event = IssuesEvent {
+            action,
+            issue,
+            changes: None,
+            repository: Repository {
+                full_name: "rust-lang-test/triagebot-test".to_string(),
+                default_branch: "main".to_string(),
+                fork: false,
+                parent: None,
+            },
+            sender: default_test_user(),
+        };
+
+        let input = parse_input(&handler_ctx, &event, config.as_ref())
+            .await
+            .unwrap();
+        if let Some(input) = input {
+            handle_input(&handler_ctx, &config.unwrap(), &event, input)
+                .await
+                .unwrap()
+        }
+    }
+
+    fn create_config() -> Config {
+        toml::from_str::<Config>(
+            r#"
+[pr-tracking]
+"#,
+        )
+        .unwrap()
+    }
+}

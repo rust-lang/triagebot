@@ -1,9 +1,14 @@
 use crate::db;
 use crate::db::notifications::record_username;
 use crate::db::{make_client, ClientPool, PooledClient};
+use crate::github::GithubClient;
+use crate::handlers::Context;
+use octocrab::Octocrab;
 use std::future::Future;
 use tokio_postgres::config::Host;
 use tokio_postgres::{Config, GenericClient};
+
+pub mod github;
 
 /// Represents a connection to a Postgres database that can be
 /// used in integration tests to test logic that interacts with
@@ -11,6 +16,7 @@ use tokio_postgres::{Config, GenericClient};
 pub struct TestContext {
     pool: ClientPool,
     db_name: String,
+    test_db_url: String,
     original_db_url: String,
 }
 
@@ -44,14 +50,34 @@ impl TestContext {
             },
             db_name
         );
-        let pool = ClientPool::new(test_db_url);
+        let pool = ClientPool::new(test_db_url.clone());
         db::run_migrations(&mut *pool.get().await)
             .await
             .expect("Cannot run database migrations");
         Self {
             pool,
             db_name,
+            test_db_url,
             original_db_url: db_url.to_string(),
+        }
+    }
+
+    /// Creates a fake handler context.
+    /// We currently do not mock outgoing nor incoming GitHub API calls,
+    /// so the API endpoints will not be actually working
+    pub fn handler_ctx(&self) -> Context {
+        let octocrab = Octocrab::builder().build().unwrap();
+        let github = GithubClient::new(
+            "gh-test-fake-token".to_string(),
+            "https://api.github.com".to_string(),
+            "https://api.github.com/graphql".to_string(),
+            "https://raw.githubusercontent.com".to_string(),
+        );
+        Context {
+            github,
+            db: self.create_pool(),
+            username: "triagebot-test".to_string(),
+            octocrab,
         }
     }
 
@@ -63,6 +89,10 @@ impl TestContext {
         record_username(self.db_client().await.client(), id, name)
             .await
             .expect("Cannot create user");
+    }
+
+    fn create_pool(&self) -> ClientPool {
+        ClientPool::new(self.test_db_url.clone())
     }
 
     async fn finish(self) {

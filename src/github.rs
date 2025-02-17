@@ -15,7 +15,7 @@ use std::{
 };
 use tracing as log;
 
-#[derive(Debug, PartialEq, Eq, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, serde::Deserialize, Clone)]
 pub struct User {
     pub login: String,
     pub id: u64,
@@ -364,13 +364,13 @@ pub struct Issue {
     /// The API URL for discussion comments.
     ///
     /// Example: `https://api.github.com/repos/octocat/Hello-World/issues/1347/comments`
-    comments_url: String,
+    pub comments_url: String,
     /// The repository for this issue.
     ///
     /// Note that this is constructed via the [`Issue::repository`] method.
     /// It is not deserialized from the GitHub API.
     #[serde(skip)]
-    repository: OnceCell<IssueRepository>,
+    pub repository: OnceCell<IssueRepository>,
 
     /// The base commit for a PR (the branch of the destination repo).
     #[serde(default)]
