@@ -238,7 +238,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn remove_pr_from_workqueue_on_assign() {
+    async fn remove_pr_from_workqueue_on_unassign() {
         run_test(|ctx| async move {
             let user = user("Martin", 2);
             set_assigned_prs(&ctx, &user, &[10]).await;
@@ -305,6 +305,7 @@ mod tests {
         .await;
     }
 
+    // Make sure that we only consider pull requests, not issues.
     #[tokio::test]
     async fn ignore_issue_assignments() {
         run_test(|ctx| async move {
