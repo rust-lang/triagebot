@@ -6,6 +6,8 @@
 //! - Adds the PR to the workqueue of one team member (after the PR has been assigned)
 //! - Removes the PR from the workqueue of one team member (after the PR has been unassigned or closed)
 
+use super::assign::{FindReviewerError, REVIEWER_HAS_NO_CAPACITY, SELF_ASSIGN_HAS_NO_CAPACITY};
+use crate::github::User;
 use crate::{
     config::ReviewPrefsConfig,
     db::notifications::record_username,
@@ -17,9 +19,12 @@ use anyhow::Context as _;
 use tokio_postgres::Client as DbClient;
 use tracing as log;
 
-use super::assign::{FindReviewerError, REVIEWER_HAS_NO_CAPACITY, SELF_ASSIGN_HAS_NO_CAPACITY};
-
-pub(super) struct ReviewPrefsInput {}
+pub(super) enum ReviewPrefsInput {
+    Assigned { assignee: User },
+    Unassigned { assignee: User },
+    Reopened,
+    Closed,
+}
 
 pub(super) async fn parse_input(
     _ctx: &Context,
@@ -38,9 +43,17 @@ pub(super) async fn parse_input(
     }
 
     // ... and if the action is an assignment or unassignment with an assignee
-    match event.action {
-        IssuesAction::Assigned { .. } | IssuesAction::Unassigned { .. } => {
-            Ok(Some(ReviewPrefsInput {}))
+    match &event.action {
+        IssuesAction::Assigned { assignee } => Ok(Some(ReviewPrefsInput::Assigned {
+            assignee: assignee.clone(),
+        })),
+        IssuesAction::Unassigned { assignee } => Ok(Some(ReviewPrefsInput::Unassigned {
+            assignee: assignee.clone(),
+        })),
+        // We don't need to handle Opened explicitly, because that will trigger the Assigned event
+        IssuesAction::Reopened => Ok(Some(ReviewPrefsInput::Reopened)),
+        IssuesAction::Closed | IssuesAction::Deleted | IssuesAction::Transferred => {
+            Ok(Some(ReviewPrefsInput::Closed))
         }
         _ => Ok(None),
     }
@@ -50,63 +63,87 @@ pub(super) async fn handle_input<'a>(
     ctx: &Context,
     _config: &ReviewPrefsConfig,
     event: &IssuesEvent,
-    _inputs: ReviewPrefsInput,
+    input: ReviewPrefsInput,
 ) -> anyhow::Result<()> {
     let db_client = ctx.db.get().await;
 
-    // extract the assignee or ignore this handler and return
-    let IssuesEvent {
-        action: IssuesAction::Assigned { assignee } | IssuesAction::Unassigned { assignee },
-        ..
-    } = event
-    else {
-        return Ok(());
-    };
+    log::info!("Handling event action {:?} in PR tracking", event.action);
 
-    // ensure the team member object of this action exists in the `users` table
-    record_username(&db_client, assignee.id, &assignee.login)
-        .await
-        .context("failed to record username")?;
+    match input {
+        // This handler is reached also when assigning a PR using the Github UI
+        // (i.e. from the "Assignees" dropdown menu).
+        // We need to also check assignee availability here.
+        ReviewPrefsInput::Assigned { assignee } => {
+            let work_queue = has_user_capacity(&db_client, &assignee.login)
+                .await
+                .context("Failed to retrieve user work queue");
 
-    if matches!(event.action, IssuesAction::Unassigned { .. }) {
-        delete_pr_from_workqueue(&db_client, assignee.id, event.issue.number)
-            .await
-            .context("Failed to remove PR from work ueue")?;
-    }
+            // if user has no capacity, revert the PR assignment (GitHub has already assigned it)
+            // and post a comment suggesting what to do
+            if let Err(_) = work_queue {
+                log::warn!(
+                    "[#{}] DB reported that user {} has no review capacity. Ignoring.",
+                    event.issue.number,
+                    &assignee.login
+                );
 
-    // This handler is reached also when assigning a PR using the Github UI
-    // (i.e. from the "Assignees" dropdown menu).
-    // We need to also check assignee availability here.
-    if matches!(event.action, IssuesAction::Assigned { .. }) {
-        let work_queue = has_user_capacity(&db_client, &assignee.login)
-            .await
-            .context("Failed to retrieve user work queue");
+                // NOTE: disabled for now, just log
+                // event
+                //     .issue
+                //     .remove_assignees(&ctx.github, crate::github::Selection::One(&assignee.login))
+                //     .await?;
+                // let msg = if assignee.login.to_lowercase() == event.issue.user.login.to_lowercase() {
+                //     SELF_ASSIGN_HAS_NO_CAPACITY.replace("{username}", &assignee.login)
+                // } else {
+                //     REVIEWER_HAS_NO_CAPACITY.replace("{username}", &assignee.login)
+                // };
+                // event.issue.post_comment(&ctx.github, &msg).await?;
+            }
 
-        // if user has no capacity, revert the PR assignment (GitHub has already assigned it)
-        // and post a comment suggesting what to do
-        if let Err(_) = work_queue {
-            log::warn!(
-                "[#{}] DB reported that user {} has no review capacity. Ignoring.",
+            log::info!(
+                "Adding PR {} from workqueue of {} because they were assigned.",
                 event.issue.number,
-                &assignee.login
+                assignee.login
             );
 
-            // NOTE: disabled for now, just log
-            // event
-            //     .issue
-            //     .remove_assignees(&ctx.github, crate::github::Selection::One(&assignee.login))
-            //     .await?;
-            // let msg = if assignee.login.to_lowercase() == event.issue.user.login.to_lowercase() {
-            //     SELF_ASSIGN_HAS_NO_CAPACITY.replace("{username}", &assignee.login)
-            // } else {
-            //     REVIEWER_HAS_NO_CAPACITY.replace("{username}", &assignee.login)
-            // };
-            // event.issue.post_comment(&ctx.github, &msg).await?;
+            upsert_pr_into_workqueue(&db_client, &assignee, event.issue.number)
+                .await
+                .context("Failed to add PR to work queue")?;
         }
-
-        upsert_pr_into_workqueue(&db_client, assignee.id, event.issue.number)
-            .await
-            .context("Failed to add PR to work queue")?;
+        ReviewPrefsInput::Unassigned { assignee } => {
+            let pr_number = event.issue.number;
+            log::info!(
+                "Removing PR {pr_number} from workqueue of {} because they were unassigned.",
+                assignee.login
+            );
+            delete_pr_from_workqueue(&db_client, assignee.id, pr_number)
+                .await
+                .context("Failed to remove PR from work queue")?;
+        }
+        ReviewPrefsInput::Closed => {
+            for assignee in &event.issue.assignees {
+                let pr_number = event.issue.number;
+                log::info!(
+                    "Removing PR {pr_number} from workqueue of {} because it was closed or merged.",
+                    assignee.login
+                );
+                delete_pr_from_workqueue(&db_client, assignee.id, pr_number)
+                    .await
+                    .context("Failed to to remove PR from work queue")?;
+            }
+        }
+        ReviewPrefsInput::Reopened => {
+            for assignee in &event.issue.assignees {
+                let pr_number = event.issue.number;
+                log::info!(
+                    "Re-adding PR {pr_number} to workqueue of {} because it was (re)opened.",
+                    assignee.login
+                );
+                upsert_pr_into_workqueue(&db_client, &assignee, pr_number)
+                    .await
+                    .context("Failed to add PR to work queue")?;
+            }
+        }
     }
 
     Ok(())
@@ -137,15 +174,20 @@ AND CARDINALITY(r.assigned_prs) < LEAST(COALESCE(r.max_assigned_prs,1000000));";
 /// Ensures no accidental PR duplicates.
 async fn upsert_pr_into_workqueue(
     db: &DbClient,
-    user_id: u64,
+    user: &User,
     pr: u64,
 ) -> anyhow::Result<u64, anyhow::Error> {
+    // Ensure the user has entry in the `users` table
+    record_username(db, user.id, &user.login)
+        .await
+        .context("failed to record username")?;
+
     let q = "
 INSERT INTO review_prefs
 (user_id, assigned_prs) VALUES ($1, $2)
 ON CONFLICT (user_id)
 DO UPDATE SET assigned_prs = uniq(sort(array_append(review_prefs.assigned_prs, $3)));";
-    db.execute(q, &[&(user_id as i64), &vec![pr as i32], &(pr as i32)])
+    db.execute(q, &[&(user.id as i64), &vec![pr as i32], &(pr as i32)])
         .await
         .context("Upsert DB error")
 }
@@ -168,7 +210,6 @@ WHERE r.user_id = $1;";
 #[cfg(test)]
 mod tests {
     use crate::config::Config;
-    use crate::db::notifications::record_username;
     use crate::github::{Issue, IssuesAction, IssuesEvent, Repository, User};
     use crate::handlers::pr_tracking::{handle_input, parse_input, upsert_pr_into_workqueue};
     use crate::tests::github::{default_test_user, issue, pull_request, user};
@@ -219,6 +260,52 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn remove_pr_from_workqueue_on_pr_closed() {
+        run_test(|ctx| async move {
+            let user = user("Martin", 2);
+            set_assigned_prs(&ctx, &user, &[10]).await;
+
+            run_handler(
+                &ctx,
+                IssuesAction::Closed,
+                pull_request()
+                    .number(10)
+                    .assignees(vec![user.clone()])
+                    .call(),
+            )
+            .await;
+
+            check_assigned_prs(&ctx, &user, &[]).await;
+
+            Ok(ctx)
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn add_pr_to_workqueue_on_pr_reopen() {
+        run_test(|ctx| async move {
+            let user = user("Martin", 2);
+            set_assigned_prs(&ctx, &user, &[42]).await;
+
+            run_handler(
+                &ctx,
+                IssuesAction::Reopened,
+                pull_request()
+                    .number(10)
+                    .assignees(vec![user.clone()])
+                    .call(),
+            )
+            .await;
+
+            check_assigned_prs(&ctx, &user, &[10, 42]).await;
+
+            Ok(ctx)
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn ignore_issue_assignments() {
         run_test(|ctx| async move {
             let user = user("Martin", 2);
@@ -250,20 +337,17 @@ mod tests {
             .await
             .unwrap();
         assert!(results.len() < 2);
-        let assigned = results
+        let mut assigned = results
             .get(0)
             .map(|row| row.get::<_, Vec<i32>>(0))
             .unwrap_or_default();
+        assigned.sort();
         assert_eq!(assigned, expected_prs);
     }
 
     async fn set_assigned_prs(ctx: &TestContext, user: &User, prs: &[i32]) {
-        let client = ctx.db_client().await;
-        let client = client.client();
-
-        record_username(client, user.id, &user.login).await.unwrap();
         for &pr in prs {
-            upsert_pr_into_workqueue(&ctx.db_client().await.client(), user.id, pr as u64)
+            upsert_pr_into_workqueue(&ctx.db_client().await.client(), user, pr as u64)
                 .await
                 .unwrap();
         }
