@@ -3,14 +3,18 @@ mod tests {
     use crate::handlers::assign::filter_by_capacity;
     use crate::tests::run_test;
     use std::collections::HashSet;
+    use tokio_postgres::GenericClient;
 
     #[tokio::test]
     async fn find_reviewers_no_review_prefs() {
         run_test(|ctx| async move {
             ctx.add_user("usr1", 1).await;
-            ctx.add_user("usr2", 1).await;
-            let _users =
-                filter_by_capacity(ctx.db_client(), &candidates(&["usr1", "usr2"])).await?;
+            ctx.add_user("usr2", 2).await;
+            let _users = filter_by_capacity(
+                ctx.db_client().await.client(),
+                &candidates(&["usr1", "usr2"]),
+            )
+            .await?;
             // FIXME: this test fails, because the query is wrong
             // check_users(users, &["usr1", "usr2"]);
             Ok(ctx)
