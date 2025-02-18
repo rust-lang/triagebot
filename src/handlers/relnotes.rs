@@ -27,6 +27,8 @@ struct RelnotesState {
     relnotes_issue: Option<u64>,
 }
 
+const TITLE_PREFIX: &str = "Tracking issue for release notes";
+
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let Event::Issue(e) = event else {
         return Ok(());
@@ -37,10 +39,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    if e.issue
-        .title
-        .starts_with("Tracking issue for release notes")
-    {
+    if e.issue.title.starts_with(TITLE_PREFIX) {
         // Ignore these issues -- they're otherwise potentially self-recursive.
         return Ok(());
     }
@@ -64,13 +63,14 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     }
 
     if let IssuesAction::Labeled { label } = &e.action {
-        if ["relnotes", "relnotes-perf", "finished-final-comment-period"]
-            .contains(&label.name.as_str())
-        {
-            let title = format!(
-                "Tracking issue for release notes of #{}: {}",
-                e.issue.number, e.issue.title
-            );
+        let is_fcp_merge = label.name == "finished-final-comment-period"
+            && e.issue
+                .labels
+                .iter()
+                .any(|label| label.name == "disposition-merge");
+
+        if label.name == "relnotes" || label.name == "relnotes-perf" || is_fcp_merge {
+            let title = format!("{TITLE_PREFIX} of #{}: {}", e.issue.number, e.issue.title);
             let body = format!(
                 "
 This issue tracks the release notes text for #{}.
