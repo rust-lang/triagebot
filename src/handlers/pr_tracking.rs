@@ -7,7 +7,6 @@
 //! - Removes the PR from the workqueue of one team member (after the PR has been unassigned or closed)
 
 use crate::github::{User, UserId};
-use crate::handlers::assign::FindReviewerError;
 use crate::{
     config::ReviewPrefsConfig,
     github::{IssuesAction, IssuesEvent},
