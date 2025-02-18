@@ -15,10 +15,12 @@ use std::{
 };
 use tracing as log;
 
-#[derive(Debug, PartialEq, Eq, serde::Deserialize, Clone)]
+pub type UserId = u64;
+
+#[derive(Debug, PartialEq, Eq, Hash, serde::Deserialize, Clone)]
 pub struct User {
     pub login: String,
-    pub id: u64,
+    pub id: UserId,
 }
 
 impl GithubClient {
@@ -3048,7 +3050,7 @@ async fn project_items_by_status(
 }
 
 /// Retrieve all pull requests in status OPEN that are not drafts
-pub async fn retrieve_pull_requests(
+pub async fn retrieve_open_pull_requests(
     repo: &Repository,
     client: &GithubClient,
 ) -> anyhow::Result<Vec<(User, i32)>> {

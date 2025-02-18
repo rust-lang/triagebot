@@ -5,6 +5,8 @@ use crate::github::GithubClient;
 use crate::handlers::Context;
 use octocrab::Octocrab;
 use std::future::Future;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio_postgres::config::Host;
 use tokio_postgres::{Config, GenericClient};
 
@@ -15,8 +17,8 @@ pub mod github;
 /// a database.
 pub struct TestContext {
     pool: ClientPool,
+    ctx: Context,
     db_name: String,
-    test_db_url: String,
     original_db_url: String,
 }
 
@@ -54,18 +56,7 @@ impl TestContext {
         db::run_migrations(&mut *pool.get().await)
             .await
             .expect("Cannot run database migrations");
-        Self {
-            pool,
-            db_name,
-            test_db_url,
-            original_db_url: db_url.to_string(),
-        }
-    }
 
-    /// Creates a fake handler context.
-    /// We currently do not mock outgoing nor incoming GitHub API calls,
-    /// so the API endpoints will not be actually working
-    pub fn handler_ctx(&self) -> Context {
         let octocrab = Octocrab::builder().build().unwrap();
         let github = GithubClient::new(
             "gh-test-fake-token".to_string(),
@@ -73,12 +64,27 @@ impl TestContext {
             "https://api.github.com/graphql".to_string(),
             "https://raw.githubusercontent.com".to_string(),
         );
-        Context {
+        let ctx = Context {
             github,
-            db: self.create_pool(),
+            db: ClientPool::new(test_db_url),
             username: "triagebot-test".to_string(),
             octocrab,
+            workqueue: Arc::new(RwLock::new(Default::default())),
+        };
+
+        Self {
+            pool,
+            db_name,
+            original_db_url: db_url.to_string(),
+            ctx,
         }
+    }
+
+    /// Returns a fake handler context.
+    /// We currently do not mock outgoing nor incoming GitHub API calls,
+    /// so the API endpoints will not be actually working.
+    pub fn handler_ctx(&self) -> &Context {
+        &self.ctx
     }
 
     pub async fn db_client(&self) -> PooledClient {
@@ -89,10 +95,6 @@ impl TestContext {
         record_username(self.db_client().await.client(), id, name)
             .await
             .expect("Cannot create user");
-    }
-
-    fn create_pool(&self) -> ClientPool {
-        ClientPool::new(self.test_db_url.clone())
     }
 
     async fn finish(self) {
