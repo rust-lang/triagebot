@@ -1,6 +1,6 @@
 #![allow(clippy::new_without_default)]
 
-use crate::github::PullRequestDetails;
+use crate::github::{PullRequestDetails, UserId};
 
 use anyhow::Context;
 use handlers::HandlerError;
@@ -128,41 +128,35 @@ impl From<anyhow::Error> for WebhookError {
 #[derive(Debug, Serialize)]
 pub struct ReviewPrefs {
     pub id: uuid::Uuid,
-    pub username: String,
     pub user_id: i64,
-    pub assigned_prs: Vec<i32>,
     pub max_assigned_prs: Option<i32>,
-}
-
-impl ReviewPrefs {
-    fn to_string(&self) -> String {
-        let capacity = match self.max_assigned_prs {
-            Some(max) => format!("{}", max),
-            None => String::from("Not set (i.e. unlimited)"),
-        };
-        let prs = self
-            .assigned_prs
-            .iter()
-            .map(|pr| format!("#{}", pr))
-            .collect::<Vec<String>>()
-            .join(", ");
-        format!(
-            "Username: {}\nAssigned PRs: {}\nReview capacity: {}",
-            self.username, prs, capacity
-        )
-    }
 }
 
 impl From<tokio_postgres::row::Row> for ReviewPrefs {
     fn from(row: tokio_postgres::row::Row) -> Self {
         Self {
             id: row.get("id"),
-            username: row.get("username"),
             user_id: row.get("user_id"),
-            assigned_prs: row.get("assigned_prs"),
             max_assigned_prs: row.get("max_assigned_prs"),
         }
     }
+}
+
+/// Get team member review preferences.
+/// If they are missing, returns `Ok(None)`.
+pub async fn get_review_prefs(
+    db: &tokio_postgres::Client,
+    user_id: UserId,
+) -> anyhow::Result<Option<ReviewPrefs>> {
+    let query = "
+SELECT id, user_id, max_assigned_prs
+FROM review_prefs
+WHERE review_prefs.user_id = $1;";
+    let row = db
+        .query_opt(query, &[&(user_id as i64)])
+        .await
+        .context("Error retrieving review preferences")?;
+    Ok(row.map(|r| r.into()))
 }
 
 pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::Result<T> {
