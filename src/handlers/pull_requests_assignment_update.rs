@@ -1,5 +1,5 @@
-use crate::db::users::record_username;
-use crate::github::retrieve_pull_requests;
+use crate::github::{retrieve_open_pull_requests, UserId};
+use crate::handlers::pr_tracking::{PullRequestNumber, ReviewerWorkqueue};
 use crate::jobs::Job;
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
