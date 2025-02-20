@@ -15,17 +15,6 @@ pub struct Notification {
     pub team_name: Option<String>,
 }
 
-/// Add a new user (if not existing)
-pub async fn record_username(db: &DbClient, user_id: u64, username: &str) -> anyhow::Result<()> {
-    db.execute(
-        "INSERT INTO users (user_id, username) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-        &[&(user_id as i64), &username],
-    )
-    .await
-    .context("inserting user id / username")?;
-    Ok(())
-}
-
 pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::Result<()> {
     db.execute("INSERT INTO notifications (user_id, origin_url, origin_html, time, short_description, team_name, idx)
         VALUES (

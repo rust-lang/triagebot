@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::db::notifications::record_username;
+use crate::db::users::record_username;
 use crate::github::retrieve_pull_requests;
 use crate::jobs::Job;
 use crate::ReviewPrefs;
