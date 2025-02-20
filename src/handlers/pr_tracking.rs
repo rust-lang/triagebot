@@ -7,10 +7,10 @@
 //! - Removes the PR from the workqueue of one team member (after the PR has been unassigned or closed)
 
 use super::assign::{FindReviewerError, REVIEWER_HAS_NO_CAPACITY, SELF_ASSIGN_HAS_NO_CAPACITY};
+use crate::db::users::record_username;
 use crate::github::User;
 use crate::{
     config::ReviewPrefsConfig,
-    db::notifications::record_username,
     github::{IssuesAction, IssuesEvent},
     handlers::Context,
     ReviewPrefs,

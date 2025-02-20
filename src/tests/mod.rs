@@ -1,5 +1,5 @@
 use crate::db;
-use crate::db::notifications::record_username;
+use crate::db::users::record_username;
 use crate::db::{make_client, ClientPool, PooledClient};
 use crate::github::GithubClient;
 use crate::handlers::Context;

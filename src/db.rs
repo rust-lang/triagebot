@@ -11,6 +11,7 @@ pub mod issue_data;
 pub mod jobs;
 pub mod notifications;
 pub mod rustc_commits;
+pub mod users;
 
 const CERT_URL: &str = "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem";
 

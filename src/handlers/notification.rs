@@ -4,7 +4,7 @@
 //!
 //! Parsing is done in the `parser::command::ping` module.
 
-use crate::db::notifications;
+use crate::db::{notifications, users};
 use crate::github::get_id_for_username;
 use crate::{
     github::{self, Event},
@@ -92,7 +92,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 continue;
             }
 
-            if let Err(err) = notifications::record_username(&client, user.id, &user.login)
+            if let Err(err) = users::record_username(&client, user.id, &user.login)
                 .await
                 .context("failed to record username")
             {
