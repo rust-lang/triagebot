@@ -1,7 +1,9 @@
+use crate::github::User;
 use anyhow::Context;
 use tokio_postgres::Client as DbClient;
 
-/// Add a new user (if not existing)
+/// Add a new user.
+/// If an user already exists, updates their username.
 pub async fn record_username(db: &DbClient, user_id: u64, username: &str) -> anyhow::Result<()> {
     db.execute(
         r"
@@ -15,9 +17,30 @@ DO UPDATE SET username = $2",
     Ok(())
 }
 
+/// Return a user from the DB.
+pub async fn get_user(db: &DbClient, user_id: u64) -> anyhow::Result<Option<User>> {
+    let row = db
+        .query_opt(
+            r"
+SELECT username
+FROM users
+WHERE user_id = $1;",
+            &[&(user_id as i64)],
+        )
+        .await
+        .context("cannot load user from DB")?;
+    Ok(row.map(|row| {
+        let username: &str = row.get(0);
+        User {
+            id: user_id,
+            login: username.to_string(),
+        }
+    }))
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::db::users::record_username;
+    use crate::db::users::{get_user, record_username};
     use crate::tests::run_test;
 
     #[tokio::test]
@@ -28,12 +51,7 @@ mod tests {
             record_username(&db, 1, "Foo").await?;
             record_username(&db, 1, "Bar").await?;
 
-            let row = db
-                .query_one("SELECT username FROM users WHERE user_id = 1", &[])
-                .await
-                .unwrap();
-            let name: &str = row.get(0);
-            assert_eq!(name, "Bar");
+            assert_eq!(get_user(&db, 1).await?.unwrap().login, "Bar");
 
             Ok(ctx)
         })
