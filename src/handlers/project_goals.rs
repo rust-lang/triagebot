@@ -45,14 +45,30 @@ impl Job for ProjectGoalsUpdateJob {
 
 /// Returns true if the user with the given github id is allowed to ping all group people
 /// and do other "project group adminstrative" tasks.
-pub async fn check_project_goal_acl(_gh: &GithubClient, gh_id: u64) -> anyhow::Result<bool> {
-    /// Github ID of the user allowed to ping all group people.
-    ///
-    /// FIXME: We should create a team for the person/people managing the goals program
-    /// and check that the zulip person is on it, but I'm too
-    const GOAL_OWNER_GH_ID: u64 = 155238; // nikomatsakis
+pub async fn check_project_goal_acl(gh: &GithubClient, gh_id: u64) -> anyhow::Result<bool> {
+    const GOALS_TEAM: &str = "goals";
 
-    Ok(gh_id == GOAL_OWNER_GH_ID)
+    let team = match github::get_team(gh, GOALS_TEAM).await {
+        Ok(Some(team)) => team,
+        Ok(None) => {
+            log::info!("team ({}) failed to resolve to a known team", GOALS_TEAM);
+            return Ok(false);
+        }
+        Err(err) => {
+            log::error!(
+                "team ({}) failed to resolve to a known team: {:?}",
+                GOALS_TEAM,
+                err
+            );
+            return Ok(false);
+        }
+    };
+
+    Ok(team
+        .members
+        .into_iter()
+        .find(|member| member.github_id == gh_id)
+        .is_some())
 }
 
 async fn ping_project_goals_owners_automatically(gh: &GithubClient) -> anyhow::Result<()> {
