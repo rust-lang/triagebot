@@ -75,36 +75,36 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 "
 This issue tracks the release notes text for #{}.
 
-### Steps
+cc {} -- original issue/PR authors and assignees for drafting text
 
-- [ ] Proposed text is drafted by PR author (or team) making the noteworthy change.
-- [ ] Issue is nominated for release team review of clarity for wider audience.
-- [ ] Release team includes text in release notes/blog posts.
+See the forge.rust-lang.org chapter about [release notes](https://forge.rust-lang.org/release/release-notes.html#preparing-release-notes) for an overview of how the release team makes use of these tracking issues.
 
 ### Release notes text
 
-The responsible team for the underlying change should edit this section to replace the automatically generated link with a succinct description of what changed, drawing upon text proposed by the author (either in discussion or through direct editing).
+This section should be edited to specify the correct category(s) for the change, with succinct description(s) of what changed. Some things worth considering:
+- Does this need an additional compat notes section?
+- Was this a libs stabilization that should have additional headers to list new APIs under `Stabilized APIs` and `Const Stabilized APIs`?
+
 
 ````markdown
-# Category (e.g. Language, Compiler, Libraries, Compatibility notes, ...)
+# Language/Compiler/Libraries/Stabilized APIs/Const Stabilized APIs/Rustdoc/Compatibility Notes/Internal Changes/Other
 - [{}]({})
 ````
 
 > [!TIP]
-> Use the [previous releases](https://doc.rust-lang.org/nightly/releases.html) categories to help choose which one(s) to use.
-> The category will be de-duplicated with all the other ones by the release team.
->
-> *More than one section can be included if needed.*
+> Use the [previous releases](https://doc.rust-lang.org/nightly/releases.html) for inspiration on how to write the release notes text and which categories to pick.
 
 ### Release blog section
 
-If the change is notable enough for inclusion in the blog post, the responsible team should add content to this section.
-*Otherwise leave it empty.*
+If this change is notable enough for inclusion in the blog post then this section should be edited to contain a draft for the blog post. *Otherwise leave it empty.*
+
 
 ````markdown
 ````
 
-cc {} -- origin issue/PR authors and assignees for starting to draft text
+> [!NOTE]
+>
+> If a blog post section is required the `release-blog-post` label should be added (`@rustbot label +release-blog-post`) to this issue as otherwise it may be missed by the release team.
 ",
                 e.issue.number, e.issue.title, e.issue.html_url,
                 [&e.issue.user].into_iter().chain(e.issue.assignees.iter())
