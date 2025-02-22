@@ -92,7 +92,7 @@ This section should be edited to specify the correct category(s) for the change,
 ````
 
 > [!TIP]
-> Use the [previous releases](https://doc.rust-lang.org/nightly/releases.html) categories to help choose which one(s) to use.
+> Use the [previous releases](https://doc.rust-lang.org/nightly/releases.html) for inspiration on how to write the release notes text and which categories to pick.
 
 ### Release blog section
 
