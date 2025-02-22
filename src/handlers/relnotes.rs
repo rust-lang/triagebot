@@ -98,11 +98,13 @@ This section should be edited to specify the correct category(s) for the change,
 
 If this change is notable enough for inclusion in the blog post then this section should be edited to contain a draft for the blog post. *Otherwise leave it empty.*
 
-**Note:** If a blog post section is required the `release-blog-post` label should be added to this issue as otherwise it may be missed by the release team.
 
 ````markdown
 ````
 
+> [!NOTE]
+>
+> If a blog post section is required the `release-blog-post` label should be added (`@rustbot label +release-blog-post`) to this issue as otherwise it may be missed by the release team.
 ",
                 e.issue.number, e.issue.title, e.issue.html_url,
                 [&e.issue.user].into_iter().chain(e.issue.assignees.iter())
