@@ -1,9 +1,10 @@
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
+use crate::get_review_prefs;
 use crate::github::{get_id_for_username, GithubClient};
 use crate::handlers::docs_update::docs_update;
+use crate::handlers::pr_tracking::get_assigned_prs;
 use crate::handlers::project_goals::{self, ping_project_goals_owners};
-use crate::handlers::pull_requests_assignment_update::get_review_prefs;
 use crate::handlers::Context;
 use anyhow::{format_err, Context as _};
 use std::env;
@@ -163,7 +164,7 @@ fn handle_command<'a>(
                 .map_err(|e| format_err!("Failed to parse movement, expected `move <from> <to>`: {e:?}.")),
             Some("meta") => add_meta_notification(&ctx, gh_id, words).await
                 .map_err(|e| format_err!("Failed to parse `meta` command. Synopsis: meta <num> <text>: Add <text> to your notification identified by <num> (>0)\n\nError: {e:?}")),
-            Some("work") => query_pr_assignments(&ctx, gh_id, words).await
+            Some("work") => query_pr_assignments(ctx, gh_id, words).await
                                                                     .map_err(|e| format_err!("Failed to parse `work` command. Synopsis: work <show>: shows your current PRs assignment\n\nError: {e:?}")),
             _ => {
                 while let Some(word) = next {
@@ -242,7 +243,7 @@ fn handle_command<'a>(
 }
 
 async fn query_pr_assignments(
-    ctx: &&Context,
+    ctx: &Context,
     gh_id: u64,
     mut words: impl Iterator<Item = &str>,
 ) -> anyhow::Result<Option<String>> {
@@ -253,18 +254,34 @@ async fn query_pr_assignments(
 
     let db_client = ctx.db.get().await;
 
-    let record = match subcommand {
+    let response = match subcommand {
         "show" => {
-            let rec = get_review_prefs(&db_client, gh_id).await;
-            if rec.is_err() {
-                anyhow::bail!("No preferences set.")
-            }
-            rec?
+            let mut assigned_prs = get_assigned_prs(ctx, gh_id)
+                .await
+                .into_iter()
+                .collect::<Vec<_>>();
+            assigned_prs.sort();
+
+            let prs = assigned_prs
+                .iter()
+                .map(|pr| format!("#{pr}"))
+                .collect::<Vec<String>>()
+                .join(", ");
+
+            let review_prefs = get_review_prefs(&db_client, gh_id).await?;
+            let capacity = match review_prefs.and_then(|p| p.max_assigned_prs) {
+                Some(max) => format!("{max}"),
+                None => String::from("Not set (i.e. unlimited)"),
+            };
+
+            let mut response = format!("Assigned PRs: {prs}\n");
+            writeln!(response, "Review capacity: {capacity}")?;
+            response
         }
         _ => anyhow::bail!("Invalid subcommand."),
     };
 
-    Ok(Some(record.to_string()))
+    Ok(Some(response))
 }
 
 // This does two things:

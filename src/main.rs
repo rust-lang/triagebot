@@ -6,6 +6,7 @@ use futures::StreamExt;
 use hyper::{header, Body, Request, Response, Server, StatusCode};
 use route_recognizer::Router;
 use std::{env, net::SocketAddr, sync::Arc};
+use tokio::sync::RwLock;
 use tokio::{task, time};
 use tower::{Service, ServiceExt};
 use tracing as log;
@@ -261,6 +262,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         db: pool,
         github: gh,
         octocrab: oc,
+        workqueue: Arc::new(RwLock::new(Default::default())),
     });
 
     // Run all jobs that don't have a schedule (one-off jobs)
