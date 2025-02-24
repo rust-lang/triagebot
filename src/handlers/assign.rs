@@ -169,10 +169,14 @@ pub(super) async fn handle_input(
             // want any assignments or noise.
             return Ok(());
         }
-        let welcome = if ctx
-            .github
-            .is_new_contributor(&event.repository, &event.issue.user.login)
-            .await
+        // This is temporarily disabled until we come up with a better
+        // solution, or decide to remove this. The `is_new_contributor` query
+        // is too expensive and takes too long to process.
+        let welcome = if false
+            && ctx
+                .github
+                .is_new_contributor(&event.repository, &event.issue.user.login)
+                .await
         {
             let who_text = match &assignee {
                 Some(assignee) => WELCOME_WITH_REVIEWER.replace("{assignee}", assignee),
