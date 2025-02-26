@@ -246,10 +246,25 @@ macro_rules! command_handlers {
                     log::debug!("skipping event, issue was {:?}", e.action);
                     return;
                 }
-                Event::IssueComment(e) => if e.action == IssueCommentAction::Deleted {
-                    // don't execute commands again when comment is deleted
-                    log::debug!("skipping event, comment was {:?}", e.action);
-                    return;
+                Event::IssueComment(e) => {
+                    match e.action {
+                        IssueCommentAction::Created => {}
+                        IssueCommentAction::Edited => {
+                            if event.comment_from().is_none() {
+                                // We are not entirely sure why this happens.
+                                // Sometimes when someone posts a PR review,
+                                // GitHub sends an "edited" event with no
+                                // changes just before the "created" event.
+                                log::debug!("skipping issue comment edit without changes");
+                                return;
+                            }
+                        }
+                        IssueCommentAction::Deleted => {
+                            // don't execute commands again when comment is deleted
+                            log::debug!("skipping event, comment was {:?}", e.action);
+                            return;
+                        }
+                    }
                 }
                 Event::Push(_) | Event::Create(_) => {
                     log::debug!("skipping unsupported event");
