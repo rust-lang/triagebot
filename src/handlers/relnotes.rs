@@ -73,9 +73,9 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             let title = format!("{TITLE_PREFIX} of #{}: {}", e.issue.number, e.issue.title);
             let body = format!(
                 "
-This issue tracks the release notes text for #{}.
+This issue tracks the release notes text for #{pr_number}.
 
-cc {} -- original issue/PR authors and assignees for drafting text
+cc {people} -- original issue/PR authors and assignees for drafting text
 
 See the forge.rust-lang.org chapter about [release notes](https://forge.rust-lang.org/release/release-notes.html#preparing-release-notes) for an overview of how the release team makes use of these tracking issues.
 
@@ -88,7 +88,7 @@ This section should be edited to specify the correct category(s) for the change,
 
 ````markdown
 # Language/Compiler/Libraries/Stabilized APIs/Const Stabilized APIs/Rustdoc/Compatibility Notes/Internal Changes/Other
-- [{}]({})
+- [{pr_title}]({pr_url})
 ````
 
 > [!TIP]
@@ -106,9 +106,11 @@ If this change is notable enough for inclusion in the blog post then this sectio
 >
 > If a blog post section is required the `release-blog-post` label should be added (`@rustbot label +release-blog-post`) to this issue as otherwise it may be missed by the release team.
 ",
-                e.issue.number, e.issue.title, e.issue.html_url,
-                [&e.issue.user].into_iter().chain(e.issue.assignees.iter())
-                    .map(|v| format!("@{}", v.login)).collect::<Vec<_>>().join(", ")
+                pr_number = e.issue.number,
+                people = [&e.issue.user].into_iter().chain(e.issue.assignees.iter())
+                    .map(|v| format!("@{}", v.login)).collect::<Vec<_>>().join(", "),
+                pr_title = e.issue.title,
+                pr_url = e.issue.html_url,
             );
             let resp = ctx
                 .github
