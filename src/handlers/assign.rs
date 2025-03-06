@@ -23,7 +23,7 @@
 use crate::{
     config::{AssignConfig, WarnNonDefaultBranchException},
     github::{self, Event, FileDiff, Issue, IssuesAction, Selection},
-    handlers::{pr_tracking::has_user_capacity, Context, GithubClient, IssuesEvent},
+    handlers::{Context, GithubClient, IssuesEvent},
     interactions::EditIssueBody,
 };
 use anyhow::{bail, Context as _};
@@ -39,7 +39,6 @@ use tracing as log;
 #[cfg(test)]
 mod tests {
     mod tests_candidates;
-    mod tests_db;
     mod tests_from_diff;
 }
 
@@ -564,22 +563,22 @@ pub(super) async fn handle_command(
                 }
                 let db_client = ctx.db.get().await;
                 if is_self_assign(&name, &event.user().login) {
-                    let work_queue = has_user_capacity(&db_client, &name).await;
-                    if work_queue.is_err() {
-                        // NOTE: disabled for now, just log
-                        log::warn!(
-                            "[#{}] PR self-assign failed, DB reported that user {} has no review capacity. Ignoring.",
-                            issue.number,
-                            name
-                        );
-                        // issue
-                        //     .post_comment(
-                        //         &ctx.github,
-                        //         &REVIEWER_HAS_NO_CAPACITY.replace("{username}", &name),
-                        //     )
-                        //     .await?;
-                        // return Ok(());
-                    }
+                    // let work_queue = has_user_capacity(&db_client, &name).await;
+                    // if work_queue.is_err() {
+                    //     // NOTE: disabled for now, just log
+                    //     log::warn!(
+                    //         "[#{}] PR self-assign failed, DB reported that user {} has no review capacity. Ignoring.",
+                    //         issue.number,
+                    //         name
+                    //     );
+                    //     // issue
+                    //     //     .post_comment(
+                    //     //         &ctx.github,
+                    //     //         &REVIEWER_HAS_NO_CAPACITY.replace("{username}", &name),
+                    //     //     )
+                    //     //     .await?;
+                    //     // return Ok(());
+                    // }
 
                     name.to_string()
                 } else {
@@ -806,7 +805,7 @@ impl fmt::Display for FindReviewerError {
 /// auto-assign groups, or rust-lang team names. It must have at least one
 /// entry.
 async fn find_reviewer_from_names(
-    db: &DbClient,
+    _db: &DbClient,
     teams: &Teams,
     config: &AssignConfig,
     issue: &Issue,
@@ -845,24 +844,24 @@ async fn find_reviewer_from_names(
     }
 
     // filter out team members without capacity
-    let filtered_candidates = filter_by_capacity(db, &candidates)
-        .await
-        .expect("Error while filtering out team members");
-
-    if filtered_candidates.is_empty() {
-        // NOTE: disabled for now, just log
-        log::info!("[#{}] Filtered list of PR assignee is empty", issue.number);
-        // return Err(FindReviewerError::AllReviewersFiltered {
-        //     initial: names.to_vec(),
-        //     filtered: names.to_vec(),
-        // });
-    }
-
-    log::info!(
-        "[#{}] Filtered list of candidates: {:?}",
-        issue.number,
-        filtered_candidates
-    );
+    // let filtered_candidates = filter_by_capacity(db, &candidates)
+    //     .await
+    //     .expect("Error while filtering out team members");
+    //
+    // if filtered_candidates.is_empty() {
+    //     // NOTE: disabled for now, just log
+    //     log::info!("[#{}] Filtered list of PR assignee is empty", issue.number);
+    //     // return Err(FindReviewerError::AllReviewersFiltered {
+    //     //     initial: names.to_vec(),
+    //     //     filtered: names.to_vec(),
+    //     // });
+    // }
+    //
+    // log::info!(
+    //     "[#{}] Filtered list of candidates: {:?}",
+    //     issue.number,
+    //     filtered_candidates
+    // );
 
     // Return unfiltered list of candidates
     Ok(candidates
@@ -870,32 +869,6 @@ async fn find_reviewer_from_names(
         .choose(&mut rand::thread_rng())
         .expect("candidate_reviewers_from_names should return at least one entry")
         .to_string())
-}
-
-/// Filter out candidates not having review capacity
-async fn filter_by_capacity(
-    db: &DbClient,
-    candidates: &HashSet<&str>,
-) -> anyhow::Result<HashSet<String>> {
-    let usernames = candidates
-        .iter()
-        .map(|c| *c)
-        .collect::<Vec<&str>>()
-        .join(",");
-
-    let q = format!(
-        "
-SELECT username
-FROM review_prefs r
-JOIN users on users.user_id=r.user_id
-AND username = ANY('{{ {} }}')
-AND CARDINALITY(r.assigned_prs) < LEAST(COALESCE(r.max_assigned_prs,1000000))",
-        usernames
-    );
-    let result = db.query(&q, &[]).await.context("Select DB error")?;
-    let candidates: HashSet<String> = result.iter().map(|row| row.get("username")).collect();
-    log::info!("DB returned these candidates: {:?}", candidates);
-    Ok(candidates)
 }
 
 /// Returns a list of candidate usernames (from relevant teams) to choose as a reviewer.

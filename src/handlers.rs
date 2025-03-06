@@ -1,5 +1,6 @@
 use crate::config::{self, Config, ConfigurationError};
 use crate::github::{Event, GithubClient, IssueCommentAction, IssuesAction, IssuesEvent};
+use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use octocrab::Octocrab;
 use parser::command::{assign::AssignCommand, Command, Input};
 use std::fmt;
@@ -363,4 +364,7 @@ pub struct Context {
     pub db: crate::db::ClientPool,
     pub username: String,
     pub octocrab: Octocrab,
+    /// Represents the workqueue (assigned open PRs) of individual reviewers.
+    /// tokio's RwLock is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
+    pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
 }
