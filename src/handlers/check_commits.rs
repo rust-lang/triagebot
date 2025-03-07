@@ -8,6 +8,7 @@ use crate::{
 };
 
 mod modified_submodule;
+mod no_mentions;
 mod non_default_branch;
 
 /// Key for the state in the database
@@ -41,6 +42,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
             event.issue.number
         )
     };
+    let commits = event.issue.commits(&ctx.github).await?;
 
     let mut warnings = Vec::new();
 
@@ -56,6 +58,10 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
             warnings.extend(non_default_branch::non_default_branch(exceptions, event));
         }
         warnings.extend(modified_submodule::modifies_submodule(diff));
+    }
+
+    if let Some(no_mentions) = &config.no_mentions {
+        warnings.extend(no_mentions::mentions_in_commits(no_mentions, &commits));
     }
 
     handle_warnings(ctx, event, warnings).await
