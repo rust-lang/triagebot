@@ -259,35 +259,29 @@ async fn handle(
     if new_proposal {
         let topic_url = zulip_req.url();
         let comment = format!(
-            "> [!IMPORTANT] \n\
-        > This issue is *not meant to be used for technical discussion*. \
-        There is a **Zulip [stream]** for that. Use this issue to leave \
-        procedural comments, such as volunteering to review, indicating that you \
-        second the proposal (or third, etc), or raising a concern that you would \
-        like to be addressed. \
-        \n\n \
-        Concerns or objections to the proposal should be discussed on Zulip and formally registered \
-        here by adding a comment with the following syntax: \
-        \n \
-        ``` \
-        \n \
-        @rfcbot concern reason-for-concern \
-        \n \
-        <description of the concern> \
-        \n \
-        ``` \
-        \n \
-        Concerns can be lifted with: \
-        \n \
-        ``` \
-        \n \
-        @rfcbot resolve reason-for-concern \
-        \n \
-        ``` \
-        \n\n \
-        See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/compiler/mcp.html#what-kinds-of-comments-should-go-on-the-tracking-issue-in-compiler-team-repo) \
-        \n\n{} \
-        \n\n[stream]: {}",
+            r#"> [!IMPORTANT]
+> This issue is *not meant to be used for technical discussion*. There is a **Zulip [stream]** for that.
+> Use this issue to leave procedural comments, such as volunteering to review, indicating that you second the proposal (or third, etc), or raising a concern that you would like to be addressed.
+
+<details>
+<summary>Concerns or objections can formally be registered here by adding a comment.</summary>
+<p>
+
+```
+@rfcbot concern reason-for-concern
+<description of the concern>
+```
+Concerns can be lifted with:
+```
+@rfcbot resolve reason-for-concern
+```
+See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/compiler/mcp.html#what-kinds-of-comments-should-go-on-the-tracking-issue-in-compiler-team-repo)
+
+</p>
+</details>
+{}
+
+[stream]: {}"#,
             config.open_extra_text.as_deref().unwrap_or_default(),
             topic_url
         );
