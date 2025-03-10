@@ -23,7 +23,7 @@ impl Job for PullRequestAssignmentUpdate {
 }
 
 /// Loads the workqueue (mapping of open PRs assigned to users) from GitHub
-async fn load_workqueue(gh: &GithubClient) -> anyhow::Result<ReviewerWorkqueue> {
+pub async fn load_workqueue(gh: &GithubClient) -> anyhow::Result<ReviewerWorkqueue> {
     let prs = retrieve_open_pull_requests("rust-lang", "rust", &gh).await?;
 
     // Aggregate PRs by user
