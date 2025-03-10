@@ -2,8 +2,11 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
-use futures::{future::BoxFuture, FutureExt};
+use futures::{future::BoxFuture, FutureExt, TryStreamExt};
 use hyper::header::HeaderValue;
+use octocrab::params::pulls::Sort;
+use octocrab::params::{Direction, State};
+use octocrab::Octocrab;
 use once_cell::sync::OnceCell;
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
@@ -16,6 +19,7 @@ use std::{
 use tracing as log;
 
 pub type UserId = u64;
+pub type PullRequestNumber = u64;
 
 #[derive(Debug, PartialEq, Eq, Hash, serde::Deserialize, Clone)]
 pub struct User {
@@ -3049,88 +3053,55 @@ async fn project_items_by_status(
     Ok(all_items)
 }
 
-/// Retrieve all pull requests in status OPEN that are not drafts
-pub async fn retrieve_open_pull_requests(
-    repo: &Repository,
-    client: &GithubClient,
-) -> anyhow::Result<Vec<(User, i32)>> {
-    use cynic::QueryBuilder;
-    use github_graphql::pull_requests_open::{PullRequestsOpen, PullRequestsOpenVariables};
+/// Retrieve tuples of (user, PR number) where
+/// the given user is assigned as a reviewer for that PR.
+/// Only non-draft, non-rollup and open PRs are taken into account.
+pub async fn retrieve_pull_request_assignments(
+    owner: &str,
+    repository: &str,
+    client: &Octocrab,
+) -> anyhow::Result<Vec<(User, PullRequestNumber)>> {
+    let mut assignments = vec![];
 
-    let repo_owner = repo.owner();
-    let repo_name = repo.name();
-
-    let mut prs = vec![];
-
-    let mut vars = PullRequestsOpenVariables {
-        repo_owner,
-        repo_name,
-        after: None,
-    };
-    loop {
-        let query = PullRequestsOpen::build(vars.clone());
-        let req = client.post(&client.graphql_url);
-        let req = req.json(&query);
-
-        let data: cynic::GraphQlResponse<PullRequestsOpen> = client.json(req).await?;
-        if let Some(errors) = data.errors {
-            anyhow::bail!("There were graphql errors. {:?}", errors);
+    // We use the REST API to fetch open pull requests, as it is much (~5-10x)
+    // faster than using GraphQL here.
+    let stream = client
+        .pulls(owner, repository)
+        .list()
+        .state(State::Open)
+        .direction(Direction::Ascending)
+        .sort(Sort::Created)
+        .per_page(100)
+        .send()
+        .await?
+        .into_stream(client);
+    let mut stream = std::pin::pin!(stream);
+    while let Some(pr) = stream.try_next().await? {
+        if pr.draft == Some(true) {
+            continue;
         }
-        let repository = data
-            .data
-            .ok_or_else(|| anyhow::anyhow!("No data returned."))?
-            .repository
-            .ok_or_else(|| anyhow::anyhow!("No repository."))?;
-        prs.extend(repository.pull_requests.nodes);
-
-        let page_info = repository.pull_requests.page_info;
-        if !page_info.has_next_page || page_info.end_cursor.is_none() {
-            break;
+        // exclude rollup PRs
+        if pr
+            .labels
+            .unwrap_or_default()
+            .iter()
+            .any(|label| label.name == "rollup")
+        {
+            continue;
         }
-        vars.after = page_info.end_cursor;
+        for user in pr.assignees.unwrap_or_default() {
+            assignments.push((
+                User {
+                    login: user.login,
+                    id: (*user.id).into(),
+                },
+                pr.number,
+            ));
+        }
     }
+    assignments.sort_by(|a, b| a.0.id.cmp(&b.0.id));
 
-    let mut prs_processed: Vec<_> = vec![];
-    let _: Vec<_> = prs
-        .into_iter()
-        .filter_map(|pr| {
-            if pr.is_draft {
-                return None;
-            }
-
-            // exclude rollup PRs
-            let labels = pr
-                .labels
-                .map(|l| l.nodes)
-                .unwrap_or_default()
-                .into_iter()
-                .map(|node| node.name)
-                .collect::<Vec<_>>();
-            if labels.iter().any(|label| label == "rollup") {
-                return None;
-            }
-
-            let _: Vec<_> = pr
-                .assignees
-                .nodes
-                .iter()
-                .map(|user| {
-                    let user_id = user.database_id.expect("checked") as u64;
-                    prs_processed.push((
-                        User {
-                            login: user.login.clone(),
-                            id: user_id,
-                        },
-                        pr.number,
-                    ));
-                })
-                .collect();
-            Some(true)
-        })
-        .collect();
-    prs_processed.sort_by(|a, b| a.0.id.cmp(&b.0.id));
-
-    Ok(prs_processed)
+    Ok(assignments)
 }
 
 pub enum DesignMeetingStatus {
