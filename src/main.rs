@@ -261,7 +261,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     // In case this fails, we do not want to block triagebot, instead
     // we use an empty workqueue and let it be updated later through
     // webhooks and the `PullRequestAssignmentUpdate` cron job.
-    let workqueue = match tokio::time::timeout(Duration::from_secs(60), load_workqueue(&gh)).await {
+    let workqueue = match tokio::time::timeout(Duration::from_secs(60), load_workqueue(&oc)).await {
         Ok(Ok(workqueue)) => workqueue,
         Ok(Err(error)) => {
             tracing::error!("Cannot load initial workqueue: {error:?}");
