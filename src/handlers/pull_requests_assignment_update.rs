@@ -14,11 +14,7 @@ impl Job for PullRequestAssignmentUpdate {
 
     async fn run(&self, ctx: &super::Context, _metadata: &serde_json::Value) -> anyhow::Result<()> {
         let gh = &ctx.github;
-
-        tracing::trace!("starting pull_request_assignment_update");
-
-        let rust_repo = gh.repository("rust-lang/rust").await?;
-        let prs = retrieve_open_pull_requests(&rust_repo, &gh).await?;
+        let prs = retrieve_open_pull_requests("rust-lang", "rust", &gh).await?;
 
         // Aggregate PRs by user
         let aggregated: HashMap<UserId, HashSet<PullRequestNumber>> =
@@ -29,6 +25,8 @@ impl Job for PullRequestAssignmentUpdate {
             });
         tracing::info!("PR assignments\n{aggregated:?}");
         *ctx.workqueue.write().await = ReviewerWorkqueue::new(aggregated);
+
+        tracing::trace!("starting pull_request_assignment_update");
 
         Ok(())
     }

@@ -3051,20 +3051,18 @@ async fn project_items_by_status(
 
 /// Retrieve all pull requests in status OPEN that are not drafts
 pub async fn retrieve_open_pull_requests(
-    repo: &Repository,
+    owner: &str,
+    repository: &str,
     client: &GithubClient,
 ) -> anyhow::Result<Vec<(User, i32)>> {
     use cynic::QueryBuilder;
     use github_graphql::pull_requests_open::{PullRequestsOpen, PullRequestsOpenVariables};
 
-    let repo_owner = repo.owner();
-    let repo_name = repo.name();
-
     let mut prs = vec![];
 
     let mut vars = PullRequestsOpenVariables {
-        repo_owner,
-        repo_name,
+        repo_owner: owner,
+        repo_name: repository,
         after: None,
     };
     loop {
