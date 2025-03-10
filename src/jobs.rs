@@ -46,6 +46,7 @@ use std::str::FromStr;
 use async_trait::async_trait;
 use cron::Schedule;
 
+use crate::handlers::pull_requests_assignment_update::PullRequestAssignmentUpdate;
 use crate::{
     db::jobs::JobSchedule,
     handlers::{docs_update::DocsUpdateJob, rustc_commits::RustcCommitsJob, Context},
@@ -61,7 +62,11 @@ pub const JOB_PROCESSING_CADENCE_IN_SECS: u64 = 60;
 
 // The default jobs list that are currently scheduled to run
 pub fn jobs() -> Vec<Box<dyn Job + Send + Sync>> {
-    vec![Box::new(DocsUpdateJob), Box::new(RustcCommitsJob)]
+    vec![
+        Box::new(DocsUpdateJob),
+        Box::new(RustcCommitsJob),
+        Box::new(PullRequestAssignmentUpdate),
+    ]
 }
 
 // Definition of the schedule repetition for the jobs we want to run.
@@ -76,6 +81,12 @@ pub fn default_jobs() -> Vec<JobSchedule> {
         JobSchedule {
             name: RustcCommitsJob.name(),
             // Every 30 minutes...
+            schedule: Schedule::from_str("* 0,30 * * * * *").unwrap(),
+            metadata: serde_json::Value::Null,
+        },
+        JobSchedule {
+            name: PullRequestAssignmentUpdate.name(),
+            // Every 30 minutes
             schedule: Schedule::from_str("* 0,30 * * * * *").unwrap(),
             metadata: serde_json::Value::Null,
         },

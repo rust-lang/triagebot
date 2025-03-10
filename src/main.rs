@@ -11,7 +11,6 @@ use tokio::{task, time};
 use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
-use triagebot::handlers::pull_requests_assignment_update::PullRequestAssignmentUpdate;
 use triagebot::jobs::{
     default_jobs, Job, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS,
 };
@@ -334,7 +333,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 // - jobs are not guaranteed to start in sequence (care is to be taken to ensure thet are completely independent one from the other)
 // - the delay between jobs start is not guaranteed to be precise
 async fn spawn_job_oneoffs(ctx: Arc<Context>) {
-    let jobs: Vec<Box<dyn Job + Send + Sync>> = vec![Box::new(PullRequestAssignmentUpdate)];
+    let jobs: Vec<Box<dyn Job + Send + Sync>> = vec![];
 
     for (idx, job) in jobs.into_iter().enumerate() {
         let ctx = ctx.clone();
