@@ -5,12 +5,15 @@ use futures::future::FutureExt;
 use futures::StreamExt;
 use hyper::{header, Body, Request, Response, Server, StatusCode};
 use route_recognizer::Router;
+use std::time::Duration;
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tokio::{task, time};
 use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
+use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
+use triagebot::handlers::pull_requests_assignment_update::load_workqueue;
 use triagebot::jobs::{
     default_jobs, Job, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS,
 };
@@ -253,6 +256,23 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .personal_token(github::default_token_from_env())
         .build()
         .expect("Failed to build octograb.");
+
+    // Load the initial workqueue state from GitHub
+    // In case this fails, we do not want to block triagebot, instead
+    // we use an empty workqueue and let it be updated later through
+    // webhooks and the `PullRequestAssignmentUpdate` cron job.
+    let workqueue = match tokio::time::timeout(Duration::from_secs(60), load_workqueue(&gh)).await {
+        Ok(Ok(workqueue)) => workqueue,
+        Ok(Err(error)) => {
+            tracing::error!("Cannot load initial workqueue: {error:?}");
+            ReviewerWorkqueue::default()
+        }
+        Err(_) => {
+            tracing::error!("Cannot load initial workqueue, timeouted after a minute");
+            ReviewerWorkqueue::default()
+        }
+    };
+
     let ctx = Arc::new(Context {
         username: std::env::var("TRIAGEBOT_USERNAME").or_else(|err| match err {
             std::env::VarError::NotPresent => Ok("rustbot".to_owned()),
@@ -261,7 +281,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         db: pool,
         github: gh,
         octocrab: oc,
-        workqueue: Arc::new(RwLock::new(Default::default())),
+        workqueue: Arc::new(RwLock::new(workqueue)),
     });
 
     // Run all jobs that don't have a schedule (one-off jobs)
