@@ -33,7 +33,7 @@ pub async fn load_workqueue(client: &Octocrab) -> anyhow::Result<ReviewerWorkque
     let aggregated: HashMap<UserId, HashSet<PullRequestNumber>> =
         prs.into_iter().fold(HashMap::new(), |mut acc, (user, pr)| {
             let prs = acc.entry(user.id).or_default();
-            prs.insert(pr as PullRequestNumber);
+            prs.insert(pr);
             acc
         });
     tracing::debug!("PR assignments\n{aggregated:?}");
