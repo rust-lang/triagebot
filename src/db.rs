@@ -10,6 +10,7 @@ use tokio_postgres::Client as DbClient;
 pub mod issue_data;
 pub mod jobs;
 pub mod notifications;
+pub mod review_prefs;
 pub mod rustc_commits;
 pub mod users;
 
