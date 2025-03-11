@@ -1,7 +1,7 @@
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
-use crate::db::review_prefs::get_review_prefs;
-use crate::github::{get_id_for_username, GithubClient};
+use crate::db::review_prefs::{get_review_prefs, upsert_review_prefs};
+use crate::github::{get_id_for_username, GithubClient, User};
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
 use crate::handlers::project_goals::{self, ping_project_goals_owners};
@@ -82,6 +82,19 @@ struct Response {
 pub async fn to_github_id(client: &GithubClient, zulip_id: u64) -> anyhow::Result<Option<u64>> {
     let map = crate::team_data::zulip_map(client).await?;
     Ok(map.users.get(&zulip_id).copied())
+}
+
+pub async fn username_from_gh_id(
+    client: &GithubClient,
+    gh_id: u64,
+) -> anyhow::Result<Option<String>> {
+    let map = crate::team_data::users(client).await?;
+    Ok(map
+        .people
+        .into_iter()
+        .filter(|(_, p)| p.github_id == gh_id)
+        .map(|p| p.0)
+        .next())
 }
 
 pub async fn to_zulip_id(client: &GithubClient, github_id: u64) -> anyhow::Result<Option<u64>> {
@@ -277,6 +290,44 @@ async fn query_pr_assignments(
             let mut response = format!("Assigned PRs: {prs}\n");
             writeln!(response, "Review capacity: {capacity}")?;
             response
+        }
+        "set-pr-limit" => {
+            let max_assigned_prs = match words.next() {
+                Some(value) => {
+                    if words.next().is_some() {
+                        anyhow::bail!("Too many parameters.");
+                    }
+                    if value == "none" {
+                        None
+                    } else {
+                        Some(value.parse::<u32>().context(
+                            "Wrong parameter format. Must be a positive integer or `none` to unset the limit.",
+                        )?)
+                    }
+                }
+                None => anyhow::bail!("Missing parameter."),
+            };
+            let gh_username = username_from_gh_id(&ctx.github, gh_id)
+                .await?
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Cannot find your GitHub username in the team database")
+                })?;
+
+            let user = User {
+                login: gh_username.clone(),
+                id: gh_id,
+            };
+            upsert_review_prefs(&db_client, user, max_assigned_prs)
+                .await
+                .context("Error occurred while setting review preferences.")?;
+            tracing::info!("Setting max assignment PRs of `{gh_username}` to {max_assigned_prs:?}");
+            format!(
+                "Review capacity set to {}",
+                match max_assigned_prs {
+                    Some(v) => v.to_string(),
+                    None => "unlimited".to_string(),
+                }
+            )
         }
         _ => anyhow::bail!("Invalid subcommand."),
     };
