@@ -1,6 +1,6 @@
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
-use crate::get_review_prefs;
+use crate::db::review_prefs::get_review_prefs;
 use crate::github::{get_id_for_username, GithubClient};
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
