@@ -27,6 +27,7 @@ impl fmt::Display for HandlerError {
 mod assign;
 mod autolabel;
 mod bot_pull_requests;
+mod canonicalize_issue_links;
 mod check_commits;
 mod close;
 pub mod docs_update;
@@ -47,7 +48,6 @@ mod prioritize;
 pub mod project_goals;
 pub mod pull_requests_assignment_update;
 mod relabel;
-mod relink;
 mod relnotes;
 mod rendered_link;
 mod review_requested;
@@ -113,16 +113,6 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
             event,
             e
         );
-    }
-
-    if let Some(relink_config) = config.as_ref().ok().and_then(|c| c.relink.as_ref()) {
-        if let Err(e) = relink::handle(ctx, event, relink_config).await {
-            log::error!(
-                "failed to process event {:?} with relink handler: {:?}",
-                event,
-                e
-            );
-        }
     }
 
     if let Some(rendered_link_config) = config.as_ref().ok().and_then(|c| c.rendered_link.as_ref())
@@ -235,6 +225,7 @@ macro_rules! issue_handlers {
 issue_handlers! {
     assign,
     autolabel,
+    canonicalize_issue_links,
     major_change,
     mentions,
     no_merges,

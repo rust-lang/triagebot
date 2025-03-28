@@ -1,6 +1,6 @@
-//! This handler is used to "relink" linked GitHub issues into their long form
+//! This handler is used to canonicalize linked GitHub issues into their long form
 //! so that when pulling subtree into the main repository we don't accidentaly
-//! closes issue in the wrong repository.
+//! close issues in the wrong repository.
 //!
 //! Example: `Fixes #123` (in rust-lang/clippy) would now become `Fixes rust-lang/clippy#123`
 
@@ -10,8 +10,8 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::{
-    config::RelinkConfig,
-    github::{Event, IssuesAction, IssuesEvent},
+    config::CanonicalizeIssueLinksConfig,
+    github::{IssuesAction, IssuesEvent},
     handlers::Context,
 };
 
@@ -21,34 +21,44 @@ static LINKED_RE: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap()
 });
 
-pub async fn handle(ctx: &Context, event: &Event, config: &RelinkConfig) -> anyhow::Result<()> {
-    let Event::Issue(e) = event else {
-        return Ok(());
+pub(super) struct CanonicalizeIssueLinksInput {}
+
+pub(super) async fn parse_input(
+    _ctx: &Context,
+    event: &IssuesEvent,
+    config: Option<&CanonicalizeIssueLinksConfig>,
+) -> Result<Option<CanonicalizeIssueLinksInput>, String> {
+    if !event.issue.is_pr() {
+        return Ok(None);
+    }
+
+    if !matches!(
+        event.action,
+        IssuesAction::Opened | IssuesAction::Reopened | IssuesAction::Edited
+    ) {
+        return Ok(None);
+    }
+
+    // Require a `[canonicalize-issue-links]` configuration block to enable the handler.
+    if config.is_none() {
+        return Ok(None);
     };
 
-    if !e.issue.is_pr() {
-        return Ok(());
-    }
-
-    if let Err(e) = relink_pr(&ctx, &e, config).await {
-        tracing::error!("Error relinking pr: {:?}", e);
-    }
-
-    Ok(())
+    Ok(Some(CanonicalizeIssueLinksInput {}))
 }
 
-async fn relink_pr(ctx: &Context, e: &IssuesEvent, _config: &RelinkConfig) -> anyhow::Result<()> {
-    if e.action == IssuesAction::Opened
-        || e.action == IssuesAction::Reopened
-        || e.action == IssuesAction::Edited
-    {
-        let full_repo_name = e.issue.repository().full_repo_name();
+pub(super) async fn handle_input(
+    ctx: &Context,
+    _config: &CanonicalizeIssueLinksConfig,
+    e: &IssuesEvent,
+    _input: CanonicalizeIssueLinksInput,
+) -> anyhow::Result<()> {
+    let full_repo_name = e.issue.repository().full_repo_name();
 
-        let new_body = fix_linked_issues(&e.issue.body, full_repo_name.as_str());
+    let new_body = fix_linked_issues(&e.issue.body, full_repo_name.as_str());
 
-        if e.issue.body != new_body {
-            e.issue.edit_body(&ctx.github, &new_body).await?;
-        }
+    if e.issue.body != new_body {
+        e.issue.edit_body(&ctx.github, &new_body).await?;
     }
 
     Ok(())
