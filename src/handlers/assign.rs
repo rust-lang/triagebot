@@ -72,7 +72,7 @@ const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
 
 const ON_VACATION_WARNING: &str = "{username} is on vacation.
 
-Please choose another assignee.";
+They may take a while to respond.";
 
 const NON_DEFAULT_BRANCH: &str =
     "Pull requests are usually filed against the {default} branch for this repo, \
@@ -342,7 +342,8 @@ async fn determine_assignee(
             return Ok((Some(name.to_string()), true));
         }
         // User included `r?` in the opening PR body.
-        match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &[name]).await {
+        match find_reviewer_from_names(&db_client, &teams, config, &event.issue, ctx, &[name]).await
+        {
             Ok(assignee) => return Ok((Some(assignee), true)),
             Err(e) => {
                 event
@@ -356,8 +357,15 @@ async fn determine_assignee(
     // Errors fall-through to try fallback group.
     match find_reviewers_from_diff(config, diff) {
         Ok(candidates) if !candidates.is_empty() => {
-            match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &candidates)
-                .await
+            match find_reviewer_from_names(
+                &db_client,
+                &teams,
+                config,
+                &event.issue,
+                ctx,
+                &candidates,
+            )
+            .await
             {
                 Ok(assignee) => return Ok((Some(assignee), false)),
                 Err(FindReviewerError::TeamNotFound(team)) => log::warn!(
@@ -396,7 +404,9 @@ async fn determine_assignee(
     }
 
     if let Some(fallback) = config.adhoc_groups.get("fallback") {
-        match find_reviewer_from_names(&db_client, &teams, config, &event.issue, fallback).await {
+        match find_reviewer_from_names(&db_client, &teams, config, &event.issue, ctx, fallback)
+            .await
+        {
             Ok(assignee) => return Ok((Some(assignee), false)),
             Err(e) => {
                 log::trace!(
@@ -507,6 +517,10 @@ pub(super) async fn handle_command(
     // posts contain commands to instruct the user, not things that the bot
     // should respond to.
     if event.user().login == ctx.username.as_str() {
+        tracing::debug!(
+            "Received command from {}, which is the bot itself, ignoring",
+            ctx.username.as_str()
+        );
         return Ok(());
     }
 
@@ -605,6 +619,7 @@ pub(super) async fn handle_command(
                         &teams,
                         config,
                         issue,
+                        ctx,
                         &[team_name.to_string()],
                     )
                     .await
@@ -809,6 +824,7 @@ async fn find_reviewer_from_names(
     teams: &Teams,
     config: &AssignConfig,
     issue: &Issue,
+    ctx: &Context,
     names: &[String],
 ) -> Result<String, FindReviewerError> {
     let candidates = candidate_reviewers_from_names(teams, config, issue, names)?;
@@ -843,6 +859,24 @@ async fn find_reviewer_from_names(
         return Ok("ghost".to_string());
     }
 
+    let pick = candidates
+        .into_iter()
+        .choose(&mut rand::thread_rng())
+        .expect("candidate_reviewers_from_names should return at least one entry")
+        .to_string();
+
+    if config.is_on_vacation(&pick) {
+        let result = issue
+            .post_comment(
+                &ctx.github,
+                &ON_VACATION_WARNING.replace("{username}", &pick),
+            )
+            .await;
+        if let Err(err) = result {
+            tracing::error!(?err, "Failed to post vacation warning");
+        }
+    }
+
     // filter out team members without capacity
     // let filtered_candidates = filter_by_capacity(db, &candidates)
     //     .await
@@ -864,11 +898,7 @@ async fn find_reviewer_from_names(
     // );
 
     // Return unfiltered list of candidates
-    Ok(candidates
-        .into_iter()
-        .choose(&mut rand::thread_rng())
-        .expect("candidate_reviewers_from_names should return at least one entry")
-        .to_string())
+    Ok(pick)
 }
 
 /// Returns a list of candidate usernames (from relevant teams) to choose as a reviewer.
