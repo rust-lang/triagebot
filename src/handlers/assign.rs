@@ -978,9 +978,7 @@ fn candidate_reviewers_from_names<'a>(
         }
 
         // Assume it is a user.
-        if filter(&group_or_user) {
-            candidates.insert(group_or_user);
-        }
+        candidates.insert(group_or_user);
     }
     if candidates.is_empty() {
         let initial = names.iter().cloned().collect();
