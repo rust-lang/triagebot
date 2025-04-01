@@ -9,15 +9,6 @@ env:
   AWS_ACCESS_KEY_ID: AKIA46X5W6CZEAQSMRH7
 
 jobs:
-  rustfmt:
-    name: Rustfmt
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@master
-    - name: Install Rust
-      run: rustup update stable && rustup default stable && rustup component add rustfmt
-    - run: cargo fmt --all --check
-
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -38,6 +29,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
         run: cargo test --workspace --all-targets
+      - name: Check formatting
+        run: cargo fmt --all --check
 
   ci:
     name: CI
