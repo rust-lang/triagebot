@@ -35,9 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the source code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 1
+        uses: actions/checkout@v4
 
       - name: Test and build
         run: docker build -t triagebot .
