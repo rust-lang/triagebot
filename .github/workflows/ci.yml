@@ -2,8 +2,6 @@ name: CI
 on:
   push: {}
   pull_request: {}
-  schedule:
-    - cron: "0 12 * * 1" # Every Monday at 12:00 UTC
 
 env:
   AWS_ACCESS_KEY_ID: AKIA46X5W6CZEAQSMRH7
