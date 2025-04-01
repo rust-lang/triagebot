@@ -4,11 +4,22 @@
 
 use crate::{
     config::ShortcutConfig,
+    db::issue_data::IssueData,
     github::{Event, Label},
     handlers::Context,
     interactions::ErrorComment,
 };
 use parser::command::shortcut::ShortcutCommand;
+
+/// Key for the state in the database
+const AUTHOR_REMINDER_KEY: &str = "author-reminder";
+
+/// State stored in the database for a PR.
+#[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
+struct AuthorReminderState {
+    /// ID of the reminder comment.
+    reminder_comment: Option<String>,
+}
 
 pub(super) async fn handle_command(
     ctx: &Context,
@@ -51,6 +62,27 @@ pub(super) async fn handle_command(
                 }],
             )
             .await?;
+    }
+
+    // We add a small reminder for the author to use `@bot ready` when ready
+    if matches!(input, ShortcutCommand::Author) {
+        // Get the state of the author reminder for this PR
+        let mut db = ctx.db.get().await;
+        let mut state: IssueData<'_, AuthorReminderState> =
+            IssueData::load(&mut db, &issue, AUTHOR_REMINDER_KEY).await?;
+
+        if state.data.reminder_comment.is_none() {
+            let comment_body = format!(
+                "Reminder, once the PR becomes ready for a review, use `@{bot} ready`.",
+                bot = &ctx.username,
+            );
+            let comment = issue
+                .post_comment(&ctx.github, comment_body.as_str())
+                .await?;
+
+            state.data.reminder_comment = Some(comment.node_id);
+            state.save().await?;
+        }
     }
 
     Ok(())
