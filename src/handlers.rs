@@ -27,6 +27,7 @@ impl fmt::Display for HandlerError {
 mod assign;
 mod autolabel;
 mod bot_pull_requests;
+mod check_commits;
 mod close;
 pub mod docs_update;
 mod github_releases;
@@ -69,6 +70,16 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
 
     if let Some(body) = event.comment_body() {
         handle_command(ctx, event, &config, body, &mut errors).await;
+    }
+
+    if let Ok(config) = &config {
+        if let Err(e) = check_commits::handle(ctx, event, &config).await {
+            log::error!(
+                "failed to process event {:?} with `check_commits` handler: {:?}",
+                event,
+                e
+            );
+        }
     }
 
     if let Err(e) = project_goals::handle(ctx, event).await {
