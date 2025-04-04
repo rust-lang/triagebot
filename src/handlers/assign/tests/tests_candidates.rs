@@ -273,18 +273,14 @@ fn vacation() {
     let config = toml::toml!(users_on_vacation = ["jyn514"]);
     let issue = generic_issue("octocat", "rust-lang/rust");
 
-    // Test that `r? user` falls through to assigning from the team.
-    // See `determine_assignee` - ideally we would test that function directly instead of indirectly through `find_reviewer_from_names`.
-    let err_names = vec!["jyn514".into()];
+    // Test that the user on vacation can still be assigned manually.
     test_from_names(
         Some(teams.clone()),
         config.clone(),
         issue.clone(),
         &["jyn514"],
-        Err(FindReviewerError::AllReviewersFiltered {
-            initial: err_names.clone(),
-            filtered: err_names,
-        }),
+        Ok(&["jyn514"]),
+
     );
 
     // Test that `r? bootstrap` doesn't assign from users on vacation.
