@@ -36,6 +36,7 @@ mod major_change;
 mod mentions;
 mod merge_conflicts;
 mod milestone_prs;
+mod no_mentions;
 mod no_merges;
 mod nominate;
 mod note;
@@ -231,6 +232,7 @@ issue_handlers! {
     review_requested,
     pr_tracking,
     validate_config,
+    no_mentions,
 }
 
 macro_rules! command_handlers {
