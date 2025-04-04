@@ -99,6 +99,32 @@ Where the value in `--secret` is the secret value you place in `GITHUB_WEBHOOK_S
 
 If you are modifying code that sends message to Zulip and want to test your changes, you can register a [new free Zulip instance](https://zulip.com/new/). Before launching the triagebot locally, set the Zulip env vars to connect to your test instance (see example in `.env.sample`).
 
+You can also test Zulip webhooks locally with `curl`. For example, to test the Zulip hooks (commands sent to the
+Triagebot from the Rust lang Zulip), you start the triagebot on `localhost:8000` and then simulate a
+Zulip hook payload:
+``` sh
+curl http://localhost:8000/zulip-hook \
+    -H "Content-Type: application/json" \
+    -d '{
+        "data": "<CMD>",
+        "token": "<ZULIP_TOKEN>",
+        "message": {
+            "sender_id": <YOUR_ID>,
+            "recipient_id": <YOUR_ID>,
+            "sender_full_name": "Randolph Carter",
+            "sender_email": "r.carter@rust-lang.org",
+            "type": "stream"
+            }
+        }'
+```
+
+Where:
+- `CMD` is the exact command you would issue @triagebot on Zulip (ex. open a direct chat with the
+  bot and send "work show")
+- `ZULIP_TOKEN`: can be anything. Must correspond to the env var `$ZULIP_TOKEN` on your workstation
+- `YOUR_ID`: your GitHub user ID. Must be existing in your local triagebot database (table `users` and as
+  foreign key also in `review_prefs`)
+
 #### ngrok
 
 The following is an example of using <https://ngrok.com/> to provide webhook forwarding.
