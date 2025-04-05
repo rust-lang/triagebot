@@ -17,7 +17,7 @@ use crate::{
 
 // Taken from https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue?quot#linking-a-pull-request-to-an-issue-using-a-keyword
 static LINKED_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new("(?i)(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved) +(#[0-9]+)")
+    Regex::new("(?i)(?P<action>close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)(?P<spaces>:? +)(?P<issue>#[0-9]+)")
         .unwrap()
 });
 
@@ -65,7 +65,7 @@ pub(super) async fn handle_input(
 }
 
 fn fix_linked_issues<'a>(body: &'a str, full_repo_name: &str) -> Cow<'a, str> {
-    let replace_by = format!("$1 {full_repo_name}$2");
+    let replace_by = format!("${{action}}${{spaces}}{full_repo_name}${{issue}}");
     LINKED_RE.replace_all(body, replace_by)
 }
 
@@ -79,6 +79,8 @@ fn fixed_body() {
     Fix #123
     fixed #456
     Fixes    #7895
+    Closes: #987
+    resolves:   #655
     Resolves #00000 Closes #888
     "#;
 
@@ -87,7 +89,9 @@ fn fixed_body() {
 
     Fix rust-lang/rust#123
     fixed rust-lang/rust#456
-    Fixes rust-lang/rust#7895
+    Fixes    rust-lang/rust#7895
+    Closes: rust-lang/rust#987
+    resolves:   rust-lang/rust#655
     Resolves rust-lang/rust#00000 Closes rust-lang/rust#888
     "#;
 
@@ -105,6 +109,7 @@ fn untouched_body() {
     Fix rust-lang#123
     Fixesd #7895
     Resolves #abgt
+    Resolves: #abgt
     "#;
 
     let new_body = fix_linked_issues(body, full_repo_name);
