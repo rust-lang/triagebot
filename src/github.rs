@@ -522,7 +522,7 @@ impl IssueRepository {
         )
     }
 
-    fn full_repo_name(&self) -> String {
+    pub(crate) fn full_repo_name(&self) -> String {
         format!("{}/{}", self.organization, self.repository)
     }
 
