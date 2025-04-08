@@ -35,22 +35,44 @@ fn mentions_in_commits_warn(commits: Vec<&str>) -> String {
 }
 
 #[test]
-fn test_warning_printing() {
-    let commits_to_warn = vec![
-        "4d6ze57403udfrzefrfe6574",
-        "f54efz57405u46z6ef465z4f6ze57",
-        "404u57403uzf5fe5f4f5e57405u4zf",
-    ];
+fn test_mentions_in_commits() {
+    fn dummy_commit_from_body(sha: &str, body: &str) -> GithubCommit {
+        use chrono::{DateTime, FixedOffset};
 
-    let msg = mentions_in_commits_warn(commits_to_warn);
+        GithubCommit {
+            sha: sha.to_string(),
+            commit: crate::github::GithubCommitCommitField {
+                author: crate::github::GitUser {
+                    date: DateTime::<FixedOffset>::MIN_UTC.into(),
+                },
+                message: body.to_string(),
+                tree: crate::github::GitCommitTree {
+                    sha: "60ff73dfdd81aa1e6737eb3dacdfd4a141f6e14d".to_string(),
+                },
+            },
+            parents: vec![],
+        }
+    }
+
+    let mut commits = vec![dummy_commit_from_body(
+        "d1992a392617dfb10518c3e56446b6c9efae38b0",
+        "This is simple without mentions!",
+    )];
+
+    assert_eq!(mentions_in_commits(&NoMentionsConfig {}, &commits), None);
+
+    commits.push(dummy_commit_from_body(
+        "d7daa17bc97df9377640b0d33cbd0bbeed703c3a",
+        "This is a body with a @mention!",
+    ));
 
     assert_eq!(
-        msg,
-        r#"There are username mentions (such as `@user`) in the commit messages of the following commits.
+        mentions_in_commits(&NoMentionsConfig {}, &commits),
+        Some(
+            r#"There are username mentions (such as `@user`) in the commit messages of the following commits.
   *Please remove the mentions to avoid spamming these users.*
-    - 4d6ze57403udfrzefrfe6574
-    - f54efz57405u46z6ef465z4f6ze57
-    - 404u57403uzf5fe5f4f5e57405u4zf
-"#
+    - d7daa17bc97df9377640b0d33cbd0bbeed703c3a
+"#.to_string()
+        )
     );
 }
