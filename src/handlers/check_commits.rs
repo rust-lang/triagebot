@@ -94,12 +94,7 @@ async fn handle_warnings(
                 .await?;
         }
 
-        // Format the warnings for user consumption on Github
-        let warnings: Vec<_> = warnings
-            .iter()
-            .map(|warning| format!("* {warning}"))
-            .collect();
-        let warning = format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"));
+        let warning = warning_from_warnings(&warnings);
         let comment = event.issue.post_comment(&ctx.github, &warning).await?;
 
         // Save new state in the database
@@ -125,4 +120,13 @@ async fn handle_warnings(
     }
 
     Ok(())
+}
+
+// Format the warnings for user consumption on Github
+fn warning_from_warnings(warnings: &[String]) -> String {
+    let warnings: Vec<_> = warnings
+        .iter()
+        .map(|warning| format!("* {warning}"))
+        .collect();
+    format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"))
 }
