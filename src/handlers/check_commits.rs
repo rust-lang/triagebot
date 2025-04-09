@@ -8,6 +8,7 @@ use crate::{
 };
 
 mod modified_submodule;
+mod no_mentions;
 mod non_default_branch;
 
 /// Key for the state in the database
@@ -41,6 +42,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
             event.issue.number
         )
     };
+    let commits = event.issue.commits(&ctx.github).await?;
 
     let mut warnings = Vec::new();
 
@@ -56,6 +58,10 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
             warnings.extend(non_default_branch::non_default_branch(exceptions, event));
         }
         warnings.extend(modified_submodule::modifies_submodule(diff));
+    }
+
+    if let Some(no_mentions) = &config.no_mentions {
+        warnings.extend(no_mentions::mentions_in_commits(no_mentions, &commits));
     }
 
     handle_warnings(ctx, event, warnings).await
@@ -88,12 +94,7 @@ async fn handle_warnings(
                 .await?;
         }
 
-        // Format the warnings for user consumption on Github
-        let warnings: Vec<_> = warnings
-            .iter()
-            .map(|warning| format!("* {warning}"))
-            .collect();
-        let warning = format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"));
+        let warning = warning_from_warnings(&warnings);
         let comment = event.issue.post_comment(&ctx.github, &warning).await?;
 
         // Save new state in the database
@@ -119,4 +120,13 @@ async fn handle_warnings(
     }
 
     Ok(())
+}
+
+// Format the warnings for user consumption on Github
+fn warning_from_warnings(warnings: &[String]) -> String {
+    let warnings: Vec<_> = warnings
+        .iter()
+        .map(|warning| format!("* {warning}"))
+        .collect();
+    format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"))
 }

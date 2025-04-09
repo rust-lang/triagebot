@@ -47,6 +47,7 @@ pub(crate) struct Config {
     pub(crate) bot_pull_requests: Option<BotPullRequests>,
     pub(crate) rendered_link: Option<RenderedLinkConfig>,
     pub(crate) canonicalize_issue_links: Option<CanonicalizeIssueLinksConfig>,
+    pub(crate) no_mentions: Option<NoMentionsConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -420,6 +421,11 @@ pub(crate) struct RenderedLinkConfig {
 #[serde(deny_unknown_fields)]
 pub(crate) struct CanonicalizeIssueLinksConfig {}
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct NoMentionsConfig {}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -545,6 +551,8 @@ mod tests {
 
             [rendered-link]
             trigger-files = ["posts/"]
+
+            [no-mentions]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -608,6 +616,7 @@ mod tests {
                     trigger_files: vec!["posts/".to_string()]
                 }),
                 canonicalize_issue_links: Some(CanonicalizeIssueLinksConfig {}),
+                no_mentions: Some(NoMentionsConfig {}),
             }
         );
     }
@@ -671,7 +680,8 @@ mod tests {
                 merge_conflicts: None,
                 bot_pull_requests: None,
                 rendered_link: None,
-                canonicalize_issue_links: None
+                canonicalize_issue_links: None,
+                no_mentions: None,
             }
         );
     }
