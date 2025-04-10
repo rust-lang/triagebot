@@ -1,5 +1,6 @@
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
-use std::ops::Range;
+use regex::{Regex, Replacer};
+use std::{borrow::Cow, ops::Range};
 
 #[derive(Debug)]
 pub struct IgnoreBlocks {
@@ -61,6 +62,40 @@ impl IgnoreBlocks {
         }
         None
     }
+}
+
+pub fn replace_all_and_ignores<'h, R: Replacer>(
+    re: &Regex,
+    haystack: &'h str,
+    mut replacement: R,
+) -> Cow<'h, str> {
+    // Implementation taken mostly verbatim from
+    // https://docs.rs/regex/latest/regex/struct.Regex.html#method.replace_all
+    let mut last_match = 0;
+
+    let mut it = re.captures_iter(haystack).peekable();
+    if it.peek().is_none() {
+        // Fast-path, nothing to replace, returning the input verbatim
+        return Cow::Borrowed(haystack);
+    }
+
+    let ignore_blocks = IgnoreBlocks::new(haystack);
+    let mut new = String::with_capacity(haystack.len());
+    for caps in it {
+        let m = caps.get(0).unwrap();
+        new.push_str(&haystack[last_match..m.start()]);
+        // This is the "custom" part, we check if the capture range does not
+        // overlaps with a ignore range, if it does we use the match as-is,
+        // otherwise we apply the replacer.
+        if ignore_blocks.overlaps_ignore(m.range()).is_some() {
+            new.push_str(m.as_str());
+        } else {
+            replacement.replace_append(&caps, &mut new);
+        }
+        last_match = m.end();
+    }
+    new.push_str(&haystack[last_match..]);
+    Cow::Owned(new)
 }
 
 #[cfg(test)]
