@@ -66,7 +66,7 @@ pub(super) async fn handle_input(
 
 fn fix_linked_issues<'a>(body: &'a str, full_repo_name: &str) -> Cow<'a, str> {
     let replace_by = format!("${{action}}${{spaces}}{full_repo_name}${{issue}}");
-    LINKED_RE.replace_all(body, replace_by)
+    parser::replace_all_outside_ignore_blocks(&LINKED_RE, body, replace_by)
 }
 
 #[test]
@@ -74,25 +74,25 @@ fn fixed_body() {
     let full_repo_name = "rust-lang/rust";
 
     let body = r#"
-    This is a PR.
+This is a PR.
 
-    Fix #123
-    fixed #456
-    Fixes    #7895
-    Closes: #987
-    resolves:   #655
-    Resolves #00000 Closes #888
+Fix #123
+fixed #456
+Fixes    #7895
+Closes: #987
+resolves:   #655
+Resolves #00000 Closes #888
     "#;
 
     let fixed_body = r#"
-    This is a PR.
+This is a PR.
 
-    Fix rust-lang/rust#123
-    fixed rust-lang/rust#456
-    Fixes    rust-lang/rust#7895
-    Closes: rust-lang/rust#987
-    resolves:   rust-lang/rust#655
-    Resolves rust-lang/rust#00000 Closes rust-lang/rust#888
+Fix rust-lang/rust#123
+fixed rust-lang/rust#456
+Fixes    rust-lang/rust#7895
+Closes: rust-lang/rust#987
+resolves:   rust-lang/rust#655
+Resolves rust-lang/rust#00000 Closes rust-lang/rust#888
     "#;
 
     let new_body = fix_linked_issues(body, full_repo_name);
@@ -104,12 +104,19 @@ fn untouched_body() {
     let full_repo_name = "rust-lang/rust";
 
     let body = r#"
-    This is a PR.
+This is a PR.
 
-    Fix rust-lang#123
-    Fixesd #7895
-    Resolves #abgt
-    Resolves: #abgt
+Fix rust-lang#123
+Fixesd #7895
+Resolves #abgt
+Resolves: #abgt
+`Fixes #123`
+
+```
+Example: Fixes #123
+```
+
+<!-- Fixes #123 -->
     "#;
 
     let new_body = fix_linked_issues(body, full_repo_name);

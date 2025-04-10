@@ -1,5 +1,6 @@
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
-use std::ops::Range;
+use regex::{Captures, Regex, Replacer};
+use std::{borrow::Cow, cell::LazyCell, ops::Range};
 
 #[derive(Debug)]
 pub struct IgnoreBlocks {
@@ -61,6 +62,27 @@ impl IgnoreBlocks {
         }
         None
     }
+}
+
+pub fn replace_all_outside_ignore_blocks<'h, R: Replacer>(
+    re: &Regex,
+    haystack: &'h str,
+    mut replacement: R,
+) -> Cow<'h, str> {
+    let ignore_blocks = LazyCell::new(|| IgnoreBlocks::new(haystack));
+    re.replace_all(haystack, |c: &Captures| {
+        let m = c.get(0).unwrap();
+        // This is the "custom" part, we check if the capture range does not
+        // overlap with a ignore range, if it does we use the match as-is,
+        // otherwise we apply the replacement.
+        if ignore_blocks.overlaps_ignore(m.range()).is_some() {
+            m.as_str().to_string()
+        } else {
+            let mut out = String::new();
+            replacement.replace_append(c, &mut out);
+            out
+        }
+    })
 }
 
 #[cfg(test)]
