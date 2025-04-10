@@ -5,15 +5,17 @@ use futures::future::FutureExt;
 use futures::StreamExt;
 use hyper::{header, Body, Request, Response, Server, StatusCode};
 use route_recognizer::Router;
+use std::time::Duration;
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tokio::{task, time};
 use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
-use triagebot::handlers::pull_requests_assignment_update::PullRequestAssignmentUpdate;
+use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
+use triagebot::handlers::pull_requests_assignment_update::load_workqueue;
 use triagebot::jobs::{
-    default_jobs, Job, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS,
+    default_jobs, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS,
 };
 use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
 
@@ -254,6 +256,25 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .personal_token(github::default_token_from_env())
         .build()
         .expect("Failed to build octograb.");
+
+    // Load the initial workqueue state from GitHub
+    // In case this fails, we do not want to block triagebot, instead
+    // we use an empty workqueue and let it be updated later through
+    // webhooks and the `PullRequestAssignmentUpdate` cron job.
+    tracing::info!("Loading reviewer workqueue for rust-lang/rust");
+    let workqueue = match tokio::time::timeout(Duration::from_secs(60), load_workqueue(&oc)).await {
+        Ok(Ok(workqueue)) => workqueue,
+        Ok(Err(error)) => {
+            tracing::error!("Cannot load initial workqueue: {error:?}");
+            ReviewerWorkqueue::default()
+        }
+        Err(_) => {
+            tracing::error!("Cannot load initial workqueue, timeouted after a minute");
+            ReviewerWorkqueue::default()
+        }
+    };
+    tracing::info!("Workqueue loaded");
+
     let ctx = Arc::new(Context {
         username: std::env::var("TRIAGEBOT_USERNAME").or_else(|err| match err {
             std::env::VarError::NotPresent => Ok("rustbot".to_owned()),
@@ -262,15 +283,8 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         db: pool,
         github: gh,
         octocrab: oc,
-        workqueue: Arc::new(RwLock::new(Default::default())),
+        workqueue: Arc::new(RwLock::new(workqueue)),
     });
-
-    // Run all jobs that don't have a schedule (one-off jobs)
-    // TODO: Ideally JobSchedule.schedule should become an `Option<Schedule>`
-    // and here we run all those with schedule=None
-    if !is_scheduled_jobs_disabled() {
-        spawn_job_oneoffs(ctx.clone()).await;
-    }
 
     // Run all jobs that have a schedule (recurring jobs)
     if !is_scheduled_jobs_disabled() {
@@ -327,35 +341,6 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 
     serve_future.await?;
     Ok(())
-}
-
-/// Spawns a background tokio task which runs all jobs having no schedule
-/// i.e. manually executed at the end of the triagebot startup
-// - jobs are not guaranteed to start in sequence (care is to be taken to ensure thet are completely independent one from the other)
-// - the delay between jobs start is not guaranteed to be precise
-async fn spawn_job_oneoffs(ctx: Arc<Context>) {
-    let jobs: Vec<Box<dyn Job + Send + Sync>> = vec![Box::new(PullRequestAssignmentUpdate)];
-
-    for (idx, job) in jobs.into_iter().enumerate() {
-        let ctx = ctx.clone();
-        task::spawn(async move {
-            // Allow some spacing between starting jobs
-            let delay = idx as u64 * 2;
-            time::sleep(time::Duration::from_secs(delay)).await;
-            match job.run(&ctx, &serde_json::Value::Null).await {
-                Ok(_) => {
-                    log::trace!("job successfully executed (name={})", &job.name());
-                }
-                Err(e) => {
-                    log::error!(
-                        "job failed on execution (name={:?}, error={:?})",
-                        job.name(),
-                        e
-                    );
-                }
-            }
-        });
-    }
 }
 
 /// Spawns a background tokio task which runs continuously to queue up jobs

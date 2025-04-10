@@ -6,6 +6,7 @@
 //! - Adds the PR to the workqueue of one team member (after the PR has been assigned or reopened)
 //! - Removes the PR from the workqueue of one team member (after the PR has been unassigned or closed)
 
+use crate::github::PullRequestNumber;
 use crate::github::{User, UserId};
 use crate::{
     config::ReviewPrefsConfig,
@@ -14,8 +15,6 @@ use crate::{
 };
 use std::collections::{HashMap, HashSet};
 use tracing as log;
-
-pub type PullRequestNumber = u64;
 
 /// Maps users to a set of currently assigned open non-draft pull requests.
 /// We store this map in memory, rather than in the DB, because it can get desynced when webhooks
@@ -161,10 +160,9 @@ async fn delete_pr_from_workqueue(ctx: &Context, user_id: UserId, pr: PullReques
 #[cfg(test)]
 mod tests {
     use crate::config::Config;
+    use crate::github::PullRequestNumber;
     use crate::github::{Issue, IssuesAction, IssuesEvent, Repository, User};
-    use crate::handlers::pr_tracking::{
-        handle_input, parse_input, upsert_pr_into_workqueue, PullRequestNumber,
-    };
+    use crate::handlers::pr_tracking::{handle_input, parse_input, upsert_pr_into_workqueue};
     use crate::tests::github::{default_test_user, issue, pull_request, user};
     use crate::tests::{run_test, TestContext};
 

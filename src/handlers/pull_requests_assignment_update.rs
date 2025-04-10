@@ -1,7 +1,9 @@
-use crate::github::{retrieve_open_pull_requests, UserId};
-use crate::handlers::pr_tracking::{PullRequestNumber, ReviewerWorkqueue};
+use crate::github::PullRequestNumber;
+use crate::github::{retrieve_pull_request_assignments, UserId};
+use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::jobs::Job;
 use async_trait::async_trait;
+use octocrab::Octocrab;
 use std::collections::{HashMap, HashSet};
 
 pub struct PullRequestAssignmentUpdate;
@@ -13,23 +15,27 @@ impl Job for PullRequestAssignmentUpdate {
     }
 
     async fn run(&self, ctx: &super::Context, _metadata: &serde_json::Value) -> anyhow::Result<()> {
-        let gh = &ctx.github;
-
         tracing::trace!("starting pull_request_assignment_update");
-
-        let rust_repo = gh.repository("rust-lang/rust").await?;
-        let prs = retrieve_open_pull_requests(&rust_repo, &gh).await?;
-
-        // Aggregate PRs by user
-        let aggregated: HashMap<UserId, HashSet<PullRequestNumber>> =
-            prs.into_iter().fold(HashMap::new(), |mut acc, (user, pr)| {
-                let prs = acc.entry(user.id).or_default();
-                prs.insert(pr as PullRequestNumber);
-                acc
-            });
-        tracing::info!("PR assignments\n{aggregated:?}");
-        *ctx.workqueue.write().await = ReviewerWorkqueue::new(aggregated);
+        let workqueue = load_workqueue(&ctx.octocrab).await?;
+        *ctx.workqueue.write().await = workqueue;
+        tracing::trace!("finished pull_request_assignment_update");
 
         Ok(())
     }
+}
+
+/// Loads the workqueue (mapping of open PRs assigned to users) from GitHub
+pub async fn load_workqueue(client: &Octocrab) -> anyhow::Result<ReviewerWorkqueue> {
+    tracing::debug!("Loading workqueue for rust-lang/rust");
+    let prs = retrieve_pull_request_assignments("rust-lang", "rust", &client).await?;
+
+    // Aggregate PRs by user
+    let aggregated: HashMap<UserId, HashSet<PullRequestNumber>> =
+        prs.into_iter().fold(HashMap::new(), |mut acc, (user, pr)| {
+            let prs = acc.entry(user.id).or_default();
+            prs.insert(pr);
+            acc
+        });
+    tracing::debug!("PR assignments\n{aggregated:?}");
+    Ok(ReviewerWorkqueue::new(aggregated))
 }
