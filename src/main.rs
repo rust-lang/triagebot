@@ -261,6 +261,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     // In case this fails, we do not want to block triagebot, instead
     // we use an empty workqueue and let it be updated later through
     // webhooks and the `PullRequestAssignmentUpdate` cron job.
+    tracing::info!("Loading reviewer workqueue for rust-lang/rust");
     let workqueue = match tokio::time::timeout(Duration::from_secs(60), load_workqueue(&oc)).await {
         Ok(Ok(workqueue)) => workqueue,
         Ok(Err(error)) => {
@@ -272,6 +273,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             ReviewerWorkqueue::default()
         }
     };
+    tracing::info!("Workqueue loaded");
 
     let ctx = Arc::new(Context {
         username: std::env::var("TRIAGEBOT_USERNAME").or_else(|err| match err {
