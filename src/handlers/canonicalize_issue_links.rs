@@ -15,11 +15,8 @@ use crate::{
     handlers::Context,
 };
 
-// Taken from https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue?quot#linking-a-pull-request-to-an-issue-using-a-keyword
-static LINKED_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new("(?i)(?P<action>close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)(?P<spaces>:? +)(?P<issue>#[0-9]+)")
-        .unwrap()
-});
+static LINKED_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?P<start> |^)(?P<issue>#[0-9]+)\b").unwrap());
 
 pub(super) struct CanonicalizeIssueLinksInput {}
 
@@ -65,7 +62,7 @@ pub(super) async fn handle_input(
 }
 
 fn fix_linked_issues<'a>(body: &'a str, full_repo_name: &str) -> Cow<'a, str> {
-    let replace_by = format!("${{action}}${{spaces}}{full_repo_name}${{issue}}");
+    let replace_by = format!("${{start}}{full_repo_name}${{issue}}");
     parser::replace_all_outside_ignore_blocks(&LINKED_RE, body, replace_by)
 }
 
@@ -74,22 +71,24 @@ fn fixed_body() {
     let full_repo_name = "rust-lang/rust";
 
     let body = r#"
-This is a PR.
+This is a PR, which links to #123.
 
 Fix #123
 fixed #456
 Fixes    #7895
+Fixesd #7895
 Closes: #987
 resolves:   #655
 Resolves #00000 Closes #888
     "#;
 
     let fixed_body = r#"
-This is a PR.
+This is a PR, which links to rust-lang/rust#123.
 
 Fix rust-lang/rust#123
 fixed rust-lang/rust#456
 Fixes    rust-lang/rust#7895
+Fixesd rust-lang/rust#7895
 Closes: rust-lang/rust#987
 resolves:   rust-lang/rust#655
 Resolves rust-lang/rust#00000 Closes rust-lang/rust#888
@@ -100,6 +99,24 @@ Resolves rust-lang/rust#00000 Closes rust-lang/rust#888
 }
 
 #[test]
+fn edge_case_body() {
+    let full_repo_name = "rust-lang/rust";
+
+    assert_eq!(
+        fix_linked_issues("#132 with a end", full_repo_name),
+        "rust-lang/rust#132 with a end"
+    );
+    assert_eq!(
+        fix_linked_issues("with a start #132", full_repo_name),
+        "with a start rust-lang/rust#132"
+    );
+    assert_eq!(
+        fix_linked_issues("#132", full_repo_name),
+        "rust-lang/rust#132"
+    );
+}
+
+#[test]
 fn untouched_body() {
     let full_repo_name = "rust-lang/rust";
 
@@ -107,9 +124,10 @@ fn untouched_body() {
 This is a PR.
 
 Fix rust-lang#123
-Fixesd #7895
 Resolves #abgt
 Resolves: #abgt
+Fixes #157a
+Fixes#123
 `Fixes #123`
 
 ```
