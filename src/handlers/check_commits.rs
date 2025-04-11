@@ -10,6 +10,7 @@ use crate::{
 #[cfg(test)]
 use crate::github::GithubCommit;
 
+mod issue_links;
 mod modified_submodule;
 mod no_mentions;
 mod non_default_branch;
@@ -65,6 +66,10 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
 
     if let Some(no_mentions) = &config.no_mentions {
         warnings.extend(no_mentions::mentions_in_commits(no_mentions, &commits));
+    }
+
+    if let Some(issue_links) = &config.issue_links {
+        warnings.extend(issue_links::issue_links_in_commits(issue_links, &commits));
     }
 
     handle_warnings(ctx, event, warnings).await
