@@ -16,7 +16,7 @@ pub fn get_mentions(input: &str) -> Vec<&str> {
             // Oddly enough, english letters do not work, but letters outside
             // ASCII do work as separators; for now just go with this limited
             // list.
-            if let 'a'..='z' | 'A'..='Z' = previous {
+            if let 'a'..='z' | 'A'..='Z' | '1'..'9' = previous {
                 continue;
             }
         }
