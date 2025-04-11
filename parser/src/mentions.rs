@@ -16,7 +16,7 @@ pub fn get_mentions(input: &str) -> Vec<&str> {
             // Oddly enough, english letters do not work, but letters outside
             // ASCII do work as separators; for now just go with this limited
             // list.
-            if let 'a'..='z' | 'A'..='Z' = previous {
+            if let 'a'..='z' | 'A'..='Z' | '0'..='9' = previous {
                 continue;
             }
         }
@@ -83,4 +83,5 @@ fn no_panic_lone() {
 #[test]
 fn no_email() {
     assert_eq!(get_mentions("user@example.com"), Vec::<&str>::new());
+    assert_eq!(get_mentions("user123@example.com"), Vec::<&str>::new());
 }
