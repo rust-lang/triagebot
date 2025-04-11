@@ -275,7 +275,7 @@ Concerns can be lifted with:
 ```
 @rfcbot resolve reason-for-concern
 ```
-See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/compiler/mcp.html#what-kinds-of-comments-should-go-on-the-tracking-issue-in-compiler-team-repo)
+See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/compiler/proposals-and-stabilization.html#what-kinds-of-comments-should-go-on-a-mcp-in-the-compiler-team-repo)
 
 </p>
 </details>
