@@ -26,23 +26,7 @@ pub(super) fn mentions_in_commits(
 
 #[test]
 fn test_mentions_in_commits() {
-    fn dummy_commit_from_body(sha: &str, body: &str) -> GithubCommit {
-        use chrono::{DateTime, FixedOffset};
-
-        GithubCommit {
-            sha: sha.to_string(),
-            commit: crate::github::GithubCommitCommitField {
-                author: crate::github::GitUser {
-                    date: DateTime::<FixedOffset>::MIN_UTC.into(),
-                },
-                message: body.to_string(),
-                tree: crate::github::GitCommitTree {
-                    sha: "60ff73dfdd81aa1e6737eb3dacdfd4a141f6e14d".to_string(),
-                },
-            },
-            parents: vec![],
-        }
-    }
+    use super::dummy_commit_from_body;
 
     let mut commits = vec![dummy_commit_from_body(
         "d1992a392617dfb10518c3e56446b6c9efae38b0",

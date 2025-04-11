@@ -7,6 +7,9 @@ use crate::{
     github::{Event, IssuesAction, IssuesEvent, ReportedContentClassifiers},
 };
 
+#[cfg(test)]
+use crate::github::GithubCommit;
+
 mod modified_submodule;
 mod no_mentions;
 mod non_default_branch;
@@ -129,4 +132,23 @@ fn warning_from_warnings(warnings: &[String]) -> String {
         .map(|warning| format!("* {warning}"))
         .collect();
     format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"))
+}
+
+#[cfg(test)]
+fn dummy_commit_from_body(sha: &str, body: &str) -> GithubCommit {
+    use chrono::{DateTime, FixedOffset};
+
+    GithubCommit {
+        sha: sha.to_string(),
+        commit: crate::github::GithubCommitCommitField {
+            author: crate::github::GitUser {
+                date: DateTime::<FixedOffset>::MIN_UTC.into(),
+            },
+            message: body.to_string(),
+            tree: crate::github::GitCommitTree {
+                sha: "60ff73dfdd81aa1e6737eb3dacdfd4a141f6e14d".to_string(),
+            },
+        },
+        parents: vec![],
+    }
 }
