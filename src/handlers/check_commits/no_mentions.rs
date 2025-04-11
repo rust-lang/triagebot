@@ -62,6 +62,15 @@ fn test_mentions_in_commits() {
     assert_eq!(mentions_in_commits(&NoMentionsConfig {}, &commits), None);
 
     commits.push(dummy_commit_from_body(
+        "10b96a74c484cae79164cbbcdfcd412109e0e4cf",
+        r"This is a body with a sign-off and co-author
+Signed-off-by: Foo Bar <foobar123@example.com>
+Co-authored-by: Baz Qux <bazqux@example.com>",
+    ));
+
+    assert_eq!(mentions_in_commits(&NoMentionsConfig {}, &commits), None);
+
+    commits.push(dummy_commit_from_body(
         "d7daa17bc97df9377640b0d33cbd0bbeed703c3a",
         "This is a body with a @mention!",
     ));
