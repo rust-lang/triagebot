@@ -46,7 +46,8 @@ pub(crate) struct Config {
     pub(crate) merge_conflicts: Option<MergeConflictConfig>,
     pub(crate) bot_pull_requests: Option<BotPullRequests>,
     pub(crate) rendered_link: Option<RenderedLinkConfig>,
-    pub(crate) canonicalize_issue_links: Option<CanonicalizeIssueLinksConfig>,
+    #[serde(alias = "canonicalize-issue-links")]
+    pub(crate) issue_links: Option<IssueLinksConfig>,
     pub(crate) no_mentions: Option<NoMentionsConfig>,
 }
 
@@ -419,7 +420,7 @@ pub(crate) struct RenderedLinkConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
-pub(crate) struct CanonicalizeIssueLinksConfig {}
+pub(crate) struct IssueLinksConfig {}
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -615,14 +616,14 @@ mod tests {
                 rendered_link: Some(RenderedLinkConfig {
                     trigger_files: vec!["posts/".to_string()]
                 }),
-                canonicalize_issue_links: Some(CanonicalizeIssueLinksConfig {}),
+                issue_links: Some(IssueLinksConfig {}),
                 no_mentions: Some(NoMentionsConfig {}),
             }
         );
     }
 
     #[test]
-    fn warn_non_default_branch() {
+    fn warn_non_default_branch_and_issue_links() {
         let config = r#"
             [assign]
             warn_non_default_branch.enable = true
@@ -634,6 +635,8 @@ mod tests {
             [[assign.warn_non_default_branch.exceptions]]
             title = "[stable"
             branch = "stable"
+
+            [canonicalize-issue-links]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         assert_eq!(
@@ -680,7 +683,7 @@ mod tests {
                 merge_conflicts: None,
                 bot_pull_requests: None,
                 rendered_link: None,
-                canonicalize_issue_links: None,
+                issue_links: Some(IssueLinksConfig {}),
                 no_mentions: None,
             }
         );

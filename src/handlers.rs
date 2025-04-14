@@ -27,12 +27,12 @@ impl fmt::Display for HandlerError {
 mod assign;
 mod autolabel;
 mod bot_pull_requests;
-mod canonicalize_issue_links;
 mod check_commits;
 mod close;
 pub mod docs_update;
 mod github_releases;
 mod glacier;
+mod issue_links;
 mod major_change;
 mod mentions;
 mod merge_conflicts;
@@ -225,7 +225,7 @@ macro_rules! issue_handlers {
 issue_handlers! {
     assign,
     autolabel,
-    canonicalize_issue_links,
+    issue_links,
     major_change,
     mentions,
     no_merges,
