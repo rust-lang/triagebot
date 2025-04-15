@@ -14,9 +14,13 @@ use std::fmt;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum AssignCommand {
+    /// Corresponds to `@bot claim`.
     Own,
+    /// Corresponds to `@bot release-assignment`.
     Release,
+    /// Corresponds to `@bot assign @user`.
     User { username: String },
+    /// Corresponds to `r? [@]user`.
     ReviewName { name: String },
 }
 
