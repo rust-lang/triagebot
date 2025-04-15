@@ -1,10 +1,13 @@
+use std::collections::HashSet;
+
 use anyhow::bail;
+use anyhow::Context as _;
 
 use super::Context;
 use crate::{
     config::Config,
     db::issue_data::IssueData,
-    github::{Event, IssuesAction, IssuesEvent, ReportedContentClassifiers},
+    github::{Event, IssuesAction, IssuesEvent, Label, ReportedContentClassifiers},
 };
 
 #[cfg(test)]
@@ -25,6 +28,8 @@ struct CheckCommitsWarningsState {
     last_warnings: Vec<String>,
     /// ID of the most recent warning comment.
     last_warned_comment: Option<String>,
+    /// List of the last labels added.
+    last_labels: Vec<String>,
 }
 
 pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> anyhow::Result<()> {
@@ -49,6 +54,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
     let commits = event.issue.commits(&ctx.github).await?;
 
     let mut warnings = Vec::new();
+    let mut labels = Vec::new();
 
     // Compute the warnings
     if let Some(assign_config) = &config.assign {
@@ -72,14 +78,15 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
         warnings.extend(issue_links::issue_links_in_commits(issue_links, &commits));
     }
 
-    handle_warnings(ctx, event, warnings).await
+    handle_warnings_and_labels(ctx, event, warnings, labels).await
 }
 
 // Add, hide or hide&add a comment with the warnings.
-async fn handle_warnings(
+async fn handle_warnings_and_labels(
     ctx: &Context,
     event: &IssuesEvent,
     warnings: Vec<String>,
+    labels: Vec<String>,
 ) -> anyhow::Result<()> {
     // Get the state of the warnings for this PR in the database.
     let mut db = ctx.db.get().await;
@@ -105,10 +112,8 @@ async fn handle_warnings(
         let warning = warning_from_warnings(&warnings);
         let comment = event.issue.post_comment(&ctx.github, &warning).await?;
 
-        // Save new state in the database
         state.data.last_warnings = warnings;
         state.data.last_warned_comment = Some(comment.node_id);
-        state.save().await?;
     } else if warnings.is_empty() {
         // No warnings to be shown, let's resolve a previous warnings comment, if there was one.
         if let Some(last_warned_comment_id) = state.data.last_warned_comment {
@@ -123,9 +128,45 @@ async fn handle_warnings(
 
             state.data.last_warnings = Vec::new();
             state.data.last_warned_comment = None;
-            state.save().await?;
         }
     }
+
+    // Handle the labels, add the new ones, remove the one no longer required, or don't do anything
+    if !state.data.last_labels.is_empty() || !labels.is_empty() {
+        let (labels_to_remove, labels_to_add) =
+            calculate_label_changes(&state.data.last_labels, &labels);
+
+        // Remove the labels no longer required
+        if !labels_to_remove.is_empty() {
+            for label in labels_to_remove {
+                event
+                    .issue
+                    .remove_label(&ctx.github, &label)
+                    .await
+                    .context("failed to remove a label in check_commits")?;
+            }
+        }
+
+        // Add the labels that are now required
+        if !labels_to_add.is_empty() {
+            event
+                .issue
+                .add_labels(
+                    &ctx.github,
+                    labels_to_add
+                        .into_iter()
+                        .map(|name| Label { name })
+                        .collect(),
+                )
+                .await
+                .context("failed to add labels in check_commits")?;
+        }
+
+        state.data.last_labels = labels;
+    }
+
+    // Save new state in the database
+    state.save().await?;
 
     Ok(())
 }
@@ -137,6 +178,20 @@ fn warning_from_warnings(warnings: &[String]) -> String {
         .map(|warning| format!("* {warning}"))
         .collect();
     format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"))
+}
+
+// Calculate the label changes
+fn calculate_label_changes(
+    previous: &Vec<String>,
+    current: &Vec<String>,
+) -> (Vec<String>, Vec<String>) {
+    let previous_set: HashSet<String> = previous.into_iter().cloned().collect();
+    let current_set: HashSet<String> = current.into_iter().cloned().collect();
+
+    let removals = previous_set.difference(&current_set).cloned().collect();
+    let additions = current_set.difference(&previous_set).cloned().collect();
+
+    (removals, additions)
 }
 
 #[cfg(test)]
