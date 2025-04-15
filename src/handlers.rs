@@ -37,7 +37,6 @@ mod major_change;
 mod mentions;
 mod merge_conflicts;
 mod milestone_prs;
-mod no_merges;
 mod nominate;
 mod note;
 mod notification;
@@ -228,7 +227,6 @@ issue_handlers! {
     issue_links,
     major_change,
     mentions,
-    no_merges,
     notify_zulip,
     review_requested,
     pr_tracking,

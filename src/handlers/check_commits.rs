@@ -16,6 +16,7 @@ use crate::github::GithubCommit;
 mod issue_links;
 mod modified_submodule;
 mod no_mentions;
+mod no_merges;
 mod non_default_branch;
 
 /// Key for the state in the database
@@ -81,6 +82,15 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
 
     if let Some(issue_links) = &config.issue_links {
         warnings.extend(issue_links::issue_links_in_commits(issue_links, &commits));
+    }
+
+    if let Some(no_merges) = &config.no_merges {
+        if let Some(warn) =
+            no_merges::merges_in_commits(&event.issue.title, &event.repository, no_merges, &commits)
+        {
+            warnings.push(warn.0);
+            labels.extend(warn.1);
+        }
     }
 
     handle_warnings_and_labels(ctx, event, warnings, labels).await
