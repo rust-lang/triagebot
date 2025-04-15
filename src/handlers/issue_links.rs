@@ -10,7 +10,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::{
-    config::CanonicalizeIssueLinksConfig,
+    config::IssueLinksConfig,
     github::{IssuesAction, IssuesEvent},
     handlers::Context,
 };
@@ -18,13 +18,13 @@ use crate::{
 static LINKED_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?P<start> |^)(?P<issue>#[0-9]+)\b").unwrap());
 
-pub(super) struct CanonicalizeIssueLinksInput {}
+pub(super) struct IssueLinksInput {}
 
 pub(super) async fn parse_input(
     _ctx: &Context,
     event: &IssuesEvent,
-    config: Option<&CanonicalizeIssueLinksConfig>,
-) -> Result<Option<CanonicalizeIssueLinksInput>, String> {
+    config: Option<&IssueLinksConfig>,
+) -> Result<Option<IssueLinksInput>, String> {
     if !event.issue.is_pr() {
         return Ok(None);
     }
@@ -36,19 +36,20 @@ pub(super) async fn parse_input(
         return Ok(None);
     }
 
-    // Require a `[canonicalize-issue-links]` configuration block to enable the handler.
+    // Require a `[issue-links]` (or it's alias `[canonicalize-issue-links]`)
+    // configuration block to enable the handler.
     if config.is_none() {
         return Ok(None);
     };
 
-    Ok(Some(CanonicalizeIssueLinksInput {}))
+    Ok(Some(IssueLinksInput {}))
 }
 
 pub(super) async fn handle_input(
     ctx: &Context,
-    _config: &CanonicalizeIssueLinksConfig,
+    _config: &IssueLinksConfig,
     e: &IssuesEvent,
-    _input: CanonicalizeIssueLinksInput,
+    _input: IssueLinksInput,
 ) -> anyhow::Result<()> {
     let full_repo_name = e.issue.repository().full_repo_name();
 

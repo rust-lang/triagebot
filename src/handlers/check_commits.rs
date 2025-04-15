@@ -7,6 +7,10 @@ use crate::{
     github::{Event, IssuesAction, IssuesEvent, ReportedContentClassifiers},
 };
 
+#[cfg(test)]
+use crate::github::GithubCommit;
+
+mod issue_links;
 mod modified_submodule;
 mod no_mentions;
 mod non_default_branch;
@@ -62,6 +66,10 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
 
     if let Some(no_mentions) = &config.no_mentions {
         warnings.extend(no_mentions::mentions_in_commits(no_mentions, &commits));
+    }
+
+    if let Some(issue_links) = &config.issue_links {
+        warnings.extend(issue_links::issue_links_in_commits(issue_links, &commits));
     }
 
     handle_warnings(ctx, event, warnings).await
@@ -129,4 +137,23 @@ fn warning_from_warnings(warnings: &[String]) -> String {
         .map(|warning| format!("* {warning}"))
         .collect();
     format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"))
+}
+
+#[cfg(test)]
+fn dummy_commit_from_body(sha: &str, body: &str) -> GithubCommit {
+    use chrono::{DateTime, FixedOffset};
+
+    GithubCommit {
+        sha: sha.to_string(),
+        commit: crate::github::GithubCommitCommitField {
+            author: crate::github::GitUser {
+                date: DateTime::<FixedOffset>::MIN_UTC.into(),
+            },
+            message: body.to_string(),
+            tree: crate::github::GitCommitTree {
+                sha: "60ff73dfdd81aa1e6737eb3dacdfd4a141f6e14d".to_string(),
+            },
+        },
+        parents: vec![],
+    }
 }
