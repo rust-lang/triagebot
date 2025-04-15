@@ -70,9 +70,13 @@ Use `r?` to explicitly pick a reviewer";
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
     "@{author}: no appropriate reviewer found, use `r?` to override";
 
-const ON_VACATION_WARNING: &str = "{username} is on vacation.
+fn on_vacation_warning(username: &str) -> String {
+    format!(
+        r"{username} is on vacation.
 
-Please choose another assignee.";
+Please choose another assignee."
+    )
+}
 
 pub const SELF_ASSIGN_HAS_NO_CAPACITY: &str = "
 You have insufficient capacity to be assigned the pull request at this time. PR assignment has been reverted.
@@ -467,10 +471,7 @@ pub(super) async fn handle_command(
                 {
                     // This is a comment, so there must already be a reviewer assigned. No need to assign anyone else.
                     issue
-                        .post_comment(
-                            &ctx.github,
-                            &ON_VACATION_WARNING.replace("{username}", &username),
-                        )
+                        .post_comment(&ctx.github, &on_vacation_warning(&username))
                         .await?;
                     return Ok(());
                 }
@@ -700,7 +701,7 @@ impl fmt::Display for FindReviewerError {
                 write!(f, "{}", NO_REVIEWER_HAS_CAPACITY)
             }
             FindReviewerError::ReviewerOnVacation { username } => {
-                write!(f, "{}", ON_VACATION_WARNING.replace("{username}", username))
+                write!(f, "{}", on_vacation_warning(username))
             }
             FindReviewerError::ReviewerIsPrAuthor { username } => {
                 write!(
