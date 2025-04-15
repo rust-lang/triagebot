@@ -503,23 +503,6 @@ pub(super) async fn handle_command(
                 }
                 let db_client = ctx.db.get().await;
                 if is_self_assign(&name, &event.user().login) {
-                    // let work_queue = has_user_capacity(&db_client, &name).await;
-                    // if work_queue.is_err() {
-                    //     // NOTE: disabled for now, just log
-                    //     log::warn!(
-                    //         "[#{}] PR self-assign failed, DB reported that user {} has no review capacity. Ignoring.",
-                    //         issue.number,
-                    //         name
-                    //     );
-                    //     // issue
-                    //     //     .post_comment(
-                    //     //         &ctx.github,
-                    //     //         &REVIEWER_HAS_NO_CAPACITY.replace("{username}", &name),
-                    //     //     )
-                    //     //     .await?;
-                    //     // return Ok(());
-                    // }
-
                     name.to_string()
                 } else {
                     let teams = crate::team_data::teams(&ctx.github).await?;
@@ -620,7 +603,6 @@ pub(super) async fn handle_command(
 
     e.apply(&ctx.github, String::new(), &data).await?;
 
-    // Assign the PR: user's work queue has been checked and can accept this PR
     match issue.set_assignee(&ctx.github, &to_assign).await {
         Ok(()) => return Ok(()), // we are done
         Err(github::AssignmentError::InvalidAssignee) => {
