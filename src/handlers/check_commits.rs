@@ -39,9 +39,14 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
 
     if !matches!(
         event.action,
-        IssuesAction::Opened | IssuesAction::Synchronize
+        IssuesAction::Opened | IssuesAction::Synchronize | IssuesAction::ReadyForReview
     ) || !event.issue.is_pr()
     {
+        return Ok(());
+    }
+
+    // Don't ping on rollups or draft PRs.
+    if event.issue.title.starts_with("Rollup of") || event.issue.draft {
         return Ok(());
     }
 
