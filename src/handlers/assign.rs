@@ -462,7 +462,20 @@ pub(super) async fn handle_command(
                 .await?;
             return Ok(());
         }
-        let username = match cmd {
+        if matches!(
+            event,
+            Event::Issue(IssuesEvent {
+                action: IssuesAction::Opened,
+                ..
+            })
+        ) {
+            // Don't handle review request comments on new PRs. Those will be
+            // handled by the new PR trigger (which also handles the
+            // welcome message).
+            return Ok(());
+        }
+
+        let requested_name = match cmd {
             AssignCommand::Own => event.user().login.clone(),
             AssignCommand::User { username } => {
                 // Allow users on vacation to assign themselves to a PR, but not anyone else.
@@ -488,18 +501,6 @@ pub(super) async fn handle_command(
                 if config.owners.is_empty() {
                     // To avoid conflicts with the highfive bot while transitioning,
                     // r? is ignored if `owners` is not configured in triagebot.toml.
-                    return Ok(());
-                }
-                if matches!(
-                    event,
-                    Event::Issue(IssuesEvent {
-                        action: IssuesAction::Opened,
-                        ..
-                    })
-                ) {
-                    // Don't handle r? comments on new PRs. Those will be
-                    // handled by the new PR trigger (which also handles the
-                    // welcome message).
                     return Ok(());
                 }
                 let db_client = ctx.db.get().await;
@@ -544,7 +545,7 @@ pub(super) async fn handle_command(
         };
 
         // This user is validated and can accept the PR
-        set_assignee(issue, &ctx.github, &username).await;
+        set_assignee(issue, &ctx.github, &requested_name).await;
         // This PR will now be registered in the reviewer's work queue
         // by the `pr_tracking` handler
         return Ok(());
