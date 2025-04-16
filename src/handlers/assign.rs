@@ -78,27 +78,6 @@ Please choose another assignee."
     )
 }
 
-pub const SELF_ASSIGN_HAS_NO_CAPACITY: &str = "
-You have insufficient capacity to be assigned the pull request at this time. PR assignment has been reverted.
-
-Please choose another assignee or increase your assignment limit.
-
-(see [documentation](https://forge.rust-lang.org/triagebot/pr-assignment-tracking.html))";
-
-pub const REVIEWER_HAS_NO_CAPACITY: &str = "
-`{username}` has insufficient capacity to be assigned the pull request at this time. PR assignment has been reverted.
-
-Please choose another assignee.
-
-(see [documentation](https://forge.rust-lang.org/triagebot/pr-assignment-tracking.html))";
-
-const NO_REVIEWER_HAS_CAPACITY: &str = "
-Could not find a reviewer with enough capacity to be assigned at this time. This is a problem.
-
-Please contact us on [#t-infra](https://rust-lang.zulipchat.com/#narrow/stream/242791-t-infra) on Zulip.
-
-cc: @jackh726 @apiraino";
-
 const REVIEWER_IS_PR_AUTHOR: &str = "Pull request author cannot be assigned as reviewer.
 
 Please choose another assignee.";
@@ -308,22 +287,13 @@ async fn determine_assignee(
                 ),
                 Err(
                     e @ FindReviewerError::NoReviewer { .. }
-                    | e @ FindReviewerError::AllReviewersFiltered { .. }
-                    | e @ FindReviewerError::NoReviewerHasCapacity
-                    | e @ FindReviewerError::ReviewerHasNoCapacity { .. }
                     | e @ FindReviewerError::ReviewerIsPrAuthor { .. }
-                    | e @ FindReviewerError::ReviewerAlreadyAssigned { .. },
+                    | e @ FindReviewerError::ReviewerAlreadyAssigned { .. }
+                    | e @ FindReviewerError::ReviewerOnVacation { .. },
                 ) => log::trace!(
                     "no reviewer could be determined for PR {}: {e}",
                     event.issue.global_id()
                 ),
-                Err(e @ FindReviewerError::ReviewerOnVacation { .. }) => {
-                    // TODO: post a comment on the PR if the reviewer(s) were filtered due to being on vacation
-                    log::trace!(
-                        "no reviewer could be determined for PR {}: {e}",
-                        event.issue.global_id()
-                    )
-                }
             }
         }
         // If no owners matched the diff, fall-through.
@@ -623,20 +593,6 @@ pub enum FindReviewerError {
     /// This could happen if there is a cyclical group or other misconfiguration.
     /// `initial` is the initial list of candidate names.
     NoReviewer { initial: Vec<String> },
-    /// All potential candidates were excluded. `initial` is the list of
-    /// candidate names that were used to seed the selection. `filtered` is
-    /// the users who were prevented from being assigned. One example where
-    /// this happens is if the given name was for a team where the PR author
-    /// is the only member.
-    AllReviewersFiltered {
-        initial: Vec<String>,
-        filtered: Vec<String>,
-    },
-    /// No reviewer has capacity to accept a pull request assignment at this time
-    NoReviewerHasCapacity,
-    /// The requested reviewer has no capacity to accept a pull request
-    /// assignment at this time
-    ReviewerHasNoCapacity { username: String },
     /// Requested reviewer is on vacation
     /// (i.e. username is in [users_on_vacation] in the triagebot.toml)
     ReviewerOnVacation { username: String },
@@ -668,26 +624,6 @@ impl fmt::Display for FindReviewerError {
                      Use `r?` to specify someone else to assign.",
                     initial.join(",")
                 )
-            }
-            FindReviewerError::AllReviewersFiltered { initial, filtered } => {
-                write!(
-                    f,
-                    "Could not assign reviewer from: `{}`.\n\
-                     User(s) `{}` are either the PR author, already assigned, or on vacation. \
-                     Please use `r?` to specify someone else to assign.",
-                    initial.join(","),
-                    filtered.join(","),
-                )
-            }
-            FindReviewerError::ReviewerHasNoCapacity { username } => {
-                write!(
-                    f,
-                    "{}",
-                    REVIEWER_HAS_NO_CAPACITY.replace("{username}", username)
-                )
-            }
-            FindReviewerError::NoReviewerHasCapacity => {
-                write!(f, "{}", NO_REVIEWER_HAS_CAPACITY)
             }
             FindReviewerError::ReviewerOnVacation { username } => {
                 write!(f, "{}", on_vacation_warning(username))
