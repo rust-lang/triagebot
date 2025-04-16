@@ -474,22 +474,8 @@ pub(super) async fn handle_command(
             // welcome message).
             return Ok(());
         }
-
         let requested_name = match cmd {
             AssignCommand::Claim => event.user().login.clone(),
-            AssignCommand::AssignUser { username } => {
-                // Allow users on vacation to assign themselves to a PR, but not anyone else.
-                if config.is_on_vacation(&username)
-                    && event.user().login.to_lowercase() != username.to_lowercase()
-                {
-                    // This is a comment, so there must already be a reviewer assigned. No need to assign anyone else.
-                    issue
-                        .post_comment(&ctx.github, &on_vacation_warning(&username))
-                        .await?;
-                    return Ok(());
-                }
-                username
-            }
             AssignCommand::ReleaseAssignment => {
                 log::trace!(
                     "ignoring release on PR {:?}, must always have assignee",
@@ -497,7 +483,8 @@ pub(super) async fn handle_command(
                 );
                 return Ok(());
             }
-            AssignCommand::RequestReview { name } => {
+            AssignCommand::RequestReview { name }
+            | AssignCommand::AssignUser { username: name } => {
                 let db_client = ctx.db.get().await;
                 if is_self_assign(&name, &event.user().login) {
                     name.to_string()
