@@ -127,9 +127,8 @@ fn candidate_filtered_author_only_candidate() {
         config,
         issue,
         &["compiler"],
-        Err(FindReviewerError::AllReviewersFiltered {
+        Err(FindReviewerError::NoReviewer {
             initial: vec!["compiler".to_string()],
-            filtered: vec!["nikomatsakis".to_string()],
         }),
     );
 }
@@ -231,14 +230,6 @@ fn what_do_slashes_mean() {
         &["foo/bar"],
         Ok(&["foo-user"]),
     );
-    // Since this is rust-lang-nursery, it uses the rust-lang team, not the group.
-    test_from_names(
-        Some(teams.clone()),
-        config.clone(),
-        issue.clone(),
-        &["rust-lang/compiler"],
-        Ok(&["t-user1"]),
-    );
     test_from_names(
         Some(teams.clone()),
         config.clone(),
@@ -273,17 +264,14 @@ fn vacation() {
     let config = toml::toml!(users_on_vacation = ["jyn514"]);
     let issue = generic_issue("octocat", "rust-lang/rust");
 
-    // Test that `r? user` falls through to assigning from the team.
-    // See `determine_assignee` - ideally we would test that function directly instead of indirectly through `find_reviewer_from_names`.
-    let err_names = vec!["jyn514".into()];
+    // Test that `r? user` returns a specific error about the user being on vacation.
     test_from_names(
         Some(teams.clone()),
         config.clone(),
         issue.clone(),
         &["jyn514"],
-        Err(FindReviewerError::AllReviewersFiltered {
-            initial: err_names.clone(),
-            filtered: err_names,
+        Err(FindReviewerError::ReviewerOnVacation {
+            username: "jyn514".to_string(),
         }),
     );
 

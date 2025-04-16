@@ -613,18 +613,17 @@ pub(super) async fn handle_command(
     Ok(())
 }
 
+fn strip_organization_prefix<'a>(issue: &Issue, name: &'a str) -> &'a str {
+    let repo = issue.repository();
+    // @ is optional, so it is trimmed separately
+    // both @rust-lang/compiler and rust-lang/compiler should work
+    name.trim_start_matches("@")
+        .trim_start_matches(&format!("{}/", repo.organization))
+}
+
 /// Returns `Some(team_name)` if `name` corresponds to a name of a team.
 fn get_team_name<'a>(teams: &Teams, issue: &Issue, name: &'a str) -> Option<&'a str> {
-    // Strip organization prefix
-    let team_name = if let Some(repo) = issue.repository.get() {
-        // @ is optional, so it is trimmed separately
-        // both @rust-lang/compiler and rust-lang/compiler should work
-        name.trim_start_matches("@")
-            .trim_start_matches(&format!("{}/", repo.organization))
-    } else {
-        name
-    };
-
+    let team_name = strip_organization_prefix(issue, name);
     // Remove "t-" or "T-" prefixes before checking if it's a team name
     let team_name = team_name.trim_start_matches("t-").trim_start_matches("T-");
     teams.teams.get(team_name).map(|_| team_name)
@@ -780,85 +779,44 @@ async fn find_reviewer_from_names(
         .to_string())
 }
 
-/// Returns a list of candidate usernames (from relevant teams) to choose as a reviewer.
-fn candidate_reviewers_from_names<'a>(
-    teams: &'a Teams,
-    config: &'a AssignConfig,
+/// Recursively expand all teams and adhoc groups found within `names`.
+/// Returns a set of expanded usernames.
+/// Also normalizes usernames from `@user` to `user`.
+///
+/// Returns `(set of expanded users, expansion_happened)`.
+/// `expansion_happened` signals if any expansion has been performed.
+fn expand_teams_and_groups(
+    teams: &Teams,
     issue: &Issue,
-    names: &'a [String],
-) -> Result<HashSet<&'a str>, FindReviewerError> {
-    // Set of candidate usernames to choose from. This uses a set to
-    // deduplicate entries so that someone in multiple teams isn't
-    // over-weighted.
-    let mut candidates: HashSet<&str> = HashSet::new();
+    config: &AssignConfig,
+    names: &[String],
+) -> Result<(HashSet<String>, bool), FindReviewerError> {
+    let mut expanded = HashSet::new();
+    let mut expansion_happened = false;
+
     // Keep track of groups seen to avoid cycles and avoid expanding the same
     // team multiple times.
-    let mut seen = HashSet::new();
+    let mut seen_names = HashSet::new();
+
     // This is a queue of potential groups or usernames to expand. The loop
     // below will pop from this and then append the expanded results of teams.
-    // Usernames will be added to `candidates`.
-    let mut group_expansion: Vec<&str> = names.iter().map(|n| n.as_str()).collect();
-    // Keep track of which users get filtered out for a better error message.
-    let mut filtered = Vec::new();
-    // For debugging purposes, keep track about /why/ candidates were filtered out
-    let mut filtered_debug: HashMap<String, Option<FindReviewerError>> = HashMap::new();
-    let repo = issue.repository();
-    let org_prefix = format!("{}/", repo.organization);
-    // Don't allow groups or teams to include the current author or assignee.
-    let mut filter = |name: &&str| -> bool {
-        let name_lower = name.to_lowercase();
-        let is_pr_author = name_lower == issue.user.login.to_lowercase();
-        let is_on_vacation = config.is_on_vacation(name);
-        let is_already_assigned = issue
-            .assignees
-            .iter()
-            .any(|assignee| name_lower == assignee.login.to_lowercase());
+    // Usernames will be added to `expanded`.
+    let mut to_be_expanded: Vec<&str> = names.iter().map(|n| n.as_str()).collect();
 
-        // Record the reason why the candidate was filtered out
-        let reason = {
-            if is_pr_author {
-                Some(FindReviewerError::ReviewerIsPrAuthor {
-                    username: name.to_string(),
-                })
-            } else if is_on_vacation {
-                Some(FindReviewerError::ReviewerOnVacation {
-                    username: name.to_string(),
-                })
-            } else if is_already_assigned {
-                Some(FindReviewerError::ReviewerAlreadyAssigned {
-                    username: name.to_string(),
-                })
-            } else {
-                None
-            }
-        };
-
-        let can_be_assigned = !is_pr_author && !is_on_vacation && !is_already_assigned;
-        if !can_be_assigned {
-            filtered.push(name.to_string());
-            filtered_debug.insert(name.to_string(), reason);
-        }
-        can_be_assigned
-    };
-
-    // Loop over groups to recursively expand them.
-    while let Some(group_or_user) = group_expansion.pop() {
-        let group_or_user = group_or_user.strip_prefix('@').unwrap_or(group_or_user);
+    // Loop over names to recursively expand them.
+    while let Some(name_to_expand) = to_be_expanded.pop() {
+        // `name_to_expand` could be a team name, an adhoc group name or a username.
+        let maybe_team = get_team_name(teams, issue, name_to_expand);
+        let maybe_group = strip_organization_prefix(issue, name_to_expand);
+        let maybe_user = name_to_expand.strip_prefix('@').unwrap_or(name_to_expand);
 
         // Try ad-hoc groups first.
-        // Allow `rust-lang/compiler` to match `compiler`.
-        let maybe_group = group_or_user
-            .strip_prefix(&org_prefix)
-            .unwrap_or(group_or_user);
         if let Some(group_members) = config.adhoc_groups.get(maybe_group) {
+            expansion_happened = true;
+
             // If a group has already been expanded, don't expand it again.
-            if seen.insert(maybe_group) {
-                group_expansion.extend(
-                    group_members
-                        .iter()
-                        .map(|member| member.as_str())
-                        .filter(&mut filter),
-                );
+            if seen_names.insert(maybe_group) {
+                to_be_expanded.extend(group_members.iter().map(|s| s.as_str()));
             }
             continue;
         }
@@ -869,42 +827,105 @@ fn candidate_reviewers_from_names<'a>(
         // that is a real GitHub team name).
         //
         // This ignores subteam relationships (it only uses direct members).
-        let maybe_team = group_or_user
-            .strip_prefix("rust-lang/")
-            .unwrap_or(group_or_user);
-        if let Some(team) = teams.teams.get(maybe_team) {
-            candidates.extend(
-                team.members
-                    .iter()
-                    .map(|member| member.github.as_str())
-                    .filter(&mut filter),
-            );
+        if let Some(team) = maybe_team.and_then(|t| teams.teams.get(t)) {
+            expansion_happened = true;
+            expanded.extend(team.members.iter().map(|member| member.github.clone()));
             continue;
         }
 
-        if group_or_user.contains('/') {
-            return Err(FindReviewerError::TeamNotFound(group_or_user.to_string()));
+        // Here we know it's not a known team nor a group.
+        // If the username contains a slash, assume that it is an unknown team.
+        if maybe_user.contains('/') {
+            return Err(FindReviewerError::TeamNotFound(maybe_user.to_string()));
         }
 
         // Assume it is a user.
-        if filter(&group_or_user) {
-            candidates.insert(group_or_user);
+        expanded.insert(maybe_user.to_string());
+    }
+
+    Ok((expanded, expansion_happened))
+}
+
+/// Returns a list of candidate usernames (from relevant teams) to choose as a reviewer.
+/// If not reviewer is available, returns an error.
+fn candidate_reviewers_from_names<'a>(
+    teams: &'a Teams,
+    config: &'a AssignConfig,
+    issue: &Issue,
+    names: &'a [String],
+) -> Result<HashSet<String>, FindReviewerError> {
+    let (expanded, expansion_happened) = expand_teams_and_groups(teams, issue, config, names)?;
+    let expanded_count = expanded.len();
+
+    // Set of candidate usernames to choose from.
+    // We go through each expanded candidate and store either success or an error for them.
+    let mut candidates: Vec<Result<String, FindReviewerError>> = Vec::new();
+
+    for candidate in expanded {
+        let name_lower = candidate.to_lowercase();
+        let is_pr_author = name_lower == issue.user.login.to_lowercase();
+        let is_on_vacation = config.is_on_vacation(&candidate);
+        let is_already_assigned = issue
+            .assignees
+            .iter()
+            .any(|assignee| name_lower == assignee.login.to_lowercase());
+
+        // Record the reason why the candidate was filtered out
+        let reason = {
+            if is_pr_author {
+                Some(FindReviewerError::ReviewerIsPrAuthor {
+                    username: candidate.clone(),
+                })
+            } else if is_on_vacation {
+                Some(FindReviewerError::ReviewerOnVacation {
+                    username: candidate.clone(),
+                })
+            } else if is_already_assigned {
+                Some(FindReviewerError::ReviewerAlreadyAssigned {
+                    username: candidate.clone(),
+                })
+            } else {
+                None
+            }
+        };
+
+        if let Some(error_reason) = reason {
+            candidates.push(Err(error_reason));
+        } else {
+            candidates.push(Ok(candidate));
         }
     }
-    if candidates.is_empty() {
-        let initial = names.iter().cloned().collect();
-        if filtered.is_empty() {
-            Err(FindReviewerError::NoReviewer { initial })
+    assert_eq!(candidates.len(), expanded_count);
+
+    let valid_candidates: HashSet<String> = candidates
+        .iter()
+        .filter_map(|res| res.as_ref().ok().cloned())
+        .collect();
+
+    if valid_candidates.is_empty() {
+        // Was it a request for a single user, i.e. `r? @username`?
+        let is_single_user = names.len() == 1 && !expansion_happened;
+
+        // If we requested a single user for a review, we return a concrete error message
+        // describing why they couldn't be assigned.
+        if is_single_user {
+            Err(candidates
+                .pop()
+                .unwrap()
+                .expect_err("valid_candidates is empty, so this should be an error"))
         } else {
+            // If it was a request for a team or a group, and no one is available, simply
+            // return `NoReviewer`.
             log::warn!(
-                "[#{}] Initial list of candidates {:?}, filtered-out with reasons: {:?}",
-                issue.number,
-                initial,
-                filtered_debug
+                "No valid candidates found for review request on {}. Reasons: {:?}",
+                issue.global_id(),
+                candidates
             );
-            Err(FindReviewerError::AllReviewersFiltered { initial, filtered })
+            Err(FindReviewerError::NoReviewer {
+                initial: names.to_vec(),
+            })
         }
     } else {
-        Ok(candidates)
+        Ok(valid_candidates)
     }
 }
