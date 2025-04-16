@@ -520,19 +520,6 @@ pub(super) async fn handle_command(
             }
         };
 
-        // Allow users on vacation to assign themselves to a PR, but not anyone else.
-        if config.is_on_vacation(&assignee) && !is_self_assign(&assignee, &event.user().login) {
-            // This is a comment, so there must already be a reviewer assigned. No need to assign anyone else.
-            issue
-                .post_comment(&ctx.github, &on_vacation_warning(&assignee))
-                .await?;
-            return Ok(());
-        }
-        // Do not assign PR author
-        if issue.user.login.to_lowercase() == assignee.to_lowercase() {
-            return Ok(());
-        }
-
         set_assignee(issue, &ctx.github, &assignee).await;
     } else {
         let e = EditIssueBody::new(&issue, "ASSIGN");
