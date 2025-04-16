@@ -475,6 +475,8 @@ pub(super) async fn handle_command(
             return Ok(());
         }
 
+        let teams = crate::team_data::teams(&ctx.github).await?;
+
         let assignee = match cmd {
             AssignCommand::Claim => event.user().login.clone(),
             AssignCommand::AssignUser { username } => username,
@@ -485,46 +487,39 @@ pub(super) async fn handle_command(
                 );
                 return Ok(());
             }
-            AssignCommand::RequestReview { name } => name,
+            AssignCommand::RequestReview { name } => {
+                // Determine if assignee is a team. If yes, add the corresponding GH label.
+                if let Some(team_name) = get_team_name(&teams, &issue, &name) {
+                    let t_label = format!("T-{team_name}");
+                    if let Err(err) = issue
+                        .add_labels(&ctx.github, vec![github::Label { name: t_label }])
+                        .await
+                    {
+                        if let Some(github::UnknownLabels { .. }) = err.downcast_ref() {
+                            log::warn!("Error assigning label: {}", err);
+                        } else {
+                            return Err(err);
+                        }
+                    }
+                }
+                name
+            }
         };
 
         let db_client = ctx.db.get().await;
-
-        let assignee = if is_self_assign(&assignee, &event.user().login) {
-            assignee
-        } else {
-            let teams = crate::team_data::teams(&ctx.github).await?;
-            // remove "t-" or "T-" prefixes before checking if it's a team name
-            let team_name = assignee.trim_start_matches("t-").trim_start_matches("T-");
-            // Determine if assignee is a team. If yes, add the corresponding GH label.
-            if teams.teams.get(team_name).is_some() {
-                let t_label = format!("T-{}", &team_name);
-                if let Err(err) = issue
-                    .add_labels(&ctx.github, vec![github::Label { name: t_label }])
-                    .await
-                {
-                    if let Some(github::UnknownLabels { .. }) = err.downcast_ref() {
-                        log::warn!("Error assigning label: {}", err);
-                    } else {
-                        return Err(err);
-                    }
-                }
-            }
-
-            match find_reviewer_from_names(
-                &db_client,
-                &teams,
-                config,
-                issue,
-                &[team_name.to_string()],
-            )
-            .await
-            {
-                Ok(assignee) => assignee,
-                Err(e) => {
-                    issue.post_comment(&ctx.github, &e.to_string()).await?;
-                    return Ok(());
-                }
+        let assignee = match find_reviewer_from_names(
+            &db_client,
+            &teams,
+            config,
+            issue,
+            &[assignee.to_string()],
+        )
+        .await
+        {
+            Ok(assignee) => assignee,
+            Err(e) => {
+                issue.post_comment(&ctx.github, &e.to_string()).await?;
+                return Ok(());
             }
         };
 
@@ -616,6 +611,23 @@ pub(super) async fn handle_command(
     }
 
     Ok(())
+}
+
+/// Returns `Some(team_name)` if `name` corresponds to a name of a team.
+fn get_team_name<'a>(teams: &Teams, issue: &Issue, name: &'a str) -> Option<&'a str> {
+    // Strip organization prefix
+    let team_name = if let Some(repo) = issue.repository.get() {
+        // @ is optional, so it is trimmed separately
+        // both @rust-lang/compiler and rust-lang/compiler should work
+        name.trim_start_matches("@")
+            .trim_start_matches(&format!("{}/", repo.organization))
+    } else {
+        name
+    };
+
+    // Remove "t-" or "T-" prefixes before checking if it's a team name
+    let team_name = team_name.trim_start_matches("t-").trim_start_matches("T-");
+    teams.teams.get(team_name).map(|_| team_name)
 }
 
 #[derive(PartialEq, Debug)]
