@@ -219,7 +219,7 @@ pub(super) async fn handle_input(
 fn find_assign_command(ctx: &Context, event: &IssuesEvent) -> Option<String> {
     let mut input = Input::new(&event.issue.body, vec![&ctx.username]);
     input.find_map(|command| match command {
-        Command::Assign(Ok(AssignCommand::ReviewName { name })) => Some(name),
+        Command::Assign(Ok(AssignCommand::RequestReview { name })) => Some(name),
         _ => None,
     })
 }
@@ -476,8 +476,8 @@ pub(super) async fn handle_command(
         }
 
         let requested_name = match cmd {
-            AssignCommand::Own => event.user().login.clone(),
-            AssignCommand::User { username } => {
+            AssignCommand::Claim => event.user().login.clone(),
+            AssignCommand::AssignUser { username } => {
                 // Allow users on vacation to assign themselves to a PR, but not anyone else.
                 if config.is_on_vacation(&username)
                     && event.user().login.to_lowercase() != username.to_lowercase()
@@ -490,14 +490,14 @@ pub(super) async fn handle_command(
                 }
                 username
             }
-            AssignCommand::Release => {
+            AssignCommand::ReleaseAssignment => {
                 log::trace!(
                     "ignoring release on PR {:?}, must always have assignee",
                     issue.global_id()
                 );
                 return Ok(());
             }
-            AssignCommand::ReviewName { name } => {
+            AssignCommand::RequestReview { name } => {
                 if config.owners.is_empty() {
                     // To avoid conflicts with the highfive bot while transitioning,
                     // r? is ignored if `owners` is not configured in triagebot.toml.
@@ -554,14 +554,14 @@ pub(super) async fn handle_command(
     let e = EditIssueBody::new(&issue, "ASSIGN");
 
     let to_assign = match cmd {
-        AssignCommand::Own => event.user().login.clone(),
-        AssignCommand::User { username } => {
+        AssignCommand::Claim => event.user().login.clone(),
+        AssignCommand::AssignUser { username } => {
             if !is_team_member && username != event.user().login {
                 bail!("Only Rust team members can assign other users");
             }
             username.clone()
         }
-        AssignCommand::Release => {
+        AssignCommand::ReleaseAssignment => {
             if let Some(AssignData {
                 user: Some(current),
             }) = e.current_data()
@@ -588,7 +588,7 @@ pub(super) async fn handle_command(
                 }
             };
         }
-        AssignCommand::ReviewName { .. } => bail!("r? is only allowed on PRs."),
+        AssignCommand::RequestReview { .. } => bail!("r? is only allowed on PRs."),
     };
     // Don't re-assign if aleady assigned, e.g. on comment edit
     if issue.contain_assignee(&to_assign) {
