@@ -475,21 +475,9 @@ pub(super) async fn handle_command(
             return Ok(());
         }
 
-        let requested_name = match cmd {
+        let assignee = match cmd {
             AssignCommand::Claim => event.user().login.clone(),
-            AssignCommand::AssignUser { username } => {
-                // Allow users on vacation to assign themselves to a PR, but not anyone else.
-                if config.is_on_vacation(&username)
-                    && event.user().login.to_lowercase() != username.to_lowercase()
-                {
-                    // This is a comment, so there must already be a reviewer assigned. No need to assign anyone else.
-                    issue
-                        .post_comment(&ctx.github, &on_vacation_warning(&username))
-                        .await?;
-                    return Ok(());
-                }
-                username
-            }
+            AssignCommand::AssignUser { username } => username,
             AssignCommand::ReleaseAssignment => {
                 log::trace!(
                     "ignoring release on PR {:?}, must always have assignee",
@@ -497,49 +485,63 @@ pub(super) async fn handle_command(
                 );
                 return Ok(());
             }
-            AssignCommand::RequestReview { name } => {
-                let db_client = ctx.db.get().await;
-                if is_self_assign(&name, &event.user().login) {
-                    name.to_string()
-                } else {
-                    let teams = crate::team_data::teams(&ctx.github).await?;
-                    // remove "t-" or "T-" prefixes before checking if it's a team name
-                    let team_name = name.trim_start_matches("t-").trim_start_matches("T-");
-                    // Determine if assignee is a team. If yes, add the corresponding GH label.
-                    if teams.teams.get(team_name).is_some() {
-                        let t_label = format!("T-{}", &team_name);
-                        if let Err(err) = issue
-                            .add_labels(&ctx.github, vec![github::Label { name: t_label }])
-                            .await
-                        {
-                            if let Some(github::UnknownLabels { .. }) = err.downcast_ref() {
-                                log::warn!("Error assigning label: {}", err);
-                            } else {
-                                return Err(err);
-                            }
-                        }
-                    }
+            AssignCommand::RequestReview { name } => name,
+        };
 
-                    match find_reviewer_from_names(
-                        &db_client,
-                        &teams,
-                        config,
-                        issue,
-                        &[team_name.to_string()],
-                    )
+        let db_client = ctx.db.get().await;
+
+        let assignee = if is_self_assign(&assignee, &event.user().login) {
+            assignee
+        } else {
+            let teams = crate::team_data::teams(&ctx.github).await?;
+            // remove "t-" or "T-" prefixes before checking if it's a team name
+            let team_name = assignee.trim_start_matches("t-").trim_start_matches("T-");
+            // Determine if assignee is a team. If yes, add the corresponding GH label.
+            if teams.teams.get(team_name).is_some() {
+                let t_label = format!("T-{}", &team_name);
+                if let Err(err) = issue
+                    .add_labels(&ctx.github, vec![github::Label { name: t_label }])
                     .await
-                    {
-                        Ok(assignee) => assignee,
-                        Err(e) => {
-                            issue.post_comment(&ctx.github, &e.to_string()).await?;
-                            return Ok(());
-                        }
+                {
+                    if let Some(github::UnknownLabels { .. }) = err.downcast_ref() {
+                        log::warn!("Error assigning label: {}", err);
+                    } else {
+                        return Err(err);
                     }
+                }
+            }
+
+            match find_reviewer_from_names(
+                &db_client,
+                &teams,
+                config,
+                issue,
+                &[team_name.to_string()],
+            )
+            .await
+            {
+                Ok(assignee) => assignee,
+                Err(e) => {
+                    issue.post_comment(&ctx.github, &e.to_string()).await?;
+                    return Ok(());
                 }
             }
         };
 
-        set_assignee(issue, &ctx.github, &requested_name).await;
+        // Allow users on vacation to assign themselves to a PR, but not anyone else.
+        if config.is_on_vacation(&assignee) && !is_self_assign(&assignee, &event.user().login) {
+            // This is a comment, so there must already be a reviewer assigned. No need to assign anyone else.
+            issue
+                .post_comment(&ctx.github, &on_vacation_warning(&assignee))
+                .await?;
+            return Ok(());
+        }
+        // Do not assign PR author
+        if issue.user.login.to_lowercase() == assignee.to_lowercase() {
+            return Ok(());
+        }
+
+        set_assignee(issue, &ctx.github, &assignee).await;
     } else {
         let e = EditIssueBody::new(&issue, "ASSIGN");
 
