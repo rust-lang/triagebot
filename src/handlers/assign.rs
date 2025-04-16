@@ -539,82 +539,78 @@ pub(super) async fn handle_command(
             }
         };
 
-        // This user is validated and can accept the PR
         set_assignee(issue, &ctx.github, &requested_name).await;
-        // This PR will now be registered in the reviewer's work queue
-        // by the `pr_tracking` handler
-        return Ok(());
-    }
+    } else {
+        let e = EditIssueBody::new(&issue, "ASSIGN");
 
-    let e = EditIssueBody::new(&issue, "ASSIGN");
-
-    let to_assign = match cmd {
-        AssignCommand::Claim => event.user().login.clone(),
-        AssignCommand::AssignUser { username } => {
-            if !is_team_member && username != event.user().login {
-                bail!("Only Rust team members can assign other users");
+        let to_assign = match cmd {
+            AssignCommand::Claim => event.user().login.clone(),
+            AssignCommand::AssignUser { username } => {
+                if !is_team_member && username != event.user().login {
+                    bail!("Only Rust team members can assign other users");
+                }
+                username.clone()
             }
-            username.clone()
-        }
-        AssignCommand::ReleaseAssignment => {
-            if let Some(AssignData {
-                user: Some(current),
-            }) = e.current_data()
-            {
-                if current == event.user().login || is_team_member {
-                    issue.remove_assignees(&ctx.github, Selection::All).await?;
-                    e.apply(&ctx.github, String::new(), AssignData { user: None })
-                        .await?;
-                    return Ok(());
+            AssignCommand::ReleaseAssignment => {
+                if let Some(AssignData {
+                    user: Some(current),
+                }) = e.current_data()
+                {
+                    if current == event.user().login || is_team_member {
+                        issue.remove_assignees(&ctx.github, Selection::All).await?;
+                        e.apply(&ctx.github, String::new(), AssignData { user: None })
+                            .await?;
+                        return Ok(());
+                    } else {
+                        bail!("Cannot release another user's assignment");
+                    }
                 } else {
-                    bail!("Cannot release another user's assignment");
-                }
-            } else {
-                let current = &event.user().login;
-                if issue.contain_assignee(current) {
-                    issue
-                        .remove_assignees(&ctx.github, Selection::One(&current))
-                        .await?;
-                    e.apply(&ctx.github, String::new(), AssignData { user: None })
-                        .await?;
-                    return Ok(());
-                } else {
-                    bail!("Cannot release unassigned issue");
-                }
-            };
-        }
-        AssignCommand::RequestReview { .. } => bail!("r? is only allowed on PRs."),
-    };
-    // Don't re-assign if aleady assigned, e.g. on comment edit
-    if issue.contain_assignee(&to_assign) {
-        log::trace!(
-            "ignoring assign issue {} to {}, already assigned",
-            issue.global_id(),
-            to_assign,
-        );
-        return Ok(());
-    }
-    let data = AssignData {
-        user: Some(to_assign.clone()),
-    };
-
-    e.apply(&ctx.github, String::new(), &data).await?;
-
-    match issue.set_assignee(&ctx.github, &to_assign).await {
-        Ok(()) => return Ok(()), // we are done
-        Err(github::AssignmentError::InvalidAssignee) => {
-            issue
-                .set_assignee(&ctx.github, &ctx.username)
-                .await
-                .context("self-assignment failed")?;
-            let cmt_body = format!(
-                "This issue has been assigned to @{} via [this comment]({}).",
+                    let current = &event.user().login;
+                    if issue.contain_assignee(current) {
+                        issue
+                            .remove_assignees(&ctx.github, Selection::One(&current))
+                            .await?;
+                        e.apply(&ctx.github, String::new(), AssignData { user: None })
+                            .await?;
+                        return Ok(());
+                    } else {
+                        bail!("Cannot release unassigned issue");
+                    }
+                };
+            }
+            AssignCommand::RequestReview { .. } => bail!("r? is only allowed on PRs."),
+        };
+        // Don't re-assign if aleady assigned, e.g. on comment edit
+        if issue.contain_assignee(&to_assign) {
+            log::trace!(
+                "ignoring assign issue {} to {}, already assigned",
+                issue.global_id(),
                 to_assign,
-                event.html_url().unwrap()
             );
-            e.apply(&ctx.github, cmt_body, &data).await?;
+            return Ok(());
         }
-        Err(e) => return Err(e.into()),
+        let data = AssignData {
+            user: Some(to_assign.clone()),
+        };
+
+        e.apply(&ctx.github, String::new(), &data).await?;
+
+        match issue.set_assignee(&ctx.github, &to_assign).await {
+            Ok(()) => return Ok(()), // we are done
+            Err(github::AssignmentError::InvalidAssignee) => {
+                issue
+                    .set_assignee(&ctx.github, &ctx.username)
+                    .await
+                    .context("self-assignment failed")?;
+                let cmt_body = format!(
+                    "This issue has been assigned to @{} via [this comment]({}).",
+                    to_assign,
+                    event.html_url().unwrap()
+                );
+                e.apply(&ctx.github, cmt_body, &data).await?;
+            }
+            Err(e) => return Err(e.into()),
+        }
     }
 
     Ok(())
