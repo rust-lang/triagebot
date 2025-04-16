@@ -282,9 +282,6 @@ async fn determine_assignee(
     let db_client = ctx.db.get().await;
     let teams = crate::team_data::teams(&ctx.github).await?;
     if let Some(name) = find_assign_command(ctx, event) {
-        if is_self_assign(&name, &event.issue.user.login) {
-            return Ok((Some(name.to_string()), true));
-        }
         // User included `r?` in the opening PR body.
         match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &[name]).await {
             Ok(assignee) => return Ok((Some(assignee), true)),
@@ -739,6 +736,13 @@ async fn find_reviewer_from_names(
     issue: &Issue,
     names: &[String],
 ) -> Result<String, FindReviewerError> {
+    // Fast path for self-assign, which is always allowed.
+    if let [name] = names {
+        if is_self_assign(&name, &issue.user.login) {
+            return Ok(name.clone());
+        }
+    }
+
     let candidates = candidate_reviewers_from_names(teams, config, issue, names)?;
     // This uses a relatively primitive random choice algorithm.
     // GitHub's CODEOWNERS supports much more sophisticated options, such as:
