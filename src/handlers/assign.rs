@@ -498,11 +498,6 @@ pub(super) async fn handle_command(
                 return Ok(());
             }
             AssignCommand::RequestReview { name } => {
-                if config.owners.is_empty() {
-                    // To avoid conflicts with the highfive bot while transitioning,
-                    // r? is ignored if `owners` is not configured in triagebot.toml.
-                    return Ok(());
-                }
                 let db_client = ctx.db.get().await;
                 if is_self_assign(&name, &event.user().login) {
                     name.to_string()
