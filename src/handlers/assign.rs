@@ -70,9 +70,13 @@ Use `r?` to explicitly pick a reviewer";
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
     "@{author}: no appropriate reviewer found, use `r?` to override";
 
-const ON_VACATION_WARNING: &str = "{username} is on vacation.
+fn on_vacation_warning(username: &str) -> String {
+    format!(
+        r"{username} is on vacation.
 
-Please choose another assignee.";
+Please choose another assignee."
+    )
+}
 
 pub const SELF_ASSIGN_HAS_NO_CAPACITY: &str = "
 You have insufficient capacity to be assigned the pull request at this time. PR assignment has been reverted.
@@ -215,7 +219,7 @@ pub(super) async fn handle_input(
 fn find_assign_command(ctx: &Context, event: &IssuesEvent) -> Option<String> {
     let mut input = Input::new(&event.issue.body, vec![&ctx.username]);
     input.find_map(|command| match command {
-        Command::Assign(Ok(AssignCommand::ReviewName { name })) => Some(name),
+        Command::Assign(Ok(AssignCommand::RequestReview { name })) => Some(name),
         _ => None,
     })
 }
@@ -458,68 +462,49 @@ pub(super) async fn handle_command(
                 .await?;
             return Ok(());
         }
-        let username = match cmd {
-            AssignCommand::Own => event.user().login.clone(),
-            AssignCommand::User { username } => {
+        if matches!(
+            event,
+            Event::Issue(IssuesEvent {
+                action: IssuesAction::Opened,
+                ..
+            })
+        ) {
+            // Don't handle review request comments on new PRs. Those will be
+            // handled by the new PR trigger (which also handles the
+            // welcome message).
+            return Ok(());
+        }
+
+        let requested_name = match cmd {
+            AssignCommand::Claim => event.user().login.clone(),
+            AssignCommand::AssignUser { username } => {
                 // Allow users on vacation to assign themselves to a PR, but not anyone else.
                 if config.is_on_vacation(&username)
                     && event.user().login.to_lowercase() != username.to_lowercase()
                 {
                     // This is a comment, so there must already be a reviewer assigned. No need to assign anyone else.
                     issue
-                        .post_comment(
-                            &ctx.github,
-                            &ON_VACATION_WARNING.replace("{username}", &username),
-                        )
+                        .post_comment(&ctx.github, &on_vacation_warning(&username))
                         .await?;
                     return Ok(());
                 }
                 username
             }
-            AssignCommand::Release => {
+            AssignCommand::ReleaseAssignment => {
                 log::trace!(
                     "ignoring release on PR {:?}, must always have assignee",
                     issue.global_id()
                 );
                 return Ok(());
             }
-            AssignCommand::ReviewName { name } => {
+            AssignCommand::RequestReview { name } => {
                 if config.owners.is_empty() {
                     // To avoid conflicts with the highfive bot while transitioning,
                     // r? is ignored if `owners` is not configured in triagebot.toml.
                     return Ok(());
                 }
-                if matches!(
-                    event,
-                    Event::Issue(IssuesEvent {
-                        action: IssuesAction::Opened,
-                        ..
-                    })
-                ) {
-                    // Don't handle r? comments on new PRs. Those will be
-                    // handled by the new PR trigger (which also handles the
-                    // welcome message).
-                    return Ok(());
-                }
                 let db_client = ctx.db.get().await;
                 if is_self_assign(&name, &event.user().login) {
-                    // let work_queue = has_user_capacity(&db_client, &name).await;
-                    // if work_queue.is_err() {
-                    //     // NOTE: disabled for now, just log
-                    //     log::warn!(
-                    //         "[#{}] PR self-assign failed, DB reported that user {} has no review capacity. Ignoring.",
-                    //         issue.number,
-                    //         name
-                    //     );
-                    //     // issue
-                    //     //     .post_comment(
-                    //     //         &ctx.github,
-                    //     //         &REVIEWER_HAS_NO_CAPACITY.replace("{username}", &name),
-                    //     //     )
-                    //     //     .await?;
-                    //     // return Ok(());
-                    // }
-
                     name.to_string()
                 } else {
                     let teams = crate::team_data::teams(&ctx.github).await?;
@@ -560,7 +545,7 @@ pub(super) async fn handle_command(
         };
 
         // This user is validated and can accept the PR
-        set_assignee(issue, &ctx.github, &username).await;
+        set_assignee(issue, &ctx.github, &requested_name).await;
         // This PR will now be registered in the reviewer's work queue
         // by the `pr_tracking` handler
         return Ok(());
@@ -569,14 +554,14 @@ pub(super) async fn handle_command(
     let e = EditIssueBody::new(&issue, "ASSIGN");
 
     let to_assign = match cmd {
-        AssignCommand::Own => event.user().login.clone(),
-        AssignCommand::User { username } => {
+        AssignCommand::Claim => event.user().login.clone(),
+        AssignCommand::AssignUser { username } => {
             if !is_team_member && username != event.user().login {
                 bail!("Only Rust team members can assign other users");
             }
             username.clone()
         }
-        AssignCommand::Release => {
+        AssignCommand::ReleaseAssignment => {
             if let Some(AssignData {
                 user: Some(current),
             }) = e.current_data()
@@ -603,7 +588,7 @@ pub(super) async fn handle_command(
                 }
             };
         }
-        AssignCommand::ReviewName { .. } => bail!("r? is only allowed on PRs."),
+        AssignCommand::RequestReview { .. } => bail!("r? is only allowed on PRs."),
     };
     // Don't re-assign if aleady assigned, e.g. on comment edit
     if issue.contain_assignee(&to_assign) {
@@ -620,7 +605,6 @@ pub(super) async fn handle_command(
 
     e.apply(&ctx.github, String::new(), &data).await?;
 
-    // Assign the PR: user's work queue has been checked and can accept this PR
     match issue.set_assignee(&ctx.github, &to_assign).await {
         Ok(()) => return Ok(()), // we are done
         Err(github::AssignmentError::InvalidAssignee) => {
@@ -718,7 +702,7 @@ impl fmt::Display for FindReviewerError {
                 write!(f, "{}", NO_REVIEWER_HAS_CAPACITY)
             }
             FindReviewerError::ReviewerOnVacation { username } => {
-                write!(f, "{}", ON_VACATION_WARNING.replace("{username}", username))
+                write!(f, "{}", on_vacation_warning(username))
             }
             FindReviewerError::ReviewerIsPrAuthor { username } => {
                 write!(

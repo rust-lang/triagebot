@@ -14,10 +14,14 @@ use std::fmt;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum AssignCommand {
-    Own,
-    Release,
-    User { username: String },
-    ReviewName { name: String },
+    /// Corresponds to `@bot claim`.
+    Claim,
+    /// Corresponds to `@bot release-assignment`.
+    ReleaseAssignment,
+    /// Corresponds to `@bot assign @user`.
+    AssignUser { username: String },
+    /// Corresponds to `r? [@]user`.
+    RequestReview { name: String },
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -47,7 +51,7 @@ impl AssignCommand {
             if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
                 *input = toks;
-                return Ok(Some(AssignCommand::Own));
+                return Ok(Some(AssignCommand::Claim));
             } else {
                 return Err(toks.error(ParseError::ExpectedEnd));
             }
@@ -55,7 +59,7 @@ impl AssignCommand {
             toks.next_token()?;
             if let Some(Token::Word(user)) = toks.next_token()? {
                 if user.starts_with('@') && user.len() != 1 {
-                    Ok(Some(AssignCommand::User {
+                    Ok(Some(AssignCommand::AssignUser {
                         username: user[1..].to_owned(),
                     }))
                 } else {
@@ -69,7 +73,7 @@ impl AssignCommand {
             if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
                 *input = toks;
-                return Ok(Some(AssignCommand::Release));
+                return Ok(Some(AssignCommand::ReleaseAssignment));
             } else {
                 return Err(toks.error(ParseError::ExpectedEnd));
             }
@@ -86,7 +90,7 @@ impl AssignCommand {
                 if name.is_empty() {
                     return Err(input.error(ParseError::NoUser));
                 }
-                Ok(Some(AssignCommand::ReviewName { name }))
+                Ok(Some(AssignCommand::RequestReview { name }))
             }
             _ => Err(input.error(ParseError::NoUser)),
         }
@@ -104,19 +108,19 @@ mod tests {
 
     #[test]
     fn test_1() {
-        assert_eq!(parse("claim."), Ok(Some(AssignCommand::Own)),);
+        assert_eq!(parse("claim."), Ok(Some(AssignCommand::Claim)),);
     }
 
     #[test]
     fn test_2() {
-        assert_eq!(parse("claim"), Ok(Some(AssignCommand::Own)),);
+        assert_eq!(parse("claim"), Ok(Some(AssignCommand::Claim)),);
     }
 
     #[test]
     fn test_3() {
         assert_eq!(
             parse("assign @user"),
-            Ok(Some(AssignCommand::User {
+            Ok(Some(AssignCommand::AssignUser {
                 username: "user".to_owned()
             })),
         );
@@ -154,7 +158,7 @@ mod tests {
         ] {
             assert_eq!(
                 parse_review(input),
-                Ok(Some(AssignCommand::ReviewName {
+                Ok(Some(AssignCommand::RequestReview {
                     name: name.to_string()
                 })),
                 "failed on {input}"

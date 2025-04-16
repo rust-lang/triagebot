@@ -322,7 +322,7 @@ fn review_commands() {
         let mut input = Input::new(input, vec!["bot"]);
         assert_eq!(
             input.next(),
-            Some(Command::Assign(Ok(assign::AssignCommand::ReviewName {
+            Some(Command::Assign(Ok(assign::AssignCommand::RequestReview {
                 name: name.to_string()
             })))
         );

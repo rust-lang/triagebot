@@ -308,7 +308,7 @@ macro_rules! command_handlers {
                     // case, just ignore it.
                     if commands
                         .iter()
-                        .all(|cmd| matches!(cmd, Command::Assign(Ok(AssignCommand::ReviewName { .. }))))
+                        .all(|cmd| matches!(cmd, Command::Assign(Ok(AssignCommand::RequestReview { .. }))))
                     {
                         return;
                     }
