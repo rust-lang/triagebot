@@ -760,26 +760,6 @@ async fn find_reviewer_from_names(
         return Ok("ghost".to_string());
     }
 
-    // filter out team members without capacity
-    // let filtered_candidates = filter_by_capacity(db, &candidates)
-    //     .await
-    //     .expect("Error while filtering out team members");
-    //
-    // if filtered_candidates.is_empty() {
-    //     // NOTE: disabled for now, just log
-    //     log::info!("[#{}] Filtered list of PR assignee is empty", issue.number);
-    //     // return Err(FindReviewerError::AllReviewersFiltered {
-    //     //     initial: names.to_vec(),
-    //     //     filtered: names.to_vec(),
-    //     // });
-    // }
-    //
-    // log::info!(
-    //     "[#{}] Filtered list of candidates: {:?}",
-    //     issue.number,
-    //     filtered_candidates
-    // );
-
     // Return unfiltered list of candidates
     Ok(candidates
         .into_iter()
