@@ -10,6 +10,7 @@
 
 use crate::{
     config::RelabelConfig,
+    github::UnknownLabels,
     github::{self, Event, GithubClient},
     handlers::Context,
     interactions::ErrorComment,
@@ -71,6 +72,14 @@ pub(super) async fn handle_command(
             event.issue().unwrap().global_id(),
             e
         );
+        if let Some(err @ UnknownLabels { .. }) = e.downcast_ref() {
+            event
+                .issue()
+                .unwrap()
+                .post_comment(&ctx.github, &err.to_string())
+                .await?;
+        }
+
         return Err(e);
     }
 
