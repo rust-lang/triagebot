@@ -301,11 +301,11 @@ async fn workqueue_commands(
                     if words.next().is_some() {
                         anyhow::bail!("Too many parameters.");
                     }
-                    if value == "none" {
+                    if value == "unlimited" {
                         None
                     } else {
                         Some(value.parse::<u32>().context(
-                            "Wrong parameter format. Must be a positive integer or `none` to unset the limit.",
+                            "Wrong parameter format. Must be a positive integer or `unlimited` to unset the limit.",
                         )?)
                     }
                 }
