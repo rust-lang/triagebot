@@ -476,6 +476,15 @@ pub(super) async fn handle_command(
             }
         };
 
+        // In the PR body, `r? ghost` means "do not assign anybody".
+        // When you send `r? ghost` in a PR comment, it should mean "unassign the current assignee".
+        // Only allow this for the PR author (usually when they forget to do `r? ghost` in the PR
+        // body), otherwise anyone could remove assignees from any PR.
+        if assignee == GHOST_ACCOUNT && issue.user.login == event.user().login {
+            issue.remove_assignees(&ctx.github, Selection::All).await?;
+            return Ok(());
+        }
+
         let db_client = ctx.db.get().await;
         let assignee = match find_reviewer_from_names(
             &db_client,
