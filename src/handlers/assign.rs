@@ -696,11 +696,6 @@ async fn find_reviewer_from_names(
         candidates
     );
 
-    // Special case user "ghost", we always skip filtering
-    if candidates.contains(GHOST_ACCOUNT) {
-        return Ok(GHOST_ACCOUNT.to_string());
-    }
-
     // Return unfiltered list of candidates
     Ok(candidates
         .into_iter()
