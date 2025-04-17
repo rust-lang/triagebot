@@ -87,6 +87,9 @@ const REVIEWER_ALREADY_ASSIGNED: &str =
 
 Please choose another assignee.";
 
+// Special account that we use to prevent assignment.
+const GHOST_ACCOUNT: &str = "ghost";
+
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct AssignData {
     user: Option<String>,
@@ -132,7 +135,7 @@ pub(super) async fn handle_input(
     // Don't auto-assign or welcome if the user manually set the assignee when opening.
     if event.issue.assignees.is_empty() {
         let (assignee, from_comment) = determine_assignee(ctx, event, config, &diff).await?;
-        if assignee.as_deref() == Some("ghost") {
+        if assignee.as_deref() == Some(GHOST_ACCOUNT) {
             // "ghost" is GitHub's placeholder account for deleted accounts.
             // It is used here as a convenient way to prevent assignment. This
             // is typically used for rollups or experiments where you don't
@@ -694,8 +697,8 @@ async fn find_reviewer_from_names(
     );
 
     // Special case user "ghost", we always skip filtering
-    if candidates.contains("ghost") {
-        return Ok("ghost".to_string());
+    if candidates.contains(GHOST_ACCOUNT) {
+        return Ok(GHOST_ACCOUNT.to_string());
     }
 
     // Return unfiltered list of candidates
