@@ -13,6 +13,7 @@ use crate::{
 #[cfg(test)]
 use crate::github::GithubCommit;
 
+mod behind_upstream;
 mod issue_links;
 mod modified_submodule;
 mod no_mentions;
@@ -90,6 +91,19 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
         {
             warnings.push(warn.0);
             labels.extend(warn.1);
+        }
+    }
+
+    // Check if PR is behind upstream branch by a significant number of days
+    if let Some(behind_upstream) = &config.behind_upstream {
+        let age_threshold = behind_upstream
+            .days_threshold
+            .unwrap_or(behind_upstream::DEFAULT_DAYS_THRESHOLD);
+
+        if let Some(warning) =
+            behind_upstream::behind_upstream(age_threshold, event, &ctx.github, &commits).await
+        {
+            warnings.push(warning);
         }
     }
 

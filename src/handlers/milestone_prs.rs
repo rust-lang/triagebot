@@ -134,7 +134,7 @@ async fn milestone_cargo(
     let cargo_repo = gh.repository("rust-lang/cargo").await?;
     log::info!("loading cargo changes {cargo_start_hash}...{cargo_end_hash}");
     let commits = cargo_repo
-        .commits_in_range(gh, cargo_start_hash, cargo_end_hash)
+        .github_commits_in_range(gh, cargo_start_hash, cargo_end_hash)
         .await?;
 
     // For each commit, look for a message from bors that indicates which
