@@ -87,6 +87,9 @@ const REVIEWER_ALREADY_ASSIGNED: &str =
 
 Please choose another assignee.";
 
+// Special account that we use to prevent assignment.
+const GHOST_ACCOUNT: &str = "ghost";
+
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct AssignData {
     user: Option<String>,
@@ -132,7 +135,7 @@ pub(super) async fn handle_input(
     // Don't auto-assign or welcome if the user manually set the assignee when opening.
     if event.issue.assignees.is_empty() {
         let (assignee, from_comment) = determine_assignee(ctx, event, config, &diff).await?;
-        if assignee.as_deref() == Some("ghost") {
+        if assignee.as_deref() == Some(GHOST_ACCOUNT) {
             // "ghost" is GitHub's placeholder account for deleted accounts.
             // It is used here as a convenient way to prevent assignment. This
             // is typically used for rollups or experiments where you don't
@@ -473,6 +476,15 @@ pub(super) async fn handle_command(
             }
         };
 
+        // In the PR body, `r? ghost` means "do not assign anybody".
+        // When you send `r? ghost` in a PR comment, it should mean "unassign the current assignee".
+        // Only allow this for the PR author (usually when they forget to do `r? ghost` in the PR
+        // body), otherwise anyone could remove assignees from any PR.
+        if assignee == GHOST_ACCOUNT && issue.user.login == event.user().login {
+            issue.remove_assignees(&ctx.github, Selection::All).await?;
+            return Ok(());
+        }
+
         let db_client = ctx.db.get().await;
         let assignee = match find_reviewer_from_names(
             &db_client,
@@ -692,11 +704,6 @@ async fn find_reviewer_from_names(
         issue.number,
         candidates
     );
-
-    // Special case user "ghost", we always skip filtering
-    if candidates.contains("ghost") {
-        return Ok("ghost".to_string());
-    }
 
     // Return unfiltered list of candidates
     Ok(candidates
