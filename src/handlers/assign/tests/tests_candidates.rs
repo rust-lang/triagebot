@@ -1,84 +1,70 @@
 //! Tests for `candidate_reviewers_from_names`
 
 use super::super::*;
+use crate::tests::github::{issue, user};
+
+#[must_use]
+struct TestCtx {
+    teams: Teams,
+    config: AssignConfig,
+    issue: Issue,
+}
+
+impl TestCtx {
+    fn new(config: toml::Table, issue: Issue) -> Self {
+        Self {
+            teams: Teams {
+                teams: Default::default(),
+            },
+            config: config.try_into().unwrap(),
+            issue,
+        }
+    }
+
+    fn teams(mut self, table: &toml::Table) -> Self {
+        let teams: serde_json::Value = table.clone().try_into().unwrap();
+        let mut teams_config = serde_json::json!({});
+        for (team_name, members) in teams.as_object().unwrap() {
+            let members: Vec<_> = members.as_array().unwrap().iter().map(|member| {
+                serde_json::json!({"name": member, "github": member, "github_id": 100, "is_lead": false})
+            }).collect();
+            teams_config[team_name] = serde_json::json!({
+                "name": team_name,
+                "kind": "team",
+                "members": serde_json::Value::Array(members),
+                "alumni": [],
+                "discord": [],
+                "roles": [],
+            });
+        }
+        self.teams = serde_json::value::from_value(teams_config).unwrap();
+        self
+    }
+
+    fn run(self, names: &[&str], expected: Result<&[&str], FindReviewerError>) {
+        let names: Vec<_> = names.iter().map(|n| n.to_string()).collect();
+        match (
+            candidate_reviewers_from_names(&self.teams, &self.config, &self.issue, &names),
+            expected,
+        ) {
+            (Ok(candidates), Ok(expected)) => {
+                let mut candidates: Vec<_> = candidates.into_iter().collect();
+                candidates.sort();
+                let expected: Vec<_> = expected.iter().map(|x| *x).collect();
+                assert_eq!(candidates, expected);
+            }
+            (Err(actual), Err(expected)) => {
+                assert_eq!(actual, expected)
+            }
+            (Ok(candidates), Err(_)) => panic!("expected Err, got Ok: {candidates:?}"),
+            (Err(e), Ok(_)) => panic!("expected Ok, got Err: {e}"),
+        }
+    }
+}
 
 /// Basic test function for testing `candidate_reviewers_from_names`.
-fn test_from_names(
-    teams: Option<toml::Table>,
-    config: toml::Table,
-    issue: serde_json::Value,
-    names: &[&str],
-    expected: Result<&[&str], FindReviewerError>,
-) {
-    let (teams, config, issue) = convert_simplified(teams, config, issue);
-    let names: Vec<_> = names.iter().map(|n| n.to_string()).collect();
-    match (
-        candidate_reviewers_from_names(&teams, &config, &issue, &names),
-        expected,
-    ) {
-        (Ok(candidates), Ok(expected)) => {
-            let mut candidates: Vec<_> = candidates.into_iter().collect();
-            candidates.sort();
-            let expected: Vec<_> = expected.iter().map(|x| *x).collect();
-            assert_eq!(candidates, expected);
-        }
-        (Err(actual), Err(expected)) => {
-            assert_eq!(actual, expected)
-        }
-        (Ok(candidates), Err(_)) => panic!("expected Err, got Ok: {candidates:?}"),
-        (Err(e), Ok(_)) => panic!("expected Ok, got Err: {e}"),
-    }
-}
-
-/// Convert the simplified input in preparation for `candidate_reviewers_from_names`.
-fn convert_simplified(
-    teams: Option<toml::Table>,
-    config: toml::Table,
-    issue: serde_json::Value,
-) -> (Teams, AssignConfig, Issue) {
-    // Convert the simplified team config to a real team config.
-    // This uses serde_json since it is easier to manipulate than toml.
-    let teams: serde_json::Value = match teams {
-        Some(teams) => teams.try_into().unwrap(),
-        None => serde_json::json!({}),
-    };
-    let mut teams_config = serde_json::json!({});
-    for (team_name, members) in teams.as_object().unwrap() {
-        let members: Vec<_> = members.as_array().unwrap().iter().map(|member| {
-            serde_json::json!({"name": member, "github": member, "github_id": 1, "is_lead": false})
-        }).collect();
-        teams_config[team_name] = serde_json::json!({
-            "name": team_name,
-            "kind": "team",
-            "members": serde_json::Value::Array(members),
-            "alumni": [],
-            "discord": [],
-            "roles": [],
-        });
-    }
-    let teams = serde_json::value::from_value(teams_config).unwrap();
-    let config = config.try_into().unwrap();
-    let issue = serde_json::value::from_value(issue).unwrap();
-    (teams, config, issue)
-}
-
-fn generic_issue(author: &str, repo: &str) -> serde_json::Value {
-    serde_json::json!({
-        "number": 1234,
-        "created_at": "2022-06-26T21:31:31Z",
-        "updated_at": "2022-06-26T21:31:31Z",
-        "title": "Example PR",
-        "body": "PR body",
-        "html_url": "https://github.com/rust-lang/rust/pull/1234",
-        "user": {
-            "login": author,
-            "id": 583231,
-        },
-        "labels": [],
-        "assignees": [],
-        "comments_url": format!("https://api.github.com/repos/{repo}/pull/1234/comments"),
-        "state": "open",
-    })
+fn test_candidates(config: toml::Table, issue: Issue) -> TestCtx {
+    TestCtx::new(config, issue)
 }
 
 #[test]
@@ -89,11 +75,7 @@ fn circular_groups() {
         compiler = ["other"]
         other = ["compiler"]
     );
-    let issue = generic_issue("octocat", "rust-lang/rust");
-    test_from_names(
-        None,
-        config,
-        issue,
+    test_candidates(config, issue().call()).run(
         &["compiler"],
         Err(FindReviewerError::NoReviewer {
             initial: vec!["compiler".to_string()],
@@ -110,8 +92,7 @@ fn nested_groups() {
         b = ["@nrc"]
         c = ["a", "b"]
     );
-    let issue = generic_issue("octocat", "rust-lang/rust");
-    test_from_names(None, config, issue, &["c"], Ok(&["nrc", "pnkfelix"]));
+    test_candidates(config, issue().call()).run(&["c"], Ok(&["nrc", "pnkfelix"]));
 }
 
 #[test]
@@ -121,15 +102,10 @@ fn candidate_filtered_author_only_candidate() {
         [adhoc_groups]
         compiler = ["nikomatsakis"]
     );
-    let issue = generic_issue("nikomatsakis", "rust-lang/rust");
-    test_from_names(
-        None,
-        config,
-        issue,
+    test_candidates(config, issue().author(user("nikomatsakis", 1)).call()).run(
         &["compiler"],
-        Err(FindReviewerError::AllReviewersFiltered {
+        Err(FindReviewerError::NoReviewer {
             initial: vec!["compiler".to_string()],
-            filtered: vec!["nikomatsakis".to_string()],
         }),
     );
 }
@@ -142,14 +118,8 @@ fn candidate_filtered_author() {
         compiler = ["user1", "user2", "user3", "group2"]
         group2 = ["user2", "user4"]
     );
-    let issue = generic_issue("user2", "rust-lang/rust");
-    test_from_names(
-        None,
-        config,
-        issue,
-        &["compiler"],
-        Ok(&["user1", "user3", "user4"]),
-    );
+    test_candidates(config, issue().author(user("user2", 1)).call())
+        .run(&["compiler"], Ok(&["user1", "user3", "user4"]));
 }
 
 #[test]
@@ -159,12 +129,11 @@ fn candidate_filtered_assignee() {
         [adhoc_groups]
         compiler = ["user1", "user2", "user3", "user4"]
     );
-    let mut issue = generic_issue("user2", "rust-lang/rust");
-    issue["assignees"] = serde_json::json!([
-        {"login": "user1", "id": 1},
-        {"login": "user3", "id": 3},
-    ]);
-    test_from_names(None, config, issue, &["compiler"], Ok(&["user4"]));
+    let issue = issue()
+        .author(user("user2", 2))
+        .assignees(vec![user("user1", 1), user("user3", 3)])
+        .call();
+    test_candidates(config, issue).run(&["compiler"], Ok(&["user4"]));
 }
 
 #[test]
@@ -178,11 +147,7 @@ fn groups_teams_users() {
         [adhoc_groups]
         group1 = ["user1", "rust-lang/team2"]
     );
-    let issue = generic_issue("octocat", "rust-lang/rust");
-    test_from_names(
-        Some(teams),
-        config,
-        issue,
+    test_candidates(config, issue().call()).teams(&teams).run(
         &["team1", "group1", "user3"],
         Ok(&["t-user1", "t-user2", "user1", "user3"]),
     );
@@ -196,21 +161,12 @@ fn group_team_user_precedence() {
         [adhoc_groups]
         compiler = ["user2"]
     );
-    let issue = generic_issue("octocat", "rust-lang/rust");
-    test_from_names(
-        Some(teams.clone()),
-        config.clone(),
-        issue.clone(),
-        &["compiler"],
-        Ok(&["user2"]),
-    );
-    test_from_names(
-        Some(teams.clone()),
-        config.clone(),
-        issue.clone(),
-        &["rust-lang/compiler"],
-        Ok(&["user2"]),
-    );
+    test_candidates(config.clone(), issue().call())
+        .teams(&teams)
+        .run(&["compiler"], Ok(&["user2"]));
+    test_candidates(config, issue().call())
+        .teams(&teams)
+        .run(&["rust-lang/compiler"], Ok(&["user2"]));
 }
 
 #[test]
@@ -222,30 +178,16 @@ fn what_do_slashes_mean() {
         compiler = ["user2"]
         "foo/bar" = ["foo-user"]
     );
-    let issue = generic_issue("octocat", "rust-lang-nursery/rust");
+    let issue = || issue().org("rust-lang-nursery").call();
+
     // Random slash names should work from groups.
-    test_from_names(
-        Some(teams.clone()),
-        config.clone(),
-        issue.clone(),
-        &["foo/bar"],
-        Ok(&["foo-user"]),
-    );
-    // Since this is rust-lang-nursery, it uses the rust-lang team, not the group.
-    test_from_names(
-        Some(teams.clone()),
-        config.clone(),
-        issue.clone(),
-        &["rust-lang/compiler"],
-        Ok(&["t-user1"]),
-    );
-    test_from_names(
-        Some(teams.clone()),
-        config.clone(),
-        issue.clone(),
-        &["rust-lang-nursery/compiler"],
-        Ok(&["user2"]),
-    );
+    test_candidates(config.clone(), issue())
+        .teams(&teams)
+        .run(&["foo/bar"], Ok(&["foo-user"]));
+
+    test_candidates(config, issue())
+        .teams(&teams)
+        .run(&["rust-lang-nursery/compiler"], Ok(&["user2"]));
 }
 
 #[test]
@@ -255,11 +197,7 @@ fn invalid_org_doesnt_match() {
         [adhoc_groups]
         compiler = ["user2"]
     );
-    let issue = generic_issue("octocat", "rust-lang/rust");
-    test_from_names(
-        Some(teams),
-        config,
-        issue,
+    test_candidates(config, issue().call()).teams(&teams).run(
         &["github/compiler"],
         Err(FindReviewerError::TeamNotFound(
             "github/compiler".to_string(),
@@ -271,28 +209,18 @@ fn invalid_org_doesnt_match() {
 fn vacation() {
     let teams = toml::toml!(bootstrap = ["jyn514", "Mark-Simulacrum"]);
     let config = toml::toml!(users_on_vacation = ["jyn514"]);
-    let issue = generic_issue("octocat", "rust-lang/rust");
 
-    // Test that `r? user` falls through to assigning from the team.
-    // See `determine_assignee` - ideally we would test that function directly instead of indirectly through `find_reviewer_from_names`.
-    let err_names = vec!["jyn514".into()];
-    test_from_names(
-        Some(teams.clone()),
-        config.clone(),
-        issue.clone(),
-        &["jyn514"],
-        Err(FindReviewerError::AllReviewersFiltered {
-            initial: err_names.clone(),
-            filtered: err_names,
-        }),
-    );
+    // Test that `r? user` returns a specific error about the user being on vacation.
+    test_candidates(config.clone(), issue().call())
+        .teams(&teams)
+        .run(
+            &["jyn514"],
+            Err(FindReviewerError::ReviewerOnVacation {
+                username: "jyn514".to_string(),
+            }),
+        );
 
-    // Test that `r? bootstrap` doesn't assign from users on vacation.
-    test_from_names(
-        Some(teams.clone()),
-        config.clone(),
-        issue,
-        &["bootstrap"],
-        Ok(&["Mark-Simulacrum"]),
-    );
+    test_candidates(config.clone(), issue().call())
+        .teams(&teams)
+        .run(&["bootstrap"], Ok(&["Mark-Simulacrum"]));
 }

@@ -78,27 +78,6 @@ Please choose another assignee."
     )
 }
 
-pub const SELF_ASSIGN_HAS_NO_CAPACITY: &str = "
-You have insufficient capacity to be assigned the pull request at this time. PR assignment has been reverted.
-
-Please choose another assignee or increase your assignment limit.
-
-(see [documentation](https://forge.rust-lang.org/triagebot/pr-assignment-tracking.html))";
-
-pub const REVIEWER_HAS_NO_CAPACITY: &str = "
-`{username}` has insufficient capacity to be assigned the pull request at this time. PR assignment has been reverted.
-
-Please choose another assignee.
-
-(see [documentation](https://forge.rust-lang.org/triagebot/pr-assignment-tracking.html))";
-
-const NO_REVIEWER_HAS_CAPACITY: &str = "
-Could not find a reviewer with enough capacity to be assigned at this time. This is a problem.
-
-Please contact us on [#t-infra](https://rust-lang.zulipchat.com/#narrow/stream/242791-t-infra) on Zulip.
-
-cc: @jackh726 @apiraino";
-
 const REVIEWER_IS_PR_AUTHOR: &str = "Pull request author cannot be assigned as reviewer.
 
 Please choose another assignee.";
@@ -282,9 +261,6 @@ async fn determine_assignee(
     let db_client = ctx.db.get().await;
     let teams = crate::team_data::teams(&ctx.github).await?;
     if let Some(name) = find_assign_command(ctx, event) {
-        if is_self_assign(&name, &event.issue.user.login) {
-            return Ok((Some(name.to_string()), true));
-        }
         // User included `r?` in the opening PR body.
         match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &[name]).await {
             Ok(assignee) => return Ok((Some(assignee), true)),
@@ -311,22 +287,13 @@ async fn determine_assignee(
                 ),
                 Err(
                     e @ FindReviewerError::NoReviewer { .. }
-                    | e @ FindReviewerError::AllReviewersFiltered { .. }
-                    | e @ FindReviewerError::NoReviewerHasCapacity
-                    | e @ FindReviewerError::ReviewerHasNoCapacity { .. }
                     | e @ FindReviewerError::ReviewerIsPrAuthor { .. }
-                    | e @ FindReviewerError::ReviewerAlreadyAssigned { .. },
+                    | e @ FindReviewerError::ReviewerAlreadyAssigned { .. }
+                    | e @ FindReviewerError::ReviewerOnVacation { .. },
                 ) => log::trace!(
                     "no reviewer could be determined for PR {}: {e}",
                     event.issue.global_id()
                 ),
-                Err(e @ FindReviewerError::ReviewerOnVacation { .. }) => {
-                    // TODO: post a comment on the PR if the reviewer(s) were filtered due to being on vacation
-                    log::trace!(
-                        "no reviewer could be determined for PR {}: {e}",
-                        event.issue.global_id()
-                    )
-                }
             }
         }
         // If no owners matched the diff, fall-through.
@@ -475,21 +442,11 @@ pub(super) async fn handle_command(
             return Ok(());
         }
 
-        let requested_name = match cmd {
+        let teams = crate::team_data::teams(&ctx.github).await?;
+
+        let assignee = match cmd {
             AssignCommand::Claim => event.user().login.clone(),
-            AssignCommand::AssignUser { username } => {
-                // Allow users on vacation to assign themselves to a PR, but not anyone else.
-                if config.is_on_vacation(&username)
-                    && event.user().login.to_lowercase() != username.to_lowercase()
-                {
-                    // This is a comment, so there must already be a reviewer assigned. No need to assign anyone else.
-                    issue
-                        .post_comment(&ctx.github, &on_vacation_warning(&username))
-                        .await?;
-                    return Ok(());
-                }
-                username
-            }
+            AssignCommand::AssignUser { username } => username,
             AssignCommand::ReleaseAssignment => {
                 log::trace!(
                     "ignoring release on PR {:?}, must always have assignee",
@@ -498,126 +455,132 @@ pub(super) async fn handle_command(
                 return Ok(());
             }
             AssignCommand::RequestReview { name } => {
-                let db_client = ctx.db.get().await;
-                if is_self_assign(&name, &event.user().login) {
-                    name.to_string()
-                } else {
-                    let teams = crate::team_data::teams(&ctx.github).await?;
-                    // remove "t-" or "T-" prefixes before checking if it's a team name
-                    let team_name = name.trim_start_matches("t-").trim_start_matches("T-");
-                    // Determine if assignee is a team. If yes, add the corresponding GH label.
-                    if teams.teams.get(team_name).is_some() {
-                        let t_label = format!("T-{}", &team_name);
-                        if let Err(err) = issue
-                            .add_labels(&ctx.github, vec![github::Label { name: t_label }])
-                            .await
-                        {
-                            if let Some(github::UnknownLabels { .. }) = err.downcast_ref() {
-                                log::warn!("Error assigning label: {}", err);
-                            } else {
-                                return Err(err);
-                            }
-                        }
-                    }
-
-                    match find_reviewer_from_names(
-                        &db_client,
-                        &teams,
-                        config,
-                        issue,
-                        &[team_name.to_string()],
-                    )
-                    .await
+                // Determine if assignee is a team. If yes, add the corresponding GH label.
+                if let Some(team_name) = get_team_name(&teams, &issue, &name) {
+                    let t_label = format!("T-{team_name}");
+                    if let Err(err) = issue
+                        .add_labels(&ctx.github, vec![github::Label { name: t_label }])
+                        .await
                     {
-                        Ok(assignee) => assignee,
-                        Err(e) => {
-                            issue.post_comment(&ctx.github, &e.to_string()).await?;
-                            return Ok(());
+                        if let Some(github::UnknownLabels { .. }) = err.downcast_ref() {
+                            log::warn!("Error assigning label: {}", err);
+                        } else {
+                            return Err(err);
                         }
                     }
                 }
+                name
             }
         };
 
-        // This user is validated and can accept the PR
-        set_assignee(issue, &ctx.github, &requested_name).await;
-        // This PR will now be registered in the reviewer's work queue
-        // by the `pr_tracking` handler
-        return Ok(());
-    }
-
-    let e = EditIssueBody::new(&issue, "ASSIGN");
-
-    let to_assign = match cmd {
-        AssignCommand::Claim => event.user().login.clone(),
-        AssignCommand::AssignUser { username } => {
-            if !is_team_member && username != event.user().login {
-                bail!("Only Rust team members can assign other users");
+        let db_client = ctx.db.get().await;
+        let assignee = match find_reviewer_from_names(
+            &db_client,
+            &teams,
+            config,
+            issue,
+            &[assignee.to_string()],
+        )
+        .await
+        {
+            Ok(assignee) => assignee,
+            Err(e) => {
+                issue.post_comment(&ctx.github, &e.to_string()).await?;
+                return Ok(());
             }
-            username.clone()
-        }
-        AssignCommand::ReleaseAssignment => {
-            if let Some(AssignData {
-                user: Some(current),
-            }) = e.current_data()
-            {
-                if current == event.user().login || is_team_member {
-                    issue.remove_assignees(&ctx.github, Selection::All).await?;
-                    e.apply(&ctx.github, String::new(), AssignData { user: None })
-                        .await?;
-                    return Ok(());
-                } else {
-                    bail!("Cannot release another user's assignment");
-                }
-            } else {
-                let current = &event.user().login;
-                if issue.contain_assignee(current) {
-                    issue
-                        .remove_assignees(&ctx.github, Selection::One(&current))
-                        .await?;
-                    e.apply(&ctx.github, String::new(), AssignData { user: None })
-                        .await?;
-                    return Ok(());
-                } else {
-                    bail!("Cannot release unassigned issue");
-                }
-            };
-        }
-        AssignCommand::RequestReview { .. } => bail!("r? is only allowed on PRs."),
-    };
-    // Don't re-assign if aleady assigned, e.g. on comment edit
-    if issue.contain_assignee(&to_assign) {
-        log::trace!(
-            "ignoring assign issue {} to {}, already assigned",
-            issue.global_id(),
-            to_assign,
-        );
-        return Ok(());
-    }
-    let data = AssignData {
-        user: Some(to_assign.clone()),
-    };
+        };
 
-    e.apply(&ctx.github, String::new(), &data).await?;
+        set_assignee(issue, &ctx.github, &assignee).await;
+    } else {
+        let e = EditIssueBody::new(&issue, "ASSIGN");
 
-    match issue.set_assignee(&ctx.github, &to_assign).await {
-        Ok(()) => return Ok(()), // we are done
-        Err(github::AssignmentError::InvalidAssignee) => {
-            issue
-                .set_assignee(&ctx.github, &ctx.username)
-                .await
-                .context("self-assignment failed")?;
-            let cmt_body = format!(
-                "This issue has been assigned to @{} via [this comment]({}).",
+        let to_assign = match cmd {
+            AssignCommand::Claim => event.user().login.clone(),
+            AssignCommand::AssignUser { username } => {
+                if !is_team_member && username != event.user().login {
+                    bail!("Only Rust team members can assign other users");
+                }
+                username.clone()
+            }
+            AssignCommand::ReleaseAssignment => {
+                if let Some(AssignData {
+                    user: Some(current),
+                }) = e.current_data()
+                {
+                    if current == event.user().login || is_team_member {
+                        issue.remove_assignees(&ctx.github, Selection::All).await?;
+                        e.apply(&ctx.github, String::new(), AssignData { user: None })
+                            .await?;
+                        return Ok(());
+                    } else {
+                        bail!("Cannot release another user's assignment");
+                    }
+                } else {
+                    let current = &event.user().login;
+                    if issue.contain_assignee(current) {
+                        issue
+                            .remove_assignees(&ctx.github, Selection::One(&current))
+                            .await?;
+                        e.apply(&ctx.github, String::new(), AssignData { user: None })
+                            .await?;
+                        return Ok(());
+                    } else {
+                        bail!("Cannot release unassigned issue");
+                    }
+                };
+            }
+            AssignCommand::RequestReview { .. } => bail!("r? is only allowed on PRs."),
+        };
+        // Don't re-assign if aleady assigned, e.g. on comment edit
+        if issue.contain_assignee(&to_assign) {
+            log::trace!(
+                "ignoring assign issue {} to {}, already assigned",
+                issue.global_id(),
                 to_assign,
-                event.html_url().unwrap()
             );
-            e.apply(&ctx.github, cmt_body, &data).await?;
+            return Ok(());
         }
-        Err(e) => return Err(e.into()),
+        let data = AssignData {
+            user: Some(to_assign.clone()),
+        };
+
+        e.apply(&ctx.github, String::new(), &data).await?;
+
+        match issue.set_assignee(&ctx.github, &to_assign).await {
+            Ok(()) => return Ok(()), // we are done
+            Err(github::AssignmentError::InvalidAssignee) => {
+                issue
+                    .set_assignee(&ctx.github, &ctx.username)
+                    .await
+                    .context("self-assignment failed")?;
+                let cmt_body = format!(
+                    "This issue has been assigned to @{} via [this comment]({}).",
+                    to_assign,
+                    event.html_url().unwrap()
+                );
+                e.apply(&ctx.github, cmt_body, &data).await?;
+            }
+            Err(e) => return Err(e.into()),
+        }
     }
 
     Ok(())
+}
+
+fn strip_organization_prefix<'a>(issue: &Issue, name: &'a str) -> &'a str {
+    let repo = issue.repository();
+    // @ is optional, so it is trimmed separately
+    // both @rust-lang/compiler and rust-lang/compiler should work
+    name.trim_start_matches("@")
+        .trim_start_matches(&format!("{}/", repo.organization))
+}
+
+/// Returns `Some(team_name)` if `name` corresponds to a name of a team.
+fn get_team_name<'a>(teams: &Teams, issue: &Issue, name: &'a str) -> Option<&'a str> {
+    let team_name = strip_organization_prefix(issue, name);
+    // Remove "t-" or "T-" prefixes before checking if it's a team name
+    let team_name = team_name.trim_start_matches("t-").trim_start_matches("T-");
+    teams.teams.get(team_name).map(|_| team_name)
 }
 
 #[derive(PartialEq, Debug)]
@@ -630,20 +593,6 @@ pub enum FindReviewerError {
     /// This could happen if there is a cyclical group or other misconfiguration.
     /// `initial` is the initial list of candidate names.
     NoReviewer { initial: Vec<String> },
-    /// All potential candidates were excluded. `initial` is the list of
-    /// candidate names that were used to seed the selection. `filtered` is
-    /// the users who were prevented from being assigned. One example where
-    /// this happens is if the given name was for a team where the PR author
-    /// is the only member.
-    AllReviewersFiltered {
-        initial: Vec<String>,
-        filtered: Vec<String>,
-    },
-    /// No reviewer has capacity to accept a pull request assignment at this time
-    NoReviewerHasCapacity,
-    /// The requested reviewer has no capacity to accept a pull request
-    /// assignment at this time
-    ReviewerHasNoCapacity { username: String },
     /// Requested reviewer is on vacation
     /// (i.e. username is in [users_on_vacation] in the triagebot.toml)
     ReviewerOnVacation { username: String },
@@ -675,26 +624,6 @@ impl fmt::Display for FindReviewerError {
                      Use `r?` to specify someone else to assign.",
                     initial.join(",")
                 )
-            }
-            FindReviewerError::AllReviewersFiltered { initial, filtered } => {
-                write!(
-                    f,
-                    "Could not assign reviewer from: `{}`.\n\
-                     User(s) `{}` are either the PR author, already assigned, or on vacation. \
-                     Please use `r?` to specify someone else to assign.",
-                    initial.join(","),
-                    filtered.join(","),
-                )
-            }
-            FindReviewerError::ReviewerHasNoCapacity { username } => {
-                write!(
-                    f,
-                    "{}",
-                    REVIEWER_HAS_NO_CAPACITY.replace("{username}", username)
-                )
-            }
-            FindReviewerError::NoReviewerHasCapacity => {
-                write!(f, "{}", NO_REVIEWER_HAS_CAPACITY)
             }
             FindReviewerError::ReviewerOnVacation { username } => {
                 write!(f, "{}", on_vacation_warning(username))
@@ -730,6 +659,13 @@ async fn find_reviewer_from_names(
     issue: &Issue,
     names: &[String],
 ) -> Result<String, FindReviewerError> {
+    // Fast path for self-assign, which is always allowed.
+    if let [name] = names {
+        if is_self_assign(&name, &issue.user.login) {
+            return Ok(name.clone());
+        }
+    }
+
     let candidates = candidate_reviewers_from_names(teams, config, issue, names)?;
     // This uses a relatively primitive random choice algorithm.
     // GitHub's CODEOWNERS supports much more sophisticated options, such as:
@@ -762,26 +698,6 @@ async fn find_reviewer_from_names(
         return Ok("ghost".to_string());
     }
 
-    // filter out team members without capacity
-    // let filtered_candidates = filter_by_capacity(db, &candidates)
-    //     .await
-    //     .expect("Error while filtering out team members");
-    //
-    // if filtered_candidates.is_empty() {
-    //     // NOTE: disabled for now, just log
-    //     log::info!("[#{}] Filtered list of PR assignee is empty", issue.number);
-    //     // return Err(FindReviewerError::AllReviewersFiltered {
-    //     //     initial: names.to_vec(),
-    //     //     filtered: names.to_vec(),
-    //     // });
-    // }
-    //
-    // log::info!(
-    //     "[#{}] Filtered list of candidates: {:?}",
-    //     issue.number,
-    //     filtered_candidates
-    // );
-
     // Return unfiltered list of candidates
     Ok(candidates
         .into_iter()
@@ -790,85 +706,44 @@ async fn find_reviewer_from_names(
         .to_string())
 }
 
-/// Returns a list of candidate usernames (from relevant teams) to choose as a reviewer.
-fn candidate_reviewers_from_names<'a>(
-    teams: &'a Teams,
-    config: &'a AssignConfig,
+/// Recursively expand all teams and adhoc groups found within `names`.
+/// Returns a set of expanded usernames.
+/// Also normalizes usernames from `@user` to `user`.
+///
+/// Returns `(set of expanded users, expansion_happened)`.
+/// `expansion_happened` signals if any expansion has been performed.
+fn expand_teams_and_groups(
+    teams: &Teams,
     issue: &Issue,
-    names: &'a [String],
-) -> Result<HashSet<&'a str>, FindReviewerError> {
-    // Set of candidate usernames to choose from. This uses a set to
-    // deduplicate entries so that someone in multiple teams isn't
-    // over-weighted.
-    let mut candidates: HashSet<&str> = HashSet::new();
+    config: &AssignConfig,
+    names: &[String],
+) -> Result<(HashSet<String>, bool), FindReviewerError> {
+    let mut expanded = HashSet::new();
+    let mut expansion_happened = false;
+
     // Keep track of groups seen to avoid cycles and avoid expanding the same
     // team multiple times.
-    let mut seen = HashSet::new();
+    let mut seen_names = HashSet::new();
+
     // This is a queue of potential groups or usernames to expand. The loop
     // below will pop from this and then append the expanded results of teams.
-    // Usernames will be added to `candidates`.
-    let mut group_expansion: Vec<&str> = names.iter().map(|n| n.as_str()).collect();
-    // Keep track of which users get filtered out for a better error message.
-    let mut filtered = Vec::new();
-    // For debugging purposes, keep track about /why/ candidates were filtered out
-    let mut filtered_debug: HashMap<String, Option<FindReviewerError>> = HashMap::new();
-    let repo = issue.repository();
-    let org_prefix = format!("{}/", repo.organization);
-    // Don't allow groups or teams to include the current author or assignee.
-    let mut filter = |name: &&str| -> bool {
-        let name_lower = name.to_lowercase();
-        let is_pr_author = name_lower == issue.user.login.to_lowercase();
-        let is_on_vacation = config.is_on_vacation(name);
-        let is_already_assigned = issue
-            .assignees
-            .iter()
-            .any(|assignee| name_lower == assignee.login.to_lowercase());
+    // Usernames will be added to `expanded`.
+    let mut to_be_expanded: Vec<&str> = names.iter().map(|n| n.as_str()).collect();
 
-        // Record the reason why the candidate was filtered out
-        let reason = {
-            if is_pr_author {
-                Some(FindReviewerError::ReviewerIsPrAuthor {
-                    username: name.to_string(),
-                })
-            } else if is_on_vacation {
-                Some(FindReviewerError::ReviewerOnVacation {
-                    username: name.to_string(),
-                })
-            } else if is_already_assigned {
-                Some(FindReviewerError::ReviewerAlreadyAssigned {
-                    username: name.to_string(),
-                })
-            } else {
-                None
-            }
-        };
-
-        let can_be_assigned = !is_pr_author && !is_on_vacation && !is_already_assigned;
-        if !can_be_assigned {
-            filtered.push(name.to_string());
-            filtered_debug.insert(name.to_string(), reason);
-        }
-        can_be_assigned
-    };
-
-    // Loop over groups to recursively expand them.
-    while let Some(group_or_user) = group_expansion.pop() {
-        let group_or_user = group_or_user.strip_prefix('@').unwrap_or(group_or_user);
+    // Loop over names to recursively expand them.
+    while let Some(name_to_expand) = to_be_expanded.pop() {
+        // `name_to_expand` could be a team name, an adhoc group name or a username.
+        let maybe_team = get_team_name(teams, issue, name_to_expand);
+        let maybe_group = strip_organization_prefix(issue, name_to_expand);
+        let maybe_user = name_to_expand.strip_prefix('@').unwrap_or(name_to_expand);
 
         // Try ad-hoc groups first.
-        // Allow `rust-lang/compiler` to match `compiler`.
-        let maybe_group = group_or_user
-            .strip_prefix(&org_prefix)
-            .unwrap_or(group_or_user);
         if let Some(group_members) = config.adhoc_groups.get(maybe_group) {
+            expansion_happened = true;
+
             // If a group has already been expanded, don't expand it again.
-            if seen.insert(maybe_group) {
-                group_expansion.extend(
-                    group_members
-                        .iter()
-                        .map(|member| member.as_str())
-                        .filter(&mut filter),
-                );
+            if seen_names.insert(maybe_group) {
+                to_be_expanded.extend(group_members.iter().map(|s| s.as_str()));
             }
             continue;
         }
@@ -879,42 +754,105 @@ fn candidate_reviewers_from_names<'a>(
         // that is a real GitHub team name).
         //
         // This ignores subteam relationships (it only uses direct members).
-        let maybe_team = group_or_user
-            .strip_prefix("rust-lang/")
-            .unwrap_or(group_or_user);
-        if let Some(team) = teams.teams.get(maybe_team) {
-            candidates.extend(
-                team.members
-                    .iter()
-                    .map(|member| member.github.as_str())
-                    .filter(&mut filter),
-            );
+        if let Some(team) = maybe_team.and_then(|t| teams.teams.get(t)) {
+            expansion_happened = true;
+            expanded.extend(team.members.iter().map(|member| member.github.clone()));
             continue;
         }
 
-        if group_or_user.contains('/') {
-            return Err(FindReviewerError::TeamNotFound(group_or_user.to_string()));
+        // Here we know it's not a known team nor a group.
+        // If the username contains a slash, assume that it is an unknown team.
+        if maybe_user.contains('/') {
+            return Err(FindReviewerError::TeamNotFound(maybe_user.to_string()));
         }
 
         // Assume it is a user.
-        if filter(&group_or_user) {
-            candidates.insert(group_or_user);
+        expanded.insert(maybe_user.to_string());
+    }
+
+    Ok((expanded, expansion_happened))
+}
+
+/// Returns a list of candidate usernames (from relevant teams) to choose as a reviewer.
+/// If not reviewer is available, returns an error.
+fn candidate_reviewers_from_names<'a>(
+    teams: &'a Teams,
+    config: &'a AssignConfig,
+    issue: &Issue,
+    names: &'a [String],
+) -> Result<HashSet<String>, FindReviewerError> {
+    let (expanded, expansion_happened) = expand_teams_and_groups(teams, issue, config, names)?;
+    let expanded_count = expanded.len();
+
+    // Set of candidate usernames to choose from.
+    // We go through each expanded candidate and store either success or an error for them.
+    let mut candidates: Vec<Result<String, FindReviewerError>> = Vec::new();
+
+    for candidate in expanded {
+        let name_lower = candidate.to_lowercase();
+        let is_pr_author = name_lower == issue.user.login.to_lowercase();
+        let is_on_vacation = config.is_on_vacation(&candidate);
+        let is_already_assigned = issue
+            .assignees
+            .iter()
+            .any(|assignee| name_lower == assignee.login.to_lowercase());
+
+        // Record the reason why the candidate was filtered out
+        let reason = {
+            if is_pr_author {
+                Some(FindReviewerError::ReviewerIsPrAuthor {
+                    username: candidate.clone(),
+                })
+            } else if is_on_vacation {
+                Some(FindReviewerError::ReviewerOnVacation {
+                    username: candidate.clone(),
+                })
+            } else if is_already_assigned {
+                Some(FindReviewerError::ReviewerAlreadyAssigned {
+                    username: candidate.clone(),
+                })
+            } else {
+                None
+            }
+        };
+
+        if let Some(error_reason) = reason {
+            candidates.push(Err(error_reason));
+        } else {
+            candidates.push(Ok(candidate));
         }
     }
-    if candidates.is_empty() {
-        let initial = names.iter().cloned().collect();
-        if filtered.is_empty() {
-            Err(FindReviewerError::NoReviewer { initial })
+    assert_eq!(candidates.len(), expanded_count);
+
+    let valid_candidates: HashSet<String> = candidates
+        .iter()
+        .filter_map(|res| res.as_ref().ok().cloned())
+        .collect();
+
+    if valid_candidates.is_empty() {
+        // Was it a request for a single user, i.e. `r? @username`?
+        let is_single_user = names.len() == 1 && !expansion_happened;
+
+        // If we requested a single user for a review, we return a concrete error message
+        // describing why they couldn't be assigned.
+        if is_single_user {
+            Err(candidates
+                .pop()
+                .unwrap()
+                .expect_err("valid_candidates is empty, so this should be an error"))
         } else {
+            // If it was a request for a team or a group, and no one is available, simply
+            // return `NoReviewer`.
             log::warn!(
-                "[#{}] Initial list of candidates {:?}, filtered-out with reasons: {:?}",
-                issue.number,
-                initial,
-                filtered_debug
+                "No valid candidates found for review request on {}. Reasons: {:?}",
+                issue.global_id(),
+                candidates
             );
-            Err(FindReviewerError::AllReviewersFiltered { initial, filtered })
+            Err(FindReviewerError::NoReviewer {
+                initial: names.to_vec(),
+            })
         }
     } else {
-        Ok(candidates)
+        Ok(valid_candidates)
     }
 }

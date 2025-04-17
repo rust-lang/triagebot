@@ -24,6 +24,8 @@ pub fn issue(
     body: Option<&str>,
     assignees: Option<Vec<User>>,
     pr: Option<bool>,
+    org: Option<&str>,
+    repo: Option<&str>,
 ) -> Issue {
     let number = number.unwrap_or(1);
     let state = state.unwrap_or(IssueState::Open);
@@ -35,6 +37,8 @@ pub fn issue(
     } else {
         None
     };
+    let org = org.unwrap_or("rust-lang");
+    let repo = repo.unwrap_or("rust");
 
     Issue {
         number,
@@ -43,7 +47,7 @@ pub fn issue(
         updated_at: Utc::now(),
         merge_commit_sha: None,
         title: format!("Issue #{number}"),
-        html_url: "<html-url>".to_string(),
+        html_url: format!("https://github.com/{org}/{repo}/pull/{number}"),
         user: author,
         labels: vec![],
         assignees,
@@ -51,7 +55,8 @@ pub fn issue(
         merged: false,
         draft: false,
         comments: None,
-        comments_url: "".to_string(),
+        // The repository is parsed from comments_url, so this field is important
+        comments_url: format!("https://api.github.com/repos/{org}/{repo}/issues/{number}/comments"),
         repository: Default::default(),
         base: None,
         head: None,
