@@ -54,8 +54,7 @@ fn get_default_message<'a>(
     commits: impl IntoIterator<Item = &'a str>,
 ) -> String {
     let mut message = format!(
-        "
-The following commits have merge commits (commits with multiple parents) in your changes. \
+        "The following commits have merge commits (commits with multiple parents) in your changes. \
 We have a [no merge policy](https://rustc-dev-guide.rust-lang.org/git.html#no-merge-policy) \
 so these commits will need to be removed for this pull request to be merged.
 "
@@ -126,8 +125,7 @@ fn end_to_end() {
         ) else {
             unreachable!()
         };
-        assert_eq!(warning, "
-The following commits have merge commits (commits with multiple parents) in your changes. We have a [no merge policy](https://rustc-dev-guide.rust-lang.org/git.html#no-merge-policy) so these commits will need to be removed for this pull request to be merged.
+        assert_eq!(warning, "The following commits have merge commits (commits with multiple parents) in your changes. We have a [no merge policy](https://rustc-dev-guide.rust-lang.org/git.html#no-merge-policy) so these commits will need to be removed for this pull request to be merged.
     - 9cc6dce67c917fe5937e984f58f5003ccbb5c37e
 
     You can start a rebase with the following commands:
