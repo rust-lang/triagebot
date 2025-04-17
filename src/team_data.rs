@@ -1,6 +1,6 @@
 use crate::github::GithubClient;
 use anyhow::Context as _;
-use rust_team_data::v1::{Teams, ZulipMapping, BASE_URL};
+use rust_team_data::v1::{People, Teams, ZulipMapping, BASE_URL};
 use serde::de::DeserializeOwned;
 
 async fn by_url<T: DeserializeOwned>(client: &GithubClient, path: &str) -> anyhow::Result<T> {
@@ -35,4 +35,10 @@ pub async fn teams(client: &GithubClient) -> anyhow::Result<Teams> {
     by_url(client, "/teams.json")
         .await
         .context("team-api: teams.json")
+}
+
+pub async fn people(client: &GithubClient) -> anyhow::Result<People> {
+    by_url(client, "/people.json")
+        .await
+        .context("team-api: people.json")
 }
