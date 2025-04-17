@@ -7,12 +7,19 @@ use crate::{config::IssueLinksConfig, github::GithubCommit};
 static LINKED_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"( |^)([a-zA-Z-_]+/[a-zA-Z-_]+)?(#[0-9]+)\b").unwrap());
 
+const MERGE_IGNORE_LIST: [&str; 2] = ["Rollup merge of ", "Auto merge of "];
+
 pub(super) fn issue_links_in_commits(
     _conf: &IssueLinksConfig,
     commits: &[GithubCommit],
 ) -> Option<String> {
     let issue_links_commits = commits
         .into_iter()
+        .filter(|c| {
+            !MERGE_IGNORE_LIST
+                .iter()
+                .any(|i| c.commit.message.starts_with(i))
+        })
         .filter(|c| LINKED_RE.is_match(&c.commit.message))
         .map(|c| format!("    - {}\n", c.sha))
         .collect::<String>();
@@ -38,6 +45,17 @@ fn test_mentions_in_commits() {
         "d1992a392617dfb10518c3e56446b6c9efae38b0",
         "This is simple without issue links!",
     )];
+
+    assert_eq!(issue_links_in_commits(&config, &commits), None);
+
+    commits.push(dummy_commit_from_body(
+        "86176475acda9c775f844f5ad2470f05aebd4249",
+        "Rollup merge of #123\n\nWe ignore the issue link for Rollup merge of",
+    ));
+    commits.push(dummy_commit_from_body(
+        "8009423d53d30b56d8cf0fec08f9852329a1a9a4",
+        "Auto merge of #123\n\nWe ignore the issue link for Auto merge of",
+    ));
 
     assert_eq!(issue_links_in_commits(&config, &commits), None);
 
