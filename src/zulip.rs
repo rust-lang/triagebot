@@ -333,6 +333,9 @@ async fn workqueue_commands(
                 }
             )
         }
+        "help" => r"work show => show your assigned PRs
+work set-pr-limit <number>|unlimited => set the maximum number of PRs you can be assigned to"
+            .to_string(),
         _ => anyhow::bail!("Invalid subcommand."),
     };
 
