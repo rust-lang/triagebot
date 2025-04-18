@@ -20,6 +20,7 @@
 //! `assign.owners` config, it will auto-select an assignee based on the files
 //! the PR modifies.
 
+use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::{
     config::AssignConfig,
     github::{self, Event, FileDiff, Issue, IssuesAction, Selection},
@@ -33,6 +34,8 @@ use rand::seq::IteratorRandom;
 use rust_team_data::v1::Teams;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio_postgres::Client as DbClient;
 use tracing as log;
 
@@ -299,7 +302,16 @@ async fn determine_assignee(
     let teams = crate::team_data::teams(&ctx.github).await?;
     if let Some(name) = assign_command {
         // User included `r?` in the opening PR body.
-        match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &[name]).await {
+        match find_reviewer_from_names(
+            &db_client,
+            ctx.workqueue.clone(),
+            &teams,
+            config,
+            &event.issue,
+            &[name],
+        )
+        .await
+        {
             Ok(assignee) => return Ok((Some(assignee), true)),
             Err(e) => {
                 event
@@ -313,8 +325,15 @@ async fn determine_assignee(
     // Errors fall-through to try fallback group.
     match find_reviewers_from_diff(config, diff) {
         Ok(candidates) if !candidates.is_empty() => {
-            match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &candidates)
-                .await
+            match find_reviewer_from_names(
+                &db_client,
+                ctx.workqueue.clone(),
+                &teams,
+                config,
+                &event.issue,
+                &candidates,
+            )
+            .await
             {
                 Ok(assignee) => return Ok((Some(assignee), false)),
                 Err(FindReviewerError::TeamNotFound(team)) => log::warn!(
@@ -344,7 +363,16 @@ async fn determine_assignee(
     }
 
     if let Some(fallback) = config.adhoc_groups.get("fallback") {
-        match find_reviewer_from_names(&db_client, &teams, config, &event.issue, fallback).await {
+        match find_reviewer_from_names(
+            &db_client,
+            ctx.workqueue.clone(),
+            &teams,
+            config,
+            &event.issue,
+            fallback,
+        )
+        .await
+        {
             Ok(assignee) => return Ok((Some(assignee), false)),
             Err(e) => {
                 log::trace!(
@@ -522,6 +550,7 @@ pub(super) async fn handle_command(
         let db_client = ctx.db.get().await;
         let assignee = match find_reviewer_from_names(
             &db_client,
+            ctx.workqueue.clone(),
             &teams,
             config,
             issue,
@@ -700,6 +729,7 @@ impl fmt::Display for FindReviewerError {
 /// entry.
 async fn find_reviewer_from_names(
     _db: &DbClient,
+    workqueue: Arc<RwLock<ReviewerWorkqueue>>,
     teams: &Teams,
     config: &AssignConfig,
     issue: &Issue,
@@ -712,7 +742,7 @@ async fn find_reviewer_from_names(
         }
     }
 
-    let candidates = candidate_reviewers_from_names(teams, config, issue, names)?;
+    let candidates = candidate_reviewers_from_names(workqueue, teams, config, issue, names)?;
     // This uses a relatively primitive random choice algorithm.
     // GitHub's CODEOWNERS supports much more sophisticated options, such as:
     //
@@ -817,6 +847,7 @@ fn expand_teams_and_groups(
 /// Returns a list of candidate usernames (from relevant teams) to choose as a reviewer.
 /// If not reviewer is available, returns an error.
 fn candidate_reviewers_from_names<'a>(
+    workqueue: Arc<RwLock<ReviewerWorkqueue>>,
     teams: &'a Teams,
     config: &'a AssignConfig,
     issue: &Issue,
