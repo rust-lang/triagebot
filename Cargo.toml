@@ -17,7 +17,7 @@ hex = "0.4"
 parser = { path = "parser" }
 rust_team_data = { git = "https://github.com/rust-lang/team" }
 glob = "0.3.0"
-toml = "0.8.8"
+toml = "0.8.20"
 hyper = { version = "0.14.4", features = ["server", "stream"] }
 tokio = { version = "1.7.1", features = ["macros", "time", "rt"] }
 futures = { version = "0.3", default-features = false, features = ["std"] }
