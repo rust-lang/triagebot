@@ -428,8 +428,8 @@ fn is_scheduled_jobs_disabled() -> bool {
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() {
-    dotenv::dotenv().ok();
+async fn main() -> anyhow::Result<()> {
+    dotenvy::dotenv().ok();
     tracing_subscriber::fmt::Subscriber::builder()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .with_ansi(std::env::var_os("DISABLE_COLOR").is_none())
@@ -441,7 +441,6 @@ async fn main() {
         .map(|p| p.parse::<u16>().expect("parsed PORT"))
         .unwrap_or(8000);
     let addr = ([0, 0, 0, 0], port).into();
-    if let Err(e) = run_server(addr).await {
-        eprintln!("Failed to run server: {:?}", e);
-    }
+    run_server(addr).await.context("Failed to run the server")?;
+    Ok(())
 }

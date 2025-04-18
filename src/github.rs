@@ -7,11 +7,11 @@ use hyper::header::HeaderValue;
 use octocrab::params::pulls::Sort;
 use octocrab::params::{Direction, State};
 use octocrab::Octocrab;
-use once_cell::sync::OnceCell;
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
 use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 use std::{
     fmt,
     time::{Duration, SystemTime},
@@ -376,7 +376,7 @@ pub struct Issue {
     /// Note that this is constructed via the [`Issue::repository`] method.
     /// It is not deserialized from the GitHub API.
     #[serde(skip)]
-    pub repository: OnceCell<IssueRepository>,
+    pub repository: OnceLock<IssueRepository>,
 
     /// The base commit for a PR (the branch of the destination repo).
     #[serde(default)]
