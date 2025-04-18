@@ -245,12 +245,6 @@ async fn serve_req(
 }
 
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
-    let db_url = std::env::var("DATABASE_URL").expect("needs DATABASE_URL");
-    let pool = db::ClientPool::new(db_url.clone());
-    db::run_migrations(&mut *pool.get().await)
-        .await
-        .context("database migrations")?;
-
     let gh = github::GithubClient::new_from_env();
     let oc = octocrab::OctocrabBuilder::new()
         .personal_token(github::default_token_from_env())
@@ -274,6 +268,17 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         }
     };
     tracing::info!("Workqueue loaded");
+
+    // Only run the migrations after the workqueue has been loaded, immediately
+    // before starting the HTTP server.
+    // On AWS ECS, triagebot shortly runs in two instances at once.
+    // We thus want to minimize the time where migrations have been executed
+    // and the old instance potentially runs on an newer database schema.
+    let db_url = std::env::var("DATABASE_URL").expect("needs DATABASE_URL");
+    let pool = db::ClientPool::new(db_url.clone());
+    db::run_migrations(&mut *pool.get().await)
+        .await
+        .context("database migrations")?;
 
     let ctx = Arc::new(Context {
         username: std::env::var("TRIAGEBOT_USERNAME").or_else(|err| match err {
