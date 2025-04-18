@@ -16,7 +16,7 @@ use crate::{
 };
 
 static LINKED_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?P<start> |^)(?P<issue>#[0-9]+)\b").unwrap());
+    LazyLock::new(|| Regex::new(r"\B(?P<issue>#[0-9]+)\b").unwrap());
 
 pub(super) struct IssueLinksInput {}
 
@@ -63,7 +63,7 @@ pub(super) async fn handle_input(
 }
 
 fn fix_linked_issues<'a>(body: &'a str, full_repo_name: &str) -> Cow<'a, str> {
-    let replace_by = format!("${{start}}{full_repo_name}${{issue}}");
+    let replace_by = format!("{full_repo_name}${{issue}}");
     parser::replace_all_outside_ignore_blocks(&LINKED_RE, body, replace_by)
 }
 
@@ -114,6 +114,10 @@ fn edge_case_body() {
     assert_eq!(
         fix_linked_issues("#132", full_repo_name),
         "rust-lang/rust#132"
+    );
+    assert_eq!(
+        fix_linked_issues("(#132)", full_repo_name),
+        "(rust-lang/rust#132)"
     );
 }
 
