@@ -2871,7 +2871,6 @@ dependencies = [
  "itertools",
  "native-tls",
  "octocrab",
- "once_cell",
  "openssl",
  "parser",
  "postgres-native-tls",
