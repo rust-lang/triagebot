@@ -117,12 +117,9 @@ mod tests {
     #[tokio::test]
     async fn insert_prefs_create_user() {
         run_db_test(|ctx| async {
-            let db = ctx.db_client().await;
-
             let user = user("Martin", 1);
-            upsert_review_prefs(&db, user.clone(), Some(1)).await?;
-
-            assert_eq!(get_user(&db, user.id).await?.unwrap(), user);
+            upsert_review_prefs(&ctx.db_client(), user.clone(), Some(1)).await?;
+            assert_eq!(get_user(&ctx.db_client(), user.id).await?.unwrap(), user);
 
             Ok(ctx)
         })
@@ -132,11 +129,12 @@ mod tests {
     #[tokio::test]
     async fn insert_max_assigned_prs() {
         run_db_test(|ctx| async {
-            let db = ctx.db_client().await;
-
-            upsert_review_prefs(&db, user("Martin", 1), Some(5)).await?;
+            upsert_review_prefs(&ctx.db_client(), user("Martin", 1), Some(5)).await?;
             assert_eq!(
-                get_review_prefs(&db, 1).await?.unwrap().max_assigned_prs,
+                get_review_prefs(&ctx.db_client(), 1)
+                    .await?
+                    .unwrap()
+                    .max_assigned_prs,
                 Some(5)
             );
 
@@ -148,7 +146,7 @@ mod tests {
     #[tokio::test]
     async fn update_max_assigned_prs() {
         run_db_test(|ctx| async {
-            let db = ctx.db_client().await;
+            let db = ctx.db_client();
 
             upsert_review_prefs(&db, user("Martin", 1), Some(5)).await?;
             assert_eq!(
