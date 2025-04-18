@@ -112,11 +112,11 @@ mod tests {
     use crate::db::review_prefs::{get_review_prefs, upsert_review_prefs};
     use crate::db::users::get_user;
     use crate::tests::github::user;
-    use crate::tests::run_test;
+    use crate::tests::run_db_test;
 
     #[tokio::test]
     async fn insert_prefs_create_user() {
-        run_test(|ctx| async {
+        run_db_test(|ctx| async {
             let db = ctx.db_client().await;
 
             let user = user("Martin", 1);
@@ -131,7 +131,7 @@ mod tests {
 
     #[tokio::test]
     async fn insert_max_assigned_prs() {
-        run_test(|ctx| async {
+        run_db_test(|ctx| async {
             let db = ctx.db_client().await;
 
             upsert_review_prefs(&db, user("Martin", 1), Some(5)).await?;
@@ -147,7 +147,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_max_assigned_prs() {
-        run_test(|ctx| async {
+        run_db_test(|ctx| async {
             let db = ctx.db_client().await;
 
             upsert_review_prefs(&db, user("Martin", 1), Some(5)).await?;

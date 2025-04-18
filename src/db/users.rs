@@ -41,11 +41,11 @@ WHERE user_id = $1;",
 #[cfg(test)]
 mod tests {
     use crate::db::users::{get_user, record_username};
-    use crate::tests::run_test;
+    use crate::tests::run_db_test;
 
     #[tokio::test]
     async fn update_username_on_conflict() {
-        run_test(|ctx| async {
+        run_db_test(|ctx| async {
             let db = ctx.db_client().await;
 
             record_username(&db, 1, "Foo").await?;

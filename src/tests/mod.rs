@@ -114,7 +114,7 @@ impl TestContext {
     }
 }
 
-pub(crate) async fn run_test<F, Fut>(f: F)
+pub(crate) async fn run_db_test<F, Fut>(f: F)
 where
     F: FnOnce(TestContext) -> Fut,
     Fut: Future<Output = anyhow::Result<TestContext>>,
