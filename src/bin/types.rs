@@ -2,7 +2,7 @@ use triagebot::agenda;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
     let args: Vec<String> = std::env::args().collect();

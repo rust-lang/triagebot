@@ -17,7 +17,7 @@ struct Opt {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
     let opt = Opt::from_args();
