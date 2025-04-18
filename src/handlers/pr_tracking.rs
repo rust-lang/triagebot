@@ -36,6 +36,13 @@ impl ReviewerWorkqueue {
     pub fn new(reviewers: HashMap<UserId, HashSet<PullRequestNumber>>) -> Self {
         Self { reviewers }
     }
+
+    pub fn assigned_pr_count(&self, user_id: UserId) -> u64 {
+        self.reviewers
+            .get(&user_id)
+            .map(|prs| prs.len() as u64)
+            .unwrap_or(0)
+    }
 }
 
 pub(super) enum ReviewPrefsInput {

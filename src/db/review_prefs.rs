@@ -2,6 +2,7 @@ use crate::db::users::record_username;
 use crate::github::{User, UserId};
 use anyhow::Context;
 use serde::Serialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize)]
 pub struct ReviewPrefs {
@@ -35,6 +36,50 @@ WHERE review_prefs.user_id = $1;";
         .await
         .context("Error retrieving review preferences")?;
     Ok(row.map(|r| r.into()))
+}
+
+/// Returns a set of review preferences for all passed usernames.
+/// Usernames are matched regardless of case.
+///
+/// Usernames that are not present in the resulting map have no review preferences configured
+/// in the database.
+pub async fn get_review_prefs_batch<'a>(
+    db: &tokio_postgres::Client,
+    users: &[&'a str],
+) -> anyhow::Result<HashMap<&'a str, ReviewPrefs>> {
+    // We need to make sure that we match users regardless of case, but at the
+    // same time we need to return the originally-cased usernames in the final hashmap.
+    // At the same time, we can't depend on the order of results returned by the DB.
+    // So we need to do some additional bookkeeping here.
+    let lowercase_map: HashMap<String, &str> = users
+        .iter()
+        .map(|name| (name.to_lowercase(), *name))
+        .collect();
+    let lowercase_users: Vec<&str> = lowercase_map.keys().map(|s| s.as_str()).collect();
+
+    // The id/user_id/max_assigned_prs columns have to match the names used in
+    // `From<tokio_postgres::row::Row> for ReviewPrefs`.
+    let query = "
+SELECT lower(u.username) AS username, r.id AS id, r.user_id AS user_id, r.max_assigned_prs AS max_assigned_prs
+FROM review_prefs AS r
+JOIN users AS u ON u.user_id = r.user_id
+WHERE lower(u.username) = ANY($1);";
+
+    Ok(db
+        .query(query, &[&lowercase_users])
+        .await
+        .context("Error retrieving review preferences from usernames")?
+        .into_iter()
+        .map(|row| {
+            // Map back from the lowercase username to the original username.
+            let username_lower: &str = row.get("username");
+            let username = lowercase_map
+                .get(username_lower)
+                .expect("Lowercase username not found");
+            let prefs: ReviewPrefs = row.into();
+            (*username, prefs)
+        })
+        .collect())
 }
 
 /// Updates review preferences of the specified user, or creates them
