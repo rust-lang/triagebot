@@ -5,7 +5,7 @@ use regex::Regex;
 use crate::{config::IssueLinksConfig, github::GithubCommit};
 
 static LINKED_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"( |^)([a-zA-Z-_]+/[a-zA-Z-_]+)?(#[0-9]+)\b").unwrap());
+    LazyLock::new(|| Regex::new(r"\B([a-zA-Z-_]+/[a-zA-Z-_]+)?(#[0-9]+)\b").unwrap());
 
 const MERGE_IGNORE_LIST: [&str; 2] = ["Rollup merge of ", "Auto merge of "];
 
@@ -76,7 +76,7 @@ fn test_mentions_in_commits() {
 
     commits.push(dummy_commit_from_body(
         "891f0916a07c215ae8173f782251422f1fea6acb",
-        "This is a body with a issue link rust-lang/rust#123.",
+        "This is a body with a issue link (rust-lang/rust#123).",
     ));
 
     assert_eq!(
