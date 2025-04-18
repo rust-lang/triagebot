@@ -94,6 +94,10 @@ pub(crate) struct PingTeamConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct AssignReviewPrefsConfig {}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct AssignConfig {
     /// If enabled, then posts a warning comment if the PR is opened against a
     /// different branch than the default (usually master or main).
@@ -111,6 +115,9 @@ pub(crate) struct AssignConfig {
     pub(crate) owners: HashMap<String, Vec<String>>,
     #[serde(default)]
     pub(crate) users_on_vacation: HashSet<String>,
+    /// Should review preferences be taken into account when deciding who to assign to a PR?
+    #[serde(default)]
+    pub(crate) review_prefs: Option<AssignReviewPrefsConfig>,
 }
 
 impl AssignConfig {
@@ -656,6 +663,7 @@ mod tests {
                     adhoc_groups: HashMap::new(),
                     owners: HashMap::new(),
                     users_on_vacation: HashSet::from(["jyn514".into()]),
+                    review_prefs: None,
                 }),
                 note: Some(NoteConfig { _empty: () }),
                 ping: Some(PingConfig { teams: ping_teams }),
@@ -736,6 +744,7 @@ mod tests {
                     adhoc_groups: HashMap::new(),
                     owners: HashMap::new(),
                     users_on_vacation: HashSet::new(),
+                    review_prefs: None,
                 }),
                 note: None,
                 ping: None,
