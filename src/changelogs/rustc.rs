@@ -1,9 +1,9 @@
 use super::Changelog;
+use anyhow::Context as _;
 use comrak::{
-    nodes::{Ast, AstNode, NodeHeading, NodeValue},
+    nodes::{AstNode, NodeHeading, NodeValue},
     Arena, ComrakOptions,
 };
-use std::cell::RefCell;
 use std::collections::HashMap;
 
 pub(super) struct RustcFormat<'a> {
@@ -35,7 +35,16 @@ impl<'a> RustcFormat<'a> {
                     self.store_version(h1, section_ast)?;
                 }
 
-                self.current_h1 = Some(String::from_utf8(child_data.content.clone())?);
+                let Some(h1_child_data) = child.first_child().map(|c| c.data.borrow()) else {
+                    anyhow::bail!("unable to retrieve heading (H1) child from changelog");
+                };
+                self.current_h1 = Some(
+                    h1_child_data
+                        .value
+                        .text()
+                        .context("unable to get the text of node below the heading H1")?
+                        .to_string(),
+                );
                 section_ast = Vec::new();
             } else {
                 section_ast.push(child);
@@ -50,9 +59,7 @@ impl<'a> RustcFormat<'a> {
 
     fn store_version(&mut self, h1: String, body: Vec<&'a AstNode<'a>>) -> anyhow::Result<()> {
         // Create a document with only the contents of this section
-        let document = self
-            .arena
-            .alloc(AstNode::new(RefCell::new(Ast::new(NodeValue::Document))));
+        let document = self.arena.alloc(NodeValue::Document.into());
         for child in &body {
             document.append(child);
         }
