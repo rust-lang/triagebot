@@ -705,7 +705,11 @@ impl Issue {
             name = label,
         );
 
-        if !self.labels().iter().any(|l| l.name == label) {
+        if !self
+            .labels()
+            .iter()
+            .any(|l| l.name.to_lowercase() == label.to_lowercase())
+        {
             log::info!(
                 "remove_label from {}: {:?} already not present, skipping",
                 self.global_id(),
