@@ -291,8 +291,9 @@ async fn workqueue_commands(
                 None => String::from("Not set (i.e. unlimited)"),
             };
 
-            let mut response = format!("Assigned rust-lang/rust PRs: {prs}\n");
-            writeln!(response, "Review capacity: {capacity}")?;
+            let mut response = format!("`rust-lang/rust` PRs in your review queue: {prs}\n");
+            writeln!(response, "Review capacity: {capacity}\n")?;
+            writeln!(response, "*Note that only selected PRs that are assigned to you are considered as being in the review queue.*")?;
             response
         }
         "set-pr-limit" => {
