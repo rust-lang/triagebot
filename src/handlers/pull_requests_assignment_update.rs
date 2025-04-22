@@ -1,6 +1,6 @@
 use crate::github::PullRequestNumber;
-use crate::github::{retrieve_pull_request_assignments, UserId};
-use crate::handlers::pr_tracking::ReviewerWorkqueue;
+use crate::github::UserId;
+use crate::handlers::pr_tracking::{retrieve_pull_request_assignments, ReviewerWorkqueue};
 use crate::jobs::Job;
 use async_trait::async_trait;
 use octocrab::Octocrab;

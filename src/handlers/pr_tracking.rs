@@ -13,6 +13,10 @@ use crate::{
     github::{IssuesAction, IssuesEvent},
     handlers::Context,
 };
+use futures::TryStreamExt;
+use octocrab::params::pulls::Sort;
+use octocrab::params::{Direction, State};
+use octocrab::Octocrab;
 use std::collections::{HashMap, HashSet};
 use tracing as log;
 
@@ -124,6 +128,57 @@ pub(super) async fn handle_input<'a>(
     }
 
     Ok(())
+}
+
+/// Retrieve tuples of (user, PR number) where
+/// the given user is assigned as a reviewer for that PR.
+/// Only non-draft, non-rollup and open PRs are taken into account.
+pub async fn retrieve_pull_request_assignments(
+    owner: &str,
+    repository: &str,
+    client: &Octocrab,
+) -> anyhow::Result<Vec<(User, PullRequestNumber)>> {
+    let mut assignments = vec![];
+
+    // We use the REST API to fetch open pull requests, as it is much (~5-10x)
+    // faster than using GraphQL here.
+    let stream = client
+        .pulls(owner, repository)
+        .list()
+        .state(State::Open)
+        .direction(Direction::Ascending)
+        .sort(Sort::Created)
+        .per_page(100)
+        .send()
+        .await?
+        .into_stream(client);
+    let mut stream = std::pin::pin!(stream);
+    while let Some(pr) = stream.try_next().await? {
+        if pr.draft == Some(true) {
+            continue;
+        }
+        // exclude rollup PRs
+        if pr
+            .labels
+            .unwrap_or_default()
+            .iter()
+            .any(|label| label.name == "rollup")
+        {
+            continue;
+        }
+        for user in pr.assignees.unwrap_or_default() {
+            assignments.push((
+                User {
+                    login: user.login,
+                    id: (*user.id).into(),
+                },
+                pr.number,
+            ));
+        }
+    }
+    assignments.sort_by(|a, b| a.0.id.cmp(&b.0.id));
+
+    Ok(assignments)
 }
 
 /// Get pull request assignments for a team member
