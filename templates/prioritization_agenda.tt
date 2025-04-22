@@ -18,7 +18,7 @@ note_id: xxx
 
 ### Other WG meetings
 
- - (TIP) get them from https://github.com/rust-lang/calendar
+- (TIP) get them from https://github.com/rust-lang/calendar
 
 ## MCPs/FCPs
 
@@ -40,16 +40,6 @@ note_id: xxx
 {{-issues::render(issues=fcp_finished_tcompiler, indent="  ", empty="No new finished FCP (disposition merge) this time.")}}
 - Other teams finalized FCPs
 {{-issues::render(issues=fcp_finished_not_tcompiler, indent="  ", empty="No new finished FCP (disposition merge) this time.")}}
-
-### WG checkins
-
-(TIP) pick from [here](https://rust-lang.github.io/compiler-team/about/triage-meeting/#working-group-check-in)
-
-@*WG-X* checkin by @**person1** ([previous checkin](https://hackmd.io/team/rust-compiler-team?nav=overview)):
-  > Checkin text
-
-@*WG-Y* checkin by @**person2** ([previous checkin](https://hackmd.io/team/rust-compiler-team?nav=overview)):
-  > Checkin text
 
 ## Backport nominations
 
@@ -113,10 +103,5 @@ note_id: xxx
 
 [T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Apr+is%3Aopen+sort%3Aupdated-asc+label%3AS-waiting-on-review+draft%3Afalse+label%3AT-compiler)
 {{-issues::render(issues=top_unreviewed_prs, with_age=true, empty="No unreviewed PRs on `T-compiler` this time.")}}
-
-## Next week's WG checkins
-
-- @*WG-X* checkin by @**person1**
-- @*WG-X* checkin by @**person2**
 
 Next meetings' agenda draft: [hackmd link](#)
