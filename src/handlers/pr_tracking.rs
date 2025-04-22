@@ -6,7 +6,7 @@
 //! - Adds the PR to the workqueue of one team member (after the PR has been assigned or reopened)
 //! - Removes the PR from the workqueue of one team member (after the PR has been unassigned or closed)
 
-use crate::github::PullRequestNumber;
+use crate::github::{Label, PullRequestNumber};
 use crate::github::{User, UserId};
 use crate::{
     config::ReviewPrefsConfig,
@@ -14,10 +14,12 @@ use crate::{
     handlers::Context,
 };
 use futures::TryStreamExt;
+use octocrab::models::IssueState;
 use octocrab::params::pulls::Sort;
 use octocrab::params::{Direction, State};
 use octocrab::Octocrab;
 use std::collections::{HashMap, HashSet};
+use tokio::sync::RwLockWriteGuard;
 use tracing as log;
 
 /// Maps users to a set of currently assigned open non-draft pull requests.
@@ -39,8 +41,7 @@ impl ReviewerWorkqueue {
 pub(super) enum ReviewPrefsInput {
     Assigned { assignee: User },
     Unassigned { assignee: User },
-    Reopened,
-    Closed,
+    OtherChange,
 }
 
 pub(super) async fn parse_input(
@@ -68,10 +69,12 @@ pub(super) async fn parse_input(
             assignee: assignee.clone(),
         })),
         // We don't need to handle Opened explicitly, because that will trigger the Assigned event
-        IssuesAction::Reopened => Ok(Some(ReviewPrefsInput::Reopened)),
-        IssuesAction::Closed | IssuesAction::Deleted | IssuesAction::Transferred => {
-            Ok(Some(ReviewPrefsInput::Closed))
-        }
+        IssuesAction::Reopened
+        | IssuesAction::Closed
+        | IssuesAction::Deleted
+        | IssuesAction::Transferred
+        | IssuesAction::Labeled { .. }
+        | IssuesAction::Unlabeled { .. } => Ok(Some(ReviewPrefsInput::OtherChange)),
         _ => Ok(None),
     }
 }
@@ -84,45 +87,52 @@ pub(super) async fn handle_input<'a>(
 ) -> anyhow::Result<()> {
     log::info!("Handling event action {:?} in PR tracking", event.action);
 
+    let pr = &event.issue;
+    let pr_number = event.issue.number;
+
+    let mut workqueue = ctx.workqueue.write().await;
+
+    // If the PR doesn't wait for a review, remove it from the workqueue completely.
+    // This handles situations such as labels being modified, which make the PR no longer to be
+    // in the "waiting for a review" state, or the PR being closed/merged.
+    if !waits_for_a_review(&pr.labels, pr.is_open(), pr.draft) {
+        log::info!(
+            "Removing PR {pr_number} from workqueue, because it is not waiting for a review.",
+        );
+        delete_pr_from_all_queues(&mut workqueue, pr_number);
+        return Ok(());
+    }
+
     match input {
-        // This handler is reached also when assigning a PR using the Github UI
-        // (i.e. from the "Assignees" dropdown menu).
-        // We need to also check assignee availability here.
+        // The PR was assigned to a specific user, and it is waiting for a review.
         ReviewPrefsInput::Assigned { assignee } => {
-            let pr_number = event.issue.number;
             log::info!(
-                "Adding PR {pr_number} from workqueue of {} because they were assigned.",
+                "Adding PR {pr_number} to workqueue of {} because they were assigned.",
                 assignee.login
             );
 
-            upsert_pr_into_workqueue(ctx, assignee.id, pr_number).await;
+            upsert_pr_into_user_queue(&mut workqueue, assignee.id, pr_number);
         }
         ReviewPrefsInput::Unassigned { assignee } => {
-            let pr_number = event.issue.number;
             log::info!(
                 "Removing PR {pr_number} from workqueue of {} because they were unassigned.",
                 assignee.login
             );
-            delete_pr_from_workqueue(ctx, assignee.id, pr_number).await;
+            delete_pr_from_user_queue(&mut workqueue, assignee.id, pr_number);
         }
-        ReviewPrefsInput::Closed => {
+        // Some other change has happened (e.g. labels changed or the PR being reopened).
+        // Make sure that all assigned users have the PR in their queue.
+        // When a PR is opened, it might not yet contain all the information needed to determine
+        // whether it waits for a reviewer or not. For example, when you open a PR,
+        // triagebot might apply the "S-waiting-on-review" (or similar) label to it, which we
+        // currently use to determine whether a PR is truly assigned to someone or not.
+        // We thus need to refresh the queue state after every relevant state change that we
+        // receive.
+        ReviewPrefsInput::OtherChange => {
             for assignee in &event.issue.assignees {
-                let pr_number = event.issue.number;
-                log::info!(
-                    "Removing PR {pr_number} from workqueue of {} because it was closed or merged.",
-                    assignee.login
-                );
-                delete_pr_from_workqueue(ctx, assignee.id, pr_number).await;
-            }
-        }
-        ReviewPrefsInput::Reopened => {
-            for assignee in &event.issue.assignees {
-                let pr_number = event.issue.number;
-                log::info!(
-                    "Re-adding PR {pr_number} to workqueue of {} because it was (re)opened.",
-                    assignee.login
-                );
-                upsert_pr_into_workqueue(ctx, assignee.id, pr_number).await;
+                if upsert_pr_into_user_queue(&mut workqueue, assignee.id, pr_number) {
+                    log::info!("Adding PR {pr_number} to workqueue of {}.", assignee.login);
+                }
             }
         }
     }
@@ -147,8 +157,10 @@ pub async fn load_workqueue(client: &Octocrab) -> anyhow::Result<ReviewerWorkque
 }
 
 /// Retrieve tuples of (user, PR number) where
-/// the given user is assigned as a reviewer for that PR.
-/// Only non-draft, non-rollup and open PRs are taken into account.
+/// the given user is assigned as a reviewer for that PR
+/// and the PR is considered to be "waiting for a review", according to the semantics
+/// of the reviewer workqueue.
+/// See the [`waits_for_a_review`] function.
 pub async fn retrieve_pull_request_assignments(
     owner: &str,
     repository: &str,
@@ -170,26 +182,26 @@ pub async fn retrieve_pull_request_assignments(
         .into_stream(client);
     let mut stream = std::pin::pin!(stream);
     while let Some(pr) = stream.try_next().await? {
-        if pr.draft == Some(true) {
-            continue;
-        }
-        // exclude rollup PRs
-        if pr
+        let labels = pr
             .labels
             .unwrap_or_default()
-            .iter()
-            .any(|label| label.name == "rollup")
-        {
-            continue;
-        }
-        for user in pr.assignees.unwrap_or_default() {
-            assignments.push((
-                User {
-                    login: user.login,
-                    id: (*user.id).into(),
-                },
-                pr.number,
-            ));
+            .into_iter()
+            .map(|l| Label { name: l.name })
+            .collect::<Vec<Label>>();
+        if waits_for_a_review(
+            &labels,
+            pr.state == Some(IssueState::Open),
+            pr.draft.unwrap_or_default(),
+        ) {
+            for user in pr.assignees.unwrap_or_default() {
+                assignments.push((
+                    User {
+                        login: user.login,
+                        id: (*user.id).into(),
+                    },
+                    pr.number,
+                ));
+            }
         }
     }
     assignments.sort_by(|a, b| a.0.id.cmp(&b.0.id));
@@ -210,30 +222,57 @@ pub async fn get_assigned_prs(ctx: &Context, user_id: UserId) -> HashSet<PullReq
 
 /// Add a PR to the workqueue of a team member.
 /// Ensures no accidental PR duplicates.
-async fn upsert_pr_into_workqueue(ctx: &Context, user_id: UserId, pr: PullRequestNumber) {
-    ctx.workqueue
-        .write()
-        .await
-        .reviewers
-        .entry(user_id)
-        .or_default()
-        .insert(pr);
+///
+/// Returns true if the PR was actually inserted.
+fn upsert_pr_into_user_queue(
+    workqueue: &mut RwLockWriteGuard<ReviewerWorkqueue>,
+    user_id: UserId,
+    pr: PullRequestNumber,
+) -> bool {
+    workqueue.reviewers.entry(user_id).or_default().insert(pr)
 }
 
-/// Delete a PR from the workqueue of a team member
-async fn delete_pr_from_workqueue(ctx: &Context, user_id: UserId, pr: PullRequestNumber) {
-    let mut queue = ctx.workqueue.write().await;
-    if let Some(reviewer) = queue.reviewers.get_mut(&user_id) {
-        reviewer.remove(&pr);
+/// Delete a PR from the workqueue of a team member.
+fn delete_pr_from_user_queue(
+    workqueue: &mut ReviewerWorkqueue,
+    user_id: UserId,
+    pr: PullRequestNumber,
+) {
+    if let Some(queue) = workqueue.reviewers.get_mut(&user_id) {
+        queue.remove(&pr);
     }
+}
+
+/// Delete a PR from the workqueue completely.
+fn delete_pr_from_all_queues(workqueue: &mut ReviewerWorkqueue, pr: PullRequestNumber) {
+    for queue in workqueue.reviewers.values_mut() {
+        queue.retain(|pr_number| *pr_number != pr);
+    }
+}
+
+/// Returns true if the workqueue should assume that this PR is actually waiting for a reviewer.
+/// The function receives atomic attributes so that it is compatible both with triagebot's
+/// `Issue` struct (used for incremental updates) and octocrab's `PullRequest` struct (used for
+/// batch PR loads).
+///
+/// Note: this functionality is currently hardcoded for rust-lang/rust, other repos might use
+/// different labels.
+fn waits_for_a_review(labels: &[Label], is_open: bool, is_draft: bool) -> bool {
+    let is_blocked = labels
+        .iter()
+        .any(|l| l.name == "S-blocked" || l.name == "S-inactive");
+    let is_rollup = labels.iter().any(|l| l.name == "rollup");
+    let is_waiting_for_reviewer = labels.iter().any(|l| l.name == "S-waiting-on-review");
+
+    is_open && !is_draft && !is_blocked && !is_rollup && is_waiting_for_reviewer
 }
 
 #[cfg(test)]
 mod tests {
     use crate::config::Config;
-    use crate::github::PullRequestNumber;
     use crate::github::{Issue, IssuesAction, IssuesEvent, Repository, User};
-    use crate::handlers::pr_tracking::{handle_input, parse_input, upsert_pr_into_workqueue};
+    use crate::github::{Label, PullRequestNumber};
+    use crate::handlers::pr_tracking::{handle_input, parse_input, upsert_pr_into_user_queue};
     use crate::tests::github::{default_test_user, issue, pull_request, user};
     use crate::tests::{run_test, TestContext};
 
@@ -247,11 +286,37 @@ mod tests {
                 IssuesAction::Assigned {
                     assignee: user.clone(),
                 },
-                pull_request().number(10).call(),
+                pull_request()
+                    .number(10)
+                    .labels(vec!["S-waiting-on-review"])
+                    .call(),
             )
             .await;
 
             check_assigned_prs(&ctx, &user, &[10]).await;
+
+            Ok(ctx)
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn ignore_blocked_pr() {
+        run_test(|ctx| async move {
+            let user = user("Martin", 2);
+
+            run_handler(
+                &ctx,
+                IssuesAction::Assigned {
+                    assignee: user.clone(),
+                },
+                pull_request()
+                    .labels(vec!["S-waiting-on-review", "S-blocked"])
+                    .call(),
+            )
+            .await;
+
+            check_assigned_prs(&ctx, &user, &[]).await;
 
             Ok(ctx)
         })
@@ -269,11 +334,51 @@ mod tests {
                 IssuesAction::Unassigned {
                     assignee: user.clone(),
                 },
-                pull_request().number(10).call(),
+                pull_request()
+                    .number(10)
+                    .labels(vec!["S-waiting-on-review"])
+                    .call(),
             )
             .await;
 
             check_assigned_prs(&ctx, &user, &[]).await;
+
+            Ok(ctx)
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn add_pr_to_workqueue_on_label() {
+        run_test(|ctx| async move {
+            let user = user("Martin", 2);
+
+            run_handler(
+                &ctx,
+                IssuesAction::Assigned {
+                    assignee: user.clone(),
+                },
+                pull_request().number(10).call(),
+            )
+            .await;
+            check_assigned_prs(&ctx, &user, &[]).await;
+
+            run_handler(
+                &ctx,
+                IssuesAction::Labeled {
+                    label: Label {
+                        name: "S-waiting-on-review".to_string(),
+                    },
+                },
+                pull_request()
+                    .number(10)
+                    .labels(vec!["S-waiting-on-review"])
+                    .assignees(vec![user.clone()])
+                    .call(),
+            )
+            .await;
+
+            check_assigned_prs(&ctx, &user, &[10]).await;
 
             Ok(ctx)
         })
@@ -314,6 +419,7 @@ mod tests {
                 IssuesAction::Reopened,
                 pull_request()
                     .number(10)
+                    .labels(vec!["S-waiting-on-review"])
                     .assignees(vec![user.clone()])
                     .call(),
             )
@@ -369,8 +475,11 @@ mod tests {
     }
 
     async fn set_assigned_prs(ctx: &TestContext, user: &User, prs: &[PullRequestNumber]) {
-        for &pr in prs {
-            upsert_pr_into_workqueue(ctx.handler_ctx(), user.id, pr).await;
+        {
+            let mut workqueue = ctx.handler_ctx().workqueue.write().await;
+            for &pr in prs {
+                upsert_pr_into_user_queue(&mut workqueue, user.id, pr);
+            }
         }
         check_assigned_prs(&ctx, user, prs).await;
     }

@@ -1,4 +1,4 @@
-use crate::github::{Issue, IssueState, PullRequestDetails, User};
+use crate::github::{Issue, IssueState, Label, PullRequestDetails, User};
 use bon::builder;
 use chrono::Utc;
 
@@ -26,6 +26,7 @@ pub fn issue(
     pr: Option<bool>,
     org: Option<&str>,
     repo: Option<&str>,
+    labels: Option<Vec<&str>>,
 ) -> Issue {
     let number = number.unwrap_or(1);
     let state = state.unwrap_or(IssueState::Open);
@@ -39,6 +40,13 @@ pub fn issue(
     };
     let org = org.unwrap_or("rust-lang");
     let repo = repo.unwrap_or("rust");
+    let labels = labels
+        .unwrap_or_default()
+        .into_iter()
+        .map(|l| Label {
+            name: l.to_string(),
+        })
+        .collect();
 
     Issue {
         number,
@@ -49,7 +57,7 @@ pub fn issue(
         title: format!("Issue #{number}"),
         html_url: format!("https://github.com/{org}/{repo}/pull/{number}"),
         user: author,
-        labels: vec![],
+        labels,
         assignees,
         pull_request,
         merged: false,
@@ -73,12 +81,14 @@ pub fn pull_request(
     author: Option<User>,
     body: Option<&str>,
     assignees: Option<Vec<User>>,
+    labels: Option<Vec<&str>>,
 ) -> Issue {
     issue()
         .maybe_state(state)
         .maybe_number(number)
         .maybe_author(author)
         .maybe_body(body)
+        .maybe_labels(labels)
         .maybe_assignees(assignees)
         .pr(true)
         .call()
