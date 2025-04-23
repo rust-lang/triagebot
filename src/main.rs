@@ -12,8 +12,8 @@ use tokio::{task, time};
 use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
+use triagebot::handlers::pr_tracking::load_workqueue;
 use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
-use triagebot::handlers::pull_requests_assignment_update::load_workqueue;
 use triagebot::jobs::{
     default_jobs, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS,
 };

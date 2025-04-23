@@ -2,11 +2,8 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
-use futures::{future::BoxFuture, FutureExt, TryStreamExt};
+use futures::{future::BoxFuture, FutureExt};
 use hyper::header::HeaderValue;
-use octocrab::params::pulls::Sort;
-use octocrab::params::{Direction, State};
-use octocrab::Octocrab;
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
@@ -3055,57 +3052,6 @@ async fn project_items_by_status(
 
     all_items.sort_by_key(|item| item.date());
     Ok(all_items)
-}
-
-/// Retrieve tuples of (user, PR number) where
-/// the given user is assigned as a reviewer for that PR.
-/// Only non-draft, non-rollup and open PRs are taken into account.
-pub async fn retrieve_pull_request_assignments(
-    owner: &str,
-    repository: &str,
-    client: &Octocrab,
-) -> anyhow::Result<Vec<(User, PullRequestNumber)>> {
-    let mut assignments = vec![];
-
-    // We use the REST API to fetch open pull requests, as it is much (~5-10x)
-    // faster than using GraphQL here.
-    let stream = client
-        .pulls(owner, repository)
-        .list()
-        .state(State::Open)
-        .direction(Direction::Ascending)
-        .sort(Sort::Created)
-        .per_page(100)
-        .send()
-        .await?
-        .into_stream(client);
-    let mut stream = std::pin::pin!(stream);
-    while let Some(pr) = stream.try_next().await? {
-        if pr.draft == Some(true) {
-            continue;
-        }
-        // exclude rollup PRs
-        if pr
-            .labels
-            .unwrap_or_default()
-            .iter()
-            .any(|label| label.name == "rollup")
-        {
-            continue;
-        }
-        for user in pr.assignees.unwrap_or_default() {
-            assignments.push((
-                User {
-                    login: user.login,
-                    id: (*user.id).into(),
-                },
-                pr.number,
-            ));
-        }
-    }
-    assignments.sort_by(|a, b| a.0.id.cmp(&b.0.id));
-
-    Ok(assignments)
 }
 
 pub enum DesignMeetingStatus {
