@@ -6,6 +6,7 @@ use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
 use crate::handlers::project_goals::{self, ping_project_goals_owners};
 use crate::handlers::Context;
+use crate::utils::pluralize;
 use anyhow::{format_err, Context as _};
 use std::env;
 use std::fmt::Write as _;
@@ -291,7 +292,11 @@ async fn workqueue_commands(
                 None => String::from("Not set (i.e. unlimited)"),
             };
 
-            let mut response = format!("`rust-lang/rust` PRs in your review queue: {prs}\n");
+            let mut response = format!(
+                "`rust-lang/rust` PRs in your review queue: {prs} ({} {})\n",
+                prs.len(),
+                pluralize("PR", prs.len())
+            );
             writeln!(response, "Review capacity: {capacity}\n")?;
             writeln!(response, "*Note that only selected PRs that are assigned to you are considered as being in the review queue.*")?;
             response
