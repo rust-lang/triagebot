@@ -72,7 +72,7 @@ impl ClientPool {
             // Pop connections until we hit a non-closed connection (or there are no
             // "possibly open" connections left).
             while let Some(c) = slots.pop() {
-                if !c.is_closed() {
+                if !c.is_closed() && validate_connection(&c).await {
                     return PooledClient {
                         client: Some(c),
                         permit,
@@ -88,6 +88,11 @@ impl ClientPool {
             pool: self.connections.clone(),
         }
     }
+}
+
+/// validate connection via query
+async fn validate_connection(conn: &tokio_postgres::Client) -> bool {
+    conn.query_one("SELECT 1", &[]).await.is_ok()
 }
 
 pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client> {
