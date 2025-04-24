@@ -265,7 +265,51 @@ pub(crate) struct AutolabelLabelConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct NotifyZulipConfig {
     #[serde(flatten)]
-    pub(crate) labels: HashMap<String, NotifyZulipLabelConfig>,
+    pub(crate) labels: HashMap<String, NotifyZulipTablesConfig>,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub(crate) struct NotifyZulipTablesConfig {
+    pub(crate) subtables: HashMap<String, NotifyZulipLabelConfig>,
+}
+
+impl<'de> serde::Deserialize<'de> for NotifyZulipTablesConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        use toml::Value;
+
+        // Deserialize into a toml::value::Table for dynamic inspection
+        let table = toml::Value::deserialize(deserializer)?
+            .as_table()
+            .cloned()
+            .ok_or_else(|| Error::custom("expected a TOML table"))?;
+
+        let mut subtables = HashMap::new();
+        let mut direct_fields = toml::value::Table::new();
+
+        for (k, v) in table {
+            if let Some(subtable) = v.as_table() {
+                // This is a subtable; deserialize as NotifyZulipLabelConfig
+                let sub = NotifyZulipLabelConfig::deserialize(Value::Table(subtable.clone()))
+                    .map_err(Error::custom)?;
+                subtables.insert(k, sub);
+            } else {
+                // This is a direct field; collect for the "" entry
+                direct_fields.insert(k, v);
+            }
+        }
+
+        if !direct_fields.is_empty() {
+            let direct = NotifyZulipLabelConfig::deserialize(Value::Table(direct_fields))
+                .map_err(Error::custom)?;
+            subtables.insert("".to_string(), direct);
+        }
+
+        Ok(NotifyZulipTablesConfig { subtables })
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
