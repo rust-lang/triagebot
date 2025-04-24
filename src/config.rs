@@ -49,6 +49,7 @@ pub(crate) struct Config {
     #[serde(alias = "canonicalize-issue-links")]
     pub(crate) issue_links: Option<IssueLinksConfig>,
     pub(crate) no_mentions: Option<NoMentionsConfig>,
+    pub(crate) behind_upstream: Option<BehindUpstreamConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -427,6 +428,16 @@ pub(crate) struct IssueLinksConfig {}
 #[serde(deny_unknown_fields)]
 pub(crate) struct NoMentionsConfig {}
 
+/// Configuration for PR behind commits checks
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct BehindUpstreamConfig {
+    /// The threshold of days for parent commit age to trigger a warning.
+    /// Default is 7 days if not specified.
+    pub(crate) days_threshold: Option<usize>,
+}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -554,6 +565,9 @@ mod tests {
             trigger-files = ["posts/"]
 
             [no-mentions]
+
+            [behind-upstream]
+            days-threshold = 14
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -618,6 +632,9 @@ mod tests {
                 }),
                 issue_links: Some(IssueLinksConfig {}),
                 no_mentions: Some(NoMentionsConfig {}),
+                behind_upstream: Some(BehindUpstreamConfig {
+                    days_threshold: Some(14),
+                }),
             }
         );
     }
@@ -637,6 +654,9 @@ mod tests {
             branch = "stable"
 
             [canonicalize-issue-links]
+
+            [behind-upstream]
+            days-threshold = 7
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         assert_eq!(
@@ -685,6 +705,9 @@ mod tests {
                 rendered_link: None,
                 issue_links: Some(IssueLinksConfig {}),
                 no_mentions: None,
+                behind_upstream: Some(BehindUpstreamConfig {
+                    days_threshold: Some(7),
+                }),
             }
         );
     }

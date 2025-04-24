@@ -1459,7 +1459,7 @@ impl Repository {
 
     /// Returns a list of commits between the SHA ranges of start (exclusive)
     /// and end (inclusive).
-    pub async fn commits_in_range(
+    pub async fn github_commits_in_range(
         &self,
         client: &GithubClient,
         start: &str,
@@ -1498,6 +1498,18 @@ impl Repository {
             }
             page += 1;
         }
+    }
+
+    pub async fn github_commit(
+        &self,
+        client: &GithubClient,
+        sha: &str,
+    ) -> anyhow::Result<GithubCommit> {
+        let url = format!("{}/commits/{}", self.url(client), sha);
+        client
+            .json(client.get(&url))
+            .await
+            .with_context(|| format!("{} failed to get github commit {sha}", self.full_name))
     }
 
     /// Retrieves a git commit for the given SHA.
