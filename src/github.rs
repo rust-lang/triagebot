@@ -968,14 +968,47 @@ impl Issue {
                     "{}/compare/{before}...{after}",
                     self.repository().url(client)
                 );
-                let mut req = client.get(&url);
-                req = req.header("Accept", "application/vnd.github.v3.diff");
-                let (diff, _) = client
-                    .send_req(req)
-                    .await
-                    .with_context(|| format!("failed to fetch diff comparison for {url}"))?;
-                let body = String::from_utf8_lossy(&diff);
-                Ok(parse_diff(&body))
+
+                // Maximum number of retry attempts
+                const MAX_RETRIES: u8 = 3;
+                // Delay between retries (in milliseconds)
+                const RETRY_DELAY_MS: u64 = 2000;
+
+                for attempt in 0..=MAX_RETRIES {
+                    let mut req = client.get(&url);
+                    req = req.header("Accept", "application/vnd.github.v3.diff");
+
+                    match client.send_req(req).await {
+                        Ok((diff, _)) => {
+                            let body = String::from_utf8_lossy(&diff);
+                            return Ok(parse_diff(&body));
+                        },
+                        Err(e) => {
+                            let is_404 = e.downcast_ref::<reqwest::Error>()
+                                .map_or(false, |e| e.status() == Some(reqwest::StatusCode::NOT_FOUND));
+
+                            if is_404 {
+                                if attempt < MAX_RETRIES {
+                                    log::warn!("Got 404 when fetching diff for {before}...{after}, retrying ({}/{})", 
+                                        attempt + 1, MAX_RETRIES);
+                                    // Wait before retrying
+                                    tokio::time::sleep(std::time::Duration::from_millis(RETRY_DELAY_MS)).await;
+                                    continue;
+                                } else {
+                                    log::warn!("Max retries reached for diff {before}...{after}, returning empty diff");
+                                    // After all retries failed, return empty diff
+                                    return Ok(Vec::new());
+                                }
+                            } else {
+                                // Propagate other errors immediately
+                                return Err(e.context(format!("failed to fetch diff comparison for {url}")));
+                            }
+                        }
+                    }
+                }
+
+                // This shouldn't be reached, but return empty diff as fallback
+                Ok(Vec::new())
             })
             .await?;
         Ok(Some(diff))
