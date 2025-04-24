@@ -42,9 +42,13 @@ pub(super) async fn parse_input(
         log::error!("expected head commit in {event:?}");
         return Ok(None);
     };
+    let Some(repo) = &pr_source.repo else {
+        log::warn!("repo is not available in {event:?}");
+        return Ok(None);
+    };
     let triagebot_content = match ctx
         .github
-        .raw_file(&pr_source.repo.full_name, &pr_source.sha, CONFIG_FILE_NAME)
+        .raw_file(&repo.full_name, &pr_source.sha, CONFIG_FILE_NAME)
         .await
     {
         Ok(Some(c)) => c,
@@ -66,7 +70,7 @@ pub(super) async fn parse_input(
                 let (line, col) = translate_position(&triagebot_content, span.start);
                 let url = format!(
                     "https://github.com/{}/blob/{}/{CONFIG_FILE_NAME}#L{line}",
-                    pr_source.repo.full_name, pr_source.sha
+                    repo.full_name, pr_source.sha
                 );
                 format!(" at position [{line}:{col}]({url})",)
             }

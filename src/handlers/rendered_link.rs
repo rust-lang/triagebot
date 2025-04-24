@@ -48,9 +48,9 @@ async fn add_rendered_link(
                     .iter()
                     .any(|tf| f.filename.starts_with(tf))
             })
-            .map(|file| {
-                let head = e.issue.head.as_ref().unwrap();
-                let base = e.issue.base.as_ref().unwrap();
+            .and_then(|file| {
+                let head = e.issue.head.as_ref()?;
+                let base = e.issue.base.as_ref()?;
 
                 // This URL should be stable while the PR is open, even if the
                 // user pushes new commits.
@@ -68,12 +68,12 @@ async fn add_rendered_link(
                 //  - if merged: `https://github.com/octocat/REPO/blob/master/FILEPATH`
                 //  - if open: `https://github.com/Bob/REPO/blob/patch-1/FILEPATH`
                 //  - if closed: `https://github.com/octocat/REPO/blob/SHA/FILEPATH`
-                format!(
+                Some(format!(
                     "[Rendered](https://github.com/{}/blob/{}/{})",
                     if e.issue.merged || e.action == IssuesAction::Closed {
                         &e.repository.full_name
                     } else {
-                        &head.repo.full_name
+                        &head.repo.as_ref()?.full_name
                     },
                     if e.issue.merged {
                         &base.git_ref
@@ -83,7 +83,7 @@ async fn add_rendered_link(
                         &head.git_ref
                     },
                     file.filename
-                )
+                ))
             });
 
         let new_body: Cow<'_, str> = if !e.issue.body.contains("[Rendered]") {

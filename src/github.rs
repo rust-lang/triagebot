@@ -1219,7 +1219,7 @@ pub struct CommitBase {
     pub sha: String,
     #[serde(rename = "ref")]
     pub git_ref: String,
-    pub repo: Repository,
+    pub repo: Option<Repository>,
 }
 
 pub fn parse_diff(diff: &str) -> Vec<FileDiff> {
