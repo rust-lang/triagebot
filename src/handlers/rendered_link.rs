@@ -8,7 +8,7 @@ use crate::{
     handlers::Context,
 };
 
-pub async fn handle(
+pub(super) async fn handle(
     ctx: &Context,
     event: &Event,
     config: &RenderedLinkConfig,

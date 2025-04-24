@@ -14,7 +14,7 @@ use anyhow::Context as _;
 use std::collections::HashSet;
 use tracing as log;
 
-pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
+pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let body = match event.comment_body() {
         Some(v) => v,
         // Skip events that don't have comment bodies associated

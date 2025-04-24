@@ -596,7 +596,7 @@ fn get_team_name<'a>(teams: &Teams, issue: &Issue, name: &'a str) -> Option<&'a 
 }
 
 #[derive(PartialEq, Debug)]
-pub enum FindReviewerError {
+enum FindReviewerError {
     /// User specified something like `r? foo/bar` where that team name could
     /// not be found.
     TeamNotFound(String),

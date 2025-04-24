@@ -48,7 +48,7 @@ struct NoteDataEntry {
 }
 
 impl NoteDataEntry {
-    pub fn to_markdown(&self) -> String {
+    pub(crate) fn to_markdown(&self) -> String {
         format!(
             "\n- [\"{title}\" by @{author}]({comment_url})",
             title = self.title,
@@ -74,7 +74,7 @@ struct NoteData {
 }
 
 impl NoteData {
-    pub fn get_url_from_title(&self, title: &str) -> Option<String> {
+    pub(crate) fn get_url_from_title(&self, title: &str) -> Option<String> {
         let tmp = self.entries_by_url.clone();
         tmp.iter().sorted().find_map(|(key, val)| {
             if val.title == title {
@@ -85,7 +85,7 @@ impl NoteData {
         })
     }
 
-    pub fn remove_by_title(&mut self, title: &str) -> Option<NoteDataEntry> {
+    pub(crate) fn remove_by_title(&mut self, title: &str) -> Option<NoteDataEntry> {
         if let Some(url_to_remove) = self.get_url_from_title(title) {
             if let Some(entry) = self.entries_by_url.remove(&url_to_remove) {
                 log::debug!("SUCCESSFULLY REMOVED ENTRY: {:#?}", &entry);
@@ -100,7 +100,7 @@ impl NoteData {
         }
     }
 
-    pub fn to_markdown(&self) -> String {
+    pub(crate) fn to_markdown(&self) -> String {
         if self.entries_by_url.is_empty() {
             return String::new();
         }

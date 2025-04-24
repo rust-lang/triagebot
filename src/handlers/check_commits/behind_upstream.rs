@@ -2,10 +2,10 @@ use crate::github::{GithubClient, GithubCommit, IssuesEvent, Repository};
 use tracing as log;
 
 /// Default threshold for parent commit age in days to trigger a warning
-pub const DEFAULT_DAYS_THRESHOLD: usize = 7;
+pub(super) const DEFAULT_DAYS_THRESHOLD: usize = 7;
 
 /// Check if the PR is based on an old parent commit
-pub async fn behind_upstream(
+pub(super) async fn behind_upstream(
     age_threshold: usize,
     event: &IssuesEvent,
     client: &GithubClient,
@@ -64,7 +64,7 @@ pub async fn behind_upstream(
 ///     - If there is no parent commit
 ///     - If parent is within threshold
 /// - Err(...) - If an error occurred during processing
-pub async fn is_parent_commit_too_old(
+pub(super) async fn is_parent_commit_too_old(
     commit: &GithubCommit,
     repo: &Repository,
     client: &GithubClient,
@@ -85,7 +85,7 @@ pub async fn is_parent_commit_too_old(
 }
 
 /// Returns the number of days old the commit is
-pub async fn commit_days_old(
+pub(super) async fn commit_days_old(
     sha: &str,
     repo: &Repository,
     client: &GithubClient,
