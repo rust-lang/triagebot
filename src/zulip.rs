@@ -294,8 +294,8 @@ async fn workqueue_commands(
 
             let mut response = format!(
                 "`rust-lang/rust` PRs in your review queue: {prs} ({} {})\n",
-                prs.len(),
-                pluralize("PR", prs.len())
+                assigned_prs.len(),
+                pluralize("PR", assigned_prs.len())
             );
             writeln!(response, "Review capacity: {capacity}\n")?;
             writeln!(response, "*Note that only selected PRs that are assigned to you are considered as being in the review queue.*")?;
