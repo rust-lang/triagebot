@@ -10,12 +10,12 @@ use tokio::sync::RwLock;
 use tokio_postgres::config::Host;
 use tokio_postgres::{Config, GenericClient};
 
-pub mod github;
+pub(crate) mod github;
 
 /// Represents a connection to a Postgres database that can be
 /// used in integration tests to test logic that interacts with
 /// a database.
-pub struct TestContext {
+pub(crate) struct TestContext {
     pool: ClientPool,
     ctx: Context,
     db_name: String,
@@ -83,15 +83,16 @@ impl TestContext {
     /// Returns a fake handler context.
     /// We currently do not mock outgoing nor incoming GitHub API calls,
     /// so the API endpoints will not be actually working.
-    pub fn handler_ctx(&self) -> &Context {
+    pub(crate) fn handler_ctx(&self) -> &Context {
         &self.ctx
     }
 
-    pub async fn db_client(&self) -> PooledClient {
+    pub(crate) async fn db_client(&self) -> PooledClient {
         self.pool.get().await
     }
 
-    pub async fn add_user(&self, name: &str, id: u64) {
+    #[allow(dead_code)]
+    pub(crate) async fn add_user(&self, name: &str, id: u64) {
         record_username(self.db_client().await.client(), id, name)
             .await
             .expect("Cannot create user");
@@ -113,7 +114,7 @@ impl TestContext {
     }
 }
 
-pub async fn run_test<F, Fut>(f: F)
+pub(crate) async fn run_test<F, Fut>(f: F)
 where
     F: FnOnce(TestContext) -> Fut,
     Fut: Future<Output = anyhow::Result<TestContext>>,

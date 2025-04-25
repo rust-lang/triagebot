@@ -29,7 +29,7 @@ struct RelnotesState {
 
 const TITLE_PREFIX: &str = "Tracking issue for release notes";
 
-pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
+pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let Event::Issue(e) = event else {
         return Ok(());
     };

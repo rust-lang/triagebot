@@ -9,7 +9,7 @@ use parser::command::second::SecondCommand;
 use tracing as log;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Invocation {
+pub(super) enum Invocation {
     NewProposal,
     AcceptedProposal,
     Rename { prev_issue: ZulipGitHubReference },
