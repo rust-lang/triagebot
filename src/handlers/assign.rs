@@ -90,13 +90,18 @@ Please choose another assignee.";
 // Special account that we use to prevent assignment.
 const GHOST_ACCOUNT: &str = "ghost";
 
+/// Assignment data stored in the issue/PR body.
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 struct AssignData {
     user: Option<String>,
 }
 
-/// Input for auto-assignment when a PR is created.
-pub(super) struct AssignInput {}
+/// Input for auto-assignment when a PR is created or converted from draft.
+#[derive(Debug)]
+pub(super) enum AssignInput {
+    Opened { draft: bool },
+    ReadyForReview,
+}
 
 /// Prepares the input when a new PR is opened.
 pub(super) async fn parse_input(
@@ -108,13 +113,17 @@ pub(super) async fn parse_input(
         Some(config) => config,
         None => return Ok(None),
     };
-    if config.owners.is_empty()
-        || !matches!(event.action, IssuesAction::Opened)
-        || !event.issue.is_pr()
-    {
+    if config.owners.is_empty() || !event.issue.is_pr() {
         return Ok(None);
     }
-    Ok(Some(AssignInput {}))
+
+    match event.action {
+        IssuesAction::Opened => Ok(Some(AssignInput::Opened {
+            draft: event.issue.draft,
+        })),
+        IssuesAction::ReadyForReview => Ok(Some(AssignInput::ReadyForReview)),
+        _ => Ok(None),
+    }
 }
 
 /// Handles the work of setting an assignment for a new PR and posting a
@@ -123,8 +132,31 @@ pub(super) async fn handle_input(
     ctx: &Context,
     config: &AssignConfig,
     event: &IssuesEvent,
-    _input: AssignInput,
+    input: AssignInput,
 ) -> anyhow::Result<()> {
+    let assign_command = find_assign_command(ctx, event);
+
+    // Perform assignment when:
+    // - PR was opened normally
+    // - PR was opened as a draft with an explicit r? (but not r? ghost)
+    // - PR was converted from a draft and there are no current assignees
+    let should_assign = match input {
+        AssignInput::Opened { draft: false } => true,
+        AssignInput::Opened { draft: true } => {
+            // Even if the PR is opened as a draft, we still want to perform assignment if r?
+            // was used. However, historically, `r? ghost` was supposed to mean "do not
+            // perform assignment". So in that case, we skip the assignment and only perform it once
+            // the PR has been marked as being ready for review.
+            assign_command.as_ref().is_some_and(|a| a != GHOST_ACCOUNT)
+        }
+        AssignInput::ReadyForReview => event.issue.assignees.is_empty(),
+    };
+
+    if !should_assign {
+        log::info!("Skipping PR assignment, input: {input:?}, assign_command: {assign_command:?}");
+        return Ok(());
+    }
+
     let Some(diff) = event.issue.diff(&ctx.github).await? else {
         bail!(
             "expected issue {} to be a PR, but the diff could not be determined",
@@ -134,7 +166,8 @@ pub(super) async fn handle_input(
 
     // Don't auto-assign or welcome if the user manually set the assignee when opening.
     if event.issue.assignees.is_empty() {
-        let (assignee, from_comment) = determine_assignee(ctx, event, config, &diff).await?;
+        let (assignee, from_comment) =
+            determine_assignee(ctx, assign_command, event, config, &diff).await?;
         if assignee.as_deref() == Some(GHOST_ACCOUNT) {
             // "ghost" is GitHub's placeholder account for deleted accounts.
             // It is used here as a convenient way to prevent assignment. This
@@ -257,13 +290,14 @@ async fn set_assignee(issue: &Issue, github: &GithubClient, username: &str) {
 /// determined from the diff).
 async fn determine_assignee(
     ctx: &Context,
+    assign_command: Option<String>,
     event: &IssuesEvent,
     config: &AssignConfig,
     diff: &[FileDiff],
 ) -> anyhow::Result<(Option<String>, bool)> {
     let db_client = ctx.db.get().await;
     let teams = crate::team_data::teams(&ctx.github).await?;
-    if let Some(name) = find_assign_command(ctx, event) {
+    if let Some(name) = assign_command {
         // User included `r?` in the opening PR body.
         match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &[name]).await {
             Ok(assignee) => return Ok((Some(assignee), true)),
