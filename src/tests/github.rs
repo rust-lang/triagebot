@@ -71,6 +71,7 @@ pub fn issue(
         state,
         milestone: None,
         mergeable: None,
+        author_association: octocrab::models::AuthorAssociation::None,
     }
 }
 

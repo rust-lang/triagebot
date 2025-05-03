@@ -5,7 +5,7 @@
 use crate::{
     config::ShortcutConfig,
     db::issue_data::IssueData,
-    github::{Event, Label},
+    github::{AuthorAssociation, Event, Label},
     handlers::Context,
     interactions::ErrorComment,
 };

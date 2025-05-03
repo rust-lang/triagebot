@@ -4,7 +4,7 @@ use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::{future::BoxFuture, FutureExt};
 use hyper::header::HeaderValue;
-use octocrab::models::Author;
+use octocrab::models::{Author, AuthorAssociation};
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
@@ -396,6 +396,9 @@ pub struct Issue {
     pub milestone: Option<Milestone>,
     /// Whether a PR has merge conflicts.
     pub mergeable: Option<bool>,
+
+    /// How the author is associated with the repository
+    pub author_association: AuthorAssociation,
 }
 
 #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
