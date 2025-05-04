@@ -21,7 +21,7 @@ pub(super) fn issue_links_in_commits(
                 .any(|i| c.commit.message.starts_with(i))
         })
         .filter(|c| LINKED_RE.is_match(&c.commit.message))
-        .map(|c| format!("    - {}\n", c.sha))
+        .map(|c| format!("- {}\n", c.sha))
         .collect::<String>();
 
     if issue_links_commits.is_empty() {
@@ -29,7 +29,7 @@ pub(super) fn issue_links_in_commits(
     } else {
         Some(format!(
             r"There are issue links (such as `#123`) in the commit messages of the following commits.
-  *Please remove them as they will spam the issue with references to the commit.*
+*Please remove them as they will spam the issue with references to the commit.*
 {issue_links_commits}",
         ))
     }
@@ -72,8 +72,8 @@ fn test_mentions_in_commits() {
         issue_links_in_commits(&config, &commits),
         Some(
             r"There are issue links (such as `#123`) in the commit messages of the following commits.
-  *Please remove them as they will spam the issue with references to the commit.*
-    - d7daa17bc97df9377640b0d33cbd0bbeed703c3a
+*Please remove them as they will spam the issue with references to the commit.*
+- d7daa17bc97df9377640b0d33cbd0bbeed703c3a
 ".to_string()
         )
     );
@@ -87,9 +87,9 @@ fn test_mentions_in_commits() {
         issue_links_in_commits(&config, &commits),
         Some(
             r"There are issue links (such as `#123`) in the commit messages of the following commits.
-  *Please remove them as they will spam the issue with references to the commit.*
-    - d7daa17bc97df9377640b0d33cbd0bbeed703c3a
-    - 891f0916a07c215ae8173f782251422f1fea6acb
+*Please remove them as they will spam the issue with references to the commit.*
+- d7daa17bc97df9377640b0d33cbd0bbeed703c3a
+- 891f0916a07c215ae8173f782251422f1fea6acb
 ".to_string()
         )
     );

@@ -204,6 +204,7 @@ async fn handle_warnings_and_labels(
 fn warning_from_warnings(warnings: &[String]) -> String {
     let warnings: Vec<_> = warnings
         .iter()
+        .map(|warning| warning.trim().replace("\n", "\n    "))
         .map(|warning| format!("* {warning}"))
         .collect();
     format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"))
@@ -240,4 +241,46 @@ fn dummy_commit_from_body(sha: &str, body: &str) -> GithubCommit {
         },
         parents: vec![],
     }
+}
+
+#[test]
+#[rustfmt::skip]
+fn test_warning_from_warnings() {
+    assert_eq!(
+        warning_from_warnings(
+            &[
+r#"This line should NOT be intend with 4 spaces,
+but this line should!"#
+            .to_string()
+            ]
+        ),
+r#":warning: **Warning** :warning:
+
+* This line should NOT be intend with 4 spaces,
+    but this line should!"#
+    );
+
+    assert_eq!(
+        warning_from_warnings(&[
+r#"This is warning 1.
+
+Look at this list:
+ - 12
+  - 13"#
+                .to_string(),
+r#"This is warning 2.
+ - 123456789
+"#
+            .to_string()
+        ]),
+r#":warning: **Warning** :warning:
+
+* This is warning 1.
+    
+    Look at this list:
+     - 12
+      - 13
+* This is warning 2.
+     - 123456789"#
+    );
 }

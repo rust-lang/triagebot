@@ -61,18 +61,18 @@ so these commits will need to be removed for this pull request to be merged.
     );
 
     for commit in commits {
-        writeln!(message, "    - {commit}").unwrap();
+        writeln!(message, "- {commit}").unwrap();
     }
 
     writeln!(
         message,
         "
-    You can start a rebase with the following commands:
-    ```shell-session
-    $ # rebase
-    $ git pull --rebase https://github.com/{repository_name}.git {default_branch}
-    $ git push --force-with-lease
-    ```"
+You can start a rebase with the following commands:
+```shell-session
+$ # rebase
+$ git pull --rebase https://github.com/{repository_name}.git {default_branch}
+$ git push --force-with-lease
+```"
     )
     .unwrap();
 
@@ -126,14 +126,14 @@ fn end_to_end() {
             unreachable!()
         };
         assert_eq!(warning, "The following commits have merge commits (commits with multiple parents) in your changes. We have a [no merge policy](https://rustc-dev-guide.rust-lang.org/git.html#no-merge-policy) so these commits will need to be removed for this pull request to be merged.
-    - 9cc6dce67c917fe5937e984f58f5003ccbb5c37e
+- 9cc6dce67c917fe5937e984f58f5003ccbb5c37e
 
-    You can start a rebase with the following commands:
-    ```shell-session
-    $ # rebase
-    $ git pull --rebase https://github.com/rust-lang/rust.git master
-    $ git push --force-with-lease
-    ```
+You can start a rebase with the following commands:
+```shell-session
+$ # rebase
+$ git pull --rebase https://github.com/rust-lang/rust.git master
+$ git push --force-with-lease
+```
 ");
         assert_eq!(labels, vec!["merge-commits"]);
     }

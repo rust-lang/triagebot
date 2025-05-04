@@ -29,7 +29,7 @@ pub(super) async fn behind_upstream(
             return Some(format!(
                 r"This PR is based on an upstream commit that is {} days old.
 
-    *It's recommended to update your branch according to the [rustc_dev_guide](https://rustc-dev-guide.rust-lang.org/contributing.html#keeping-your-branch-up-to-date).*",
+*It's recommended to update your branch according to the [rustc_dev_guide](https://rustc-dev-guide.rust-lang.org/contributing.html#keeping-your-branch-up-to-date).*",
                 days_old
             ));
         }
