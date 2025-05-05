@@ -10,7 +10,7 @@ pub(super) fn mentions_in_commits(
     let mentions_commits = commits
         .into_iter()
         .filter(|c| !parser::get_mentions(&c.commit.message).is_empty())
-        .map(|c| format!("    - {}\n", c.sha))
+        .map(|c| format!("- {}\n", c.sha))
         .collect::<String>();
 
     if mentions_commits.is_empty() {
@@ -18,7 +18,7 @@ pub(super) fn mentions_in_commits(
     } else {
         Some(format!(
             r"There are username mentions (such as `@user`) in the commit messages of the following commits.
-  *Please remove the mentions to avoid spamming these users.*
+*Please remove the mentions to avoid spamming these users.*
 {mentions_commits}",
         ))
     }
@@ -53,8 +53,8 @@ Co-authored-by: Baz Qux <bazqux@example.com>",
         mentions_in_commits(&NoMentionsConfig {}, &commits),
         Some(
             r"There are username mentions (such as `@user`) in the commit messages of the following commits.
-  *Please remove the mentions to avoid spamming these users.*
-    - d7daa17bc97df9377640b0d33cbd0bbeed703c3a
+*Please remove the mentions to avoid spamming these users.*
+- d7daa17bc97df9377640b0d33cbd0bbeed703c3a
 ".to_string()
         )
     );
