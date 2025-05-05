@@ -10,9 +10,13 @@ static LINKED_RE: LazyLock<Regex> =
 const MERGE_IGNORE_LIST: [&str; 3] = ["Rollup merge of ", "Auto merge of ", "Merge pull request "];
 
 pub(super) fn issue_links_in_commits(
-    _conf: &IssueLinksConfig,
+    conf: &IssueLinksConfig,
     commits: &[GithubCommit],
 ) -> Option<String> {
+    if !conf.check_commits {
+        return None;
+    }
+
     let issue_links_commits = commits
         .into_iter()
         .filter(|c| {
@@ -39,7 +43,9 @@ pub(super) fn issue_links_in_commits(
 fn test_mentions_in_commits() {
     use super::dummy_commit_from_body;
 
-    let config = IssueLinksConfig {};
+    let config = IssueLinksConfig {
+        check_commits: true,
+    };
 
     let mut commits = vec![dummy_commit_from_body(
         "d1992a392617dfb10518c3e56446b6c9efae38b0",
@@ -76,6 +82,16 @@ fn test_mentions_in_commits() {
     - d7daa17bc97df9377640b0d33cbd0bbeed703c3a
 ".to_string()
         )
+    );
+
+    assert_eq!(
+        issue_links_in_commits(
+            &IssueLinksConfig {
+                check_commits: false,
+            },
+            &commits
+        ),
+        None
     );
 
     commits.push(dummy_commit_from_body(

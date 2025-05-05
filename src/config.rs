@@ -465,7 +465,10 @@ pub(crate) struct RenderedLinkConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
-pub(crate) struct IssueLinksConfig {}
+pub(crate) struct IssueLinksConfig {
+    #[serde(default = "default_true")]
+    pub(crate) check_commits: bool,
+}
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -480,6 +483,11 @@ pub(crate) struct BehindUpstreamConfig {
     /// The threshold of days for parent commit age to trigger a warning.
     /// Default is 7 days if not specified.
     pub(crate) days_threshold: Option<usize>,
+}
+
+#[inline]
+fn default_true() -> bool {
+    true
 }
 
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
@@ -603,7 +611,7 @@ mod tests {
 
             [shortcut]
 
-            [canonicalize-issue-links]
+            [issue-links]
 
             [rendered-link]
             trigger-files = ["posts/"]
@@ -674,7 +682,9 @@ mod tests {
                 rendered_link: Some(RenderedLinkConfig {
                     trigger_files: vec!["posts/".to_string()]
                 }),
-                issue_links: Some(IssueLinksConfig {}),
+                issue_links: Some(IssueLinksConfig {
+                    check_commits: true,
+                }),
                 no_mentions: Some(NoMentionsConfig {}),
                 behind_upstream: Some(BehindUpstreamConfig {
                     days_threshold: Some(14),
@@ -697,7 +707,8 @@ mod tests {
             title = "[stable"
             branch = "stable"
 
-            [canonicalize-issue-links]
+            [issue-links]
+            check-commits = false
 
             [behind-upstream]
             days-threshold = 7
@@ -747,7 +758,9 @@ mod tests {
                 merge_conflicts: None,
                 bot_pull_requests: None,
                 rendered_link: None,
-                issue_links: Some(IssueLinksConfig {}),
+                issue_links: Some(IssueLinksConfig {
+                    check_commits: false,
+                }),
                 no_mentions: None,
                 behind_upstream: Some(BehindUpstreamConfig {
                     days_threshold: Some(7),
