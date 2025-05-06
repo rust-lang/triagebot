@@ -82,6 +82,8 @@ pub(super) async fn parse_input(
         })),
         // We don't need to handle Opened explicitly, because that will trigger the Assigned event
         IssuesAction::Reopened
+        | IssuesAction::ReadyForReview
+        | IssuesAction::ConvertedToDraft
         | IssuesAction::Closed
         | IssuesAction::Deleted
         | IssuesAction::Transferred
