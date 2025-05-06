@@ -314,7 +314,7 @@ mod tests {
 
     #[tokio::test]
     async fn ignore_blocked_pr() {
-        run_test(|ctx| async move {
+        run_db_test(|ctx| async move {
             let user = user("Martin", 2);
 
             run_handler(
@@ -362,7 +362,7 @@ mod tests {
 
     #[tokio::test]
     async fn add_pr_to_workqueue_on_label() {
-        run_test(|ctx| async move {
+        run_db_test(|ctx| async move {
             let user = user("Martin", 2);
 
             run_handler(
