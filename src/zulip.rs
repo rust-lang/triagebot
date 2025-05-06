@@ -298,7 +298,7 @@ async fn workqueue_commands(
                 pluralize("PR", assigned_prs.len())
             );
             writeln!(response, "Review capacity: {capacity}\n")?;
-            writeln!(response, "*Note that only selected PRs that are assigned to you are considered as being in the review queue.*")?;
+            writeln!(response, "*Note that only certain PRs that are assigned to you are included in your review queue.*")?;
             response
         }
         "set-pr-limit" => {
