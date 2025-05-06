@@ -148,6 +148,10 @@ async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Op
     handle_command(ctx, gh_id, &req.data, &req.message).await
 }
 
+const WORKQUEUE_HELP: &str = r#"`work show`: show your assigned PRs
+`work set-pr-limit <number>|unlimited`: set the maximum number of PRs you can be assigned to
+`work set-rotation-mode <off|on>`: configure if you are *on* rotation or *off* rotation (e.g. when you are on a vacation)"#;
+
 fn handle_command<'a>(
     ctx: &'a Context,
     gh_id: anyhow::Result<u64>,
@@ -179,7 +183,7 @@ fn handle_command<'a>(
             Some("meta") => add_meta_notification(&ctx, gh_id, words).await
                 .map_err(|e| format_err!("Failed to parse `meta` command. Synopsis: meta <num> <text>: Add <text> to your notification identified by <num> (>0)\n\nError: {e:?}")),
             Some("work") => workqueue_commands(ctx, gh_id, words).await
-                                                                    .map_err(|e| format_err!("Failed to parse `work` command. Synopsis: work <show>: shows your current PRs assignment\n\nError: {e:?}")),
+                                                                    .map_err(|e| format_err!("Failed to parse `work` command. Help: {WORKQUEUE_HELP}\n\nError: {e:?}")),
             _ => {
                 while let Some(word) = next {
                     if word == "@**triagebot**" {
@@ -333,7 +337,7 @@ async fn workqueue_commands(
                         )?)
                     }
                 }
-                None => anyhow::bail!("Missing parameter. See `work help` for more information."),
+                None => anyhow::bail!("Missing parameter."),
             };
             upsert_review_prefs(
                 &db_client,
@@ -361,10 +365,10 @@ async fn workqueue_commands(
                     match value {
                         "on" => RotationMode::OnRotation,
                         "off" => RotationMode::OffRotation,
-                        _ => anyhow::bail!("Unknown rotation mode {value}. Use `on` or `off`.")
+                        _ => anyhow::bail!("Unknown rotation mode {value}. Use `on` or `off`."),
                     }
                 }
-                None => anyhow::bail!("Missing parameter. See `work help` for more information."),
+                None => anyhow::bail!("Missing parameter."),
             };
             upsert_review_prefs(
                 &db_client,
@@ -372,18 +376,18 @@ async fn workqueue_commands(
                 review_prefs.and_then(|p| p.max_assigned_prs.map(|v| v as u32)),
                 rotation_mode,
             )
-                .await
-                .context("Error occurred while setting review preferences.")?;
+            .await
+            .context("Error occurred while setting review preferences.")?;
             tracing::info!("Setting rotation mode `{gh_username}` to {rotation_mode:?}");
             format!(
-                "Rotation mode set to {rotation_mode:?}"
+                "Rotation mode set to {}",
+                match rotation_mode {
+                    RotationMode::OnRotation => "*on rotation*",
+                    RotationMode::OffRotation => "*off rotation*.",
+                }
             )
         }
-        "help" => r"`work show`: show your assigned PRs
-`work set-pr-limit <number>|unlimited`: set the maximum number of PRs you can be assigned to
-`work set-rotation-mode <off|on>`: configure if you are *on* rotation or *off* rotation (e.g. when you are on a vacation)
-"
-            .to_string(),
+        "help" => WORKQUEUE_HELP.to_string(),
         _ => anyhow::bail!("Invalid subcommand."),
     };
 
