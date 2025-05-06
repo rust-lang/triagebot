@@ -109,7 +109,7 @@ pub(super) async fn handle_input<'a>(
     // If the PR doesn't wait for a review, remove it from the workqueue completely.
     // This handles situations such as labels being modified, which make the PR no longer to be
     // in the "waiting for a review" state, or the PR being closed/merged.
-    if !waits_for_a_review(&pr.labels, pr.is_open(), pr.draft) {
+    if !waits_for_a_review(&pr.labels, &pr.assignees, &pr.user, pr.is_open(), pr.draft) {
         log::info!(
             "Removing PR {pr_number} from workqueue, because it is not waiting for a review.",
         );
@@ -202,8 +202,23 @@ pub async fn retrieve_pull_request_assignments(
             .into_iter()
             .map(|l| Label { name: l.name })
             .collect::<Vec<Label>>();
+        let assignees = pr
+            .assignees
+            .as_ref()
+            .map(|authors| authors.iter().map(User::from).collect::<Vec<_>>())
+            .unwrap_or_default();
+        let author = pr
+            .user
+            .as_ref()
+            .map(|author| User::from(author.as_ref()))
+            .unwrap_or_else(|| User {
+                login: "ghost".to_string(),
+                id: 0,
+            });
         if waits_for_a_review(
             &labels,
+            &assignees,
+            &author,
             pr.state == Some(IssueState::Open),
             pr.draft.unwrap_or_default(),
         ) {
@@ -271,14 +286,26 @@ fn delete_pr_from_all_queues(workqueue: &mut ReviewerWorkqueue, pr: PullRequestN
 ///
 /// Note: this functionality is currently hardcoded for rust-lang/rust, other repos might use
 /// different labels.
-fn waits_for_a_review(labels: &[Label], is_open: bool, is_draft: bool) -> bool {
+fn waits_for_a_review(
+    labels: &[Label],
+    assignees: &[User],
+    author: &User,
+    is_open: bool,
+    is_draft: bool,
+) -> bool {
     let is_blocked = labels
         .iter()
         .any(|l| l.name == "S-blocked" || l.name == "S-inactive");
     let is_rollup = labels.iter().any(|l| l.name == "rollup");
     let is_waiting_for_reviewer = labels.iter().any(|l| l.name == "S-waiting-on-review");
+    let is_assigned_to_author = assignees.contains(author);
 
-    is_open && !is_draft && !is_blocked && !is_rollup && is_waiting_for_reviewer
+    is_open
+        && !is_draft
+        && !is_blocked
+        && !is_rollup
+        && is_waiting_for_reviewer
+        && !is_assigned_to_author
 }
 
 #[cfg(test)]

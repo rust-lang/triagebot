@@ -4,6 +4,7 @@ use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::{future::BoxFuture, FutureExt};
 use hyper::header::HeaderValue;
+use octocrab::models::Author;
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
@@ -22,6 +23,15 @@ pub type PullRequestNumber = u64;
 pub struct User {
     pub login: String,
     pub id: UserId,
+}
+
+impl From<&Author> for User {
+    fn from(author: &Author) -> Self {
+        Self {
+            id: author.id.0,
+            login: author.login.clone(),
+        }
+    }
 }
 
 impl GithubClient {
