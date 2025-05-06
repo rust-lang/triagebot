@@ -799,32 +799,60 @@ async fn find_reviewer_from_names(
         .to_string())
 }
 
+#[derive(Eq, PartialEq, Hash)]
+struct ReviewerCandidate {
+    name: String,
+    origin: ReviewerCandidateOrigin,
+}
+
+#[derive(Eq, PartialEq, Hash, Copy, Clone)]
+enum ReviewerCandidateOrigin {
+    /// This reviewer was directly requested for a review.
+    Direct,
+    /// This reviewer was expanded from a team or an assign group.
+    Expanded,
+}
+
 /// Recursively expand all teams and adhoc groups found within `names`.
 /// Returns a set of expanded usernames.
 /// Also normalizes usernames from `@user` to `user`.
-///
-/// Returns `(set of expanded users, expansion_happened)`.
-/// `expansion_happened` signals if any expansion has been performed.
 fn expand_teams_and_groups(
     teams: &Teams,
     issue: &Issue,
     config: &AssignConfig,
     names: &[String],
-) -> Result<(HashSet<String>, bool), FindReviewerError> {
-    let mut expanded = HashSet::new();
-    let mut expansion_happened = false;
+) -> Result<HashSet<ReviewerCandidate>, FindReviewerError> {
+    let mut selected_candidates: HashSet<String> = HashSet::new();
 
     // Keep track of groups seen to avoid cycles and avoid expanding the same
     // team multiple times.
     let mut seen_names = HashSet::new();
 
+    enum Candidate<'a> {
+        Direct(&'a str),
+        Expanded(&'a str),
+    }
+
     // This is a queue of potential groups or usernames to expand. The loop
     // below will pop from this and then append the expanded results of teams.
-    // Usernames will be added to `expanded`.
-    let mut to_be_expanded: Vec<&str> = names.iter().map(|n| n.as_str()).collect();
+    // Usernames will be added to `selected_candidates`.
+    let mut to_be_expanded: Vec<Candidate> = names
+        .iter()
+        .map(|n| Candidate::Direct(n.as_str()))
+        .collect();
+
+    // We store the directly requested usernames (after normalization).
+    // A username can be both directly requested and expanded from a group/team, the former
+    // should have priority.
+    let mut directly_requested: HashSet<&str> = HashSet::new();
 
     // Loop over names to recursively expand them.
-    while let Some(name_to_expand) = to_be_expanded.pop() {
+    while let Some(candidate) = to_be_expanded.pop() {
+        let name_to_expand = match &candidate {
+            Candidate::Direct(name) => name,
+            Candidate::Expanded(name) => name,
+        };
+
         // `name_to_expand` could be a team name, an adhoc group name or a username.
         let maybe_team = get_team_name(teams, issue, name_to_expand);
         let maybe_group = strip_organization_prefix(issue, name_to_expand);
@@ -832,11 +860,13 @@ fn expand_teams_and_groups(
 
         // Try ad-hoc groups first.
         if let Some(group_members) = config.adhoc_groups.get(maybe_group) {
-            expansion_happened = true;
-
             // If a group has already been expanded, don't expand it again.
             if seen_names.insert(maybe_group) {
-                to_be_expanded.extend(group_members.iter().map(|s| s.as_str()));
+                to_be_expanded.extend(
+                    group_members
+                        .iter()
+                        .map(|s| Candidate::Expanded(s.as_str())),
+                );
             }
             continue;
         }
@@ -848,8 +878,7 @@ fn expand_teams_and_groups(
         //
         // This ignores subteam relationships (it only uses direct members).
         if let Some(team) = maybe_team.and_then(|t| teams.teams.get(t)) {
-            expansion_happened = true;
-            expanded.extend(team.members.iter().map(|member| member.github.clone()));
+            selected_candidates.extend(team.members.iter().map(|member| member.github.clone()));
             continue;
         }
 
@@ -860,14 +889,31 @@ fn expand_teams_and_groups(
         }
 
         // Assume it is a user.
-        expanded.insert(maybe_user.to_string());
+        let username = maybe_user.to_string();
+        selected_candidates.insert(username);
+
+        if let Candidate::Direct(_) = candidate {
+            directly_requested.insert(maybe_user);
+        }
     }
 
-    Ok((expanded, expansion_happened))
+    // Now that we have a unique set of candidates, figure out which ones of them were requested
+    // directly.
+    Ok(selected_candidates
+        .into_iter()
+        .map(|name| {
+            let origin = if directly_requested.contains(name.as_str()) {
+                ReviewerCandidateOrigin::Direct
+            } else {
+                ReviewerCandidateOrigin::Expanded
+            };
+            ReviewerCandidate { name, origin }
+        })
+        .collect())
 }
 
 /// Returns a list of candidate usernames (from relevant teams) to choose as a reviewer.
-/// If not reviewer is available, returns an error.
+/// If no reviewer is available, returns an error.
 async fn candidate_reviewers_from_names<'a>(
     db: &DbClient,
     workqueue: Arc<RwLock<ReviewerWorkqueue>>,
@@ -877,15 +923,23 @@ async fn candidate_reviewers_from_names<'a>(
     names: &'a [String],
 ) -> Result<HashSet<String>, FindReviewerError> {
     // Step 1: expand teams and groups into candidate names
-    let (expanded, expansion_happened) = expand_teams_and_groups(teams, issue, config, names)?;
+    let expanded = expand_teams_and_groups(teams, issue, config, names)?;
     let expanded_count = expanded.len();
+
+    // Was it a request for a single user, i.e. `r? @username`?
+    let is_single_user = expanded_count == 1
+        && matches!(
+            expanded.iter().next().map(|c| c.origin),
+            Some(ReviewerCandidateOrigin::Direct)
+        );
 
     // Set of candidate usernames to choose from.
     // We go through each expanded candidate and store either success or an error for them.
     let mut candidates: Vec<Result<String, FindReviewerError>> = Vec::new();
 
     // Step 2: pre-filter candidates based on checks that we can perform quickly
-    for candidate in expanded {
+    for reviewer_candidate in expanded {
+        let candidate = &reviewer_candidate.name;
         let name_lower = candidate.to_lowercase();
         let is_pr_author = name_lower == issue.user.login.to_lowercase();
         let is_on_vacation = config.is_on_vacation(&candidate);
@@ -916,7 +970,7 @@ async fn candidate_reviewers_from_names<'a>(
         if let Some(error_reason) = reason {
             candidates.push(Err(error_reason));
         } else {
-            candidates.push(Ok(candidate));
+            candidates.push(Ok(reviewer_candidate.name));
         }
     }
     assert_eq!(candidates.len(), expanded_count);
@@ -968,9 +1022,6 @@ async fn candidate_reviewers_from_names<'a>(
         .collect();
 
     if valid_candidates.is_empty() {
-        // Was it a request for a single user, i.e. `r? @username`?
-        let is_single_user = names.len() == 1 && !expansion_happened;
-
         // If we requested a single user for a review, we return a concrete error message
         // describing why they couldn't be assigned.
         if is_single_user {
