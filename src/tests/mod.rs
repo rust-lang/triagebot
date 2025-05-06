@@ -43,7 +43,7 @@ impl TestContext {
         // There does not seem to be a way to turn the config back into a connection
         // string, so construct it manually.
         let test_db_url = format!(
-            "postgresql://{}:{}@{}/{}",
+            "postgresql://{}:{}@{}:{}/{}",
             config.get_user().unwrap(),
             String::from_utf8(config.get_password().unwrap().to_vec()).unwrap(),
             match &config.get_hosts()[0] {
@@ -51,6 +51,7 @@ impl TestContext {
                 Host::Unix(_) =>
                     panic!("Unix sockets in Postgres connection string are not supported"),
             },
+            &config.get_ports()[0],
             db_name
         );
         let pool = ClientPool::new(test_db_url.clone());
