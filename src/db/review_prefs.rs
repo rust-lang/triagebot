@@ -1,10 +1,9 @@
 use crate::db::users::record_username;
 use crate::github::{User, UserId};
 use anyhow::Context;
-use serde::Serialize;
 use std::collections::HashMap;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct ReviewPrefs {
     pub id: uuid::Uuid,
     pub user_id: i64,
