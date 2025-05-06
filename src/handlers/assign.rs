@@ -20,6 +20,9 @@
 //! `assign.owners` config, it will auto-select an assignee based on the files
 //! the PR modifies.
 
+use crate::db::review_prefs::get_review_prefs_batch;
+use crate::github::UserId;
+use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::{
     config::AssignConfig,
     github::{self, Event, FileDiff, Issue, IssuesAction, Selection},
@@ -33,6 +36,8 @@ use rand::seq::IteratorRandom;
 use rust_team_data::v1::Teams;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio_postgres::Client as DbClient;
 use tracing as log;
 
@@ -299,7 +304,16 @@ async fn determine_assignee(
     let teams = crate::team_data::teams(&ctx.github).await?;
     if let Some(name) = assign_command {
         // User included `r?` in the opening PR body.
-        match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &[name]).await {
+        match find_reviewer_from_names(
+            &db_client,
+            ctx.workqueue.clone(),
+            &teams,
+            config,
+            &event.issue,
+            &[name],
+        )
+        .await
+        {
             Ok(assignee) => return Ok((Some(assignee), true)),
             Err(e) => {
                 event
@@ -313,8 +327,15 @@ async fn determine_assignee(
     // Errors fall-through to try fallback group.
     match find_reviewers_from_diff(config, diff) {
         Ok(candidates) if !candidates.is_empty() => {
-            match find_reviewer_from_names(&db_client, &teams, config, &event.issue, &candidates)
-                .await
+            match find_reviewer_from_names(
+                &db_client,
+                ctx.workqueue.clone(),
+                &teams,
+                config,
+                &event.issue,
+                &candidates,
+            )
+            .await
             {
                 Ok(assignee) => return Ok((Some(assignee), false)),
                 Err(FindReviewerError::TeamNotFound(team)) => log::warn!(
@@ -326,7 +347,9 @@ async fn determine_assignee(
                     e @ FindReviewerError::NoReviewer { .. }
                     | e @ FindReviewerError::ReviewerIsPrAuthor { .. }
                     | e @ FindReviewerError::ReviewerAlreadyAssigned { .. }
-                    | e @ FindReviewerError::ReviewerOnVacation { .. },
+                    | e @ FindReviewerError::ReviewerOnVacation { .. }
+                    | e @ FindReviewerError::DatabaseError(_)
+                    | e @ FindReviewerError::ReviewerAtMaxCapacity { .. },
                 ) => log::trace!(
                     "no reviewer could be determined for PR {}: {e}",
                     event.issue.global_id()
@@ -344,7 +367,16 @@ async fn determine_assignee(
     }
 
     if let Some(fallback) = config.adhoc_groups.get("fallback") {
-        match find_reviewer_from_names(&db_client, &teams, config, &event.issue, fallback).await {
+        match find_reviewer_from_names(
+            &db_client,
+            ctx.workqueue.clone(),
+            &teams,
+            config,
+            &event.issue,
+            fallback,
+        )
+        .await
+        {
             Ok(assignee) => return Ok((Some(assignee), false)),
             Err(e) => {
                 log::trace!(
@@ -522,6 +554,7 @@ pub(super) async fn handle_command(
         let db_client = ctx.db.get().await;
         let assignee = match find_reviewer_from_names(
             &db_client,
+            ctx.workqueue.clone(),
             &teams,
             config,
             issue,
@@ -646,6 +679,10 @@ enum FindReviewerError {
     ReviewerIsPrAuthor { username: String },
     /// Requested reviewer is already assigned to that PR
     ReviewerAlreadyAssigned { username: String },
+    /// Data required for assignment could not be loaded from the DB.
+    DatabaseError(String),
+    /// The reviewer has too many PRs alreayd assigned.
+    ReviewerAtMaxCapacity { username: String },
 }
 
 impl std::error::Error for FindReviewerError {}
@@ -688,6 +725,17 @@ impl fmt::Display for FindReviewerError {
                     REVIEWER_ALREADY_ASSIGNED.replace("{username}", username)
                 )
             }
+            FindReviewerError::DatabaseError(error) => {
+                write!(f, "Database error: {error}")
+            }
+            FindReviewerError::ReviewerAtMaxCapacity { username } => {
+                write!(
+                    f,
+                    r"`{username}` has too many PRs assigned to them.
+
+Please select a different reviewer.",
+                )
+            }
         }
     }
 }
@@ -699,7 +747,8 @@ impl fmt::Display for FindReviewerError {
 /// auto-assign groups, or rust-lang team names. It must have at least one
 /// entry.
 async fn find_reviewer_from_names(
-    _db: &DbClient,
+    db: &DbClient,
+    workqueue: Arc<RwLock<ReviewerWorkqueue>>,
     teams: &Teams,
     config: &AssignConfig,
     issue: &Issue,
@@ -712,7 +761,10 @@ async fn find_reviewer_from_names(
         }
     }
 
-    let candidates = candidate_reviewers_from_names(teams, config, issue, names)?;
+    let candidates =
+        candidate_reviewers_from_names(db, workqueue, teams, config, issue, names).await?;
+    assert!(!candidates.is_empty());
+
     // This uses a relatively primitive random choice algorithm.
     // GitHub's CODEOWNERS supports much more sophisticated options, such as:
     //
@@ -816,12 +868,15 @@ fn expand_teams_and_groups(
 
 /// Returns a list of candidate usernames (from relevant teams) to choose as a reviewer.
 /// If not reviewer is available, returns an error.
-fn candidate_reviewers_from_names<'a>(
+async fn candidate_reviewers_from_names<'a>(
+    db: &DbClient,
+    workqueue: Arc<RwLock<ReviewerWorkqueue>>,
     teams: &'a Teams,
     config: &'a AssignConfig,
     issue: &Issue,
     names: &'a [String],
 ) -> Result<HashSet<String>, FindReviewerError> {
+    // Step 1: expand teams and groups into candidate names
     let (expanded, expansion_happened) = expand_teams_and_groups(teams, issue, config, names)?;
     let expanded_count = expanded.len();
 
@@ -829,6 +884,7 @@ fn candidate_reviewers_from_names<'a>(
     // We go through each expanded candidate and store either success or an error for them.
     let mut candidates: Vec<Result<String, FindReviewerError>> = Vec::new();
 
+    // Step 2: pre-filter candidates based on checks that we can perform quickly
     for candidate in expanded {
         let name_lower = candidate.to_lowercase();
         let is_pr_author = name_lower == issue.user.login.to_lowercase();
@@ -865,9 +921,50 @@ fn candidate_reviewers_from_names<'a>(
     }
     assert_eq!(candidates.len(), expanded_count);
 
-    let valid_candidates: HashSet<String> = candidates
+    if config.review_prefs.is_some() {
+        // Step 3: gather potential usernames to form a DB query for review preferences
+        let usernames: Vec<String> = candidates
+            .iter()
+            .filter_map(|res| res.as_deref().ok().map(|s| s.to_string()))
+            .collect();
+        let usernames: Vec<&str> = usernames.iter().map(|s| s.as_str()).collect();
+        let review_prefs = get_review_prefs_batch(db, &usernames)
+            .await
+            .context("cannot fetch review preferences")
+            .map_err(|e| FindReviewerError::DatabaseError(e.to_string()))?;
+
+        let workqueue = workqueue.read().await;
+
+        // Step 4: check review preferences
+        candidates = candidates
+            .into_iter()
+            .map(|username| {
+                // Only consider candidates that did not have an earlier error
+                let username = username?;
+
+                // If no review prefs were found, we assume the default unlimited
+                // review capacity.
+                let Some(review_prefs) = review_prefs.get(username.as_str()) else {
+                    return Ok(username);
+                };
+                let Some(capacity) = review_prefs.max_assigned_prs else {
+                    return Ok(username);
+                };
+                let assigned_prs = workqueue.assigned_pr_count(review_prefs.user_id as UserId);
+                // Can we assign one more PR?
+                if (assigned_prs as i32) < capacity {
+                    Ok(username)
+                } else {
+                    Err(FindReviewerError::ReviewerAtMaxCapacity { username })
+                }
+            })
+            .collect();
+    }
+    assert_eq!(candidates.len(), expanded_count);
+
+    let valid_candidates: HashSet<&str> = candidates
         .iter()
-        .filter_map(|res| res.as_ref().ok().cloned())
+        .filter_map(|res| res.as_deref().ok())
         .collect();
 
     if valid_candidates.is_empty() {
@@ -894,6 +991,9 @@ fn candidate_reviewers_from_names<'a>(
             })
         }
     } else {
-        Ok(valid_candidates)
+        Ok(valid_candidates
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect())
     }
 }

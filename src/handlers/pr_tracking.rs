@@ -36,6 +36,18 @@ impl ReviewerWorkqueue {
     pub fn new(reviewers: HashMap<UserId, HashSet<PullRequestNumber>>) -> Self {
         Self { reviewers }
     }
+
+    pub fn assigned_pr_count(&self, user_id: UserId) -> u64 {
+        self.reviewers
+            .get(&user_id)
+            .map(|prs| prs.len() as u64)
+            .unwrap_or(0)
+    }
+
+    #[cfg(test)]
+    pub fn set_user_prs(&mut self, user_id: UserId, prs: HashSet<PullRequestNumber>) {
+        self.reviewers.insert(user_id, prs);
+    }
 }
 
 pub(super) enum ReviewPrefsInput {
@@ -274,11 +286,11 @@ mod tests {
     use crate::github::{Label, PullRequestNumber};
     use crate::handlers::pr_tracking::{handle_input, parse_input, upsert_pr_into_user_queue};
     use crate::tests::github::{default_test_user, issue, pull_request, user};
-    use crate::tests::{run_test, TestContext};
+    use crate::tests::{run_db_test, TestContext};
 
     #[tokio::test]
     async fn add_pr_to_workqueue_on_assign() {
-        run_test(|ctx| async move {
+        run_db_test(|ctx| async move {
             let user = user("Martin", 2);
 
             run_handler(
@@ -302,7 +314,7 @@ mod tests {
 
     #[tokio::test]
     async fn ignore_blocked_pr() {
-        run_test(|ctx| async move {
+        run_db_test(|ctx| async move {
             let user = user("Martin", 2);
 
             run_handler(
@@ -325,7 +337,7 @@ mod tests {
 
     #[tokio::test]
     async fn remove_pr_from_workqueue_on_unassign() {
-        run_test(|ctx| async move {
+        run_db_test(|ctx| async move {
             let user = user("Martin", 2);
             set_assigned_prs(&ctx, &user, &[10]).await;
 
@@ -350,7 +362,7 @@ mod tests {
 
     #[tokio::test]
     async fn add_pr_to_workqueue_on_label() {
-        run_test(|ctx| async move {
+        run_db_test(|ctx| async move {
             let user = user("Martin", 2);
 
             run_handler(
@@ -387,7 +399,7 @@ mod tests {
 
     #[tokio::test]
     async fn remove_pr_from_workqueue_on_pr_closed() {
-        run_test(|ctx| async move {
+        run_db_test(|ctx| async move {
             let user = user("Martin", 2);
             set_assigned_prs(&ctx, &user, &[10]).await;
 
@@ -410,7 +422,7 @@ mod tests {
 
     #[tokio::test]
     async fn add_pr_to_workqueue_on_pr_reopen() {
-        run_test(|ctx| async move {
+        run_db_test(|ctx| async move {
             let user = user("Martin", 2);
             set_assigned_prs(&ctx, &user, &[42]).await;
 
@@ -435,7 +447,7 @@ mod tests {
     // Make sure that we only consider pull requests, not issues.
     #[tokio::test]
     async fn ignore_issue_assignments() {
-        run_test(|ctx| async move {
+        run_db_test(|ctx| async move {
             let user = user("Martin", 2);
 
             run_handler(

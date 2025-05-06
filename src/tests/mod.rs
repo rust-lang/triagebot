@@ -8,7 +8,7 @@ use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_postgres::config::Host;
-use tokio_postgres::{Config, GenericClient};
+use tokio_postgres::Config;
 
 pub(crate) mod github;
 
@@ -16,10 +16,11 @@ pub(crate) mod github;
 /// used in integration tests to test logic that interacts with
 /// a database.
 pub(crate) struct TestContext {
-    pool: ClientPool,
     ctx: Context,
     db_name: String,
     original_db_url: String,
+    // Pre-cached client to avoid creating unnecessary connections in tests
+    client: PooledClient,
 }
 
 impl TestContext {
@@ -53,7 +54,8 @@ impl TestContext {
             db_name
         );
         let pool = ClientPool::new(test_db_url.clone());
-        db::run_migrations(&mut *pool.get().await)
+        let mut client = pool.get().await;
+        db::run_migrations(&mut client)
             .await
             .expect("Cannot run database migrations");
 
@@ -66,17 +68,17 @@ impl TestContext {
         );
         let ctx = Context {
             github,
-            db: ClientPool::new(test_db_url),
+            db: pool,
             username: "triagebot-test".to_string(),
             octocrab,
             workqueue: Arc::new(RwLock::new(Default::default())),
         };
 
         Self {
-            pool,
             db_name,
             original_db_url: db_url.to_string(),
             ctx,
+            client,
         }
     }
 
@@ -87,13 +89,12 @@ impl TestContext {
         &self.ctx
     }
 
-    pub(crate) async fn db_client(&self) -> PooledClient {
-        self.pool.get().await
+    pub(crate) fn db_client(&self) -> &PooledClient {
+        &self.client
     }
 
-    #[allow(dead_code)]
     pub(crate) async fn add_user(&self, name: &str, id: u64) {
-        record_username(self.db_client().await.client(), id, name)
+        record_username(self.db_client(), id, name)
             .await
             .expect("Cannot create user");
     }
@@ -101,7 +102,8 @@ impl TestContext {
     async fn finish(self) {
         // Cleanup the test database
         // First, we need to stop using the database
-        drop(self.pool);
+        drop(self.client);
+        drop(self.ctx);
 
         // Then we need to connect to the default database and drop our test DB
         let client = make_client(&self.original_db_url)
@@ -114,7 +116,7 @@ impl TestContext {
     }
 }
 
-pub(crate) async fn run_test<F, Fut>(f: F)
+pub(crate) async fn run_db_test<F, Fut>(f: F)
 where
     F: FnOnce(TestContext) -> Fut,
     Fut: Future<Output = anyhow::Result<TestContext>>,

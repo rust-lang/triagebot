@@ -1,23 +1,30 @@
 //! Tests for `candidate_reviewers_from_names`
 
 use super::super::*;
+use crate::db::review_prefs::upsert_review_prefs;
+use crate::github::{PullRequestNumber, User};
 use crate::tests::github::{issue, user};
+use crate::tests::{run_db_test, TestContext};
 
 #[must_use]
-struct TestCtx {
+struct AssignCtx {
+    test_ctx: TestContext,
     teams: Teams,
     config: AssignConfig,
     issue: Issue,
+    reviewer_workqueue: ReviewerWorkqueue,
 }
 
-impl TestCtx {
-    fn new(config: toml::Table, issue: Issue) -> Self {
+impl AssignCtx {
+    fn new(test_ctx: TestContext, config: toml::Table, issue: Issue) -> Self {
         Self {
+            test_ctx,
             teams: Teams {
                 teams: Default::default(),
             },
             config: config.try_into().unwrap(),
             issue,
+            reviewer_workqueue: Default::default(),
         }
     }
 
@@ -41,12 +48,36 @@ impl TestCtx {
         self
     }
 
-    fn run(self, names: &[&str], expected: Result<&[&str], FindReviewerError>) {
+    fn assign_prs(mut self, user_id: UserId, count: u64) -> Self {
+        let prs: HashSet<PullRequestNumber> = (0..count).collect();
+        self.reviewer_workqueue.set_user_prs(user_id, prs);
+        self
+    }
+
+    async fn set_max_capacity(self, user: &User, capacity: Option<u32>) -> Self {
+        upsert_review_prefs(self.test_ctx.db_client(), user.clone(), capacity)
+            .await
+            .unwrap();
+        self
+    }
+
+    async fn check(
+        self,
+        names: &[&str],
+        expected: Result<&[&str], FindReviewerError>,
+    ) -> anyhow::Result<TestContext> {
         let names: Vec<_> = names.iter().map(|n| n.to_string()).collect();
-        match (
-            candidate_reviewers_from_names(&self.teams, &self.config, &self.issue, &names),
-            expected,
-        ) {
+
+        let reviewers = candidate_reviewers_from_names(
+            self.test_ctx.db_client(),
+            Arc::new(RwLock::new(self.reviewer_workqueue)),
+            &self.teams,
+            &self.config,
+            &self.issue,
+            &names,
+        )
+        .await;
+        match (reviewers, expected) {
             (Ok(candidates), Ok(expected)) => {
                 let mut candidates: Vec<_> = candidates.into_iter().collect();
                 candidates.sort();
@@ -58,33 +89,196 @@ impl TestCtx {
             }
             (Ok(candidates), Err(_)) => panic!("expected Err, got Ok: {candidates:?}"),
             (Err(e), Ok(_)) => panic!("expected Ok, got Err: {e}"),
-        }
+        };
+        Ok(self.test_ctx)
     }
 }
 
 /// Basic test function for testing `candidate_reviewers_from_names`.
-fn test_candidates(config: toml::Table, issue: Issue) -> TestCtx {
-    TestCtx::new(config, issue)
+fn basic_test(ctx: TestContext, config: toml::Table, issue: Issue) -> AssignCtx {
+    AssignCtx::new(ctx, config, issue)
 }
 
-#[test]
-fn circular_groups() {
+fn review_prefs_test(ctx: TestContext) -> AssignCtx {
+    let config = toml::toml!([review_prefs]);
+    basic_test(ctx, config, issue().call())
+}
+
+#[tokio::test]
+async fn no_assigned_prs() {
+    run_db_test(|ctx| async move {
+        let user = user("martin", 1);
+        review_prefs_test(ctx)
+            .set_max_capacity(&user, Some(3))
+            .await
+            .check(&["martin"], Ok(&["martin"]))
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn no_review_prefs() {
+    run_db_test(|ctx| async move {
+        ctx.add_user("martin", 1).await;
+        review_prefs_test(ctx)
+            .assign_prs(1, 3)
+            .check(&["martin"], Ok(&["martin"]))
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn at_max_capacity() {
+    run_db_test(|ctx| async move {
+        let user = user("martin", 1);
+        review_prefs_test(ctx)
+            .set_max_capacity(&user, Some(3))
+            .await
+            .assign_prs(user.id, 3)
+            .check(
+                &["martin"],
+                Err(FindReviewerError::ReviewerAtMaxCapacity {
+                    username: "martin".to_string(),
+                }),
+            )
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn below_max_capacity() {
+    run_db_test(|ctx| async move {
+        let user = user("martin", 1);
+        review_prefs_test(ctx)
+            .set_max_capacity(&user, Some(3))
+            .await
+            .assign_prs(user.id, 2)
+            .check(&["martin"], Ok(&["martin"]))
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn above_max_capacity() {
+    run_db_test(|ctx| async move {
+        let user = user("martin", 1);
+        review_prefs_test(ctx)
+            .set_max_capacity(&user, Some(3))
+            .await
+            .assign_prs(user.id, 10)
+            .check(
+                &["martin"],
+                Err(FindReviewerError::ReviewerAtMaxCapacity {
+                    username: "martin".to_string(),
+                }),
+            )
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn max_capacity_zero() {
+    run_db_test(|ctx| async move {
+        let user = user("martin", 1);
+        review_prefs_test(ctx)
+            .set_max_capacity(&user, Some(0))
+            .await
+            .assign_prs(user.id, 0)
+            .check(
+                &["martin"],
+                Err(FindReviewerError::ReviewerAtMaxCapacity {
+                    username: "martin".to_string(),
+                }),
+            )
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn ignore_username_case() {
+    run_db_test(|ctx| async move {
+        let user = user("MARtin", 1);
+        review_prefs_test(ctx)
+            .set_max_capacity(&user, Some(3))
+            .await
+            .assign_prs(user.id, 3)
+            .check(
+                &["MARTIN"],
+                Err(FindReviewerError::ReviewerAtMaxCapacity {
+                    username: "MARTIN".to_string(),
+                }),
+            )
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn unlimited_capacity() {
+    run_db_test(|ctx| async move {
+        let user = user("martin", 1);
+        review_prefs_test(ctx)
+            .set_max_capacity(&user, None)
+            .await
+            .assign_prs(user.id, 10)
+            .check(&["martin"], Ok(&["martin"]))
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn multiple_reviewers() {
+    run_db_test(|ctx| async move {
+        let users = &[user("martin", 1), user("jana", 2), user("mark", 3)];
+        let teams = toml::toml!(team = ["martin", "jana", "mark", "diana"]);
+        review_prefs_test(ctx)
+            .teams(&teams)
+            .set_max_capacity(&users[0], Some(3))
+            .await
+            .set_max_capacity(&users[1], Some(4))
+            .await
+            .set_max_capacity(&users[2], Some(2))
+            .await
+            .assign_prs(users[0].id, 4)
+            .assign_prs(users[1].id, 2)
+            .assign_prs(users[2].id, 2)
+            .check(&["team"], Ok(&["diana", "jana"]))
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn circular_groups() {
     // A cycle in the groups map.
     let config = toml::toml!(
         [adhoc_groups]
         compiler = ["other"]
         other = ["compiler"]
     );
-    test_candidates(config, issue().call()).run(
-        &["compiler"],
-        Err(FindReviewerError::NoReviewer {
-            initial: vec!["compiler".to_string()],
-        }),
-    );
+
+    run_db_test(|ctx| async move {
+        basic_test(ctx, config, issue().call())
+            .check(
+                &["compiler"],
+                Err(FindReviewerError::NoReviewer {
+                    initial: vec!["compiler".to_string()],
+                }),
+            )
+            .await
+    })
+    .await;
 }
 
-#[test]
-fn nested_groups() {
+#[tokio::test]
+async fn nested_groups() {
     // Test choosing a reviewer from group with nested groups.
     let config = toml::toml!(
         [adhoc_groups]
@@ -92,38 +286,52 @@ fn nested_groups() {
         b = ["@nrc"]
         c = ["a", "b"]
     );
-    test_candidates(config, issue().call()).run(&["c"], Ok(&["nrc", "pnkfelix"]));
+    run_db_test(|ctx| async move {
+        basic_test(ctx, config, issue().call())
+            .check(&["c"], Ok(&["nrc", "pnkfelix"]))
+            .await
+    })
+    .await;
 }
 
-#[test]
-fn candidate_filtered_author_only_candidate() {
+#[tokio::test]
+async fn candidate_filtered_author_only_candidate() {
     // When the author is the only candidate.
     let config = toml::toml!(
         [adhoc_groups]
         compiler = ["nikomatsakis"]
     );
-    test_candidates(config, issue().author(user("nikomatsakis", 1)).call()).run(
-        &["compiler"],
-        Err(FindReviewerError::NoReviewer {
-            initial: vec!["compiler".to_string()],
-        }),
-    );
+    run_db_test(|ctx| async move {
+        basic_test(ctx, config, issue().author(user("nikomatsakis", 1)).call())
+            .check(
+                &["compiler"],
+                Err(FindReviewerError::NoReviewer {
+                    initial: vec!["compiler".to_string()],
+                }),
+            )
+            .await
+    })
+    .await;
 }
 
-#[test]
-fn candidate_filtered_author() {
+#[tokio::test]
+async fn candidate_filtered_author() {
     // Filter out the author from the candidates.
     let config = toml::toml!(
         [adhoc_groups]
         compiler = ["user1", "user2", "user3", "group2"]
         group2 = ["user2", "user4"]
     );
-    test_candidates(config, issue().author(user("user2", 1)).call())
-        .run(&["compiler"], Ok(&["user1", "user3", "user4"]));
+    run_db_test(|ctx| async move {
+        basic_test(ctx, config, issue().author(user("user2", 1)).call())
+            .check(&["compiler"], Ok(&["user1", "user3", "user4"]))
+            .await
+    })
+    .await;
 }
 
-#[test]
-fn candidate_filtered_assignee() {
+#[tokio::test]
+async fn candidate_filtered_assignee() {
     // Filter out an existing assignee from the candidates.
     let config = toml::toml!(
         [adhoc_groups]
@@ -133,11 +341,16 @@ fn candidate_filtered_assignee() {
         .author(user("user2", 2))
         .assignees(vec![user("user1", 1), user("user3", 3)])
         .call();
-    test_candidates(config, issue).run(&["compiler"], Ok(&["user4"]));
+    run_db_test(|ctx| async move {
+        basic_test(ctx, config, issue)
+            .check(&["compiler"], Ok(&["user4"]))
+            .await
+    })
+    .await;
 }
 
-#[test]
-fn groups_teams_users() {
+#[tokio::test]
+async fn groups_teams_users() {
     // Assortment of groups, teams, and users all selected at once.
     let teams = toml::toml!(
         team1 = ["t-user1"]
@@ -147,30 +360,42 @@ fn groups_teams_users() {
         [adhoc_groups]
         group1 = ["user1", "rust-lang/team2"]
     );
-    test_candidates(config, issue().call()).teams(&teams).run(
-        &["team1", "group1", "user3"],
-        Ok(&["t-user1", "t-user2", "user1", "user3"]),
-    );
+    run_db_test(|ctx| async move {
+        basic_test(ctx, config, issue().call())
+            .teams(&teams)
+            .check(
+                &["team1", "group1", "user3"],
+                Ok(&["t-user1", "t-user2", "user1", "user3"]),
+            )
+            .await
+    })
+    .await;
 }
 
-#[test]
-fn group_team_user_precedence() {
+#[tokio::test]
+async fn group_team_user_precedence() {
     // How it handles ambiguity when names overlap.
     let teams = toml::toml!(compiler = ["t-user1"]);
     let config = toml::toml!(
         [adhoc_groups]
         compiler = ["user2"]
     );
-    test_candidates(config.clone(), issue().call())
-        .teams(&teams)
-        .run(&["compiler"], Ok(&["user2"]));
-    test_candidates(config, issue().call())
-        .teams(&teams)
-        .run(&["rust-lang/compiler"], Ok(&["user2"]));
+    run_db_test(|ctx| async move {
+        let ctx = basic_test(ctx, config.clone(), issue().call())
+            .teams(&teams)
+            .check(&["compiler"], Ok(&["user2"]))
+            .await?;
+
+        basic_test(ctx, config, issue().call())
+            .teams(&teams)
+            .check(&["rust-lang/compiler"], Ok(&["user2"]))
+            .await
+    })
+    .await;
 }
 
-#[test]
-fn what_do_slashes_mean() {
+#[tokio::test]
+async fn what_do_slashes_mean() {
     // How slashed names are handled.
     let teams = toml::toml!(compiler = ["t-user1"]);
     let config = toml::toml!(
@@ -180,47 +405,63 @@ fn what_do_slashes_mean() {
     );
     let issue = || issue().org("rust-lang-nursery").call();
 
-    // Random slash names should work from groups.
-    test_candidates(config.clone(), issue())
-        .teams(&teams)
-        .run(&["foo/bar"], Ok(&["foo-user"]));
+    run_db_test(|ctx| async move {
+        // Random slash names should work from groups.
+        let ctx = basic_test(ctx, config.clone(), issue())
+            .teams(&teams)
+            .check(&["foo/bar"], Ok(&["foo-user"]))
+            .await?;
 
-    test_candidates(config, issue())
-        .teams(&teams)
-        .run(&["rust-lang-nursery/compiler"], Ok(&["user2"]));
+        basic_test(ctx, config, issue())
+            .teams(&teams)
+            .check(&["rust-lang-nursery/compiler"], Ok(&["user2"]))
+            .await
+    })
+    .await;
 }
 
-#[test]
-fn invalid_org_doesnt_match() {
+#[tokio::test]
+async fn invalid_org_doesnt_match() {
     let teams = toml::toml!(compiler = ["t-user1"]);
     let config = toml::toml!(
         [adhoc_groups]
         compiler = ["user2"]
     );
-    test_candidates(config, issue().call()).teams(&teams).run(
-        &["github/compiler"],
-        Err(FindReviewerError::TeamNotFound(
-            "github/compiler".to_string(),
-        )),
-    );
+    run_db_test(|ctx| async move {
+        basic_test(ctx, config, issue().call())
+            .teams(&teams)
+            .check(
+                &["github/compiler"],
+                Err(FindReviewerError::TeamNotFound(
+                    "github/compiler".to_string(),
+                )),
+            )
+            .await
+    })
+    .await;
 }
 
-#[test]
-fn vacation() {
+#[tokio::test]
+async fn vacation() {
     let teams = toml::toml!(bootstrap = ["jyn514", "Mark-Simulacrum"]);
     let config = toml::toml!(users_on_vacation = ["jyn514"]);
 
-    // Test that `r? user` returns a specific error about the user being on vacation.
-    test_candidates(config.clone(), issue().call())
-        .teams(&teams)
-        .run(
-            &["jyn514"],
-            Err(FindReviewerError::ReviewerOnVacation {
-                username: "jyn514".to_string(),
-            }),
-        );
+    run_db_test(|ctx| async move {
+        // Test that `r? user` returns a specific error about the user being on vacation.
+        let ctx = basic_test(ctx, config.clone(), issue().call())
+            .teams(&teams)
+            .check(
+                &["jyn514"],
+                Err(FindReviewerError::ReviewerOnVacation {
+                    username: "jyn514".to_string(),
+                }),
+            )
+            .await?;
 
-    test_candidates(config.clone(), issue().call())
-        .teams(&teams)
-        .run(&["bootstrap"], Ok(&["Mark-Simulacrum"]));
+        basic_test(ctx, config.clone(), issue().call())
+            .teams(&teams)
+            .check(&["bootstrap"], Ok(&["Mark-Simulacrum"]))
+            .await
+    })
+    .await;
 }
