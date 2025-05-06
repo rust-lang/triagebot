@@ -1,7 +1,7 @@
 //! Tests for `candidate_reviewers_from_names`
 
 use super::super::*;
-use crate::db::review_prefs::upsert_review_prefs;
+use crate::db::review_prefs::{upsert_review_prefs, RotationMode};
 use crate::github::{PullRequestNumber, User};
 use crate::tests::github::{issue, user};
 use crate::tests::{run_db_test, TestContext};
@@ -54,10 +54,20 @@ impl AssignCtx {
         self
     }
 
-    async fn set_max_capacity(self, user: &User, capacity: Option<u32>) -> Self {
-        upsert_review_prefs(self.test_ctx.db_client(), user.clone(), capacity)
-            .await
-            .unwrap();
+    async fn set_review_prefs(
+        self,
+        user: &User,
+        capacity: Option<u32>,
+        rotation_mode: RotationMode,
+    ) -> Self {
+        upsert_review_prefs(
+            self.test_ctx.db_client(),
+            user.clone(),
+            capacity,
+            rotation_mode,
+        )
+        .await
+        .unwrap();
         self
     }
 
@@ -109,7 +119,7 @@ async fn no_assigned_prs() {
     run_db_test(|ctx| async move {
         let user = user("martin", 1);
         review_prefs_test(ctx)
-            .set_max_capacity(&user, Some(3))
+            .set_review_prefs(&user, Some(3), RotationMode::OnRotation)
             .await
             .check(&["martin"], Ok(&["martin"]))
             .await
@@ -134,7 +144,7 @@ async fn at_max_capacity() {
     run_db_test(|ctx| async move {
         let user = user("martin", 1);
         review_prefs_test(ctx)
-            .set_max_capacity(&user, Some(3))
+            .set_review_prefs(&user, Some(3), RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 3)
             .check(
@@ -153,7 +163,7 @@ async fn below_max_capacity() {
     run_db_test(|ctx| async move {
         let user = user("martin", 1);
         review_prefs_test(ctx)
-            .set_max_capacity(&user, Some(3))
+            .set_review_prefs(&user, Some(3), RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 2)
             .check(&["martin"], Ok(&["martin"]))
@@ -167,7 +177,7 @@ async fn above_max_capacity() {
     run_db_test(|ctx| async move {
         let user = user("martin", 1);
         review_prefs_test(ctx)
-            .set_max_capacity(&user, Some(3))
+            .set_review_prefs(&user, Some(3), RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 10)
             .check(
@@ -186,7 +196,7 @@ async fn max_capacity_zero() {
     run_db_test(|ctx| async move {
         let user = user("martin", 1);
         review_prefs_test(ctx)
-            .set_max_capacity(&user, Some(0))
+            .set_review_prefs(&user, Some(0), RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 0)
             .check(
@@ -205,7 +215,7 @@ async fn ignore_username_case() {
     run_db_test(|ctx| async move {
         let user = user("MARtin", 1);
         review_prefs_test(ctx)
-            .set_max_capacity(&user, Some(3))
+            .set_review_prefs(&user, Some(3), RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 3)
             .check(
@@ -224,7 +234,7 @@ async fn unlimited_capacity() {
     run_db_test(|ctx| async move {
         let user = user("martin", 1);
         review_prefs_test(ctx)
-            .set_max_capacity(&user, None)
+            .set_review_prefs(&user, None, RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 10)
             .check(&["martin"], Ok(&["martin"]))
@@ -240,11 +250,11 @@ async fn multiple_reviewers() {
         let teams = toml::toml!(team = ["martin", "jana", "mark", "diana"]);
         review_prefs_test(ctx)
             .teams(&teams)
-            .set_max_capacity(&users[0], Some(3))
+            .set_review_prefs(&users[0], Some(3), RotationMode::OnRotation)
             .await
-            .set_max_capacity(&users[1], Some(4))
+            .set_review_prefs(&users[1], Some(4), RotationMode::OnRotation)
             .await
-            .set_max_capacity(&users[2], Some(2))
+            .set_review_prefs(&users[2], Some(2), RotationMode::OnRotation)
             .await
             .assign_prs(users[0].id, 4)
             .assign_prs(users[1].id, 2)
