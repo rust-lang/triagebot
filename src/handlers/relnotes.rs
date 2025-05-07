@@ -22,7 +22,7 @@ use crate::{
 
 const RELNOTES_KEY: &str = "relnotes";
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
 struct RelnotesState {
     relnotes_issue: Option<u64>,
 }

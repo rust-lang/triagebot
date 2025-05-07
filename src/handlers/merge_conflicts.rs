@@ -45,7 +45,7 @@ const MERGE_CONFLICTS_KEY: &str = "merge-conflicts";
 const UNKNOWN_RESCAN_DELAY: Duration = Duration::from_secs(60);
 
 /// State stored in the database for a PR.
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
 struct MergeConflictState {
     /// The GraphQL ID of the most recent warning comment.
     ///

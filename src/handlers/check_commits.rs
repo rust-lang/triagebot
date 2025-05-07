@@ -24,7 +24,7 @@ mod non_default_branch;
 const CHECK_COMMITS_WARNINGS_KEY: &str = "check-commits-warnings";
 
 /// State stored in the database
-#[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, serde::Deserialize, serde::Serialize, Clone, PartialEq)]
 struct CheckCommitsWarningsState {
     /// List of the last warnings in the most recent comment.
     last_warnings: Vec<String>,
