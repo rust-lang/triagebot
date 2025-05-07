@@ -6,7 +6,7 @@ use postgres_types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
 use std::collections::HashMap;
 use std::error::Error;
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub enum RotationMode {
     /// The reviewer can be automatically assigned by triagebot,
     /// and they can be assigned through teams and assign groups.
@@ -237,6 +237,28 @@ mod tests {
             assert_eq!(
                 get_review_prefs(&db, 1).await?.unwrap().max_assigned_prs,
                 None
+            );
+
+            Ok(ctx)
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn set_rotation_mode() {
+        run_db_test(|ctx| async {
+            let db = ctx.db_client();
+            let user = user("Martin", 1);
+
+            upsert_review_prefs(&db, user.clone(), Some(5), RotationMode::OnRotation).await?;
+            assert_eq!(
+                get_review_prefs(&db, 1).await?.unwrap().rotation_mode,
+                RotationMode::OnRotation
+            );
+            upsert_review_prefs(&db, user.clone(), Some(10), RotationMode::OffRotation).await?;
+            assert_eq!(
+                get_review_prefs(&db, 1).await?.unwrap().rotation_mode,
+                RotationMode::OffRotation
             );
 
             Ok(ctx)
