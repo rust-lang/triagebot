@@ -346,4 +346,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS review_prefs_user_id ON review_prefs(user_id);
     "
 ALTER TABLE review_prefs ADD COLUMN IF NOT EXISTS max_assigned_prs INTEGER DEFAULT NULL;
 ",
+    "
+ALTER TABLE review_prefs ADD COLUMN IF NOT EXISTS rotation_mode TEXT NOT NULL DEFAULT 'on-rotation';
+",
 ];

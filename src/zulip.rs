@@ -1,6 +1,6 @@
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
-use crate::db::review_prefs::{get_review_prefs, upsert_review_prefs};
+use crate::db::review_prefs::{get_review_prefs, upsert_review_prefs, RotationMode};
 use crate::github::{get_id_for_username, GithubClient, User};
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
@@ -148,6 +148,10 @@ async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Op
     handle_command(ctx, gh_id, &req.data, &req.message).await
 }
 
+const WORKQUEUE_HELP: &str = r#"`work show`: show your assigned PRs
+`work set-pr-limit <number>|unlimited`: set the maximum number of PRs you can be assigned to
+`work set-rotation-mode <off|on>`: configure if you are *on* rotation or *off* rotation (e.g. when you are on a vacation)"#;
+
 fn handle_command<'a>(
     ctx: &'a Context,
     gh_id: anyhow::Result<u64>,
@@ -179,7 +183,7 @@ fn handle_command<'a>(
             Some("meta") => add_meta_notification(&ctx, gh_id, words).await
                 .map_err(|e| format_err!("Failed to parse `meta` command. Synopsis: meta <num> <text>: Add <text> to your notification identified by <num> (>0)\n\nError: {e:?}")),
             Some("work") => workqueue_commands(ctx, gh_id, words).await
-                                                                    .map_err(|e| format_err!("Failed to parse `work` command. Synopsis: work <show>: shows your current PRs assignment\n\nError: {e:?}")),
+                                                                    .map_err(|e| format_err!("Failed to parse `work` command. Help: {WORKQUEUE_HELP}\n\nError: {e:?}")),
             _ => {
                 while let Some(word) = next {
                     if word == "@**triagebot**" {
@@ -270,6 +274,17 @@ async fn workqueue_commands(
 
     let db_client = ctx.db.get().await;
 
+    let gh_username = username_from_gh_id(&ctx.github, gh_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Cannot find your GitHub username in the team database"))?;
+    let user = User {
+        login: gh_username.clone(),
+        id: gh_id,
+    };
+    let review_prefs = get_review_prefs(&db_client, gh_id)
+        .await
+        .context("Unable to retrieve your review preferences.")?;
+
     let response = match subcommand {
         "show" => {
             let mut assigned_prs = get_assigned_prs(ctx, gh_id)
@@ -287,9 +302,17 @@ async fn workqueue_commands(
             let review_prefs = get_review_prefs(&db_client, gh_id)
                 .await
                 .context("cannot get review preferences")?;
-            let capacity = match review_prefs.and_then(|p| p.max_assigned_prs) {
+            let capacity = match review_prefs.as_ref().and_then(|p| p.max_assigned_prs) {
                 Some(max) => max.to_string(),
                 None => String::from("Not set (i.e. unlimited)"),
+            };
+            let rotation_mode = review_prefs
+                .as_ref()
+                .map(|p| p.rotation_mode)
+                .unwrap_or_default();
+            let rotation_mode = match rotation_mode {
+                RotationMode::OnRotation => "on rotation",
+                RotationMode::OffRotation => "off rotation",
             };
 
             let mut response = format!(
@@ -298,6 +321,7 @@ async fn workqueue_commands(
                 pluralize("PR", assigned_prs.len())
             );
             writeln!(response, "Review capacity: {capacity}\n")?;
+            writeln!(response, "Rotation mode: *{rotation_mode}*\n")?;
             writeln!(response, "*Note that only certain PRs that are assigned to you are included in your review queue.*")?;
             response
         }
@@ -317,19 +341,14 @@ async fn workqueue_commands(
                 }
                 None => anyhow::bail!("Missing parameter."),
             };
-            let gh_username = username_from_gh_id(&ctx.github, gh_id)
-                .await?
-                .ok_or_else(|| {
-                    anyhow::anyhow!("Cannot find your GitHub username in the team database")
-                })?;
-
-            let user = User {
-                login: gh_username.clone(),
-                id: gh_id,
-            };
-            upsert_review_prefs(&db_client, user, max_assigned_prs)
-                .await
-                .context("Error occurred while setting review preferences.")?;
+            upsert_review_prefs(
+                &db_client,
+                user,
+                max_assigned_prs,
+                review_prefs.map(|p| p.rotation_mode).unwrap_or_default(),
+            )
+            .await
+            .context("Error occurred while setting review preferences.")?;
             tracing::info!("Setting max assignment PRs of `{gh_username}` to {max_assigned_prs:?}");
             format!(
                 "Review capacity set to {}",
@@ -339,9 +358,38 @@ async fn workqueue_commands(
                 }
             )
         }
-        "help" => r"work show => show your assigned PRs
-work set-pr-limit <number>|unlimited => set the maximum number of PRs you can be assigned to"
-            .to_string(),
+        "set-rotation-mode" => {
+            let rotation_mode = match words.next() {
+                Some(value) => {
+                    if words.next().is_some() {
+                        anyhow::bail!("Too many parameters.");
+                    }
+                    match value {
+                        "on" => RotationMode::OnRotation,
+                        "off" => RotationMode::OffRotation,
+                        _ => anyhow::bail!("Unknown rotation mode {value}. Use `on` or `off`."),
+                    }
+                }
+                None => anyhow::bail!("Missing parameter."),
+            };
+            upsert_review_prefs(
+                &db_client,
+                user,
+                review_prefs.and_then(|p| p.max_assigned_prs.map(|v| v as u32)),
+                rotation_mode,
+            )
+            .await
+            .context("Error occurred while setting review preferences.")?;
+            tracing::info!("Setting rotation mode `{gh_username}` to {rotation_mode:?}");
+            format!(
+                "Rotation mode set to {}",
+                match rotation_mode {
+                    RotationMode::OnRotation => "*on rotation*",
+                    RotationMode::OffRotation => "*off rotation*.",
+                }
+            )
+        }
+        "help" => WORKQUEUE_HELP.to_string(),
         _ => anyhow::bail!("Invalid subcommand."),
     };
 
