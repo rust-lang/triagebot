@@ -16,18 +16,19 @@ use tokio_postgres::{Client as DbClient, Transaction};
 
 pub struct IssueData<'db, T>
 where
-    T: for<'a> Deserialize<'a> + Serialize + Default + std::fmt::Debug + Sync,
+    T: for<'a> Deserialize<'a> + Serialize + Default + std::fmt::Debug + Sync + PartialEq + Clone,
 {
     transaction: Transaction<'db>,
     repo: String,
     issue_number: i32,
     key: String,
     pub data: T,
+    initial_data: T,
 }
 
 impl<'db, T> IssueData<'db, T>
 where
-    T: for<'a> Deserialize<'a> + Serialize + Default + std::fmt::Debug + Sync,
+    T: for<'a> Deserialize<'a> + Serialize + Default + std::fmt::Debug + Sync + PartialEq + Clone,
 {
     pub async fn load(
         db: &'db mut DbClient,
@@ -51,25 +52,32 @@ where
             .context("selecting issue data")?
             .map(|row| row.get::<usize, Json<T>>(0).0)
             .unwrap_or_default();
+
+        let initial_data = data.clone();
+
         Ok(IssueData {
             transaction,
             repo,
             issue_number,
             key: key.to_string(),
             data,
+            initial_data,
         })
     }
 
     pub async fn save(self) -> Result<()> {
-        self.transaction
-            .execute(
-                "INSERT INTO issue_data (repo, issue_number, key, data) \
+        // Avoid writing to the DB needlessly.
+        if self.data != self.initial_data {
+            self.transaction
+                .execute(
+                    "INSERT INTO issue_data (repo, issue_number, key, data) \
                  VALUES ($1, $2, $3, $4) \
                  ON CONFLICT (repo, issue_number, key) DO UPDATE SET data=EXCLUDED.data",
-                &[&self.repo, &self.issue_number, &self.key, &Json(&self.data)],
-            )
-            .await
-            .context("inserting issue data")?;
+                    &[&self.repo, &self.issue_number, &self.key, &Json(&self.data)],
+                )
+                .await
+                .context("inserting issue data")?;
+        }
         self.transaction
             .commit()
             .await

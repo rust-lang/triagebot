@@ -15,7 +15,7 @@ use parser::command::shortcut::ShortcutCommand;
 const AUTHOR_REMINDER_KEY: &str = "author-reminder";
 
 /// State stored in the database for a PR.
-#[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, serde::Deserialize, serde::Serialize, Clone, PartialEq)]
 struct AuthorReminderState {
     /// ID of the reminder comment.
     reminder_comment: Option<String>,

@@ -20,7 +20,7 @@ pub(super) struct MentionsInput {
     paths: Vec<String>,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
 struct MentionState {
     paths: Vec<String>,
 }
