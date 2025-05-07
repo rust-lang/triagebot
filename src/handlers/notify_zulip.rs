@@ -18,6 +18,7 @@ pub(super) struct NotifyZulipInput {
 }
 
 pub(super) enum NotificationType {
+    Open,
     Labeled,
     Unlabeled,
     Closed,
@@ -45,8 +46,8 @@ pub(super) async fn parse_input(
                 })
                 .map(|input| vec![input]))
         }
-        IssuesAction::Closed | IssuesAction::Reopened => {
-            Ok(Some(parse_close_reopen_input(event, config)))
+        IssuesAction::Opened | IssuesAction::Closed | IssuesAction::Reopened => {
+            Ok(Some(parse_open_close_reopen_input(event, config)))
         }
         _ => Ok(None),
     }
@@ -93,7 +94,7 @@ fn parse_label_change_input(
     }
 }
 
-fn parse_close_reopen_input(
+fn parse_open_close_reopen_input(
     event: &IssuesEvent,
     global_config: &NotifyZulipConfig,
 ) -> Vec<NotifyZulipInput> {
@@ -114,6 +115,9 @@ fn parse_close_reopen_input(
             for (name, label_config) in &config.subtables {
                 if has_all_required_labels(&event.issue, &label_config) {
                     match event.action {
+                        IssuesAction::Opened if !label_config.messages_on_add.is_empty() => {
+                            include_config_names.push(name.to_string());
+                        }
                         IssuesAction::Closed if !label_config.messages_on_close.is_empty() => {
                             include_config_names.push(name.to_string());
                         }
@@ -131,6 +135,11 @@ fn parse_close_reopen_input(
             }
 
             match event.action {
+                IssuesAction::Opened => Some(NotifyZulipInput {
+                    notification_type: NotificationType::Open,
+                    label,
+                    include_config_names,
+                }),
                 IssuesAction::Closed => Some(NotifyZulipInput {
                     notification_type: NotificationType::Closed,
                     label,
@@ -193,7 +202,7 @@ pub(super) async fn handle_input<'a>(
             }
 
             let msgs = match input.notification_type {
-                NotificationType::Labeled => &config.messages_on_add,
+                NotificationType::Open | NotificationType::Labeled => &config.messages_on_add,
                 NotificationType::Unlabeled => &config.messages_on_remove,
                 NotificationType::Closed => &config.messages_on_close,
                 NotificationType::Reopened => &config.messages_on_reopen,
