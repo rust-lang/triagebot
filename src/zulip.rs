@@ -281,7 +281,9 @@ async fn workqueue_commands(
         login: gh_username.clone(),
         id: gh_id,
     };
-    let review_prefs = get_review_prefs(&db_client, gh_id).await?;
+    let review_prefs = get_review_prefs(&db_client, gh_id)
+        .await
+        .context("Unable to retrieve your review preferences.")?;
 
     let response = match subcommand {
         "show" => {
