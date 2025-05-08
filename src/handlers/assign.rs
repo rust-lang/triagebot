@@ -20,7 +20,7 @@
 //! `assign.owners` config, it will auto-select an assignee based on the files
 //! the PR modifies.
 
-use crate::db::review_prefs::get_review_prefs_batch;
+use crate::db::review_prefs::{get_review_prefs_batch, RotationMode};
 use crate::github::UserId;
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::{
@@ -75,9 +75,9 @@ Use `r?` to explicitly pick a reviewer";
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
     "@{author}: no appropriate reviewer found, use `r?` to override";
 
-fn on_vacation_warning(username: &str) -> String {
+fn reviewer_off_rotation_message(username: &str) -> String {
     format!(
-        r"{username} is on vacation.
+        r"`{username}` is not available for reviewing at the moment.
 
 Please choose another assignee."
     )
@@ -347,7 +347,7 @@ async fn determine_assignee(
                     e @ FindReviewerError::NoReviewer { .. }
                     | e @ FindReviewerError::ReviewerIsPrAuthor { .. }
                     | e @ FindReviewerError::ReviewerAlreadyAssigned { .. }
-                    | e @ FindReviewerError::ReviewerOnVacation { .. }
+                    | e @ FindReviewerError::ReviewerOffRotation { .. }
                     | e @ FindReviewerError::DatabaseError(_)
                     | e @ FindReviewerError::ReviewerAtMaxCapacity { .. },
                 ) => log::trace!(
@@ -672,9 +672,10 @@ enum FindReviewerError {
     /// This could happen if there is a cyclical group or other misconfiguration.
     /// `initial` is the initial list of candidate names.
     NoReviewer { initial: Vec<String> },
-    /// Requested reviewer is on vacation
-    /// (i.e. username is in [users_on_vacation] in the triagebot.toml)
-    ReviewerOnVacation { username: String },
+    /// Requested reviewer is off the review rotation (e.g. on a vacation).
+    /// Either the username is in [users_on_vacation] in `triagebot.toml` or the user has
+    /// configured [RotationMode::OffRotation] in their reviewer preferences.
+    ReviewerOffRotation { username: String },
     /// Requested reviewer is PR author
     ReviewerIsPrAuthor { username: String },
     /// Requested reviewer is already assigned to that PR
@@ -708,8 +709,8 @@ impl fmt::Display for FindReviewerError {
                     initial.join(",")
                 )
             }
-            FindReviewerError::ReviewerOnVacation { username } => {
-                write!(f, "{}", on_vacation_warning(username))
+            FindReviewerError::ReviewerOffRotation { username } => {
+                write!(f, "{}", reviewer_off_rotation_message(username))
             }
             FindReviewerError::ReviewerIsPrAuthor { username } => {
                 write!(
@@ -955,7 +956,7 @@ async fn candidate_reviewers_from_names<'a>(
                     username: candidate.clone(),
                 })
             } else if is_on_vacation {
-                Some(FindReviewerError::ReviewerOnVacation {
+                Some(FindReviewerError::ReviewerOffRotation {
                     username: candidate.clone(),
                 })
             } else if is_already_assigned {
@@ -997,20 +998,22 @@ async fn candidate_reviewers_from_names<'a>(
                 let username = username?;
 
                 // If no review prefs were found, we assume the default unlimited
-                // review capacity.
+                // review capacity and being on rotation.
                 let Some(review_prefs) = review_prefs.get(username.as_str()) else {
                     return Ok(username);
                 };
-                let Some(capacity) = review_prefs.max_assigned_prs else {
-                    return Ok(username);
-                };
-                let assigned_prs = workqueue.assigned_pr_count(review_prefs.user_id as UserId);
-                // Can we assign one more PR?
-                if (assigned_prs as i32) < capacity {
-                    Ok(username)
-                } else {
-                    Err(FindReviewerError::ReviewerAtMaxCapacity { username })
+                if let Some(capacity) = review_prefs.max_assigned_prs {
+                    let assigned_prs = workqueue.assigned_pr_count(review_prefs.user_id as UserId);
+                    // Is the reviewer at max capacity?
+                    if (assigned_prs as i32) >= capacity {
+                        return Err(FindReviewerError::ReviewerAtMaxCapacity { username });
+                    }
                 }
+                if review_prefs.rotation_mode == RotationMode::OffRotation {
+                    return Err(FindReviewerError::ReviewerOffRotation { username });
+                }
+
+                return Ok(username);
             })
             .collect();
     }
@@ -1020,6 +1023,13 @@ async fn candidate_reviewers_from_names<'a>(
         .iter()
         .filter_map(|res| res.as_deref().ok())
         .collect();
+
+    log::debug!(
+        "Candidate reviewer results for review request `{}` on `{}`: {:?}",
+        names.join(", "),
+        issue.global_id(),
+        candidates
+    );
 
     if valid_candidates.is_empty() {
         // If we requested a single user for a review, we return a concrete error message
