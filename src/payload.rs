@@ -1,4 +1,5 @@
-use openssl::{hash::MessageDigest, memcmp, pkey::PKey, sign::Signer};
+use hmac::{Hmac, Mac};
+use sha1::Sha1;
 use std::fmt;
 
 #[derive(Debug)]
@@ -22,18 +23,12 @@ pub fn assert_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPayloa
         }
     };
 
-    let key = PKey::hmac(
+    let mut mac = Hmac::<Sha1>::new_from_slice(
         std::env::var("GITHUB_WEBHOOK_SECRET")
             .expect("Missing GITHUB_WEBHOOK_SECRET")
             .as_bytes(),
     )
     .unwrap();
-    let mut signer = Signer::new(MessageDigest::sha1(), &key).unwrap();
-    signer.update(&payload).unwrap();
-    let hmac = signer.sign_to_vec().unwrap();
-
-    if !memcmp::eq(&hmac, &signature) {
-        return Err(SignedPayloadError);
-    }
-    Ok(())
+    mac.update(&payload);
+    mac.verify_slice(&signature).map_err(|_| SignedPayloadError)
 }
