@@ -777,4 +777,16 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn assign_review_prefs() {
+        let config = r#"
+            [assign.review_prefs]
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        assert!(matches!(
+            config.assign.and_then(|c| c.review_prefs),
+            Some(AssignReviewPrefsConfig {})
+        ));
+    }
 }
