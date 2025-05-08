@@ -462,7 +462,7 @@ async fn vacation() {
             .teams(&teams)
             .check(
                 &["jyn514"],
-                Err(FindReviewerError::ReviewerOnVacation {
+                Err(FindReviewerError::ReviewerOffRotation {
                     username: "jyn514".to_string(),
                 }),
             )

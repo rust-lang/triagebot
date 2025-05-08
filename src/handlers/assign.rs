@@ -20,7 +20,7 @@
 //! `assign.owners` config, it will auto-select an assignee based on the files
 //! the PR modifies.
 
-use crate::db::review_prefs::get_review_prefs_batch;
+use crate::db::review_prefs::{get_review_prefs_batch, RotationMode};
 use crate::github::UserId;
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::{
@@ -75,9 +75,9 @@ Use `r?` to explicitly pick a reviewer";
 const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
     "@{author}: no appropriate reviewer found, use `r?` to override";
 
-fn on_vacation_warning(username: &str) -> String {
+fn reviewer_off_rotation_message(username: &str) -> String {
     format!(
-        r"{username} is on vacation.
+        r"`{username}` is not available for reviewing at the moment.
 
 Please choose another assignee."
     )
@@ -347,7 +347,7 @@ async fn determine_assignee(
                     e @ FindReviewerError::NoReviewer { .. }
                     | e @ FindReviewerError::ReviewerIsPrAuthor { .. }
                     | e @ FindReviewerError::ReviewerAlreadyAssigned { .. }
-                    | e @ FindReviewerError::ReviewerOnVacation { .. }
+                    | e @ FindReviewerError::ReviewerOffRotation { .. }
                     | e @ FindReviewerError::DatabaseError(_)
                     | e @ FindReviewerError::ReviewerAtMaxCapacity { .. },
                 ) => log::trace!(
@@ -672,9 +672,10 @@ enum FindReviewerError {
     /// This could happen if there is a cyclical group or other misconfiguration.
     /// `initial` is the initial list of candidate names.
     NoReviewer { initial: Vec<String> },
-    /// Requested reviewer is on vacation
-    /// (i.e. username is in [users_on_vacation] in the triagebot.toml)
-    ReviewerOnVacation { username: String },
+    /// Requested reviewer is off the review rotation (e.g. on a vacation).
+    /// Either the username is in [users_on_vacation] in `triagebot.toml` or the user has
+    /// configured [RotationMode::OffRotation] in their reviewer preferences.
+    ReviewerOffRotation { username: String },
     /// Requested reviewer is PR author
     ReviewerIsPrAuthor { username: String },
     /// Requested reviewer is already assigned to that PR
@@ -708,8 +709,8 @@ impl fmt::Display for FindReviewerError {
                     initial.join(",")
                 )
             }
-            FindReviewerError::ReviewerOnVacation { username } => {
-                write!(f, "{}", on_vacation_warning(username))
+            FindReviewerError::ReviewerOffRotation { username } => {
+                write!(f, "{}", reviewer_off_rotation_message(username))
             }
             FindReviewerError::ReviewerIsPrAuthor { username } => {
                 write!(
@@ -955,7 +956,7 @@ async fn candidate_reviewers_from_names<'a>(
                     username: candidate.clone(),
                 })
             } else if is_on_vacation {
-                Some(FindReviewerError::ReviewerOnVacation {
+                Some(FindReviewerError::ReviewerOffRotation {
                     username: candidate.clone(),
                 })
             } else if is_already_assigned {
