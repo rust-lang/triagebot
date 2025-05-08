@@ -244,6 +244,58 @@ async fn unlimited_capacity() {
 }
 
 #[tokio::test]
+async fn ignore_user_off_rotation_direct() {
+    run_db_test(|ctx| async move {
+        let user = user("martin", 1);
+        review_prefs_test(ctx)
+            .set_review_prefs(&user, None, RotationMode::OffRotation)
+            .await
+            .check(
+                &["martin"],
+                Err(FindReviewerError::ReviewerOffRotation {
+                    username: "martin".to_string(),
+                }),
+            )
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn ignore_user_off_rotation_through_team() {
+    run_db_test(|ctx| async move {
+        let teams = toml::toml!(compiler = ["martin", "diana"]);
+        let user = user("martin", 1);
+        review_prefs_test(ctx)
+            .teams(&teams)
+            .set_review_prefs(&user, None, RotationMode::OffRotation)
+            .await
+            .check(&["compiler"], Ok(&["diana"]))
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn review_prefs_prefer_capacity_before_rotation() {
+    run_db_test(|ctx| async move {
+        let user = user("martin", 1);
+        review_prefs_test(ctx)
+            .set_review_prefs(&user, Some(1), RotationMode::OffRotation)
+            .await
+            .assign_prs(user.id, 2)
+            .check(
+                &["martin"],
+                Err(FindReviewerError::ReviewerAtMaxCapacity {
+                    username: "martin".to_string(),
+                }),
+            )
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn multiple_reviewers() {
     run_db_test(|ctx| async move {
         let users = &[user("martin", 1), user("jana", 2), user("mark", 3)];

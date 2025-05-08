@@ -998,20 +998,22 @@ async fn candidate_reviewers_from_names<'a>(
                 let username = username?;
 
                 // If no review prefs were found, we assume the default unlimited
-                // review capacity.
+                // review capacity and being on rotation.
                 let Some(review_prefs) = review_prefs.get(username.as_str()) else {
                     return Ok(username);
                 };
-                let Some(capacity) = review_prefs.max_assigned_prs else {
-                    return Ok(username);
-                };
-                let assigned_prs = workqueue.assigned_pr_count(review_prefs.user_id as UserId);
-                // Can we assign one more PR?
-                if (assigned_prs as i32) < capacity {
-                    Ok(username)
-                } else {
-                    Err(FindReviewerError::ReviewerAtMaxCapacity { username })
+                if let Some(capacity) = review_prefs.max_assigned_prs {
+                    let assigned_prs = workqueue.assigned_pr_count(review_prefs.user_id as UserId);
+                    // Is the reviewer at max capacity?
+                    if (assigned_prs as i32) >= capacity {
+                        return Err(FindReviewerError::ReviewerAtMaxCapacity { username });
+                    }
                 }
+                if review_prefs.rotation_mode == RotationMode::OffRotation {
+                    return Err(FindReviewerError::ReviewerOffRotation { username });
+                }
+
+                return Ok(username);
             })
             .collect();
     }
