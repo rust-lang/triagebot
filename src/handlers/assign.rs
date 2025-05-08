@@ -1024,6 +1024,13 @@ async fn candidate_reviewers_from_names<'a>(
         .filter_map(|res| res.as_deref().ok())
         .collect();
 
+    log::debug!(
+        "Candidate reviewer results for review request `{}` on `{}`: {:?}",
+        names.join(", "),
+        issue.global_id(),
+        candidates
+    );
+
     if valid_candidates.is_empty() {
         // If we requested a single user for a review, we return a concrete error message
         // describing why they couldn't be assigned.
