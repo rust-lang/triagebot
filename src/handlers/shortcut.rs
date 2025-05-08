@@ -9,6 +9,7 @@ use crate::{
     handlers::Context,
     interactions::ErrorComment,
 };
+use octocrab::models::AuthorAssociation;
 use parser::command::shortcut::ShortcutCommand;
 
 /// Key for the state in the database
@@ -65,7 +66,16 @@ pub(super) async fn handle_command(
     }
 
     // We add a small reminder for the author to use `@bot ready` when ready
-    if matches!(input, ShortcutCommand::Author) {
+    //
+    // Except if the author is a member (or the owner) of the repository, as
+    // the author should already know about the `ready` command and already
+    // have the required permissions to update the labels manually anyway.
+    if matches!(input, ShortcutCommand::Author)
+        && !matches!(
+            issue.author_association,
+            AuthorAssociation::Member | AuthorAssociation::Owner
+        )
+    {
         // Get the state of the author reminder for this PR
         let mut db = ctx.db.get().await;
         let mut state: IssueData<'_, AuthorReminderState> =
