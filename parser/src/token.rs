@@ -1,9 +1,10 @@
 use crate::error::Error;
+use std::borrow::Cow;
 use std::fmt;
 use std::iter::Peekable;
 use std::str::CharIndices;
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Token<'a> {
     Dot,
     Comma,
@@ -14,7 +15,7 @@ pub enum Token<'a> {
     EndOfLine,
     ParenLeft,
     ParenRight,
-    Quote(&'a str),
+    Quote(Cow<'a, str>),
     Word(&'a str),
 }
 
@@ -153,15 +154,44 @@ impl<'a> Tokenizer<'a> {
         }
         self.advance(); // eat "
         let start = self.cur_pos();
+        let mut escaped_parts = Vec::new();
         loop {
             match self.cur() {
                 Some((_, '"')) => break,
+                Some((_, '\\')) => {
+                    // potentialy escaped part
+                    let pos = self.cur_pos();
+                    self.advance();
+                    match self.cur() {
+                        Some((_, '"')) => {
+                            // found `\"`, let's record it to be replaced later by `"`
+                            escaped_parts.push(((pos - start)..=(self.cur_pos() - start), "\""));
+                        }
+                        Some((_, '\\')) => {
+                            // found `\\`, let's record it to be replaced later by `\`
+                            escaped_parts.push(((pos - start)..=(self.cur_pos() - start), "\\"));
+                        }
+                        Some(_) => {}
+                        None => return Err(self.error(ErrorKind::UnterminatedString)),
+                    }
+                    self.advance()
+                }
                 Some(_) => self.advance(),
                 None => return Err(self.error(ErrorKind::UnterminatedString)),
             };
         }
         let body = self.str_from(start);
         self.advance(); // eat final '"'
+        let body = if escaped_parts.is_empty() {
+            body.into()
+        } else {
+            // unescape the escaped parts of the string
+            let mut body = body.to_string();
+            for (range, replace_by) in escaped_parts.into_iter().rev() {
+                body.replace_range(range, replace_by);
+            }
+            body.into()
+        };
         Ok(Some(Token::Quote(body)))
     }
 
@@ -310,7 +340,7 @@ fn tokenize_4() {
 fn tokenize_5() {
     assert_eq!(
         tokenize(r#""testing""#).unwrap(),
-        [Token::Quote("testing"), Token::EndOfLine,]
+        [Token::Quote(Cow::Borrowed("testing")), Token::EndOfLine,]
     );
 }
 
@@ -347,5 +377,29 @@ fn tokenize_raw_string_prohibit_1() {
             .unwrap_err()
             .position_and_kind(),
         (18, ErrorKind::QuoteInWord)
+    );
+}
+
+#[test]
+fn tokenize_escaped_quotes() {
+    assert_eq!(
+        tokenize(r#"note "Summary \"title\"""#).unwrap(),
+        [
+            Token::Word("note"),
+            Token::Quote(Cow::Owned(r#"Summary "title""#.to_string())),
+            Token::EndOfLine,
+        ]
+    );
+}
+
+#[test]
+fn tokenize_not_escaped_quotes() {
+    assert_eq!(
+        tokenize(r#"note "Summary \\""#).unwrap(),
+        [
+            Token::Word("note"),
+            Token::Quote(Cow::Owned(r#"Summary \"#.to_string())),
+            Token::EndOfLine,
+        ]
     );
 }

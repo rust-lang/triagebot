@@ -43,7 +43,7 @@ impl GlacierCommand {
             toks.next_token()?;
             match toks.next_token()? {
                 Some(Token::Quote(s)) => {
-                    let source = s.to_owned();
+                    let source = s.to_string();
                     if source.starts_with("https://gist.github.com/") {
                         return Ok(Some(GlacierCommand { source }));
                     } else {

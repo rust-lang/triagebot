@@ -33,8 +33,19 @@ impl NoteCommand {
                         remove = true;
                         continue;
                     }
-                    Some(Token::Word(title)) | Some(Token::Quote(title)) => {
-                        let command = if remove {
+                    Some(Token::Quote(title)) => {
+                        break Ok(Some(if remove {
+                            NoteCommand::Remove {
+                                title: title.into_owned(),
+                            }
+                        } else {
+                            NoteCommand::Summary {
+                                title: title.into_owned(),
+                            }
+                        }));
+                    }
+                    Some(Token::Word(title)) => {
+                        break Ok(Some(if remove {
                             NoteCommand::Remove {
                                 title: title.to_string(),
                             }
@@ -42,8 +53,7 @@ impl NoteCommand {
                             NoteCommand::Summary {
                                 title: title.to_string(),
                             }
-                        };
-                        break Ok(Some(command));
+                        }));
                     }
                     _ => break Err(toks.error(ParseError::MissingTitle)),
                 };
