@@ -12,6 +12,7 @@ use std::env;
 use std::fmt::Write as _;
 use std::str::FromStr;
 use std::sync::LazyLock;
+use subtle::ConstantTimeEq;
 use tracing as log;
 
 static ZULIP_URL: LazyLock<String> =
@@ -130,7 +131,7 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
 async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Option<String>> {
     let expected_token = std::env::var("ZULIP_TOKEN").expect("`ZULIP_TOKEN` set for authorization");
 
-    if !openssl::memcmp::eq(req.token.as_bytes(), expected_token.as_bytes()) {
+    if !bool::from(req.token.as_bytes().ct_eq(expected_token.as_bytes())) {
         anyhow::bail!("Invalid authorization.");
     }
 

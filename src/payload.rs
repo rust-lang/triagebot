@@ -1,4 +1,5 @@
-use openssl::{hash::MessageDigest, memcmp, pkey::PKey, sign::Signer};
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 use std::fmt;
 
 #[derive(Debug)]
@@ -13,7 +14,9 @@ impl fmt::Display for SignedPayloadError {
 impl std::error::Error for SignedPayloadError {}
 
 pub fn assert_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPayloadError> {
-    let signature = signature.get("sha1=".len()..).ok_or(SignedPayloadError)?;
+    let signature = signature
+        .strip_prefix("sha256=")
+        .ok_or(SignedPayloadError)?;
     let signature = match hex::decode(&signature) {
         Ok(e) => e,
         Err(e) => {
@@ -22,18 +25,12 @@ pub fn assert_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPayloa
         }
     };
 
-    let key = PKey::hmac(
+    let mut mac = Hmac::<Sha256>::new_from_slice(
         std::env::var("GITHUB_WEBHOOK_SECRET")
             .expect("Missing GITHUB_WEBHOOK_SECRET")
             .as_bytes(),
     )
     .unwrap();
-    let mut signer = Signer::new(MessageDigest::sha1(), &key).unwrap();
-    signer.update(&payload).unwrap();
-    let hmac = signer.sign_to_vec().unwrap();
-
-    if !memcmp::eq(&hmac, &signature) {
-        return Err(SignedPayloadError);
-    }
-    Ok(())
+    mac.update(&payload);
+    mac.verify_slice(&signature).map_err(|_| SignedPayloadError)
 }
