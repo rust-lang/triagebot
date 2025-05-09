@@ -169,6 +169,14 @@ impl<'a> Tokenizer<'a> {
         self.cur_pos()
     }
 
+    pub fn take_line_until_punc(&mut self) -> Result<&'a str, Error<'a>> {
+        let start = self.cur_pos();
+        while self.cur_punct().is_none() && !self.at_end() {
+            self.advance();
+        }
+        Ok(self.str_from(start))
+    }
+
     pub fn peek_token(&mut self) -> Result<Option<Token<'a>>, Error<'a>> {
         self.clone().next_token()
     }
@@ -348,4 +356,25 @@ fn tokenize_raw_string_prohibit_1() {
             .position_and_kind(),
         (18, ErrorKind::QuoteInWord)
     );
+}
+
+#[test]
+fn take_line_until_punc() {
+    assert_eq!(
+        Tokenizer::new("this is a text. this another one.").take_line_until_punc(),
+        Ok("this is a text")
+    );
+}
+
+#[test]
+fn take_line_until_punc_2() {
+    assert_eq!(
+        Tokenizer::new("punc is \nnewline").take_line_until_punc(),
+        Ok("punc is ")
+    );
+}
+
+#[test]
+fn take_line_until_punc_3() {
+    assert_eq!(Tokenizer::new("").take_line_until_punc(), Ok(""));
 }
