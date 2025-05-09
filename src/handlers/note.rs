@@ -74,10 +74,10 @@ struct NoteData {
 }
 
 impl NoteData {
-    pub(crate) fn get_url_from_title(&self, title: &str) -> Option<String> {
+    pub(crate) fn get_url_from_title_prefix(&self, title: &str) -> Option<String> {
         let tmp = self.entries_by_url.clone();
         tmp.iter().sorted().find_map(|(key, val)| {
-            if val.title == title {
+            if val.title.starts_with(title) {
                 Some(key.to_owned())
             } else {
                 None
@@ -86,7 +86,7 @@ impl NoteData {
     }
 
     pub(crate) fn remove_by_title(&mut self, title: &str) -> Option<NoteDataEntry> {
-        if let Some(url_to_remove) = self.get_url_from_title(title) {
+        if let Some(url_to_remove) = self.get_url_from_title_prefix(title) {
             if let Some(entry) = self.entries_by_url.remove(&url_to_remove) {
                 log::debug!("SUCCESSFULLY REMOVED ENTRY: {:#?}", &entry);
                 Some(entry)
