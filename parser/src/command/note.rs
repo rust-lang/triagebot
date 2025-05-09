@@ -26,28 +26,33 @@ impl NoteCommand {
         let mut toks = input.clone();
         if let Some(Token::Word("note")) = toks.peek_token()? {
             toks.next_token()?;
-            let mut remove = false;
-            loop {
-                match toks.next_token()? {
-                    Some(Token::Word(title)) if title == "remove" => {
-                        remove = true;
-                        continue;
-                    }
-                    Some(Token::Word(title)) | Some(Token::Quote(title)) => {
-                        let command = if remove {
-                            NoteCommand::Remove {
-                                title: title.to_string(),
-                            }
-                        } else {
-                            NoteCommand::Summary {
-                                title: title.to_string(),
-                            }
-                        };
-                        break Ok(Some(command));
-                    }
-                    _ => break Err(toks.error(ParseError::MissingTitle)),
-                };
+
+            let remove = if let Some(Token::Word("remove")) = toks.peek_token()? {
+                toks.next_token()?;
+                true
+            } else {
+                false
+            };
+
+            let title = toks.take_line_until_punc()?.trim();
+
+            // For backwards compatibility we also trim " at the start and end
+            let title = title.trim_matches('"');
+
+            if title.is_empty() {
+                return Err(toks.error(ParseError::MissingTitle));
             }
+
+            let command = if remove {
+                NoteCommand::Remove {
+                    title: title.to_string(),
+                }
+            } else {
+                NoteCommand::Summary {
+                    title: title.to_string(),
+                }
+            };
+            Ok(Some(command))
         } else {
             Ok(None)
         }
