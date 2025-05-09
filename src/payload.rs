@@ -1,5 +1,5 @@
 use hmac::{Hmac, Mac};
-use sha1::Sha1;
+use sha2::Sha256;
 use std::fmt;
 
 #[derive(Debug)]
@@ -14,7 +14,9 @@ impl fmt::Display for SignedPayloadError {
 impl std::error::Error for SignedPayloadError {}
 
 pub fn assert_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPayloadError> {
-    let signature = signature.get("sha1=".len()..).ok_or(SignedPayloadError)?;
+    let signature = signature
+        .strip_prefix("sha256=")
+        .ok_or(SignedPayloadError)?;
     let signature = match hex::decode(&signature) {
         Ok(e) => e,
         Err(e) => {
@@ -23,7 +25,7 @@ pub fn assert_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPayloa
         }
     };
 
-    let mut mac = Hmac::<Sha1>::new_from_slice(
+    let mut mac = Hmac::<Sha256>::new_from_slice(
         std::env::var("GITHUB_WEBHOOK_SECRET")
             .expect("Missing GITHUB_WEBHOOK_SECRET")
             .as_bytes(),

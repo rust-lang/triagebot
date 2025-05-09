@@ -190,20 +190,22 @@ async fn serve_req(
             .unwrap());
     };
     log::debug!("event={}", event);
-    let signature = if let Some(sig) = req.headers.get("X-Hub-Signature") {
+    let signature = if let Some(sig) = req.headers.get("X-Hub-Signature-256") {
         match sig.to_str().ok() {
             Some(v) => v,
             None => {
                 return Ok(Response::builder()
                     .status(StatusCode::BAD_REQUEST)
-                    .body(Body::from("X-Hub-Signature header must be UTF-8 encoded"))
+                    .body(Body::from(
+                        "X-Hub-Signature-256 header must be UTF-8 encoded",
+                    ))
                     .unwrap());
             }
         }
     } else {
         return Ok(Response::builder()
             .status(StatusCode::BAD_REQUEST)
-            .body(Body::from("X-Hub-Signature header must be set"))
+            .body(Body::from("X-Hub-Signature-256 header must be set"))
             .unwrap());
     };
     log::debug!("signature={}", signature);
