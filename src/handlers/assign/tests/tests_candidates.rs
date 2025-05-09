@@ -3,6 +3,7 @@
 use super::super::*;
 use crate::db::review_prefs::{upsert_review_prefs, RotationMode};
 use crate::github::{PullRequestNumber, User};
+use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::tests::github::{issue, user};
 use crate::tests::{run_db_test, TestContext};
 
@@ -72,14 +73,14 @@ impl AssignCtx {
     }
 
     async fn check(
-        self,
+        mut self,
         names: &[&str],
         expected: Result<&[&str], FindReviewerError>,
     ) -> anyhow::Result<TestContext> {
         let names: Vec<_> = names.iter().map(|n| n.to_string()).collect();
 
         let reviewers = candidate_reviewers_from_names(
-            self.test_ctx.db_client(),
+            self.test_ctx.db_client_mut(),
             Arc::new(RwLock::new(self.reviewer_workqueue)),
             &self.teams,
             &self.config,
