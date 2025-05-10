@@ -4,7 +4,7 @@ use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::{future::BoxFuture, FutureExt};
 use hyper::header::HeaderValue;
-use octocrab::models::{Author, AuthorAssociation};
+use octocrab::models::{Author, AuthorAssociation, RunId};
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
@@ -681,28 +681,6 @@ impl Issue {
             .await
             .context("failed to post comment")?;
         Ok(comment)
-    }
-
-    pub async fn hide_comment(
-        &self,
-        client: &GithubClient,
-        node_id: &str,
-        reason: ReportedContentClassifiers,
-    ) -> anyhow::Result<()> {
-        client
-            .graphql_query(
-                "mutation($node_id: ID!, $reason: ReportedContentClassifiers!) {
-                    minimizeComment(input: {subjectId: $node_id, classifier: $reason}) {
-                        __typename
-                    }
-                }",
-                serde_json::json!({
-                    "node_id": node_id,
-                    "reason": reason,
-                }),
-            )
-            .await?;
-        Ok(())
     }
 
     pub async fn remove_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<()> {
@@ -2290,6 +2268,43 @@ pub struct PushEvent {
     sender: User,
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkflowRunAction {
+    Completed,
+    InProgress,
+    Requested,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkflowRunConclusion {
+    Success,
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct PullRequestRef {
+    pub number: PullRequestNumber,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct WorkflowRunDetails {
+    pub id: RunId,
+    pub name: String,
+    pub conclusion: Option<WorkflowRunConclusion>,
+    pub pull_requests: Vec<PullRequestRef>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct WorkflowRunEvent {
+    pub action: WorkflowRunAction,
+    pub repository: Repository,
+    sender: User,
+    pub workflow_run: WorkflowRunDetails,
+}
+
 /// An event triggered by a webhook.
 #[derive(Debug)]
 pub enum Event {
@@ -2309,6 +2324,8 @@ pub enum Event {
     Issue(IssuesEvent),
     /// One or more commits are pushed to a repository branch or tag.
     Push(PushEvent),
+    /// A workflow run is requested, started running or finished.
+    WorkflowRun(WorkflowRunEvent),
 }
 
 impl Event {
@@ -2318,6 +2335,7 @@ impl Event {
             Event::IssueComment(event) => &event.repository,
             Event::Issue(event) => &event.repository,
             Event::Push(event) => &event.repository,
+            Event::WorkflowRun(event) => &event.repository,
         }
     }
 
@@ -2327,6 +2345,7 @@ impl Event {
             Event::IssueComment(event) => Some(&event.issue),
             Event::Issue(event) => Some(&event.issue),
             Event::Push(_) => None,
+            Event::WorkflowRun(_) => None,
         }
     }
 
@@ -2337,6 +2356,7 @@ impl Event {
             Event::Issue(e) => Some(&e.issue.body),
             Event::IssueComment(e) => Some(&e.comment.body),
             Event::Push(_) => None,
+            Event::WorkflowRun(_) => None,
         }
     }
 
@@ -2347,6 +2367,7 @@ impl Event {
             Event::Issue(e) => Some(&e.changes.as_ref()?.body.as_ref()?.from),
             Event::IssueComment(e) => Some(&e.changes.as_ref()?.body.as_ref()?.from),
             Event::Push(_) => None,
+            Event::WorkflowRun(_) => None,
         }
     }
 
@@ -2356,6 +2377,7 @@ impl Event {
             Event::Issue(e) => Some(&e.issue.html_url),
             Event::IssueComment(e) => Some(&e.comment.html_url),
             Event::Push(_) => None,
+            Event::WorkflowRun(_) => None,
         }
     }
 
@@ -2365,6 +2387,7 @@ impl Event {
             Event::Issue(e) => &e.issue.user,
             Event::IssueComment(e) => &e.comment.user,
             Event::Push(e) => &e.sender,
+            Event::WorkflowRun(e) => &e.sender,
         }
     }
 
@@ -2374,6 +2397,7 @@ impl Event {
             Event::Issue(e) => Some(e.issue.created_at.into()),
             Event::IssueComment(e) => Some(e.comment.updated_at.into()),
             Event::Push(_) => None,
+            Event::WorkflowRun(_) => None,
         }
     }
 }
@@ -2810,6 +2834,39 @@ impl GithubClient {
             anyhow::bail!("expected repo id, got {repo_id}");
         };
         Ok(repo_id)
+    }
+
+    pub async fn hide_comment(
+        &self,
+        node_id: &str,
+        reason: ReportedContentClassifiers,
+    ) -> anyhow::Result<()> {
+        self.graphql_query(
+            "mutation($node_id: ID!, $reason: ReportedContentClassifiers!) {
+                minimizeComment(input: {subjectId: $node_id, classifier: $reason}) {
+                    __typename
+                }
+            }",
+            serde_json::json!({
+                "node_id": node_id,
+                "reason": reason,
+            }),
+        )
+        .await?;
+        Ok(())
+    }
+
+    pub async fn unhide_comment(&self, node_id: &str) -> anyhow::Result<()> {
+        self.graphql_query(
+            "mutation($node_id: ID!) {
+                unminimizeComment(input: {subjectId: $node_id}) {
+                    __typename
+                }
+            }",
+            serde_json::json!({ "node_id": node_id }),
+        )
+        .await?;
+        Ok(())
     }
 }
 

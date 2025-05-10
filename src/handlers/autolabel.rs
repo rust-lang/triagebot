@@ -43,7 +43,7 @@ pub(super) async fn parse_input(
     ) {
         let mut db = ctx.db.get().await;
         let mut state: IssueData<'_, AutolabelState> =
-            IssueData::load(&mut db, &event.issue, AUTOLABEL_KEY)
+            IssueData::load_issue(&mut db, &event.issue, AUTOLABEL_KEY)
                 .await
                 .map_err(|e| e.to_string())?;
 

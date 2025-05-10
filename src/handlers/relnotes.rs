@@ -46,7 +46,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
 
     let mut client = ctx.db.get().await;
     let mut state: IssueData<'_, RelnotesState> =
-        IssueData::load(&mut client, &e.issue, RELNOTES_KEY).await?;
+        IssueData::load_issue(&mut client, &e.issue, RELNOTES_KEY).await?;
 
     if let Some(paired) = state.data.relnotes_issue {
         // Already has a paired release notes issue.
