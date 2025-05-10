@@ -79,18 +79,20 @@ pub(super) async fn parse_input(
                 }
             }
 
-            if let Some(files) = &files {
-                // This a PR.
+            if event.issue.is_pr() {
+                if let Some(files) = &files {
+                    // This a PR with modified files.
 
-                // Add the matching labels for the modified files paths
-                if cfg
-                    .trigger_files
-                    .iter()
-                    .any(|f| files.iter().any(|file_diff| file_diff.path.starts_with(f)))
-                {
-                    autolabels.push(Label {
-                        name: label.to_owned(),
-                    });
+                    // Add the matching labels for the modified files paths
+                    if cfg
+                        .trigger_files
+                        .iter()
+                        .any(|f| files.iter().any(|file_diff| file_diff.path.starts_with(f)))
+                    {
+                        autolabels.push(Label {
+                            name: label.to_owned(),
+                        });
+                    }
                 }
 
                 // Treat the following situations as a "new PR":
@@ -106,15 +108,12 @@ pub(super) async fn parse_input(
                     });
                     state.data.new_pr_labels_applied = true;
                 }
-            }
-
-            if event.issue.pull_request.is_none()
-                && cfg.new_issue
-                && event.action == IssuesAction::Opened
-            {
-                autolabels.push(Label {
-                    name: label.to_owned(),
-                });
+            } else {
+                if cfg.new_issue && event.action == IssuesAction::Opened {
+                    autolabels.push(Label {
+                        name: label.to_owned(),
+                    });
+                }
             }
         }
 
