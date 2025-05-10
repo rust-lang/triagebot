@@ -80,6 +80,9 @@ pub(super) async fn parse_input(
             }
 
             if let Some(files) = &files {
+                // This a PR.
+
+                // Add the matching labels for the modified files paths
                 if cfg
                     .trigger_files
                     .iter()
@@ -89,19 +92,20 @@ pub(super) async fn parse_input(
                         name: label.to_owned(),
                     });
                 }
-            }
 
-            // Treat the following situations as a "new PR":
-            // 1) New PRs opened as non-draft
-            // 2) PRs opened as draft that are marked as "ready for review" for the first time.
-            let is_new_non_draft_pr = event.action == IssuesAction::Opened && !event.issue.draft;
-            let is_first_time_ready_for_review =
-                event.action == IssuesAction::ReadyForReview && !state.data.new_pr_labels_applied;
-            if cfg.new_pr && (is_new_non_draft_pr || is_first_time_ready_for_review) {
-                autolabels.push(Label {
-                    name: label.to_owned(),
-                });
-                state.data.new_pr_labels_applied = true;
+                // Treat the following situations as a "new PR":
+                // 1) New PRs opened as non-draft
+                // 2) PRs opened as draft that are marked as "ready for review" for the first time.
+                let is_new_non_draft_pr =
+                    event.action == IssuesAction::Opened && !event.issue.draft;
+                let is_first_time_ready_for_review = event.action == IssuesAction::ReadyForReview
+                    && !state.data.new_pr_labels_applied;
+                if cfg.new_pr && (is_new_non_draft_pr || is_first_time_ready_for_review) {
+                    autolabels.push(Label {
+                        name: label.to_owned(),
+                    });
+                    state.data.new_pr_labels_applied = true;
+                }
             }
 
             if event.issue.pull_request.is_none()
