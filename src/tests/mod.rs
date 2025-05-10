@@ -94,6 +94,10 @@ impl TestContext {
         &self.client
     }
 
+    pub(crate) fn db_client_mut(&mut self) -> &mut PooledClient {
+        &mut self.client
+    }
+
     pub(crate) async fn add_user(&self, name: &str, id: u64) {
         record_username(self.db_client(), id, name)
             .await
