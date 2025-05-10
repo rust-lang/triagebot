@@ -120,7 +120,7 @@ async fn handle_warnings_and_labels(
     // Get the state of the warnings for this PR in the database.
     let mut db = ctx.db.get().await;
     let mut state: IssueData<'_, CheckCommitsWarningsState> =
-        IssueData::load(&mut db, &event.issue, CHECK_COMMITS_WARNINGS_KEY).await?;
+        IssueData::load_issue(&mut db, &event.issue, CHECK_COMMITS_WARNINGS_KEY).await?;
 
     // We only post a new comment when we haven't posted one with the same warnings before.
     if !warnings.is_empty() && state.data.last_warnings != warnings {
@@ -128,10 +128,8 @@ async fn handle_warnings_and_labels(
 
         // Hide a previous warnings comment if there was one before printing the new ones.
         if let Some(last_warned_comment_id) = state.data.last_warned_comment {
-            event
-                .issue
+            ctx.github
                 .hide_comment(
-                    &ctx.github,
                     &last_warned_comment_id,
                     ReportedContentClassifiers::Resolved,
                 )
@@ -146,10 +144,8 @@ async fn handle_warnings_and_labels(
     } else if warnings.is_empty() {
         // No warnings to be shown, let's resolve a previous warnings comment, if there was one.
         if let Some(last_warned_comment_id) = state.data.last_warned_comment {
-            event
-                .issue
+            ctx.github
                 .hide_comment(
-                    &ctx.github,
                     &last_warned_comment_id,
                     ReportedContentClassifiers::Resolved,
                 )

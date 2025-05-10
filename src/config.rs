@@ -50,6 +50,7 @@ pub(crate) struct Config {
     pub(crate) issue_links: Option<IssueLinksConfig>,
     pub(crate) no_mentions: Option<NoMentionsConfig>,
     pub(crate) behind_upstream: Option<BehindUpstreamConfig>,
+    pub(crate) lintcheck_summary: Option<LintcheckSummaryConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -492,6 +493,13 @@ pub(crate) struct BehindUpstreamConfig {
     pub(crate) days_threshold: Option<usize>,
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LintcheckSummaryConfig {
+    pub(crate) workflow: String,
+    pub(crate) artifact: String,
+}
+
 #[inline]
 fn default_true() -> bool {
     true
@@ -697,6 +705,7 @@ mod tests {
                 behind_upstream: Some(BehindUpstreamConfig {
                     days_threshold: Some(14),
                 }),
+                lintcheck_summary: None,
             }
         );
     }
@@ -774,6 +783,7 @@ mod tests {
                 behind_upstream: Some(BehindUpstreamConfig {
                     days_threshold: Some(7),
                 }),
+                lintcheck_summary: None,
             }
         );
     }

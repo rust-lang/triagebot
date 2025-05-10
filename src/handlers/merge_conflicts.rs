@@ -262,7 +262,7 @@ async fn maybe_add_comment(
     possibly: Option<&str>,
 ) -> anyhow::Result<()> {
     let mut state: IssueData<'_, MergeConflictState> =
-        IssueData::load(db, issue, MERGE_CONFLICTS_KEY).await?;
+        IssueData::load_issue(db, issue, MERGE_CONFLICTS_KEY).await?;
     if state.data.last_warned_comment.is_some() {
         // There was already an unresolved notification, don't warn again.
         return Ok(());
@@ -308,13 +308,12 @@ async fn maybe_hide_comment(
     issue: &Issue,
 ) -> anyhow::Result<()> {
     let mut state: IssueData<'_, MergeConflictState> =
-        IssueData::load(db, issue, MERGE_CONFLICTS_KEY).await?;
+        IssueData::load_issue(db, issue, MERGE_CONFLICTS_KEY).await?;
     let Some(comment_id) = &state.data.last_warned_comment else {
         return Ok(());
     };
 
-    issue
-        .hide_comment(gh, comment_id, ReportedContentClassifiers::Resolved)
+    gh.hide_comment(comment_id, ReportedContentClassifiers::Resolved)
         .await?;
 
     state.data.last_warned_comment = None;

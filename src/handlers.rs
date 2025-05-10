@@ -33,6 +33,7 @@ pub mod docs_update;
 mod github_releases;
 mod glacier;
 mod issue_links;
+mod lintcheck_summary;
 mod major_change;
 mod mentions;
 mod merge_conflicts;
@@ -185,6 +186,20 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
         }
     }
 
+    if let Some(lintcheck_summary_config) = config
+        .as_ref()
+        .ok()
+        .and_then(|c| c.lintcheck_summary.as_ref())
+    {
+        if let Err(e) = lintcheck_summary::handle(ctx, event, lintcheck_summary_config).await {
+            log::error!(
+                "failed to process event {:?} with workflow_run_comment handler: {:?}",
+                event,
+                e
+            );
+        }
+    }
+
     errors
 }
 
@@ -278,7 +293,7 @@ macro_rules! command_handlers {
                         }
                     }
                 }
-                Event::Push(_) | Event::Create(_) => {
+                Event::Push(_) | Event::Create(_) | Event::WorkflowRun(_) => {
                     log::debug!("skipping unsupported event");
                     return;
                 }

@@ -74,6 +74,12 @@ pub enum EventName {
     ///
     /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#create>
     Create,
+    /// A workflow run has been requested, started running or finished.
+    ///
+    /// This gets translated to [`github::Event::WorkflowRun`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/webhooks/webhook-events-and-payloads#workflow_run>
+    WorkflowRun,
     /// All other unhandled webhooks.
     Other,
 }
@@ -89,6 +95,7 @@ impl std::str::FromStr for EventName {
             "issues" => EventName::Issue,
             "push" => EventName::Push,
             "create" => EventName::Create,
+            "workflow_run" => EventName::WorkflowRun,
             _ => EventName::Other,
         })
     }
@@ -107,6 +114,7 @@ impl fmt::Display for EventName {
                 EventName::PullRequest => "pull_request",
                 EventName::Push => "push",
                 EventName::Create => "create",
+                EventName::WorkflowRun => "workflow_run",
                 EventName::Other => "other",
             }
         )
@@ -228,6 +236,15 @@ pub async fn webhook(
             log::info!("handling create event {:?}", payload);
 
             github::Event::Create(payload)
+        }
+        EventName::WorkflowRun => {
+            let payload = deserialize_payload::<github::WorkflowRunEvent>(&payload)
+                .with_context(|| format!("{:?} failed to deserialize", event))
+                .map_err(anyhow::Error::from)?;
+
+            log::info!("handling workflow_run event {:?}", payload);
+
+            github::Event::WorkflowRun(payload)
         }
         // Other events need not be handled
         EventName::Other => {

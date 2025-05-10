@@ -30,13 +30,22 @@ impl<'db, T> IssueData<'db, T>
 where
     T: for<'a> Deserialize<'a> + Serialize + Default + std::fmt::Debug + Sync + PartialEq + Clone,
 {
-    pub async fn load(
+    pub async fn load_issue(
         db: &'db mut DbClient,
         issue: &Issue,
         key: &str,
     ) -> Result<IssueData<'db, T>> {
         let repo = issue.repository().to_string();
         let issue_number = issue.number as i32;
+        Self::load(db, repo, issue_number, key).await
+    }
+
+    pub async fn load(
+        db: &'db mut DbClient,
+        repo: String,
+        issue_number: i32,
+        key: &str,
+    ) -> Result<IssueData<'db, T>> {
         let transaction = db.transaction().await?;
         transaction
             .execute("LOCK TABLE issue_data", &[])
