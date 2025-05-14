@@ -34,7 +34,7 @@ impl NoteCommand {
                 false
             };
 
-            let title = toks.take_line_until_punc()?.trim();
+            let title = toks.take_line()?.trim();
 
             // For backwards compatibility we also trim " at the start and end
             let title = title.trim_matches('"');
