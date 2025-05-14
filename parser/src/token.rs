@@ -169,9 +169,9 @@ impl<'a> Tokenizer<'a> {
         self.cur_pos()
     }
 
-    pub fn take_line_until_punc(&mut self) -> Result<&'a str, Error<'a>> {
+    pub fn take_line(&mut self) -> Result<&'a str, Error<'a>> {
         let start = self.cur_pos();
-        while self.cur_punct().is_none() && !self.at_end() {
+        while !matches!(self.cur_punct(), Some(Token::EndOfLine)) && !self.at_end() {
             self.advance();
         }
         Ok(self.str_from(start))
@@ -359,22 +359,30 @@ fn tokenize_raw_string_prohibit_1() {
 }
 
 #[test]
-fn take_line_until_punc() {
+fn tokennize_take_line() {
     assert_eq!(
-        Tokenizer::new("this is a text. this another one.").take_line_until_punc(),
-        Ok("this is a text")
+        Tokenizer::new("this is a text. this another one.").take_line(),
+        Ok("this is a text. this another one.")
     );
 }
 
 #[test]
-fn take_line_until_punc_2() {
+fn tokennize_take_line_2() {
     assert_eq!(
-        Tokenizer::new("punc is \nnewline").take_line_until_punc(),
+        Tokenizer::new("punc is \nnewline").take_line(),
         Ok("punc is ")
     );
 }
 
 #[test]
-fn take_line_until_punc_3() {
-    assert_eq!(Tokenizer::new("").take_line_until_punc(), Ok(""));
+fn tokennize_take_line_3() {
+    assert_eq!(Tokenizer::new("").take_line(), Ok(""));
+}
+
+#[test]
+fn tokennize_take_line_4() {
+    assert_eq!(
+        Tokenizer::new("To be used in 1.84. Another string.").take_line(),
+        Ok("To be used in 1.84. Another string.")
+    );
 }
