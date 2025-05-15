@@ -429,7 +429,7 @@ async fn execute_for_other_user(
         assert_eq!(command.pop(), Some(' ')); // pop trailing space
         command
     };
-    let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
+    let bot_api_token = env::var("ZULIP_TOKEN").expect("ZULIP_TOKEN");
 
     let members = ctx
         .github
@@ -592,7 +592,7 @@ impl<'a> MessageApiRequest<'a> {
     }
 
     pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
-        let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
+        let bot_api_token = env::var("ZULIP_TOKEN").expect("ZULIP_TOKEN");
 
         #[derive(serde::Serialize)]
         struct SerializedApi<'a> {
@@ -643,7 +643,7 @@ pub struct UpdateMessageApiRequest<'a> {
 
 impl<'a> UpdateMessageApiRequest<'a> {
     pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
-        let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
+        let bot_api_token = env::var("ZULIP_TOKEN").expect("ZULIP_TOKEN");
 
         #[derive(serde::Serialize)]
         struct SerializedApi<'a> {
@@ -846,7 +846,7 @@ struct AddReaction<'a> {
 
 impl<'a> AddReaction<'a> {
     pub async fn send(self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
-        let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
+        let bot_api_token = env::var("ZULIP_TOKEN").expect("ZULIP_TOKEN");
 
         Ok(client
             .post(&format!(
