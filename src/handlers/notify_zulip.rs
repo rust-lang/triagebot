@@ -218,12 +218,18 @@ pub(super) async fn handle_input<'a>(
                 let msg = msg.replace("{title}", &event.issue.title);
                 let msg = replace_team_to_be_nominated(&event.issue.labels, msg);
 
-                crate::zulip::MessageApiRequest {
+                let resp = crate::zulip::MessageApiRequest {
                     recipient,
                     content: &msg,
                 }
                 .send(&ctx.github.raw())
                 .await?;
+
+                let status = resp.status();
+                let body = resp.text().await?;
+                if !status.is_success() {
+                    log::error!("Failed to send notification to Zulip {}", body);
+                }
             }
         }
     }
