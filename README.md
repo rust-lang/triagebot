@@ -107,7 +107,7 @@ curl http://localhost:8000/zulip-hook \
     -H "Content-Type: application/json" \
     -d '{
         "data": "<CMD>",
-        "token": "<ZULIP_TOKEN>",
+        "token": "<ZULIP_WEBHOOK_SECRET>",
         "message": {
             "sender_id": <YOUR_ID>,
             "recipient_id": <YOUR_ID>,
@@ -121,7 +121,7 @@ curl http://localhost:8000/zulip-hook \
 Where:
 - `CMD` is the exact command you would issue @triagebot on Zulip (ex. open a direct chat with the
   bot and send "work show")
-- `ZULIP_TOKEN`: can be anything. Must correspond to the env var `$ZULIP_TOKEN` on your workstation
+- `ZULIP_WEBHOOK_SECRET`: can be anything. Must correspond to the env var `$ZULIP_WEBHOOK_SECRET` on your workstation
 - `YOUR_ID`: your GitHub user ID. Must be existing in your local triagebot database (table `users` and as
   foreign key also in `review_prefs`)
 
