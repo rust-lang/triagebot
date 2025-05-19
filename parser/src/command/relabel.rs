@@ -1,33 +1,7 @@
 //! The labels command parser.
 //!
-//! This can parse arbitrary input, giving the list of labels added/removed.
-//!
-//! The grammar is as follows:
-//!
-//! ```text
-//! Command: `@bot modify? <label-w> to? :? <label-list>.`
-//!
-//! <label-w>:
-//!  - label
-//!  - labels
-//!
-//! <label-list>:
-//!  - <label-delta>
-//!  - <label-delta> and <label-list>
-//!  - <label-delta>, <label-list>
-//!  - <label-delta>, and <label-list>
-//!
-//! <label-delta>:
-//!  - +<label>
-//!  - -<label>
-//!  this can start with a + or -, but then the only supported way of adding it
-//!  is with the previous two variants of this (i.e., ++label and -+label).
-//!  - <label>
-//!
-//! <label>:
-//!  - \S+
-//!  - ".+"
-//! ```
+//! See <https://forge.rust-lang.org/triagebot/labeling.html#usage> for the
+//! grammar this parser accepts.
 
 use crate::error::Error;
 use crate::token::{Token, Tokenizer};
