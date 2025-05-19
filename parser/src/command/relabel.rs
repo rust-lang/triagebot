@@ -24,7 +24,9 @@
 //!  is with the previous two variants of this (i.e., ++label and -+label).
 //!  - <label>
 //!
-//! <label>: \S+
+//! <label>:
+//!  - \S+
+//!  - ".+"
 //! ```
 
 use crate::error::Error;
@@ -84,7 +86,7 @@ impl std::ops::Deref for Label {
 impl LabelDelta {
     fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<LabelDelta, Error<'a>> {
         let delta = match input.peek_token()? {
-            Some(Token::Word(delta)) => {
+            Some(Token::Word(delta) | Token::Quote(delta)) => {
                 input.next_token()?;
                 delta
             }
@@ -270,6 +272,18 @@ fn parse_shorter_command_with_to_colon() {
             LabelDelta::Add(Label("T-compiler".into())),
             LabelDelta::Remove(Label("T-lang".into())),
             LabelDelta::Add(Label("bug".into())),
+        ]))
+    );
+}
+
+#[test]
+fn parse_quote() {
+    assert_eq!(
+        parse("labels +T-compiler \"-good first issue\" \"good first issue\""),
+        Ok(Some(vec![
+            LabelDelta::Add(Label("T-compiler".into())),
+            LabelDelta::Remove(Label("good first issue".into())),
+            LabelDelta::Add(Label("good first issue".into())),
         ]))
     );
 }
