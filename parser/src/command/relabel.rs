@@ -1,6 +1,6 @@
 //! The labels command parser.
 //!
-//! See https://forge.rust-lang.org/triagebot/labeling.html#usage for the
+//! See <https://forge.rust-lang.org/triagebot/labeling.html#usage> for the
 //! grammar this parser accepts.
 
 use crate::error::Error;
