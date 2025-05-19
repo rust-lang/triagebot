@@ -65,12 +65,24 @@ pub(super) async fn handle_command(
         }
     };
 
-    if let Some(label) = config.label.clone() {
-        event
+    if let Some(label) = &config.label {
+        if let Err(err) = event
             .issue()
             .unwrap()
-            .add_labels(&ctx.github, vec![github::Label { name: label }])
-            .await?;
+            .add_labels(
+                &ctx.github,
+                vec![github::Label {
+                    name: label.clone(),
+                }],
+            )
+            .await
+        {
+            let cmnt = ErrorComment::new(
+                &event.issue().unwrap(),
+                format!("Error adding team label (`{}`): {:?}.", label, err),
+            );
+            cmnt.post(&ctx.github).await?;
+        }
     }
 
     let mut users = Vec::new();
