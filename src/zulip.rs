@@ -849,10 +849,10 @@ struct AddReaction<'a> {
 }
 
 impl<'a> AddReaction<'a> {
-    pub async fn send(self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
+    pub async fn send(self, client: &reqwest::Client) -> anyhow::Result<()> {
         let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
 
-        Ok(client
+        let resp = client
             .post(&format!(
                 "{}/api/v1/messages/{}/reactions",
                 *ZULIP_URL, self.message_id
@@ -860,7 +860,20 @@ impl<'a> AddReaction<'a> {
             .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
             .form(&self)
             .send()
-            .await?)
+            .await?;
+
+        let status = resp.status();
+
+        if !status.is_success() {
+            let body = resp
+                .text()
+                .await
+                .context("fail receiving Zulip API response (when adding a reaction)")?;
+
+            anyhow::bail!(body)
+        }
+
+        Ok(())
     }
 }
 
