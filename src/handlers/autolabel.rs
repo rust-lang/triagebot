@@ -84,11 +84,11 @@ pub(super) async fn parse_input(
                     // This a PR with modified files.
 
                     // Add the matching labels for the modified files paths
-                    if cfg
-                        .trigger_files
-                        .iter()
-                        .any(|f| files.iter().any(|file_diff| file_diff.path.starts_with(f)))
-                    {
+                    if cfg.trigger_files.iter().any(|f| {
+                        files
+                            .iter()
+                            .any(|file_diff| file_diff.filename.starts_with(f))
+                    }) {
                         autolabels.push(Label {
                             name: label.to_owned(),
                         });

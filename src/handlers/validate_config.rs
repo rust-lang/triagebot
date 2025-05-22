@@ -34,7 +34,7 @@ pub(super) async fn parse_input(
             return Ok(None);
         }
     };
-    if !diff.iter().any(|diff| diff.path == CONFIG_FILE_NAME) {
+    if !diff.iter().any(|diff| diff.filename == CONFIG_FILE_NAME) {
         return Ok(None);
     }
 
