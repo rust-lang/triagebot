@@ -58,6 +58,12 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
             event.issue.number
         )
     };
+    let Some(compare) = event.issue.compare(&ctx.github).await? else {
+        bail!(
+            "expected issue {} to be a PR, but the compare could not be determined",
+            event.issue.number
+        )
+    };
     let commits = event.issue.commits(&ctx.github).await?;
 
     let mut warnings = Vec::new();
@@ -101,7 +107,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
             .unwrap_or(behind_upstream::DEFAULT_DAYS_THRESHOLD);
 
         if let Some(warning) =
-            behind_upstream::behind_upstream(age_threshold, event, &ctx.github, &commits).await
+            behind_upstream::behind_upstream(age_threshold, event, &compare).await
         {
             warnings.push(warning);
         }
