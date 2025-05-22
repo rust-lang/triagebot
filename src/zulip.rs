@@ -475,18 +475,8 @@ async fn execute_for_other_user(
     .send(ctx.github.raw())
     .await;
 
-    match res {
-        Ok(resp) => {
-            if !resp.status().is_success() {
-                log::error!(
-                    "Failed to notify real user about command: response: {:?}",
-                    resp
-                );
-            }
-        }
-        Err(err) => {
-            log::error!("Failed to notify real user about command: {:?}", err);
-        }
+    if let Err(err) = res {
+        log::error!("Failed to notify real user about command: {:?}", err);
     }
 
     Ok(Some(output))
@@ -591,7 +581,7 @@ impl<'a> MessageApiRequest<'a> {
         self.recipient.url()
     }
 
-    pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
+    pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<MessageApiResponse> {
         let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
 
         #[derive(serde::Serialize)]
@@ -604,7 +594,7 @@ impl<'a> MessageApiRequest<'a> {
             content: &'a str,
         }
 
-        Ok(client
+        let resp = client
             .post(format!("{}/api/v1/messages", *ZULIP_URL))
             .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
             .form(&SerializedApi {
@@ -623,11 +613,30 @@ impl<'a> MessageApiRequest<'a> {
                 content: self.content,
             })
             .send()
-            .await?)
+            .await
+            .context("fail sending Zulip message")?;
+
+        let status = resp.status();
+
+        if !status.is_success() {
+            let body = resp
+                .text()
+                .await
+                .context("fail receiving Zulip API response (when sending a message)")?;
+
+            anyhow::bail!(body)
+        }
+
+        let resp: MessageApiResponse = resp
+            .json()
+            .await
+            .context("fail receiving the JSON Zulip Api reponse (when sending a message)")?;
+
+        Ok(resp)
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct MessageApiResponse {
     #[serde(rename = "id")]
     pub message_id: u64,
@@ -642,7 +651,7 @@ pub struct UpdateMessageApiRequest<'a> {
 }
 
 impl<'a> UpdateMessageApiRequest<'a> {
-    pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
+    pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<()> {
         let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
 
         #[derive(serde::Serialize)]
@@ -655,7 +664,7 @@ impl<'a> UpdateMessageApiRequest<'a> {
             pub content: Option<&'a str>,
         }
 
-        Ok(client
+        let resp = client
             .patch(&format!(
                 "{}/api/v1/messages/{}",
                 *ZULIP_URL, self.message_id
@@ -667,7 +676,21 @@ impl<'a> UpdateMessageApiRequest<'a> {
                 content: self.content,
             })
             .send()
-            .await?)
+            .await
+            .context("failed to send Zulip API Update Message")?;
+
+        let status = resp.status();
+
+        if !status.is_success() {
+            let body = resp
+                .text()
+                .await
+                .context("fail receiving Zulip API response (when updating the message)")?;
+
+            anyhow::bail!(body)
+        }
+
+        Ok(())
     }
 }
 
@@ -833,11 +856,6 @@ struct ResponseNotRequired {
     response_not_required: bool,
 }
 
-#[derive(serde::Deserialize, Debug)]
-struct SentMessage {
-    id: u64,
-}
-
 #[derive(serde::Serialize, Debug, Copy, Clone)]
 struct AddReaction<'a> {
     message_id: u64,
@@ -845,10 +863,10 @@ struct AddReaction<'a> {
 }
 
 impl<'a> AddReaction<'a> {
-    pub async fn send(self, client: &reqwest::Client) -> anyhow::Result<reqwest::Response> {
+    pub async fn send(self, client: &reqwest::Client) -> anyhow::Result<()> {
         let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
 
-        Ok(client
+        let resp = client
             .post(&format!(
                 "{}/api/v1/messages/{}/reactions",
                 *ZULIP_URL, self.message_id
@@ -856,7 +874,20 @@ impl<'a> AddReaction<'a> {
             .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
             .form(&self)
             .send()
-            .await?)
+            .await?;
+
+        let status = resp.status();
+
+        if !status.is_success() {
+            let body = resp
+                .text()
+                .await
+                .context("fail receiving Zulip API response (when adding a reaction)")?;
+
+            anyhow::bail!(body)
+        }
+
+        Ok(())
     }
 }
 
@@ -911,14 +942,10 @@ async fn post_waiter(
     }
     .send(ctx.github.raw())
     .await?;
-    let body = posted.text().await?;
-    let message_id = serde_json::from_str::<SentMessage>(&body)
-        .with_context(|| format!("{:?} did not deserialize as SentMessage", body))?
-        .id;
 
     for reaction in waiting.emoji {
         AddReaction {
-            message_id,
+            message_id: posted.message_id,
             emoji_name: reaction,
         }
         .send(&ctx.github.raw())

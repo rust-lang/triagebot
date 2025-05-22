@@ -130,8 +130,6 @@ pub(super) async fn handle_input(
                 .await
                 .context("zulip post failed")?;
 
-            let zulip_send_res: crate::zulip::MessageApiResponse = zulip_send_res.json().await?;
-
             let zulip_update_req = crate::zulip::UpdateMessageApiRequest {
                 message_id: zulip_send_res.message_id,
                 topic: Some(&new_topic),
