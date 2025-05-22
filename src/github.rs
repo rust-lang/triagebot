@@ -320,6 +320,18 @@ pub struct FileDiff {
     pub diff: String,
 }
 
+/// The return from GitHub compare API
+#[derive(Debug, serde::Deserialize)]
+pub struct GithubCompare {
+    /// The base commit of the PR
+    pub base_commit: GithubCommit,
+    /// The merge base commit
+    ///
+    /// See <https://git-scm.com/docs/git-merge-base> for more details
+    pub merge_base_commit: GithubCommit,
+    // FIXME: Also retrieve and use the files list (see our diff function)
+}
+
 impl PullRequestDetails {
     pub fn new() -> PullRequestDetails {
         PullRequestDetails {
@@ -992,6 +1004,23 @@ impl Issue {
             })
             .await?;
         Ok(Some(diff))
+    }
+
+    /// Returns the comparison of this event.
+    ///
+    /// Returns `None` if the issue is not a PR.
+    pub async fn compare(&self, client: &GithubClient) -> anyhow::Result<Option<GithubCompare>> {
+        let (before, after) = if let (Some(base), Some(head)) = (&self.base, &self.head) {
+            (&base.sha, &head.sha)
+        } else {
+            return Ok(None);
+        };
+
+        let req = client.get(&format!(
+            "{}/compare/{before}...{after}",
+            self.repository().url(client)
+        ));
+        Ok(Some(client.json(req).await?))
     }
 
     /// Returns the commits from this pull request (no commits are returned if this `Issue` is not
