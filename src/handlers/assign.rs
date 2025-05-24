@@ -20,6 +20,7 @@
 //! `assign.owners` config, it will auto-select an assignee based on the files
 //! the PR modifies.
 
+use crate::db::issue_data::IssueData;
 use crate::db::review_prefs::{get_review_prefs_batch, RotationMode};
 use crate::github::UserId;
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
@@ -92,8 +93,21 @@ const REVIEWER_ALREADY_ASSIGNED: &str =
 
 Please choose another assignee.";
 
+const REVIEWER_ASSIGNED_BEFORE: &str = "Requested reviewer @{username} was already assigned before.
+
+Please choose another assignee by using `r? @reviewer`.";
+
 // Special account that we use to prevent assignment.
 const GHOST_ACCOUNT: &str = "ghost";
+
+/// Key for the state in the database
+const PREVIOUS_REVIEWERS_KEY: &str = "previous-reviewers";
+
+/// State stored in the database
+#[derive(Debug, Clone, PartialEq, Default, serde::Deserialize, serde::Serialize)]
+struct Reviewers {
+    names: HashSet<String>,
+}
 
 /// Assignment data stored in the issue/PR body.
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -217,7 +231,7 @@ pub(super) async fn handle_input(
             None
         };
         if let Some(assignee) = assignee {
-            set_assignee(&event.issue, &ctx.github, &assignee).await;
+            set_assignee(&ctx, &event.issue, &ctx.github, &assignee).await?;
         }
 
         if let Some(welcome) = welcome {
@@ -249,7 +263,16 @@ fn is_self_assign(assignee: &str, pr_author: &str) -> bool {
 }
 
 /// Sets the assignee of a PR, alerting any errors.
-async fn set_assignee(issue: &Issue, github: &GithubClient, username: &str) {
+async fn set_assignee(
+    ctx: &Context,
+    issue: &Issue,
+    github: &GithubClient,
+    username: &str,
+) -> anyhow::Result<()> {
+    let mut db = ctx.db.get().await;
+    let mut state: IssueData<'_, Reviewers> =
+        IssueData::load(&mut db, &issue, PREVIOUS_REVIEWERS_KEY).await?;
+
     // Don't re-assign if already assigned, e.g. on comment edit
     if issue.contain_assignee(&username) {
         log::trace!(
@@ -257,7 +280,7 @@ async fn set_assignee(issue: &Issue, github: &GithubClient, username: &str) {
             issue.global_id(),
             username,
         );
-        return;
+        return Ok(());
     }
     if let Err(err) = issue.set_assignee(github, &username).await {
         log::warn!(
@@ -280,8 +303,14 @@ async fn set_assignee(issue: &Issue, github: &GithubClient, username: &str) {
             .await
         {
             log::warn!("failed to post error comment: {e}");
+            return Err(e);
         }
     }
+
+    // Record the reviewer in the database
+    state.data.names.insert(username.to_string());
+    state.save().await?;
+    Ok(())
 }
 
 /// Determines who to assign the PR to based on either an `r?` command, or
@@ -300,12 +329,12 @@ async fn determine_assignee(
     config: &AssignConfig,
     diff: &[FileDiff],
 ) -> anyhow::Result<(Option<String>, bool)> {
-    let db_client = ctx.db.get().await;
+    let mut db_client = ctx.db.get().await;
     let teams = crate::team_data::teams(&ctx.github).await?;
     if let Some(name) = assign_command {
         // User included `r?` in the opening PR body.
         match find_reviewer_from_names(
-            &db_client,
+            &mut db_client,
             ctx.workqueue.clone(),
             &teams,
             config,
@@ -328,7 +357,7 @@ async fn determine_assignee(
     match find_reviewers_from_diff(config, diff) {
         Ok(candidates) if !candidates.is_empty() => {
             match find_reviewer_from_names(
-                &db_client,
+                &mut db_client,
                 ctx.workqueue.clone(),
                 &teams,
                 config,
@@ -347,6 +376,7 @@ async fn determine_assignee(
                     e @ FindReviewerError::NoReviewer { .. }
                     | e @ FindReviewerError::ReviewerIsPrAuthor { .. }
                     | e @ FindReviewerError::ReviewerAlreadyAssigned { .. }
+                    | e @ FindReviewerError::ReviewerPreviouslyAssigned { .. }
                     | e @ FindReviewerError::ReviewerOffRotation { .. }
                     | e @ FindReviewerError::DatabaseError(_)
                     | e @ FindReviewerError::ReviewerAtMaxCapacity { .. },
@@ -368,7 +398,7 @@ async fn determine_assignee(
 
     if let Some(fallback) = config.adhoc_groups.get("fallback") {
         match find_reviewer_from_names(
-            &db_client,
+            &mut db_client,
             ctx.workqueue.clone(),
             &teams,
             config,
@@ -550,10 +580,9 @@ pub(super) async fn handle_command(
             issue.remove_assignees(&ctx.github, Selection::All).await?;
             return Ok(());
         }
-
-        let db_client = ctx.db.get().await;
+        let mut db_client = ctx.db.get().await;
         let assignee = match find_reviewer_from_names(
-            &db_client,
+            &mut db_client,
             ctx.workqueue.clone(),
             &teams,
             config,
@@ -569,7 +598,7 @@ pub(super) async fn handle_command(
             }
         };
 
-        set_assignee(issue, &ctx.github, &assignee).await;
+        set_assignee(ctx, issue, &ctx.github, &assignee).await?;
     } else {
         let e = EditIssueBody::new(&issue, "ASSIGN");
 
@@ -680,6 +709,8 @@ enum FindReviewerError {
     ReviewerIsPrAuthor { username: String },
     /// Requested reviewer is already assigned to that PR
     ReviewerAlreadyAssigned { username: String },
+    /// Requested reviewer was already assigned previously to that PR.
+    ReviewerPreviouslyAssigned { username: String },
     /// Data required for assignment could not be loaded from the DB.
     DatabaseError(String),
     /// The reviewer has too many PRs alreayd assigned.
@@ -726,6 +757,13 @@ impl fmt::Display for FindReviewerError {
                     REVIEWER_ALREADY_ASSIGNED.replace("{username}", username)
                 )
             }
+            FindReviewerError::ReviewerPreviouslyAssigned { username } => {
+                write!(
+                    f,
+                    "{}",
+                    REVIEWER_ASSIGNED_BEFORE.replace("{username}", username)
+                )
+            }
             FindReviewerError::DatabaseError(error) => {
                 write!(f, "Database error: {error}")
             }
@@ -748,7 +786,7 @@ Please select a different reviewer.",
 /// auto-assign groups, or rust-lang team names. It must have at least one
 /// entry.
 async fn find_reviewer_from_names(
-    db: &DbClient,
+    db: &mut DbClient,
     workqueue: Arc<RwLock<ReviewerWorkqueue>>,
     teams: &Teams,
     config: &AssignConfig,
@@ -916,7 +954,7 @@ fn expand_teams_and_groups(
 /// Returns a list of candidate usernames (from relevant teams) to choose as a reviewer.
 /// If no reviewer is available, returns an error.
 async fn candidate_reviewers_from_names<'a>(
-    db: &DbClient,
+    db: &mut DbClient,
     workqueue: Arc<RwLock<ReviewerWorkqueue>>,
     teams: &'a Teams,
     config: &'a AssignConfig,
@@ -937,6 +975,7 @@ async fn candidate_reviewers_from_names<'a>(
     // Set of candidate usernames to choose from.
     // We go through each expanded candidate and store either success or an error for them.
     let mut candidates: Vec<Result<String, FindReviewerError>> = Vec::new();
+    let previous_reviewer_names = get_previous_reviewer_names(db, issue).await;
 
     // Step 2: pre-filter candidates based on checks that we can perform quickly
     for reviewer_candidate in expanded {
@@ -948,6 +987,8 @@ async fn candidate_reviewers_from_names<'a>(
             .assignees
             .iter()
             .any(|assignee| name_lower == assignee.login.to_lowercase());
+
+        let is_previously_assigned = previous_reviewer_names.contains(&reviewer_candidate.name);
 
         // Record the reason why the candidate was filtered out
         let reason = {
@@ -961,6 +1002,14 @@ async fn candidate_reviewers_from_names<'a>(
                 })
             } else if is_already_assigned {
                 Some(FindReviewerError::ReviewerAlreadyAssigned {
+                    username: candidate.clone(),
+                })
+            } else if reviewer_candidate.origin == ReviewerCandidateOrigin::Expanded
+                && is_previously_assigned
+            {
+                // **Only** when r? group is expanded, we consider the reviewer previously assigned
+                // `r? @reviewer` will not consider the reviewer previously assigned
+                Some(FindReviewerError::ReviewerPreviouslyAssigned {
                     username: candidate.clone(),
                 })
             } else {
@@ -1057,4 +1106,14 @@ async fn candidate_reviewers_from_names<'a>(
             .map(|s| s.to_string())
             .collect())
     }
+}
+
+async fn get_previous_reviewer_names(db: &mut DbClient, issue: &Issue) -> HashSet<String> {
+    let state: IssueData<'_, Reviewers> =
+        match IssueData::load(db, &issue, PREVIOUS_REVIEWERS_KEY).await {
+            Ok(state) => state,
+            Err(_) => return HashSet::new(),
+        };
+
+    state.data.names
 }
