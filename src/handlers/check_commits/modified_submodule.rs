@@ -1,19 +1,23 @@
 use std::sync::LazyLock;
 
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 
 use crate::github::FileDiff;
 
 const SUBMODULE_WARNING_MSG: &str = "Some commits in this PR modify **submodules**.";
 
-static SUBPROJECT_UPDATE_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\+Subproject\scommit\s").unwrap());
+static SUBPROJECT_COMMIT_RE: LazyLock<Regex> = LazyLock::new(|| {
+    RegexBuilder::new(r"^\+Subproject commit [a-zA-Z0-9]+$")
+        .multi_line(true)
+        .build()
+        .unwrap()
+});
 
 /// Returns a message if the PR modifies a git submodule.
 pub(super) fn modifies_submodule(diff: &[FileDiff]) -> Option<String> {
     if diff
         .iter()
-        .any(|fd| SUBPROJECT_UPDATE_RE.is_match(&fd.patch))
+        .any(|fd| SUBPROJECT_COMMIT_RE.is_match(&fd.patch))
     {
         Some(SUBMODULE_WARNING_MSG.to_string())
     } else {
@@ -61,6 +65,5 @@ fn no_submodule_update_tricky_case() {
             .to_string(),
     };
 
-    // FIXME: This should be true (aka None), but isn't currently!
     assert_eq!(modifies_submodule(&[filediff]), None)
 }
