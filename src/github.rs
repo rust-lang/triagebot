@@ -2847,6 +2847,7 @@ pub struct GithubCommit {
     pub sha: String,
     pub commit: GithubCommitCommitField,
     pub parents: Vec<Parent>,
+    pub html_url: String,
 }
 
 #[derive(Debug, serde::Deserialize)]

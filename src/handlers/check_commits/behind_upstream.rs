@@ -17,6 +17,8 @@ pub(super) async fn behind_upstream(
     let now = chrono::Utc::now().with_timezone(&commit_date.timezone());
     let days_old = (now - commit_date).num_days() as usize;
 
+    let upstream_commit_url = &compare.merge_base_commit.html_url;
+
     // First try the parent commit age check as it's more accurate
     if days_old > age_threshold {
         log::info!(
@@ -26,10 +28,9 @@ pub(super) async fn behind_upstream(
         );
 
         Some(format!(
-            r"This PR is based on an upstream commit that is {} days old.
+            r"This PR is based on an [upstream commit]({upstream_commit_url}) that is {days_old} days old.
 
 *It's recommended to update your branch according to the [rustc-dev-guide](https://rustc-dev-guide.rust-lang.org/contributing.html#keeping-your-branch-up-to-date).*",
-            days_old
         ))
     } else {
         // Parent commit is not too old, log and do nothing
