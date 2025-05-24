@@ -31,7 +31,6 @@ mod check_commits;
 mod close;
 pub mod docs_update;
 mod github_releases;
-mod glacier;
 mod issue_links;
 mod major_change;
 mod mentions;
@@ -358,7 +357,6 @@ macro_rules! command_handlers {
 // preceded by the module containing the corresponding `handle_command` function
 command_handlers! {
     assign: Assign,
-    glacier: Glacier,
     nominate: Nominate,
     ping: Ping,
     prioritize: Prioritize,

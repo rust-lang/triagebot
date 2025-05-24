@@ -27,7 +27,6 @@ pub(crate) struct Config {
     pub(crate) nominate: Option<NominateConfig>,
     pub(crate) prioritize: Option<PrioritizeConfig>,
     pub(crate) major_change: Option<MajorChangeConfig>,
-    pub(crate) glacier: Option<GlacierConfig>,
     pub(crate) close: Option<CloseConfig>,
     pub(crate) autolabel: Option<AutolabelConfig>,
     pub(crate) notify_zulip: Option<NotifyZulipConfig>,
@@ -386,10 +385,6 @@ impl MajorChangeConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct GlacierConfig {}
-
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(crate) struct CloseConfig {}
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -673,7 +668,6 @@ mod tests {
                 shortcut: Some(ShortcutConfig { _empty: () }),
                 prioritize: None,
                 major_change: None,
-                glacier: None,
                 close: None,
                 autolabel: None,
                 notify_zulip: None,
@@ -752,7 +746,6 @@ mod tests {
                 shortcut: None,
                 prioritize: None,
                 major_change: None,
-                glacier: None,
                 close: None,
                 autolabel: None,
                 notify_zulip: None,

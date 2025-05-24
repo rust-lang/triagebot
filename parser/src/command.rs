@@ -5,7 +5,6 @@ use regex::Regex;
 
 pub mod assign;
 pub mod close;
-pub mod glacier;
 pub mod nominate;
 pub mod note;
 pub mod ping;
@@ -23,7 +22,6 @@ pub enum Command<'a> {
     Nominate(Result<nominate::NominateCommand, Error<'a>>),
     Prioritize(Result<prioritize::PrioritizeCommand, Error<'a>>),
     Second(Result<second::SecondCommand, Error<'a>>),
-    Glacier(Result<glacier::GlacierCommand, Error<'a>>),
     Shortcut(Result<shortcut::ShortcutCommand, Error<'a>>),
     Close(Result<close::CloseCommand, Error<'a>>),
     Note(Result<note::NoteCommand, Error<'a>>),
@@ -120,11 +118,6 @@ impl<'a> Input<'a> {
             &original_tokenizer,
         ));
         success.extend(parse_single_command(
-            glacier::GlacierCommand::parse,
-            Command::Glacier,
-            &original_tokenizer,
-        ));
-        success.extend(parse_single_command(
             shortcut::ShortcutCommand::parse,
             Command::Shortcut,
             &original_tokenizer,
@@ -210,7 +203,6 @@ impl<'a> Command<'a> {
             Command::Nominate(r) => r.is_ok(),
             Command::Prioritize(r) => r.is_ok(),
             Command::Second(r) => r.is_ok(),
-            Command::Glacier(r) => r.is_ok(),
             Command::Shortcut(r) => r.is_ok(),
             Command::Close(r) => r.is_ok(),
             Command::Note(r) => r.is_ok(),
