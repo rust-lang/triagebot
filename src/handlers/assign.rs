@@ -421,7 +421,7 @@ fn find_reviewers_from_diff(
                 .with_context(|| format!("owner file pattern `{owner_pattern}` is not valid"))?
                 .build()?;
             if ignore
-                .matched_path_or_any_parents(&file_diff.path, false)
+                .matched_path_or_any_parents(&file_diff.filename, false)
                 .is_ignore()
             {
                 let owner_len = owner_pattern.split('/').count();
@@ -442,7 +442,7 @@ fn find_reviewers_from_diff(
         }
 
         // Count the modified lines.
-        for line in file_diff.diff.lines() {
+        for line in file_diff.patch.lines() {
             if (!line.starts_with("+++") && line.starts_with('+'))
                 || (!line.starts_with("---") && line.starts_with('-'))
             {

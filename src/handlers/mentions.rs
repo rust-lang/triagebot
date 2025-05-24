@@ -59,7 +59,7 @@ pub(super) async fn parse_input(
         })
         .unwrap_or_default()
     {
-        let file_paths: Vec<_> = files.iter().map(|fd| Path::new(&fd.path)).collect();
+        let file_paths: Vec<_> = files.iter().map(|fd| Path::new(&fd.filename)).collect();
         let to_mention: Vec<_> = config
             .paths
             .iter()

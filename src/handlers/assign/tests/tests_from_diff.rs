@@ -1,14 +1,12 @@
 //! Tests for `find_reviewers_from_diff`
 
 use super::super::*;
-use crate::github::parse_diff;
 use std::fmt::Write;
 
-fn test_from_diff(diff: &str, config: toml::Table, expected: &[&str]) {
-    let files = parse_diff(diff);
+fn test_from_diff(diff: &Vec<FileDiff>, config: toml::Table, expected: &[&str]) {
     let aconfig: AssignConfig = config.try_into().unwrap();
     assert_eq!(
-        find_reviewers_from_diff(&aconfig, &files).unwrap(),
+        find_reviewers_from_diff(&aconfig, &*diff).unwrap(),
         expected.iter().map(|x| x.to_string()).collect::<Vec<_>>()
     );
 }
@@ -18,19 +16,13 @@ fn test_from_diff(diff: &str, config: toml::Table, expected: &[&str]) {
 /// `paths` should be a slice of `(path, added, removed)` tuples where `added`
 /// is the number of lines added, and `removed` is the number of lines
 /// removed.
-fn make_fake_diff(paths: &[(&str, u32, u32)]) -> String {
+fn make_fake_diff(paths: &[(&str, u32, u32)]) -> Vec<FileDiff> {
     // This isn't a properly structured diff, but it has approximately enough
     // information for what is needed for testing.
     paths
         .iter()
         .map(|(path, added, removed)| {
-            let mut diff = format!(
-                "diff --git a/{path} b/{path}\n\
-                 index 1677422122e..1108c1f4d4c 100644\n\
-                 --- a/{path}\n\
-                 +++ b/{path}\n\
-                 @@ -0,0 +1 @@\n"
-            );
+            let mut diff = "@@ -0,0 +1 @@ ".to_string();
             for n in 0..*added {
                 writeln!(diff, "+Added line {n}").unwrap();
             }
@@ -38,7 +30,10 @@ fn make_fake_diff(paths: &[(&str, u32, u32)]) -> String {
                 writeln!(diff, "-Removed line {n}").unwrap();
             }
             diff.push('\n');
-            diff
+            FileDiff {
+                filename: path.to_string(),
+                patch: diff,
+            }
         })
         .collect()
 }
@@ -61,16 +56,15 @@ fn from_diff_submodule() {
         [owners]
         "/src" = ["user1", "user2"]
     );
-    let diff = "\
-        diff --git a/src/jemalloc b/src/jemalloc\n\
-        index 2dba541..b001609 160000\n\
-        --- a/src/jemalloc\n\
-        +++ b/src/jemalloc\n\
-        @@ -1 +1 @@\n\
-        -Subproject commit 2dba541881fb8e35246d653bbe2e7c7088777a4a\n\
-        +Subproject commit b001609960ca33047e5cbc5a231c1e24b6041d4b\n\
-    ";
-    test_from_diff(diff, config, &["user1", "user2"]);
+    let diff = vec![FileDiff {
+        filename: "src/jemalloc".to_string(),
+        patch: "@@ -1 +1 @@\n\
+            -Subproject commit 2dba541881fb8e35246d653bbe2e7c7088777a4a\n\
+            +Subproject commit b001609960ca33047e5cbc5a231c1e24b6041d4b\n\
+        "
+        .to_string(),
+    }];
+    test_from_diff(&diff, config, &["user1", "user2"]);
 }
 
 #[test]
@@ -131,9 +125,12 @@ fn empty_file_still_counts() {
         "/compiler" = ["compiler"]
         "/compiler/rustc_parse" = ["parser"]
     );
-    let diff = "diff --git a/compiler/rustc_parse/src/foo.rs b/compiler/rustc_parse/src/foo.rs\n\
-                new file mode 100644\n\
-                index 0000000..e69de29\n";
+    let diff = vec![FileDiff {
+        filename: "compiler/rustc_parse/src/foo.rs".to_string(),
+        patch: "new file mode 100644\n\
+                index 0000000..e69de29\n"
+            .to_string(),
+    }];
     test_from_diff(&diff, config, &["parser"]);
 }
 

@@ -52,12 +52,6 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
         return Ok(());
     }
 
-    let Some(diff) = event.issue.diff(&ctx.github).await? else {
-        bail!(
-            "expected issue {} to be a PR, but the diff could not be determined",
-            event.issue.number
-        )
-    };
     let Some(compare) = event.issue.compare(&ctx.github).await? else {
         bail!(
             "expected issue {} to be a PR, but the compare could not be determined",
@@ -65,6 +59,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
         )
     };
     let commits = event.issue.commits(&ctx.github).await?;
+    let diff = &compare.files;
 
     let mut warnings = Vec::new();
     let mut labels = Vec::new();
