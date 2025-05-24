@@ -11,3 +11,47 @@ pub(super) fn modifies_submodule(diff: &[FileDiff]) -> Option<String> {
         None
     }
 }
+
+#[test]
+fn no_submodule_update() {
+    let filediff = FileDiff {
+        path: "src/lib.rs".to_string(),
+        diff: "@@ -1 +1 @@\
+            -let mut my_var = 5;\
+            +let mut my_var = \"tmp\";"
+            .to_string(),
+    };
+
+    assert_eq!(modifies_submodule(&[filediff]), None)
+}
+
+#[test]
+fn simple_submodule_update() {
+    // Taken from https://api.github.com/repos/rust-lang/rust/compare/5af801b687e6e8b860ae970e725c8b9a3820d0ce...d6c4ab81be200855df856468ddedde057958441a
+    let filediff = FileDiff {
+        path: "src/tools/rustc-perf".to_string(),
+        diff: "@@ -1 +1 @@\n\
+            -Subproject commit c0f3b53c8e5de87714d18a5f42998859302ae03a\n\
+            +Subproject commit 8158f78f738715c060d230351623a7f7cc01bf97"
+            .to_string(),
+    };
+
+    assert_eq!(
+        modifies_submodule(&[filediff]),
+        Some(SUBMODULE_WARNING_MSG.to_string())
+    )
+}
+
+#[test]
+fn no_submodule_update_tricky_case() {
+    let filediff = FileDiff {
+        path: "src/tools.sh".to_string(),
+        diff: "@@ -1 +1 @@\
+            -let mut subproject_commit = 5;\
+            +let mut subproject_commit = \"+Subproject commit \";"
+            .to_string(),
+    };
+
+    // FIXME: This should be true (aka None), but isn't currently!
+    assert_eq!(modifies_submodule(&[filediff]), None)
+}
