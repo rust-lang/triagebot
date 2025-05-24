@@ -72,6 +72,19 @@ impl AssignCtx {
         self
     }
 
+    async fn set_previous_reviewers(mut self, users: &[&User]) -> Self {
+        let mut db = self.test_ctx.db_client_mut();
+        for user in users {
+            let mut state: IssueData<'_, Reviewers> =
+                IssueData::load(&mut db, &self.issue, PREVIOUS_REVIEWERS_KEY)
+                    .await
+                    .unwrap();
+            state.data.names.insert(user.login.to_string());
+            state.save().await.unwrap();
+        }
+        self
+    }
+
     async fn check(
         mut self,
         names: &[&str],
@@ -527,4 +540,59 @@ async fn vacation() {
             .await
     })
     .await;
+}
+
+#[tokio::test]
+async fn previous_reviewers_ignore_in_team_success() {
+    let teams = toml::toml!(compiler = ["martin", "jyn514"]);
+    let config = toml::Table::new();
+    run_db_test(|ctx| async move {
+        let user = user("martin", 1);
+        basic_test(ctx, config, issue().call())
+            .teams(&teams)
+            .set_previous_reviewers(&[&user])
+            .await
+            .check(&["compiler"], Ok(&["jyn514"]))
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn previous_reviewers_ignore_in_team_failed() {
+    let teams = toml::toml!(compiler = ["martin", "jyn514"]);
+    let config = toml::Table::new();
+    run_db_test(|ctx| async move {
+        let user1 = user("martin", 1);
+        let user2 = user("jyn514", 2);
+        basic_test(ctx, config, issue().call())
+            .teams(&teams)
+            .set_previous_reviewers(&[&user1, &user2])
+            .await
+            .check(
+                &["compiler"],
+                Err(FindReviewerError::NoReviewer {
+                    initial: vec!["compiler".to_string()],
+                }),
+            )
+            .await
+    })
+    .await
+}
+
+#[tokio::test]
+async fn previous_reviewers_direct_assignee() {
+    let teams = toml::toml!(compiler = ["martin", "jyn514"]);
+    let config = toml::Table::new();
+    run_db_test(|ctx| async move {
+        let user1 = user("martin", 1);
+        let user2 = user("jyn514", 2);
+        basic_test(ctx, config, issue().call())
+            .teams(&teams)
+            .set_previous_reviewers(&[&user1, &user2])
+            .await
+            .check(&["jyn514"], Ok(&["jyn514"]))
+            .await
+    })
+    .await
 }
