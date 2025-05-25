@@ -13,7 +13,7 @@ struct AssignCtx {
     teams: Teams,
     config: AssignConfig,
     issue: Issue,
-    reviewer_workqueue: ReviewerWorkqueue,
+    reviewer_workqueue: HashMap<UserId, HashSet<PullRequestNumber>>,
 }
 
 impl AssignCtx {
@@ -51,7 +51,7 @@ impl AssignCtx {
 
     fn assign_prs(mut self, user_id: UserId, count: u64) -> Self {
         let prs: HashSet<PullRequestNumber> = (0..count).collect();
-        self.reviewer_workqueue.set_user_prs(user_id, prs);
+        self.reviewer_workqueue.insert(user_id, prs);
         self
     }
 
@@ -89,12 +89,13 @@ impl AssignCtx {
         mut self,
         names: &[&str],
         expected: Result<&[&str], FindReviewerError>,
-    ) -> anyhow::Result<TestContext> {
+    ) -> anyhow::Result<Self> {
         let names: Vec<_> = names.iter().map(|n| n.to_string()).collect();
 
+        let workqueue = ReviewerWorkqueue::new(self.reviewer_workqueue.clone());
         let reviewers = candidate_reviewers_from_names(
             self.test_ctx.db_client_mut(),
-            Arc::new(RwLock::new(self.reviewer_workqueue)),
+            Arc::new(RwLock::new(workqueue)),
             &self.teams,
             &self.config,
             &self.issue,
@@ -114,7 +115,13 @@ impl AssignCtx {
             (Ok(candidates), Err(_)) => panic!("expected Err, got Ok: {candidates:?}"),
             (Err(e), Ok(_)) => panic!("expected Ok, got Err: {e}"),
         };
-        Ok(self.test_ctx)
+        Ok(self)
+    }
+}
+
+impl From<AssignCtx> for TestContext {
+    fn from(value: AssignCtx) -> Self {
+        value.test_ctx
     }
 }
 
@@ -462,7 +469,7 @@ async fn group_team_user_precedence() {
             .check(&["compiler"], Ok(&["user2"]))
             .await?;
 
-        basic_test(ctx, config, issue().call())
+        basic_test(ctx.into(), config, issue().call())
             .teams(&teams)
             .check(&["rust-lang/compiler"], Ok(&["user2"]))
             .await
@@ -483,13 +490,10 @@ async fn what_do_slashes_mean() {
 
     run_db_test(|ctx| async move {
         // Random slash names should work from groups.
-        let ctx = basic_test(ctx, config.clone(), issue())
-            .teams(&teams)
-            .check(&["foo/bar"], Ok(&["foo-user"]))
-            .await?;
-
         basic_test(ctx, config, issue())
             .teams(&teams)
+            .check(&["foo/bar"], Ok(&["foo-user"]))
+            .await?
             .check(&["rust-lang-nursery/compiler"], Ok(&["user2"]))
             .await
     })
@@ -524,7 +528,7 @@ async fn vacation() {
 
     run_db_test(|ctx| async move {
         // Test that `r? user` returns a specific error about the user being on vacation.
-        let ctx = basic_test(ctx, config.clone(), issue().call())
+        basic_test(ctx, config, issue().call())
             .teams(&teams)
             .check(
                 &["jyn514"],
@@ -532,10 +536,7 @@ async fn vacation() {
                     username: "jyn514".to_string(),
                 }),
             )
-            .await?;
-
-        basic_test(ctx, config.clone(), issue().call())
-            .teams(&teams)
+            .await?
             .check(&["bootstrap"], Ok(&["Mark-Simulacrum"]))
             .await
     })

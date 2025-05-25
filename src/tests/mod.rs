@@ -121,14 +121,15 @@ impl TestContext {
     }
 }
 
-pub(crate) async fn run_db_test<F, Fut>(f: F)
+pub(crate) async fn run_db_test<F, Fut, Ctx>(f: F)
 where
     F: FnOnce(TestContext) -> Fut,
-    Fut: Future<Output = anyhow::Result<TestContext>>,
+    Fut: Future<Output = anyhow::Result<Ctx>>,
+    Ctx: Into<TestContext>,
 {
     if let Ok(db_url) = std::env::var("TEST_DB_URL") {
         let ctx = TestContext::new(&db_url).await;
-        let ctx = f(ctx).await.expect("Test failed");
+        let ctx: TestContext = f(ctx).await.expect("Test failed").into();
         ctx.finish().await;
     } else {
         eprintln!("Skipping test because TEST_DB_URL was not passed");
