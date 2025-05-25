@@ -840,13 +840,13 @@ async fn find_reviewer_from_names(
         .to_string())
 }
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash, Debug)]
 struct ReviewerCandidate {
     name: String,
     origin: ReviewerCandidateOrigin,
 }
 
-#[derive(Eq, PartialEq, Hash, Copy, Clone)]
+#[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]
 enum ReviewerCandidateOrigin {
     /// This reviewer was directly requested for a review.
     Direct,
@@ -976,7 +976,7 @@ async fn candidate_reviewers_from_names<'a>(
 
     // Set of candidate usernames to choose from.
     // We go through each expanded candidate and store either success or an error for them.
-    let mut candidates: Vec<Result<String, FindReviewerError>> = Vec::new();
+    let mut candidates: Vec<Result<ReviewerCandidate, FindReviewerError>> = Vec::new();
     let previous_reviewer_names = get_previous_reviewer_names(db, issue).await;
 
     // Step 2: pre-filter candidates based on checks that we can perform quickly
@@ -1022,7 +1022,7 @@ async fn candidate_reviewers_from_names<'a>(
         if let Some(error_reason) = reason {
             candidates.push(Err(error_reason));
         } else {
-            candidates.push(Ok(reviewer_candidate.name));
+            candidates.push(Ok(reviewer_candidate));
         }
     }
     assert_eq!(candidates.len(), expanded_count);
@@ -1031,7 +1031,7 @@ async fn candidate_reviewers_from_names<'a>(
         // Step 3: gather potential usernames to form a DB query for review preferences
         let usernames: Vec<String> = candidates
             .iter()
-            .filter_map(|res| res.as_deref().ok().map(|s| s.to_string()))
+            .filter_map(|res| res.as_ref().ok().map(|s| s.name.to_string()))
             .collect();
         let usernames: Vec<&str> = usernames.iter().map(|s| s.as_str()).collect();
         let review_prefs = get_review_prefs_batch(db, &usernames)
@@ -1044,27 +1044,32 @@ async fn candidate_reviewers_from_names<'a>(
         // Step 4: check review preferences
         candidates = candidates
             .into_iter()
-            .map(|username| {
+            .map(|candidate| {
                 // Only consider candidates that did not have an earlier error
-                let username = username?;
+                let candidate = candidate?;
+                let username = &candidate.name;
 
                 // If no review prefs were found, we assume the default unlimited
                 // review capacity and being on rotation.
                 let Some(review_prefs) = review_prefs.get(username.as_str()) else {
-                    return Ok(username);
+                    return Ok(candidate);
                 };
                 if let Some(capacity) = review_prefs.max_assigned_prs {
                     let assigned_prs = workqueue.assigned_pr_count(review_prefs.user_id as UserId);
                     // Is the reviewer at max capacity?
                     if (assigned_prs as i32) >= capacity {
-                        return Err(FindReviewerError::ReviewerAtMaxCapacity { username });
+                        return Err(FindReviewerError::ReviewerAtMaxCapacity {
+                            username: username.clone(),
+                        });
                     }
                 }
                 if review_prefs.rotation_mode == RotationMode::OffRotation {
-                    return Err(FindReviewerError::ReviewerOffRotation { username });
+                    return Err(FindReviewerError::ReviewerOffRotation {
+                        username: username.clone(),
+                    });
                 }
 
-                return Ok(username);
+                return Ok(candidate);
             })
             .collect();
     }
@@ -1072,7 +1077,7 @@ async fn candidate_reviewers_from_names<'a>(
 
     let valid_candidates: HashSet<&str> = candidates
         .iter()
-        .filter_map(|res| res.as_deref().ok())
+        .filter_map(|res| res.as_ref().ok().map(|c| c.name.as_str()))
         .collect();
 
     log::debug!(
