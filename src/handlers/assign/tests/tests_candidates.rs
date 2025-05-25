@@ -72,16 +72,16 @@ impl AssignCtx {
         self
     }
 
-    async fn set_previous_reviewers(mut self, users: &[&User]) -> Self {
+    async fn set_previous_reviewers(mut self, users: HashSet<&User>) -> Self {
         let mut db = self.test_ctx.db_client_mut();
-        for user in users {
-            let mut state: IssueData<'_, Reviewers> =
-                IssueData::load(&mut db, &self.issue, PREVIOUS_REVIEWERS_KEY)
-                    .await
-                    .unwrap();
-            state.data.names.insert(user.login.to_string());
-            state.save().await.unwrap();
-        }
+        let mut state: IssueData<'_, Reviewers> =
+            IssueData::load(&mut db, &self.issue, PREVIOUS_REVIEWERS_KEY)
+                .await
+                .unwrap();
+
+        // Create a new set with all user names (overwrite existing data)
+        state.data.names = users.iter().map(|user| user.login.to_lowercase()).collect();
+        state.save().await.unwrap();
         self
     }
 
@@ -550,7 +550,7 @@ async fn previous_reviewers_ignore_in_team_success() {
         let user = user("martin", 1);
         basic_test(ctx, config, issue().call())
             .teams(&teams)
-            .set_previous_reviewers(&[&user])
+            .set_previous_reviewers(HashSet::from([&user]))
             .await
             .check(&["compiler"], Ok(&["jyn514"]))
             .await
@@ -567,7 +567,7 @@ async fn previous_reviewers_ignore_in_team_failed() {
         let user2 = user("jyn514", 2);
         basic_test(ctx, config, issue().call())
             .teams(&teams)
-            .set_previous_reviewers(&[&user1, &user2])
+            .set_previous_reviewers(HashSet::from([&user1, &user2]))
             .await
             .check(
                 &["compiler"],
@@ -589,7 +589,7 @@ async fn previous_reviewers_direct_assignee() {
         let user2 = user("jyn514", 2);
         basic_test(ctx, config, issue().call())
             .teams(&teams)
-            .set_previous_reviewers(&[&user1, &user2])
+            .set_previous_reviewers(HashSet::from([&user1, &user2]))
             .await
             .check(&["jyn514"], Ok(&["jyn514"]))
             .await

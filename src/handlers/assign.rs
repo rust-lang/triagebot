@@ -106,6 +106,7 @@ const PREVIOUS_REVIEWERS_KEY: &str = "previous-reviewers";
 /// State stored in the database
 #[derive(Debug, Clone, PartialEq, Default, serde::Deserialize, serde::Serialize)]
 struct Reviewers {
+    // names are stored in lowercase
     names: HashSet<String>,
 }
 
@@ -308,7 +309,8 @@ async fn set_assignee(
     }
 
     // Record the reviewer in the database
-    state.data.names.insert(username.to_string());
+
+    state.data.names.insert(username.to_lowercase());
     state.save().await?;
     Ok(())
 }
@@ -988,7 +990,7 @@ async fn candidate_reviewers_from_names<'a>(
             .iter()
             .any(|assignee| name_lower == assignee.login.to_lowercase());
 
-        let is_previously_assigned = previous_reviewer_names.contains(&reviewer_candidate.name);
+        let is_previously_assigned = previous_reviewer_names.contains(&name_lower);
 
         // Record the reason why the candidate was filtered out
         let reason = {
