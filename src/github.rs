@@ -308,16 +308,7 @@ pub struct PullRequestDetails {
     /// handlers want to see PR changes, and getting the diff can be
     /// expensive.
     #[serde(skip)]
-    files_changed: tokio::sync::OnceCell<Vec<FileDiff>>,
-}
-
-/// Representation of a diff to a single file.
-#[derive(Debug)]
-pub struct FileDiff {
-    /// The full path of the file.
-    pub path: String,
-    /// The diff for the file.
-    pub diff: String,
+    compare: tokio::sync::OnceCell<GithubCompare>,
 }
 
 /// The return from GitHub compare API
@@ -329,13 +320,23 @@ pub struct GithubCompare {
     ///
     /// See <https://git-scm.com/docs/git-merge-base> for more details
     pub merge_base_commit: GithubCommit,
-    // FIXME: Also retrieve and use the files list (see our diff function)
+    /// List of file differences
+    pub files: Vec<FileDiff>,
+}
+
+/// Representation of a diff to a single file.
+#[derive(Debug, serde::Deserialize)]
+pub struct FileDiff {
+    /// The fullname path of the file.
+    pub filename: String,
+    /// The patch/diff for the file.
+    pub patch: String,
 }
 
 impl PullRequestDetails {
     pub fn new() -> PullRequestDetails {
         PullRequestDetails {
-            files_changed: tokio::sync::OnceCell::new(),
+            compare: tokio::sync::OnceCell::new(),
         }
     }
 }
@@ -977,6 +978,13 @@ impl Issue {
     ///
     /// Returns `None` if the issue is not a PR.
     pub async fn diff(&self, client: &GithubClient) -> anyhow::Result<Option<&[FileDiff]>> {
+        Ok(self.compare(client).await?.map(|c| c.files.as_ref()))
+    }
+
+    /// Returns the comparison of this event.
+    ///
+    /// Returns `None` if the issue is not a PR.
+    pub async fn compare(&self, client: &GithubClient) -> anyhow::Result<Option<&GithubCompare>> {
         let Some(pr) = &self.pull_request else {
             return Ok(None);
         };
@@ -986,41 +994,17 @@ impl Issue {
             return Ok(None);
         };
 
-        let diff = pr
-            .files_changed
+        let compare = pr
+            .compare
             .get_or_try_init::<anyhow::Error, _, _>(|| async move {
-                let url = format!(
+                let req = client.get(&format!(
                     "{}/compare/{before}...{after}",
                     self.repository().url(client)
-                );
-                let mut req = client.get(&url);
-                req = req.header("Accept", "application/vnd.github.v3.diff");
-                let (diff, _) = client
-                    .send_req(req)
-                    .await
-                    .with_context(|| format!("failed to fetch diff comparison for {url}"))?;
-                let body = String::from_utf8_lossy(&diff);
-                Ok(parse_diff(&body))
+                ));
+                Ok(client.json(req).await?)
             })
             .await?;
-        Ok(Some(diff))
-    }
-
-    /// Returns the comparison of this event.
-    ///
-    /// Returns `None` if the issue is not a PR.
-    pub async fn compare(&self, client: &GithubClient) -> anyhow::Result<Option<GithubCompare>> {
-        let (before, after) = if let (Some(base), Some(head)) = (&self.base, &self.head) {
-            (&base.sha, &head.sha)
-        } else {
-            return Ok(None);
-        };
-
-        let req = client.get(&format!(
-            "{}/compare/{before}...{after}",
-            self.repository().url(client)
-        ));
-        Ok(Some(client.json(req).await?))
+        Ok(Some(compare))
     }
 
     /// Returns the commits from this pull request (no commits are returned if this `Issue` is not
@@ -1262,31 +1246,6 @@ pub struct CommitBase {
     #[serde(rename = "ref")]
     pub git_ref: String,
     pub repo: Option<Repository>,
-}
-
-pub fn parse_diff(diff: &str) -> Vec<FileDiff> {
-    // This does not properly handle filenames with spaces.
-    let re = regex::Regex::new("(?m)^diff --git .* b/(.*)").unwrap();
-    let mut files: Vec<_> = re
-        .captures_iter(diff)
-        .map(|cap| {
-            let start = cap.get(0).unwrap().start();
-            let path = cap.get(1).unwrap().as_str().to_string();
-            (start, path)
-        })
-        .collect();
-    // Break the list up into (start, end) pairs starting from the "diff --git" line.
-    files.push((diff.len(), String::new()));
-    files
-        .windows(2)
-        .map(|w| {
-            let (start, end) = (&w[0], &w[1]);
-            FileDiff {
-                path: start.1.clone(),
-                diff: diff[start.0..end.0].to_string(),
-            }
-        })
-        .collect()
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -3221,72 +3180,5 @@ mod tests {
             labels: vec!["A-bootstrap".into(), "xxx".into()],
         };
         assert_eq!(x.to_string(), "Unknown labels: A-bootstrap, xxx");
-    }
-
-    #[test]
-    fn extract_one_file() {
-        let input = r##"\
-diff --git a/triagebot.toml b/triagebot.toml
-index fb9cee43b2d..b484c25ea51 100644
---- a/triagebot.toml
-+++ b/triagebot.toml
-@@ -114,6 +114,15 @@ trigger_files = [
-        "src/tools/rustdoc-themes",
-    ]
-+[autolabel."T-compiler"]
-+trigger_files = [
-+    # Source code
-+    "compiler",
-+
-+    # Tests
-+    "src/test/ui",
-+]
-+
-    [notify-zulip."I-prioritize"]
-    zulip_stream = 245100 # #t-compiler/wg-prioritization/alerts
-    topic = "#{number} {title}"
-         "##;
-        let files: Vec<_> = parse_diff(input).into_iter().map(|d| d.path).collect();
-        assert_eq!(files, vec!["triagebot.toml".to_string()]);
-    }
-
-    #[test]
-    fn extract_several_files() {
-        let input = r##"\
-diff --git a/library/stdarch b/library/stdarch
-index b70ae88ef2a..cfba59fccd9 160000
---- a/library/stdarch
-+++ b/library/stdarch
-@@ -1 +1 @@
--Subproject commit b70ae88ef2a6c83acad0a1e83d5bd78f9655fd05
-+Subproject commit cfba59fccd90b3b52a614120834320f764ab08d1
-diff --git a/src/librustdoc/clean/types.rs b/src/librustdoc/clean/types.rs
-index 1fe4aa9023e..f0330f1e424 100644
---- a/src/librustdoc/clean/types.rs
-+++ b/src/librustdoc/clean/types.rs
-@@ -2322,3 +2322,4 @@ impl SubstParam {
-        if let Self::Lifetime(lt) = self { Some(lt) } else { None }
-    }
-}
-+
-diff --git a/src/librustdoc/core.rs b/src/librustdoc/core.rs
-index c58310947d2..3b0854d4a9b 100644
---- a/src/librustdoc/core.rs
-+++ b/src/librustdoc/core.rs
-@@ -591,3 +591,4 @@ fn from(idx: u32) -> Self {
-        ImplTraitParam::ParamIndex(idx)
-    }
-}
-+
-"##;
-        let files: Vec<_> = parse_diff(input).into_iter().map(|d| d.path).collect();
-        assert_eq!(
-            files,
-            vec![
-                "library/stdarch".to_string(),
-                "src/librustdoc/clean/types.rs".to_string(),
-                "src/librustdoc/core.rs".to_string(),
-            ]
-        )
     }
 }
