@@ -12,40 +12,42 @@ impl IgnoreBlocks {
         let mut ignore = Vec::new();
         let mut parser = Parser::new(s).into_offset_iter();
         while let Some((event, range)) = parser.next() {
-            if let Event::Start(Tag::CodeBlock(_)) = event {
-                let start = range.start;
-                while let Some((event, range)) = parser.next() {
-                    if let Event::End(TagEnd::CodeBlock) = event {
-                        ignore.push(start..range.end);
-                        break;
-                    }
-                }
-            } else if let Event::Start(Tag::BlockQuote(_)) = event {
-                let start = range.start;
-                let mut count = 1;
-                while let Some((event, range)) = parser.next() {
-                    if let Event::Start(Tag::BlockQuote(_)) = event {
-                        count += 1;
-                    } else if let Event::End(TagEnd::BlockQuote(_)) = event {
-                        count -= 1;
-                        if count == 0 {
+            macro_rules! ignore_till_end {
+                ($p:pat) => {
+                    let start = range.start;
+                    while let Some((event, range)) = parser.next() {
+                        if let Event::End($p) = event {
                             ignore.push(start..range.end);
                             break;
                         }
                     }
+                };
+            }
+            match event {
+                Event::Start(Tag::CodeBlock(_)) => {
+                    ignore_till_end!(TagEnd::CodeBlock);
                 }
-            } else if let Event::Start(Tag::HtmlBlock) = event {
-                let start = range.start;
-                while let Some((event, range)) = parser.next() {
-                    if let Event::End(TagEnd::HtmlBlock) = event {
-                        ignore.push(start..range.end);
-                        break;
+                Event::Start(Tag::BlockQuote(_)) => {
+                    let start = range.start;
+                    let mut count = 1;
+                    while let Some((event, range)) = parser.next() {
+                        if let Event::Start(Tag::BlockQuote(_)) = event {
+                            count += 1;
+                        } else if let Event::End(TagEnd::BlockQuote(_)) = event {
+                            count -= 1;
+                            if count == 0 {
+                                ignore.push(start..range.end);
+                                break;
+                            }
+                        }
                     }
                 }
-            } else if let Event::InlineHtml(_) = event {
-                ignore.push(range);
-            } else if let Event::Code(_) = event {
-                ignore.push(range);
+                Event::Start(Tag::HtmlBlock) => {
+                    ignore_till_end!(TagEnd::HtmlBlock);
+                }
+                Event::InlineHtml(_) => ignore.push(range),
+                Event::Code(_) => ignore.push(range),
+                _ => {}
             }
         }
 
