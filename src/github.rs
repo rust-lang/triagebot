@@ -1223,6 +1223,8 @@ pub enum IssuesAction {
     AutoMergeDisabled,
     Enqueued,
     Dequeued,
+    Typed,
+    Untyped,
 }
 
 #[derive(Debug, serde::Deserialize)]
