@@ -27,6 +27,12 @@ impl IgnoreBlocks {
                 Event::Start(Tag::CodeBlock(_)) => {
                     ignore_till_end!(TagEnd::CodeBlock);
                 }
+                Event::Start(Tag::Link { .. }) => {
+                    ignore_till_end!(TagEnd::Link { .. });
+                }
+                Event::Start(Tag::Image { .. }) => {
+                    ignore_till_end!(TagEnd::Image { .. });
+                }
                 Event::Start(Tag::BlockQuote(_)) => {
                     let start = range.start;
                     let mut count = 1;
@@ -324,11 +330,22 @@ fn cbs_13() {
 
 #[test]
 fn ignore_link() {
-    assert_eq!(bodies("[This is a link](https://example.com)"), []);
-    assert_eq!(bodies("![This is an image](foo.png)"), []);
+    assert_eq!(
+        bodies("[This is a link](https://example.com)"),
+        [Ignore::Yes("[This is a link](https://example.com)")]
+    );
+    assert_eq!(
+        bodies("![This is an image](foo.png)"),
+        [Ignore::Yes("![This is an image](foo.png)")]
+    );
 
+    // Unfortunately pulldown_cmark does not give ranges for the link
+    // definition.
     assert_eq!(
         bodies("[Link from def]\n\n[Link from def]: https://example.com"),
-        []
+        [
+            Ignore::Yes("[Link from def]"),
+            Ignore::No("\n\n[Link from def]: https://example.com")
+        ]
     );
 }
