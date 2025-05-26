@@ -29,6 +29,7 @@ mod autolabel;
 mod bot_pull_requests;
 mod check_commits;
 mod close;
+mod concern;
 pub mod docs_update;
 mod github_releases;
 mod issue_links;
@@ -365,6 +366,7 @@ command_handlers! {
     shortcut: Shortcut,
     close: Close,
     note: Note,
+    concern: Concern,
     transfer: Transfer,
 }
 
