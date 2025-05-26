@@ -3,6 +3,7 @@
 use super::super::*;
 use crate::db::review_prefs::{upsert_review_prefs, RotationMode};
 use crate::github::{PullRequestNumber, User};
+use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::tests::github::{issue, user};
 use crate::tests::{run_db_test, TestContext};
 
@@ -71,15 +72,28 @@ impl AssignCtx {
         self
     }
 
+    async fn set_previous_reviewers(mut self, users: HashSet<&User>) -> Self {
+        let mut db = self.test_ctx.db_client_mut();
+        let mut state: IssueData<'_, Reviewers> =
+            IssueData::load(&mut db, &self.issue, PREVIOUS_REVIEWERS_KEY)
+                .await
+                .unwrap();
+
+        // Create a new set with all user names (overwrite existing data)
+        state.data.names = users.iter().map(|user| user.login.to_lowercase()).collect();
+        state.save().await.unwrap();
+        self
+    }
+
     async fn check(
-        self,
+        mut self,
         names: &[&str],
         expected: Result<&[&str], FindReviewerError>,
     ) -> anyhow::Result<TestContext> {
         let names: Vec<_> = names.iter().map(|n| n.to_string()).collect();
 
         let reviewers = candidate_reviewers_from_names(
-            self.test_ctx.db_client(),
+            self.test_ctx.db_client_mut(),
             Arc::new(RwLock::new(self.reviewer_workqueue)),
             &self.teams,
             &self.config,
@@ -526,4 +540,59 @@ async fn vacation() {
             .await
     })
     .await;
+}
+
+#[tokio::test]
+async fn previous_reviewers_ignore_in_team_success() {
+    let teams = toml::toml!(compiler = ["martin", "jyn514"]);
+    let config = toml::Table::new();
+    run_db_test(|ctx| async move {
+        let user = user("martin", 1);
+        basic_test(ctx, config, issue().call())
+            .teams(&teams)
+            .set_previous_reviewers(HashSet::from([&user]))
+            .await
+            .check(&["compiler"], Ok(&["jyn514"]))
+            .await
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn previous_reviewers_ignore_in_team_failed() {
+    let teams = toml::toml!(compiler = ["martin", "jyn514"]);
+    let config = toml::Table::new();
+    run_db_test(|ctx| async move {
+        let user1 = user("martin", 1);
+        let user2 = user("jyn514", 2);
+        basic_test(ctx, config, issue().call())
+            .teams(&teams)
+            .set_previous_reviewers(HashSet::from([&user1, &user2]))
+            .await
+            .check(
+                &["compiler"],
+                Err(FindReviewerError::NoReviewer {
+                    initial: vec!["compiler".to_string()],
+                }),
+            )
+            .await
+    })
+    .await
+}
+
+#[tokio::test]
+async fn previous_reviewers_direct_assignee() {
+    let teams = toml::toml!(compiler = ["martin", "jyn514"]);
+    let config = toml::Table::new();
+    run_db_test(|ctx| async move {
+        let user1 = user("martin", 1);
+        let user2 = user("jyn514", 2);
+        basic_test(ctx, config, issue().call())
+            .teams(&teams)
+            .set_previous_reviewers(HashSet::from([&user1, &user2]))
+            .await
+            .check(&["jyn514"], Ok(&["jyn514"]))
+            .await
+    })
+    .await
 }
