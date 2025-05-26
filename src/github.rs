@@ -290,6 +290,25 @@ pub async fn get_team(
     Ok(map.swap_remove(team))
 }
 
+/// Fetches a Rust team via its GitHub team name.
+pub async fn get_team_by_github_name(
+    client: &GithubClient,
+    org: &str,
+    team: &str,
+) -> anyhow::Result<Option<rust_team_data::v1::Team>> {
+    let teams = crate::team_data::teams(client).await?;
+    for rust_team in teams.teams.into_values() {
+        if let Some(github) = &rust_team.github {
+            for gh_team in &github.teams {
+                if gh_team.org == org && gh_team.name == team {
+                    return Ok(Some(rust_team));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 pub struct Label {
     pub name: String,
