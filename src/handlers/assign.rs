@@ -991,6 +991,7 @@ async fn candidate_reviewers_from_names<'a>(
             .any(|assignee| name_lower == assignee.login.to_lowercase());
 
         let is_previously_assigned = previous_reviewer_names.contains(&name_lower);
+        let is_directly_requested = reviewer_candidate.origin == ReviewerCandidateOrigin::Direct;
 
         // Record the reason why the candidate was filtered out
         let reason = {
@@ -998,7 +999,8 @@ async fn candidate_reviewers_from_names<'a>(
                 Some(FindReviewerError::ReviewerIsPrAuthor {
                     username: candidate.clone(),
                 })
-            } else if is_on_vacation {
+            // Allow r? <user> even for people on a vacation
+            } else if is_on_vacation && !is_directly_requested {
                 Some(FindReviewerError::ReviewerOffRotation {
                     username: candidate.clone(),
                 })
@@ -1048,6 +1050,12 @@ async fn candidate_reviewers_from_names<'a>(
                 // Only consider candidates that did not have an earlier error
                 let candidate = candidate?;
                 let username = &candidate.name;
+
+                // If the reviewer was requested directly, do not consider their review preferences
+                let is_directly_requested = candidate.origin == ReviewerCandidateOrigin::Direct;
+                if is_directly_requested {
+                    return Ok(candidate);
+                }
 
                 // If no review prefs were found, we assume the default unlimited
                 // review capacity and being on rotation.
