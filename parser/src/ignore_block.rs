@@ -321,3 +321,14 @@ fn cbs_13() {
         ],
     );
 }
+
+#[test]
+fn ignore_link() {
+    assert_eq!(bodies("[This is a link](https://example.com)"), []);
+    assert_eq!(bodies("![This is an image](foo.png)"), []);
+
+    assert_eq!(
+        bodies("[Link from def]\n\n[Link from def]: https://example.com"),
+        []
+    );
+}
