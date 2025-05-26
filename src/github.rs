@@ -330,6 +330,10 @@ pub struct FileDiff {
     /// The fullname path of the file.
     pub filename: String,
     /// The patch/diff for the file.
+    ///
+    /// Can be empty when there isn't any changes to the content of the file
+    /// (like when a file is renamed without it's content being modified).
+    #[serde(default)]
     pub patch: String,
 }
 
