@@ -6,8 +6,10 @@ use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
 use crate::handlers::project_goals::{self, ping_project_goals_owners};
 use crate::handlers::Context;
+use crate::team_data::teams;
 use crate::utils::pluralize;
 use anyhow::{format_err, Context as _};
+use rust_team_data::v1::TeamKind;
 use std::env;
 use std::fmt::Write as _;
 use std::str::FromStr;
@@ -183,6 +185,8 @@ fn handle_command<'a>(
                 .map_err(|e| format_err!("Failed to parse movement, expected `move <from> <to>`: {e:?}.")),
             Some("meta") => add_meta_notification(&ctx, gh_id, words).await
                 .map_err(|e| format_err!("Failed to parse `meta` command. Synopsis: meta <num> <text>: Add <text> to your notification identified by <num> (>0)\n\nError: {e:?}")),
+            Some("whoami") => whoami_cmd(&ctx, gh_id, words).await
+                .map_err(|e| format_err!("Failed to run the `whoami` command. Synopsis: whoami: Show to which Rust teams you are a part of\n\nError: {e:?}")),
             Some("work") => workqueue_commands(ctx, gh_id, words).await
                                                                     .map_err(|e| format_err!("Failed to parse `work` command. Help: {WORKQUEUE_HELP}\n\nError: {e:?}")),
             _ => {
@@ -395,6 +399,64 @@ async fn workqueue_commands(
     };
 
     Ok(Some(response))
+}
+
+/// The `whoami` command displays the user's membership in Rust teams.
+async fn whoami_cmd(
+    ctx: &Context,
+    gh_id: u64,
+    mut words: impl Iterator<Item = &str>,
+) -> anyhow::Result<Option<String>> {
+    if words.next().is_some() {
+        return Err(anyhow::anyhow!("Unexpected argument"));
+    }
+
+    let gh_username = username_from_gh_id(&ctx.github, gh_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Cannot find your GitHub username in the team database"))?;
+    let teams = teams(&ctx.github)
+        .await
+        .context("cannot load team information")?;
+    let mut entries = teams
+        .teams
+        .iter()
+        .flat_map(|(_, team)| {
+            team.members
+                .iter()
+                .filter(|member| member.github_id == gh_id)
+                .map(move |member| (team, member))
+        })
+        .map(|(team, member)| {
+            let main_role = if member.is_lead { "lead" } else { "member" };
+            let mut entry = format!(
+                "**{}** ({}): {main_role}",
+                team.name,
+                match team.kind {
+                    TeamKind::Team => "team",
+                    TeamKind::WorkingGroup => "working group",
+                    TeamKind::ProjectGroup => "project group",
+                    TeamKind::MarkerTeam => "marker team",
+                    TeamKind::Unknown => "unknown team kind",
+                }
+            );
+            if !member.roles.is_empty() {
+                write!(entry, " (roles: {})", member.roles.join(", ")).unwrap();
+            }
+            entry
+        })
+        .collect::<Vec<String>>();
+    entries.sort();
+
+    let mut output = format!("You are **{gh_username}**.");
+    if entries.is_empty() {
+        output.push_str(" You are not a member of any Rust team.");
+    } else {
+        writeln!(output, " You are a member of the following Rust teams:")?;
+        for entry in entries {
+            writeln!(output, "- {entry}")?;
+        }
+    }
+    Ok(Some(output))
 }
 
 // This does two things:
