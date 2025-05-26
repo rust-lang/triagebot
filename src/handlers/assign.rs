@@ -188,7 +188,7 @@ pub(super) async fn handle_input(
     if event.issue.assignees.is_empty() {
         let (assignee, from_comment) =
             determine_assignee(ctx, assign_command, event, config, &diff).await?;
-        if assignee.as_deref() == Some(GHOST_ACCOUNT) {
+        if assignee.as_ref().map(|r| r.name.as_str()) == Some(GHOST_ACCOUNT) {
             // "ghost" is GitHub's placeholder account for deleted accounts.
             // It is used here as a convenient way to prevent assignment. This
             // is typically used for rollups or experiments where you don't
@@ -205,7 +205,7 @@ pub(super) async fn handle_input(
                 .await
         {
             let who_text = match &assignee {
-                Some(assignee) => WELCOME_WITH_REVIEWER.replace("{assignee}", assignee),
+                Some(assignee) => WELCOME_WITH_REVIEWER.replace("{assignee}", &assignee.name),
                 None => WELCOME_WITHOUT_REVIEWER.to_string(),
             };
             let mut welcome = NEW_USER_WELCOME_MESSAGE.replace("{who}", &who_text);
@@ -221,7 +221,7 @@ pub(super) async fn handle_input(
         } else if !from_comment {
             let welcome = match &assignee {
                 Some(assignee) => RETURNING_USER_WELCOME_MESSAGE
-                    .replace("{assignee}", assignee)
+                    .replace("{assignee}", &assignee.name)
                     .replace("{bot}", &ctx.username),
                 None => RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER
                     .replace("{author}", &event.issue.user.login),
@@ -268,37 +268,38 @@ async fn set_assignee(
     ctx: &Context,
     issue: &Issue,
     github: &GithubClient,
-    username: &str,
+    reviewer: &Reviewer,
 ) -> anyhow::Result<()> {
     let mut db = ctx.db.get().await;
     let mut state: IssueData<'_, Reviewers> =
         IssueData::load(&mut db, &issue, PREVIOUS_REVIEWERS_KEY).await?;
 
     // Don't re-assign if already assigned, e.g. on comment edit
-    if issue.contain_assignee(&username) {
+    if issue.contain_assignee(&reviewer.name) {
         log::trace!(
             "ignoring assign PR {} to {}, already assigned",
             issue.global_id(),
-            username,
+            reviewer.name,
         );
         return Ok(());
     }
-    if let Err(err) = issue.set_assignee(github, &username).await {
+    if let Err(err) = issue.set_assignee(github, &reviewer.name).await {
         log::warn!(
             "failed to set assignee of PR {} to {}: {:?}",
             issue.global_id(),
-            username,
+            reviewer.name,
             err
         );
         if let Err(e) = issue
             .post_comment(
                 github,
                 &format!(
-                    "Failed to set assignee to `{username}`: {err}\n\
+                    "Failed to set assignee to `{}`: {err}\n\
                      \n\
                      > **Note**: Only org members with at least the repository \"read\" role, \
                        users with write permissions, or people who have commented on the PR may \
-                       be assigned."
+                       be assigned.",
+                    reviewer.name
                 ),
             )
             .await
@@ -308,9 +309,30 @@ async fn set_assignee(
         }
     }
 
-    // Record the reviewer in the database
+    // If an error was suppressed, post a warning on the PR.
+    if let Some(suppressed_error) = &reviewer.suppressed_error {
+        let warning = match suppressed_error {
+            FindReviewerError::ReviewerOffRotation { username } => Some(format!(
+                r"`{username}` is not on the review rotation at the moment.
+They may take a while to respond.
+"
+            )),
+            FindReviewerError::ReviewerAtMaxCapacity { username } => Some(format!(
+                "`{username}` is currently at their maximum review capacity.
+They may take a while to respond."
+            )),
+            _ => None,
+        };
+        if let Some(warning) = warning {
+            if let Err(err) = issue.post_comment(&ctx.github, &warning).await {
+                // This is a best-effort warning, do not anything apart from logging if it fails
+                log::warn!("failed to post reviewer warning comment: {err}");
+            }
+        }
+    }
 
-    state.data.names.insert(username.to_lowercase());
+    // Record the reviewer in the database
+    state.data.names.insert(reviewer.name.to_lowercase());
     state.save().await?;
     Ok(())
 }
@@ -330,7 +352,7 @@ async fn determine_assignee(
     event: &IssuesEvent,
     config: &AssignConfig,
     diff: &[FileDiff],
-) -> anyhow::Result<(Option<String>, bool)> {
+) -> anyhow::Result<(Option<Reviewer>, bool)> {
     let mut db_client = ctx.db.get().await;
     let teams = crate::team_data::teams(&ctx.github).await?;
     if let Some(name) = assign_command {
@@ -693,7 +715,7 @@ fn get_team_name<'a>(teams: &Teams, issue: &Issue, name: &'a str) -> Option<&'a 
     teams.teams.get(team_name).map(|_| team_name)
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 enum FindReviewerError {
     /// User specified something like `r? foo/bar` where that team name could
     /// not be found.
@@ -715,7 +737,7 @@ enum FindReviewerError {
     ReviewerPreviouslyAssigned { username: String },
     /// Data required for assignment could not be loaded from the DB.
     DatabaseError(String),
-    /// The reviewer has too many PRs alreayd assigned.
+    /// The reviewer has too many PRs already assigned.
     ReviewerAtMaxCapacity { username: String },
 }
 
@@ -781,6 +803,24 @@ Please select a different reviewer.",
     }
 }
 
+/// Reviewer that was found to be eligible as a result of `r? <...>`.
+/// In some cases, a reviewer selection error might have been suppressed.
+/// We store it here to allow sending a comment with a warning about the suppressed error.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+struct Reviewer {
+    name: String,
+    suppressed_error: Option<FindReviewerError>,
+}
+
+impl Reviewer {
+    fn from_name(name: String) -> Self {
+        Self {
+            name,
+            suppressed_error: None,
+        }
+    }
+}
+
 /// Finds a reviewer to assign to a PR.
 ///
 /// The `names` is a list of candidate reviewers `r?`, such as `compiler` or
@@ -794,11 +834,11 @@ async fn find_reviewer_from_names(
     config: &AssignConfig,
     issue: &Issue,
     names: &[String],
-) -> Result<String, FindReviewerError> {
+) -> Result<Reviewer, FindReviewerError> {
     // Fast path for self-assign, which is always allowed.
     if let [name] = names {
         if is_self_assign(&name, &issue.user.login) {
-            return Ok(name.clone());
+            return Ok(Reviewer::from_name(name.clone()));
         }
     }
 
@@ -827,17 +867,16 @@ async fn find_reviewer_from_names(
     // sure they are really worth the effort.
 
     log::info!(
-        "[#{}] Initial unfiltered list of candidates: {:?}",
+        "[#{}] Filtered list of candidates: {:?}",
         issue.number,
         candidates
     );
 
-    // Return unfiltered list of candidates
+    // Select a random reviewer from the filtered list
     Ok(candidates
         .into_iter()
         .choose(&mut rand::thread_rng())
-        .expect("candidate_reviewers_from_names should return at least one entry")
-        .to_string())
+        .expect("candidate_reviewers_from_names should return at least one entry"))
 }
 
 #[derive(Eq, PartialEq, Hash, Debug)]
@@ -962,7 +1001,7 @@ async fn candidate_reviewers_from_names<'a>(
     config: &'a AssignConfig,
     issue: &Issue,
     names: &'a [String],
-) -> Result<HashSet<String>, FindReviewerError> {
+) -> Result<HashSet<Reviewer>, FindReviewerError> {
     // Step 1: expand teams and groups into candidate names
     let expanded = expand_teams_and_groups(teams, issue, config, names)?;
     let expanded_count = expanded.len();
@@ -991,7 +1030,6 @@ async fn candidate_reviewers_from_names<'a>(
             .any(|assignee| name_lower == assignee.login.to_lowercase());
 
         let is_previously_assigned = previous_reviewer_names.contains(&name_lower);
-        let is_directly_requested = reviewer_candidate.origin == ReviewerCandidateOrigin::Direct;
 
         // Record the reason why the candidate was filtered out
         let reason = {
@@ -1000,7 +1038,7 @@ async fn candidate_reviewers_from_names<'a>(
                     username: candidate.clone(),
                 })
             // Allow r? <user> even for people on a vacation
-            } else if is_on_vacation && !is_directly_requested {
+            } else if is_on_vacation {
                 Some(FindReviewerError::ReviewerOffRotation {
                     username: candidate.clone(),
                 })
@@ -1051,12 +1089,6 @@ async fn candidate_reviewers_from_names<'a>(
                 let candidate = candidate?;
                 let username = &candidate.name;
 
-                // If the reviewer was requested directly, do not consider their review preferences
-                let is_directly_requested = candidate.origin == ReviewerCandidateOrigin::Direct;
-                if is_directly_requested {
-                    return Ok(candidate);
-                }
-
                 // If no review prefs were found, we assume the default unlimited
                 // review capacity and being on rotation.
                 let Some(review_prefs) = review_prefs.get(username.as_str()) else {
@@ -1096,13 +1128,24 @@ async fn candidate_reviewers_from_names<'a>(
     );
 
     if valid_candidates.is_empty() {
-        // If we requested a single user for a review, we return a concrete error message
-        // describing why they couldn't be assigned.
         if is_single_user {
-            Err(candidates
+            // If we requested a single user for a review, we may suppress some errors.
+            // Check what error we got here.
+            let error = candidates
                 .pop()
                 .unwrap()
-                .expect_err("valid_candidates is empty, so this should be an error"))
+                .expect_err("valid_candidates is empty, so this should be an error");
+            let username = match &error {
+                // If the reviewer is at capacity or off rotation, allow them to be requested,
+                // but store the suppressed error.
+                FindReviewerError::ReviewerOffRotation { username }
+                | FindReviewerError::ReviewerAtMaxCapacity { username } => username,
+                _ => return Err(error),
+            };
+            Ok(HashSet::from([Reviewer {
+                name: username.to_string(),
+                suppressed_error: Some(error),
+            }]))
         } else {
             // If it was a request for a team or a group, and no one is available, simply
             // return `NoReviewer`.
@@ -1118,7 +1161,7 @@ async fn candidate_reviewers_from_names<'a>(
     } else {
         Ok(valid_candidates
             .into_iter()
-            .map(|s| s.to_string())
+            .map(|s| Reviewer::from_name(s.to_string()))
             .collect())
     }
 }
