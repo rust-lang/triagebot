@@ -12,40 +12,48 @@ impl IgnoreBlocks {
         let mut ignore = Vec::new();
         let mut parser = Parser::new(s).into_offset_iter();
         while let Some((event, range)) = parser.next() {
-            if let Event::Start(Tag::CodeBlock(_)) = event {
-                let start = range.start;
-                while let Some((event, range)) = parser.next() {
-                    if let Event::End(TagEnd::CodeBlock) = event {
-                        ignore.push(start..range.end);
-                        break;
-                    }
-                }
-            } else if let Event::Start(Tag::BlockQuote(_)) = event {
-                let start = range.start;
-                let mut count = 1;
-                while let Some((event, range)) = parser.next() {
-                    if let Event::Start(Tag::BlockQuote(_)) = event {
-                        count += 1;
-                    } else if let Event::End(TagEnd::BlockQuote(_)) = event {
-                        count -= 1;
-                        if count == 0 {
+            macro_rules! ignore_till_end {
+                ($p:pat) => {
+                    let start = range.start;
+                    while let Some((event, range)) = parser.next() {
+                        if let Event::End($p) = event {
                             ignore.push(start..range.end);
                             break;
                         }
                     }
+                };
+            }
+            match event {
+                Event::Start(Tag::CodeBlock(_)) => {
+                    ignore_till_end!(TagEnd::CodeBlock);
                 }
-            } else if let Event::Start(Tag::HtmlBlock) = event {
-                let start = range.start;
-                while let Some((event, range)) = parser.next() {
-                    if let Event::End(TagEnd::HtmlBlock) = event {
-                        ignore.push(start..range.end);
-                        break;
+                Event::Start(Tag::Link { .. }) => {
+                    ignore_till_end!(TagEnd::Link { .. });
+                }
+                Event::Start(Tag::Image { .. }) => {
+                    ignore_till_end!(TagEnd::Image { .. });
+                }
+                Event::Start(Tag::BlockQuote(_)) => {
+                    let start = range.start;
+                    let mut count = 1;
+                    while let Some((event, range)) = parser.next() {
+                        if let Event::Start(Tag::BlockQuote(_)) = event {
+                            count += 1;
+                        } else if let Event::End(TagEnd::BlockQuote(_)) = event {
+                            count -= 1;
+                            if count == 0 {
+                                ignore.push(start..range.end);
+                                break;
+                            }
+                        }
                     }
                 }
-            } else if let Event::InlineHtml(_) = event {
-                ignore.push(range);
-            } else if let Event::Code(_) = event {
-                ignore.push(range);
+                Event::Start(Tag::HtmlBlock) => {
+                    ignore_till_end!(TagEnd::HtmlBlock);
+                }
+                Event::InlineHtml(_) => ignore.push(range),
+                Event::Code(_) => ignore.push(range),
+                _ => {}
             }
         }
 
@@ -317,5 +325,27 @@ fn cbs_13() {
             Ignore::Yes("<!-- q -->\n"),
             Ignore::No("@rustbot label +F-trait_upcasting")
         ],
+    );
+}
+
+#[test]
+fn ignore_link() {
+    assert_eq!(
+        bodies("[This is a link](https://example.com)"),
+        [Ignore::Yes("[This is a link](https://example.com)")]
+    );
+    assert_eq!(
+        bodies("![This is an image](foo.png)"),
+        [Ignore::Yes("![This is an image](foo.png)")]
+    );
+
+    // Unfortunately pulldown_cmark does not give ranges for the link
+    // definition.
+    assert_eq!(
+        bodies("[Link from def]\n\n[Link from def]: https://example.com"),
+        [
+            Ignore::Yes("[Link from def]"),
+            Ignore::No("\n\n[Link from def]: https://example.com")
+        ]
     );
 }
