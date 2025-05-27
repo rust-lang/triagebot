@@ -463,6 +463,7 @@ pub struct Comment {
     pub updated_at: chrono::DateTime<Utc>,
     #[serde(default, rename = "state")]
     pub pr_review_state: Option<PullRequestReviewState>,
+    pub author_association: AuthorAssociation,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Eq, PartialEq)]
