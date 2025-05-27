@@ -88,7 +88,7 @@ impl AssignCtx {
     async fn check(
         mut self,
         names: &[&str],
-        expected: Result<&[Reviewer], FindReviewerError>,
+        expected: Result<&[ReviewerSelection], FindReviewerError>,
     ) -> anyhow::Result<Self> {
         let names: Vec<_> = names.iter().map(|n| n.to_string()).collect();
 
@@ -104,9 +104,9 @@ impl AssignCtx {
         .await;
         match (reviewers, expected) {
             (Ok(candidates), Ok(expected)) => {
-                let mut candidates: Vec<&Reviewer> = candidates.iter().collect();
+                let mut candidates: Vec<&ReviewerSelection> = candidates.iter().collect();
                 candidates.sort();
-                let expected: Vec<&Reviewer> = expected.iter().collect();
+                let expected: Vec<&ReviewerSelection> = expected.iter().collect();
                 assert_eq!(candidates, expected);
             }
             (Err(actual), Err(expected)) => {
@@ -125,9 +125,9 @@ impl From<AssignCtx> for TestContext {
     }
 }
 
-impl From<&str> for Reviewer {
+impl From<&str> for ReviewerSelection {
     fn from(value: &str) -> Self {
-        Reviewer::from_name(value.to_string())
+        ReviewerSelection::from_name(value.to_string())
     }
 }
 
@@ -178,7 +178,7 @@ async fn at_max_capacity() {
             .assign_prs(user.id, 3)
             .check(
                 &["martin"],
-                Ok(&[Reviewer {
+                Ok(&[ReviewerSelection {
                     name: "martin".to_string(),
                     suppressed_error: Some(FindReviewerError::ReviewerAtMaxCapacity {
                         username: "martin".to_string(),
@@ -218,7 +218,7 @@ async fn above_max_capacity() {
             .assign_prs(user.id, 10)
             .check(
                 &["martin"],
-                Ok(&[Reviewer {
+                Ok(&[ReviewerSelection {
                     name: "martin".to_string(),
                     suppressed_error: Some(FindReviewerError::ReviewerAtMaxCapacity {
                         username: "martin".to_string(),
@@ -244,7 +244,7 @@ async fn max_capacity_zero() {
             .assign_prs(user.id, 0)
             .check(
                 &["martin"],
-                Ok(&[Reviewer {
+                Ok(&[ReviewerSelection {
                     name: "martin".to_string(),
                     suppressed_error: Some(FindReviewerError::ReviewerAtMaxCapacity {
                         username: "martin".to_string(),
@@ -270,7 +270,7 @@ async fn ignore_username_case() {
             .assign_prs(user.id, 3)
             .check(
                 &["MARTIN"],
-                Ok(&[Reviewer {
+                Ok(&[ReviewerSelection {
                     name: "MARTIN".to_string(),
                     suppressed_error: Some(FindReviewerError::ReviewerAtMaxCapacity {
                         username: "MARTIN".to_string(),
@@ -309,7 +309,7 @@ async fn user_off_rotation() {
             .await
             .check(
                 &["martin"],
-                Ok(&[Reviewer {
+                Ok(&[ReviewerSelection {
                     name: "martin".to_string(),
                     suppressed_error: Some(FindReviewerError::ReviewerOffRotation {
                         username: "martin".to_string(),
@@ -547,7 +547,7 @@ async fn users_on_vacation() {
             // Allow direct assignment
             .check(
                 &["jyn514"],
-                Ok(&[Reviewer {
+                Ok(&[ReviewerSelection {
                     name: "jyn514".to_string(),
                     suppressed_error: Some(FindReviewerError::ReviewerOffRotation {
                         username: "jyn514".to_string(),

@@ -268,7 +268,7 @@ async fn set_assignee(
     ctx: &Context,
     issue: &Issue,
     github: &GithubClient,
-    reviewer: &Reviewer,
+    reviewer: &ReviewerSelection,
 ) -> anyhow::Result<()> {
     let mut db = ctx.db.get().await;
     let mut state: IssueData<'_, Reviewers> =
@@ -325,7 +325,7 @@ They may take a while to respond."
         };
         if let Some(warning) = warning {
             if let Err(err) = issue.post_comment(&ctx.github, &warning).await {
-                // This is a best-effort warning, do not anything apart from logging if it fails
+                // This is a best-effort warning, do not do anything apart from logging if it fails
                 log::warn!("failed to post reviewer warning comment: {err}");
             }
         }
@@ -352,7 +352,7 @@ async fn determine_assignee(
     event: &IssuesEvent,
     config: &AssignConfig,
     diff: &[FileDiff],
-) -> anyhow::Result<(Option<Reviewer>, bool)> {
+) -> anyhow::Result<(Option<ReviewerSelection>, bool)> {
     let mut db_client = ctx.db.get().await;
     let teams = crate::team_data::teams(&ctx.github).await?;
     if let Some(name) = assign_command {
@@ -807,12 +807,12 @@ Please select a different reviewer.",
 /// In some cases, a reviewer selection error might have been suppressed.
 /// We store it here to allow sending a comment with a warning about the suppressed error.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-struct Reviewer {
+struct ReviewerSelection {
     name: String,
     suppressed_error: Option<FindReviewerError>,
 }
 
-impl Reviewer {
+impl ReviewerSelection {
     fn from_name(name: String) -> Self {
         Self {
             name,
@@ -834,11 +834,11 @@ async fn find_reviewer_from_names(
     config: &AssignConfig,
     issue: &Issue,
     names: &[String],
-) -> Result<Reviewer, FindReviewerError> {
+) -> Result<ReviewerSelection, FindReviewerError> {
     // Fast path for self-assign, which is always allowed.
     if let [name] = names {
         if is_self_assign(&name, &issue.user.login) {
-            return Ok(Reviewer::from_name(name.clone()));
+            return Ok(ReviewerSelection::from_name(name.clone()));
         }
     }
 
@@ -1001,7 +1001,7 @@ async fn candidate_reviewers_from_names<'a>(
     config: &'a AssignConfig,
     issue: &Issue,
     names: &'a [String],
-) -> Result<HashSet<Reviewer>, FindReviewerError> {
+) -> Result<HashSet<ReviewerSelection>, FindReviewerError> {
     // Step 1: expand teams and groups into candidate names
     let expanded = expand_teams_and_groups(teams, issue, config, names)?;
     let expanded_count = expanded.len();
@@ -1037,7 +1037,6 @@ async fn candidate_reviewers_from_names<'a>(
                 Some(FindReviewerError::ReviewerIsPrAuthor {
                     username: candidate.clone(),
                 })
-            // Allow r? <user> even for people on a vacation
             } else if is_on_vacation {
                 Some(FindReviewerError::ReviewerOffRotation {
                     username: candidate.clone(),
@@ -1142,7 +1141,7 @@ async fn candidate_reviewers_from_names<'a>(
                 | FindReviewerError::ReviewerAtMaxCapacity { username } => username,
                 _ => return Err(error),
             };
-            Ok(HashSet::from([Reviewer {
+            Ok(HashSet::from([ReviewerSelection {
                 name: username.to_string(),
                 suppressed_error: Some(error),
             }]))
@@ -1161,7 +1160,7 @@ async fn candidate_reviewers_from_names<'a>(
     } else {
         Ok(valid_candidates
             .into_iter()
-            .map(|s| Reviewer::from_name(s.to_string()))
+            .map(|s| ReviewerSelection::from_name(s.to_string()))
             .collect())
     }
 }
