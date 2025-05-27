@@ -125,7 +125,7 @@ async fn id_from_user(
     ctx: &Context,
     login: &str,
 ) -> anyhow::Result<Option<(Vec<github::User>, Option<String>)>> {
-    if login.contains('/') {
+    if let Some((org, team)) = login.split_once('/') {
         // This is a team ping. For now, just add it to everyone's agenda on
         // that team, but also mark it as such (i.e., a team ping) for
         // potentially different prioritization and so forth.
@@ -136,11 +136,7 @@ async fn id_from_user(
         //
         // We may also want to be able to categorize into these buckets
         // *after* the ping occurs and is initially processed.
-
-        let mut iter = login.split('/');
-        let _rust_lang = iter.next().unwrap();
-        let team = iter.next().unwrap();
-        let team = match github::get_team(&ctx.github, team).await {
+        let team = match github::get_team_by_github_name(&ctx.github, org, team).await {
             Ok(Some(team)) => team,
             Ok(None) => {
                 // If the team is in rust-lang*, then this is probably an error (potentially user
