@@ -28,6 +28,7 @@ impl fmt::Display for HandlerError {
 
 mod assign;
 mod autolabel;
+mod backport;
 mod bot_pull_requests;
 mod check_commits;
 mod close;
@@ -225,6 +226,7 @@ macro_rules! issue_handlers {
 issue_handlers! {
     assign,
     autolabel,
+    backport,
     issue_links,
     major_change,
     mentions,
