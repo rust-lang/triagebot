@@ -307,26 +307,26 @@ async fn set_assignee(
             log::warn!("failed to post error comment: {e}");
             return Err(e);
         }
-    }
-
-    // If an error was suppressed, post a warning on the PR.
-    if let Some(suppressed_error) = &reviewer.suppressed_error {
-        let warning = match suppressed_error {
-            FindReviewerError::ReviewerOffRotation { username } => Some(format!(
-                r"`{username}` is not on the review rotation at the moment.
+    } else {
+        // If an error was suppressed, post a warning on the PR.
+        if let Some(suppressed_error) = &reviewer.suppressed_error {
+            let warning = match suppressed_error {
+                FindReviewerError::ReviewerOffRotation { username } => Some(format!(
+                    r"`{username}` is not on the review rotation at the moment.
 They may take a while to respond.
 "
-            )),
-            FindReviewerError::ReviewerAtMaxCapacity { username } => Some(format!(
-                "`{username}` is currently at their maximum review capacity.
+                )),
+                FindReviewerError::ReviewerAtMaxCapacity { username } => Some(format!(
+                    "`{username}` is currently at their maximum review capacity.
 They may take a while to respond."
-            )),
-            _ => None,
-        };
-        if let Some(warning) = warning {
-            if let Err(err) = issue.post_comment(&ctx.github, &warning).await {
-                // This is a best-effort warning, do not do anything apart from logging if it fails
-                log::warn!("failed to post reviewer warning comment: {err}");
+                )),
+                _ => None,
+            };
+            if let Some(warning) = warning {
+                if let Err(err) = issue.post_comment(&ctx.github, &warning).await {
+                    // This is a best-effort warning, do not do anything apart from logging if it fails
+                    log::warn!("failed to post reviewer warning comment: {err}");
+                }
             }
         }
     }
