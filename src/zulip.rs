@@ -6,10 +6,11 @@ use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
 use crate::handlers::project_goals::{self, ping_project_goals_owners};
 use crate::handlers::Context;
-use crate::team_data::teams;
+use crate::team_data::{people, teams};
 use crate::utils::pluralize;
 use anyhow::{format_err, Context as _};
 use rust_team_data::v1::TeamKind;
+use std::collections::HashMap;
 use std::env;
 use std::fmt::Write as _;
 use std::str::FromStr;
@@ -204,6 +205,8 @@ fn handle_command<'a>(
                 .map_err(|e| format_err!("Failed to parse `meta` command. Synopsis: meta <num> <text>: Add <text> to your notification identified by <num> (>0)\n\nError: {e:?}")),
             Some("whoami") => whoami_cmd(&ctx, gh_id, words).await
                 .map_err(|e| format_err!("Failed to run the `whoami` command. Synopsis: whoami: Show to which Rust teams you are a part of\n\nError: {e:?}")),
+            Some("lookup") => lookup_cmd(&ctx, words).await
+                .map_err(|e| format_err!("Failed to run the `lookup` command. Synopsis: lookup (github <zulip-username>|zulip <github-username>): Show the GitHub username of a Zulip <user> or the Zulip username of a GitHub user\n\nError: {e:?}")),
             Some("work") => workqueue_commands(ctx, gh_id, words).await
                                                                     .map_err(|e| format_err!("Failed to parse `work` command. Help: {WORKQUEUE_HELP}\n\nError: {e:?}")),
             _ => {
@@ -474,6 +477,208 @@ async fn whoami_cmd(
         }
     }
     Ok(Some(output))
+}
+
+/// The lookup command has two forms:
+/// - `lookup github <zulip-username>`: displays the GitHub username of a Zulip user.
+/// - `lookup zulip <github-username>`: displays the Zulip username of a GitHub user.
+async fn lookup_cmd(
+    ctx: &Context,
+    mut words: impl Iterator<Item = &str>,
+) -> anyhow::Result<Option<String>> {
+    let subcommand = match words.next() {
+        Some(subcommand) => subcommand,
+        None => return Err(anyhow::anyhow!("no subcommand provided")),
+    };
+
+    // Usernames could contain spaces, so rejoin everything after `whois` to serve as the username.
+    let args = words.collect::<Vec<_>>();
+    if args.is_empty() {
+        return Err(anyhow::anyhow!("no username provided"));
+    }
+    let args = args.join(" ");
+
+    // The username could be a mention, which looks like this: `@**<username>**`, so strip the
+    // extra sigils.
+    let username = args.trim_matches(&['@', '*']);
+
+    match subcommand {
+        "github" => Ok(Some(lookup_github_username(ctx, username).await?)),
+        "zulip" => Ok(Some(lookup_zulip_username(ctx, username).await?)),
+        _ => Err(anyhow::anyhow!("Unknown subcommand {subcommand}")),
+    }
+}
+
+/// Tries to find a GitHub username from a Zulip username.
+async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::Result<String> {
+    let username_lowercase = zulip_username.to_lowercase();
+
+    let users = get_zulip_users(&ctx.github.raw())
+        .await
+        .context("Cannot get Zulip users")?;
+    let Some(zulip_user) = users
+        .iter()
+        .find(|user| user.name.to_lowercase() == username_lowercase)
+    else {
+        return Ok(format!(
+            "Zulip user {zulip_username} was not found on Zulip"
+        ));
+    };
+
+    // Prefer what is configured on Zulip. If there is nothing, try to lookup the GitHub username
+    // from the team database.
+    let github_username = match zulip_user.get_github_username() {
+        Some(name) => name.to_string(),
+        None => {
+            let zulip_id = zulip_user.user_id;
+            let Some(gh_id) = to_github_id(&ctx.github, zulip_id).await? else {
+                return Ok(format!("Zulip user {zulip_username} was not found in team Zulip mapping. Maybe they do not have zulip-id configured in team."));
+            };
+            let Some(username) = username_from_gh_id(&ctx.github, gh_id).await? else {
+                return Ok(format!(
+                    "Zulip user {zulip_username} was not found in the team database."
+                ));
+            };
+            username
+        }
+    };
+
+    Ok(format!("{zulip_username}'s GitHub profile is [{github_username}](https://github.com/{github_username})."))
+}
+
+/// Tries to find a Zulip username from a GitHub username.
+async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Result<String> {
+    async fn lookup_from_zulip(ctx: &Context, gh_username: &str) -> anyhow::Result<Option<String>> {
+        let username_lowercase = gh_username.to_lowercase();
+        let users = get_zulip_users(ctx.github.raw()).await?;
+        Ok(users
+            .into_iter()
+            .find(|user| {
+                user.get_github_username()
+                    .map(|u| u.to_lowercase())
+                    .as_deref()
+                    == Some(username_lowercase.as_str())
+            })
+            .map(|u| u.name))
+    }
+
+    async fn lookup_from_team(ctx: &Context, gh_username: &str) -> anyhow::Result<Option<String>> {
+        let people = people(&ctx.github).await?.people;
+
+        // Lookup the person in the team DB
+        let Some(person) = people.get(gh_username).or_else(|| {
+            let username_lowercase = gh_username.to_lowercase();
+            people
+                .keys()
+                .find(|key| key.to_lowercase() == username_lowercase)
+                .and_then(|key| people.get(key))
+        }) else {
+            return Ok(None);
+        };
+
+        let Some(zulip_id) = to_zulip_id(&ctx.github, person.github_id).await? else {
+            return Ok(None);
+        };
+        let Ok(zulip_user) = get_zulip_user(&ctx.github.raw(), zulip_id).await else {
+            return Ok(None);
+        };
+        Ok(Some(zulip_user.name))
+    }
+
+    let zulip_username = match lookup_from_team(ctx, gh_username).await? {
+        Some(username) => username,
+        None => match lookup_from_zulip(ctx, gh_username).await? {
+            Some(username) => username,
+            None => {
+                return Ok(format!(
+                    "No Zulip account found for GitHub username `{gh_username}`."
+                ))
+            }
+        },
+    };
+    Ok(format!(
+        "The GitHub user `{gh_username}` has the following Zulip account: @**{zulip_username}**"
+    ))
+}
+
+#[derive(Clone, serde::Deserialize, Debug, PartialEq, Eq)]
+pub(crate) struct ProfileValue {
+    value: String,
+}
+
+/// A single Zulip user
+#[derive(Clone, serde::Deserialize, Debug, PartialEq, Eq)]
+pub(crate) struct ZulipUser {
+    pub(crate) user_id: u64,
+    #[serde(rename = "full_name")]
+    pub(crate) name: String,
+    #[serde(default)]
+    pub(crate) profile_data: HashMap<String, ProfileValue>,
+}
+
+impl ZulipUser {
+    // The custom profile field ID for GitHub profiles on the Rust Zulip
+    // is 3873. This is likely not portable across different Zulip instance,
+    // but we assume that triagebot will only be used on this Zulip instance anyway.
+    pub(crate) fn get_github_username(&self) -> Option<&str> {
+        self.profile_data.get("3873").map(|v| v.value.as_str())
+    }
+}
+
+/// A collection of Zulip users, as returned from '/users'
+#[derive(serde::Deserialize)]
+struct ZulipUsers {
+    members: Vec<ZulipUser>,
+}
+
+// From https://github.com/kobzol/team/blob/0f68ffc8b0d438d88ef4573deb54446d57e1eae6/src/api/zulip.rs#L45
+async fn get_zulip_users(client: &reqwest::Client) -> anyhow::Result<Vec<ZulipUser>> {
+    let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
+
+    let resp = client
+        .get(&format!(
+            "{}/api/v1/users?include_custom_profile_fields=true",
+            *ZULIP_URL
+        ))
+        .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
+        .send()
+        .await?;
+
+    let status = resp.status();
+
+    if !status.is_success() {
+        let body = resp
+            .text()
+            .await
+            .context("fail receiving Zulip API response (when getting Zulip users)")?;
+
+        anyhow::bail!(body)
+    } else {
+        Ok(resp.json::<ZulipUsers>().await.map(|users| users.members)?)
+    }
+}
+
+async fn get_zulip_user(client: &reqwest::Client, zulip_id: u64) -> anyhow::Result<ZulipUser> {
+    let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
+
+    let resp = client
+        .get(&format!("{}/api/v1/users/{zulip_id}", *ZULIP_URL))
+        .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
+        .send()
+        .await?;
+
+    let status = resp.status();
+
+    if !status.is_success() {
+        let body = resp
+            .text()
+            .await
+            .context("fail receiving Zulip API response (when getting Zulip user)")?;
+
+        anyhow::bail!(body)
+    } else {
+        Ok(resp.json::<ZulipUser>().await?)
+    }
 }
 
 // This does two things:
