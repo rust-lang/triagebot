@@ -5,6 +5,9 @@ allow-unauthenticated = ["bug", "invalid", "question", "enhancement"]
 
 [note]
 
+[concern]
+labels = ["has-concerns"]
+
 [ping.wg-meta]
 message = """\
 This is just testing some functionality, please ignore this ping.
