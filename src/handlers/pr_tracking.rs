@@ -43,11 +43,6 @@ impl ReviewerWorkqueue {
             .map(|prs| prs.len() as u64)
             .unwrap_or(0)
     }
-
-    #[cfg(test)]
-    pub fn set_user_prs(&mut self, user_id: UserId, prs: HashSet<PullRequestNumber>) {
-        self.reviewers.insert(user_id, prs);
-    }
 }
 
 pub(super) enum ReviewPrefsInput {

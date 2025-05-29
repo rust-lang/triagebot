@@ -13,7 +13,7 @@ struct AssignCtx {
     teams: Teams,
     config: AssignConfig,
     issue: Issue,
-    reviewer_workqueue: ReviewerWorkqueue,
+    reviewer_workqueue: HashMap<UserId, HashSet<PullRequestNumber>>,
 }
 
 impl AssignCtx {
@@ -51,7 +51,7 @@ impl AssignCtx {
 
     fn assign_prs(mut self, user_id: UserId, count: u64) -> Self {
         let prs: HashSet<PullRequestNumber> = (0..count).collect();
-        self.reviewer_workqueue.set_user_prs(user_id, prs);
+        self.reviewer_workqueue.insert(user_id, prs);
         self
     }
 
@@ -88,13 +88,14 @@ impl AssignCtx {
     async fn check(
         mut self,
         names: &[&str],
-        expected: Result<&[&str], FindReviewerError>,
-    ) -> anyhow::Result<TestContext> {
+        expected: Result<&[ReviewerSelection], FindReviewerError>,
+    ) -> anyhow::Result<Self> {
         let names: Vec<_> = names.iter().map(|n| n.to_string()).collect();
 
+        let workqueue = ReviewerWorkqueue::new(self.reviewer_workqueue.clone());
         let reviewers = candidate_reviewers_from_names(
             self.test_ctx.db_client_mut(),
-            Arc::new(RwLock::new(self.reviewer_workqueue)),
+            Arc::new(RwLock::new(workqueue)),
             &self.teams,
             &self.config,
             &self.issue,
@@ -103,9 +104,9 @@ impl AssignCtx {
         .await;
         match (reviewers, expected) {
             (Ok(candidates), Ok(expected)) => {
-                let mut candidates: Vec<_> = candidates.into_iter().collect();
+                let mut candidates: Vec<&ReviewerSelection> = candidates.iter().collect();
                 candidates.sort();
-                let expected: Vec<_> = expected.iter().map(|x| *x).collect();
+                let expected: Vec<&ReviewerSelection> = expected.iter().collect();
                 assert_eq!(candidates, expected);
             }
             (Err(actual), Err(expected)) => {
@@ -114,7 +115,19 @@ impl AssignCtx {
             (Ok(candidates), Err(_)) => panic!("expected Err, got Ok: {candidates:?}"),
             (Err(e), Ok(_)) => panic!("expected Ok, got Err: {e}"),
         };
-        Ok(self.test_ctx)
+        Ok(self)
+    }
+}
+
+impl From<AssignCtx> for TestContext {
+    fn from(value: AssignCtx) -> Self {
+        value.test_ctx
+    }
+}
+
+impl From<&str> for ReviewerSelection {
+    fn from(value: &str) -> Self {
+        ReviewerSelection::from_name(value.to_string())
     }
 }
 
@@ -135,7 +148,7 @@ async fn no_assigned_prs() {
         review_prefs_test(ctx)
             .set_review_prefs(&user, Some(3), RotationMode::OnRotation)
             .await
-            .check(&["martin"], Ok(&["martin"]))
+            .check(&["martin"], Ok(&["martin".into()]))
             .await
     })
     .await;
@@ -147,7 +160,7 @@ async fn no_review_prefs() {
         ctx.add_user("martin", 1).await;
         review_prefs_test(ctx)
             .assign_prs(1, 3)
-            .check(&["martin"], Ok(&["martin"]))
+            .check(&["martin"], Ok(&["martin".into()]))
             .await
     })
     .await;
@@ -155,18 +168,25 @@ async fn no_review_prefs() {
 
 #[tokio::test]
 async fn at_max_capacity() {
+    let teams = toml::toml!(compiler = ["martin", "diana"]);
     run_db_test(|ctx| async move {
         let user = user("martin", 1);
         review_prefs_test(ctx)
+            .teams(&teams)
             .set_review_prefs(&user, Some(3), RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 3)
             .check(
                 &["martin"],
-                Err(FindReviewerError::ReviewerAtMaxCapacity {
-                    username: "martin".to_string(),
-                }),
+                Ok(&[ReviewerSelection {
+                    name: "martin".to_string(),
+                    suppressed_error: Some(FindReviewerError::ReviewerAtMaxCapacity {
+                        username: "martin".to_string(),
+                    }),
+                }]),
             )
+            .await?
+            .check(&["compiler"], Ok(&["diana".into()]))
             .await
     })
     .await;
@@ -180,7 +200,7 @@ async fn below_max_capacity() {
             .set_review_prefs(&user, Some(3), RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 2)
-            .check(&["martin"], Ok(&["martin"]))
+            .check(&["martin"], Ok(&["martin".into()]))
             .await
     })
     .await;
@@ -188,18 +208,25 @@ async fn below_max_capacity() {
 
 #[tokio::test]
 async fn above_max_capacity() {
+    let teams = toml::toml!(compiler = ["martin", "diana"]);
     run_db_test(|ctx| async move {
         let user = user("martin", 1);
         review_prefs_test(ctx)
+            .teams(&teams)
             .set_review_prefs(&user, Some(3), RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 10)
             .check(
                 &["martin"],
-                Err(FindReviewerError::ReviewerAtMaxCapacity {
-                    username: "martin".to_string(),
-                }),
+                Ok(&[ReviewerSelection {
+                    name: "martin".to_string(),
+                    suppressed_error: Some(FindReviewerError::ReviewerAtMaxCapacity {
+                        username: "martin".to_string(),
+                    }),
+                }]),
             )
+            .await?
+            .check(&["compiler"], Ok(&["diana".into()]))
             .await
     })
     .await;
@@ -207,18 +234,25 @@ async fn above_max_capacity() {
 
 #[tokio::test]
 async fn max_capacity_zero() {
+    let teams = toml::toml!(compiler = ["martin", "diana"]);
     run_db_test(|ctx| async move {
         let user = user("martin", 1);
         review_prefs_test(ctx)
+            .teams(&teams)
             .set_review_prefs(&user, Some(0), RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 0)
             .check(
                 &["martin"],
-                Err(FindReviewerError::ReviewerAtMaxCapacity {
-                    username: "martin".to_string(),
-                }),
+                Ok(&[ReviewerSelection {
+                    name: "martin".to_string(),
+                    suppressed_error: Some(FindReviewerError::ReviewerAtMaxCapacity {
+                        username: "martin".to_string(),
+                    }),
+                }]),
             )
+            .await?
+            .check(&["compiler"], Ok(&["diana".into()]))
             .await
     })
     .await;
@@ -226,18 +260,25 @@ async fn max_capacity_zero() {
 
 #[tokio::test]
 async fn ignore_username_case() {
+    let teams = toml::toml!(compiler = ["martin", "diana"]);
     run_db_test(|ctx| async move {
         let user = user("MARtin", 1);
         review_prefs_test(ctx)
+            .teams(&teams)
             .set_review_prefs(&user, Some(3), RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 3)
             .check(
                 &["MARTIN"],
-                Err(FindReviewerError::ReviewerAtMaxCapacity {
-                    username: "MARTIN".to_string(),
-                }),
+                Ok(&[ReviewerSelection {
+                    name: "MARTIN".to_string(),
+                    suppressed_error: Some(FindReviewerError::ReviewerAtMaxCapacity {
+                        username: "MARTIN".to_string(),
+                    }),
+                }]),
             )
+            .await?
+            .check(&["compiler"], Ok(&["diana".into()]))
             .await
     })
     .await;
@@ -251,32 +292,14 @@ async fn unlimited_capacity() {
             .set_review_prefs(&user, None, RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 10)
-            .check(&["martin"], Ok(&["martin"]))
+            .check(&["martin"], Ok(&["martin".into()]))
             .await
     })
     .await;
 }
 
 #[tokio::test]
-async fn ignore_user_off_rotation_direct() {
-    run_db_test(|ctx| async move {
-        let user = user("martin", 1);
-        review_prefs_test(ctx)
-            .set_review_prefs(&user, None, RotationMode::OffRotation)
-            .await
-            .check(
-                &["martin"],
-                Err(FindReviewerError::ReviewerOffRotation {
-                    username: "martin".to_string(),
-                }),
-            )
-            .await
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn ignore_user_off_rotation_through_team() {
+async fn user_off_rotation() {
     run_db_test(|ctx| async move {
         let teams = toml::toml!(compiler = ["martin", "diana"]);
         let user = user("martin", 1);
@@ -284,26 +307,17 @@ async fn ignore_user_off_rotation_through_team() {
             .teams(&teams)
             .set_review_prefs(&user, None, RotationMode::OffRotation)
             .await
-            .check(&["compiler"], Ok(&["diana"]))
-            .await
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn review_prefs_prefer_capacity_before_rotation() {
-    run_db_test(|ctx| async move {
-        let user = user("martin", 1);
-        review_prefs_test(ctx)
-            .set_review_prefs(&user, Some(1), RotationMode::OffRotation)
-            .await
-            .assign_prs(user.id, 2)
             .check(
                 &["martin"],
-                Err(FindReviewerError::ReviewerAtMaxCapacity {
-                    username: "martin".to_string(),
-                }),
+                Ok(&[ReviewerSelection {
+                    name: "martin".to_string(),
+                    suppressed_error: Some(FindReviewerError::ReviewerOffRotation {
+                        username: "martin".to_string(),
+                    }),
+                }]),
             )
+            .await?
+            .check(&["compiler"], Ok(&["diana".into()]))
             .await
     })
     .await;
@@ -325,7 +339,7 @@ async fn multiple_reviewers() {
             .assign_prs(users[0].id, 4)
             .assign_prs(users[1].id, 2)
             .assign_prs(users[2].id, 2)
-            .check(&["team"], Ok(&["diana", "jana"]))
+            .check(&["team"], Ok(&["diana".into(), "jana".into()]))
             .await
     })
     .await;
@@ -364,7 +378,7 @@ async fn nested_groups() {
     );
     run_db_test(|ctx| async move {
         basic_test(ctx, config, issue().call())
-            .check(&["c"], Ok(&["nrc", "pnkfelix"]))
+            .check(&["c"], Ok(&["nrc".into(), "pnkfelix".into()]))
             .await
     })
     .await;
@@ -400,7 +414,10 @@ async fn candidate_filtered_author() {
     );
     run_db_test(|ctx| async move {
         basic_test(ctx, config, issue().author(user("user2", 1)).call())
-            .check(&["compiler"], Ok(&["user1", "user3", "user4"]))
+            .check(
+                &["compiler"],
+                Ok(&["user1".into(), "user3".into(), "user4".into()]),
+            )
             .await
     })
     .await;
@@ -419,7 +436,7 @@ async fn candidate_filtered_assignee() {
         .call();
     run_db_test(|ctx| async move {
         basic_test(ctx, config, issue)
-            .check(&["compiler"], Ok(&["user4"]))
+            .check(&["compiler"], Ok(&["user4".into()]))
             .await
     })
     .await;
@@ -441,7 +458,12 @@ async fn groups_teams_users() {
             .teams(&teams)
             .check(
                 &["team1", "group1", "user3"],
-                Ok(&["t-user1", "t-user2", "user1", "user3"]),
+                Ok(&[
+                    "t-user1".into(),
+                    "t-user2".into(),
+                    "user1".into(),
+                    "user3".into(),
+                ]),
             )
             .await
     })
@@ -459,12 +481,12 @@ async fn group_team_user_precedence() {
     run_db_test(|ctx| async move {
         let ctx = basic_test(ctx, config.clone(), issue().call())
             .teams(&teams)
-            .check(&["compiler"], Ok(&["user2"]))
+            .check(&["compiler"], Ok(&["user2".into()]))
             .await?;
 
-        basic_test(ctx, config, issue().call())
+        basic_test(ctx.into(), config, issue().call())
             .teams(&teams)
-            .check(&["rust-lang/compiler"], Ok(&["user2"]))
+            .check(&["rust-lang/compiler"], Ok(&["user2".into()]))
             .await
     })
     .await;
@@ -483,14 +505,11 @@ async fn what_do_slashes_mean() {
 
     run_db_test(|ctx| async move {
         // Random slash names should work from groups.
-        let ctx = basic_test(ctx, config.clone(), issue())
-            .teams(&teams)
-            .check(&["foo/bar"], Ok(&["foo-user"]))
-            .await?;
-
         basic_test(ctx, config, issue())
             .teams(&teams)
-            .check(&["rust-lang-nursery/compiler"], Ok(&["user2"]))
+            .check(&["foo/bar"], Ok(&["foo-user".into()]))
+            .await?
+            .check(&["rust-lang-nursery/compiler"], Ok(&["user2".into()]))
             .await
     })
     .await;
@@ -518,25 +537,26 @@ async fn invalid_org_doesnt_match() {
 }
 
 #[tokio::test]
-async fn vacation() {
+async fn users_on_vacation() {
     let teams = toml::toml!(bootstrap = ["jyn514", "Mark-Simulacrum"]);
     let config = toml::toml!(users_on_vacation = ["jyn514"]);
 
     run_db_test(|ctx| async move {
-        // Test that `r? user` returns a specific error about the user being on vacation.
-        let ctx = basic_test(ctx, config.clone(), issue().call())
+        basic_test(ctx, config, issue().call())
             .teams(&teams)
+            // Allow direct assignment
             .check(
                 &["jyn514"],
-                Err(FindReviewerError::ReviewerOffRotation {
-                    username: "jyn514".to_string(),
-                }),
+                Ok(&[ReviewerSelection {
+                    name: "jyn514".to_string(),
+                    suppressed_error: Some(FindReviewerError::ReviewerOffRotation {
+                        username: "jyn514".to_string(),
+                    }),
+                }]),
             )
-            .await?;
-
-        basic_test(ctx, config.clone(), issue().call())
-            .teams(&teams)
-            .check(&["bootstrap"], Ok(&["Mark-Simulacrum"]))
+            .await?
+            // But ignore the user when requesting a team
+            .check(&["bootstrap"], Ok(&["Mark-Simulacrum".into()]))
             .await
     })
     .await;
@@ -552,7 +572,7 @@ async fn previous_reviewers_ignore_in_team_success() {
             .teams(&teams)
             .set_previous_reviewers(HashSet::from([&user]))
             .await
-            .check(&["compiler"], Ok(&["jyn514"]))
+            .check(&["compiler"], Ok(&["jyn514".into()]))
             .await
     })
     .await;
@@ -591,7 +611,7 @@ async fn previous_reviewers_direct_assignee() {
             .teams(&teams)
             .set_previous_reviewers(HashSet::from([&user1, &user2]))
             .await
-            .check(&["jyn514"], Ok(&["jyn514"]))
+            .check(&["jyn514"], Ok(&["jyn514".into()]))
             .await
     })
     .await
