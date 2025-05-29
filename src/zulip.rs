@@ -543,7 +543,18 @@ async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::
         }
     };
 
-    Ok(format!("{zulip_username}'s GitHub profile is [{github_username}](https://github.com/{github_username})."))
+    Ok(format!(
+        "{}'s GitHub profile is [{github_username}](https://github.com/{github_username}).",
+        render_zulip_username(zulip_user.user_id)
+    ))
+}
+
+fn render_zulip_username(zulip_id: u64) -> String {
+    // Rendering the username directly was running into some encoding issues, so we use
+    // the special `|<user-id>` syntax instead.
+    // @**|<zulip-id>** is Zulip syntax that will render as the username (and a link) of the user
+    // with the given Zulip ID.
+    format!("@**|{zulip_id}**")
 }
 
 /// Tries to find a Zulip username from a GitHub username.
@@ -599,10 +610,9 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
             }
         },
     };
-    // @**|<zulip-id>** is Zulip syntax that will render as the username (and a link) of the user
-    // with the given Zulip ID.
     Ok(format!(
-        "The GitHub user `{gh_username}` has the following Zulip account: @**|{zulip_id}**"
+        "The GitHub user `{gh_username}` has the following Zulip account: {}",
+        render_zulip_username(zulip_id)
     ))
 }
 
