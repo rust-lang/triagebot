@@ -266,12 +266,12 @@ async fn handle(
 <p>
 
 ```
-@rfcbot concern reason-for-concern
+@rustbot concern reason-for-concern
 <description of the concern>
 ```
 Concerns can be lifted with:
 ```
-@rfcbot resolve reason-for-concern
+@rustbot resolve reason-for-concern
 ```
 See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/compiler/proposals-and-stabilization.html#what-kinds-of-comments-should-go-on-a-mcp-in-the-compiler-team-repo)
 
