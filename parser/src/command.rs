@@ -5,6 +5,7 @@ use regex::Regex;
 
 pub mod assign;
 pub mod close;
+pub mod concern;
 pub mod nominate;
 pub mod note;
 pub mod ping;
@@ -25,6 +26,7 @@ pub enum Command<'a> {
     Shortcut(Result<shortcut::ShortcutCommand, Error<'a>>),
     Close(Result<close::CloseCommand, Error<'a>>),
     Note(Result<note::NoteCommand, Error<'a>>),
+    Concern(Result<concern::ConcernCommand, Error<'a>>),
     Transfer(Result<transfer::TransferCommand, Error<'a>>),
 }
 
@@ -95,6 +97,11 @@ impl<'a> Input<'a> {
         success.extend(parse_single_command(
             note::NoteCommand::parse,
             Command::Note,
+            &original_tokenizer,
+        ));
+        success.extend(parse_single_command(
+            concern::ConcernCommand::parse,
+            Command::Concern,
             &original_tokenizer,
         ));
         success.extend(parse_single_command(
@@ -206,6 +213,7 @@ impl<'a> Command<'a> {
             Command::Shortcut(r) => r.is_ok(),
             Command::Close(r) => r.is_ok(),
             Command::Note(r) => r.is_ok(),
+            Command::Concern(r) => r.is_ok(),
             Command::Transfer(r) => r.is_ok(),
         }
     }
@@ -352,4 +360,28 @@ fn review_ignored() {
         let mut input = Input::new(input, vec!["bot"]);
         assert_eq!(input.next(), None);
     }
+}
+
+#[test]
+fn concern() {
+    let input = "@bot concern this is my concern";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert_eq!(
+        input.next(),
+        Some(Command::Concern(Ok(concern::ConcernCommand::Concern {
+            title: "this is my concern".to_string()
+        })))
+    );
+}
+
+#[test]
+fn resolve() {
+    let input = "@bot resolve this is my concern";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert_eq!(
+        input.next(),
+        Some(Command::Concern(Ok(concern::ConcernCommand::Resolve {
+            title: "this is my concern".to_string()
+        })))
+    );
 }

@@ -35,6 +35,7 @@ pub(crate) struct Config {
     pub(crate) review_requested: Option<ReviewRequestedConfig>,
     pub(crate) shortcut: Option<ShortcutConfig>,
     pub(crate) note: Option<NoteConfig>,
+    pub(crate) concern: Option<ConcernConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
     pub(crate) no_merges: Option<NoMergesConfig>,
     // We want this validation to run even without the entry in the config file
@@ -189,6 +190,14 @@ pub(crate) struct NoMergesConfig {
 pub(crate) struct NoteConfig {
     #[serde(default)]
     _empty: (),
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ConcernConfig {
+    /// Set the labels on the PR when concerns are active.
+    #[serde(default)]
+    pub(crate) labels: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -594,6 +603,9 @@ mod tests {
 
             [note]
 
+            [concern]
+            labels = ["has-concerns"]
+
             [ping.compiler]
             message = """\
             So many people!\
@@ -691,6 +703,9 @@ mod tests {
                 behind_upstream: Some(BehindUpstreamConfig {
                     days_threshold: Some(14),
                 }),
+                concern: Some(ConcernConfig {
+                    labels: vec!["has-concerns".to_string()],
+                }),
             }
         );
     }
@@ -742,6 +757,7 @@ mod tests {
                 }),
                 note: None,
                 ping: None,
+                concern: None,
                 nominate: None,
                 shortcut: None,
                 prioritize: None,
