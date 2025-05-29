@@ -127,12 +127,29 @@ pub async fn respond(ctx: &Context, req: Request) -> String {
     serde_json::to_string(&Response { content }).unwrap()
 }
 
+pub fn get_token_from_env() -> Result<String, anyhow::Error> {
+    // ZULIP_WEBHOOK_SECRET is preferred, ZULIP_TOKEN is kept for retrocompatibility but will be deprecated
+    match std::env::var("ZULIP_WEBHOOK_SECRET") {
+        Ok(v) => return Ok(v),
+        Err(_) => (),
+    }
+
+    match std::env::var("ZULIP_TOKEN") {
+        Ok(v) => return Ok(v),
+        Err(_) => (),
+    }
+
+    log::error!(
+        "Cannot communicate with Zulip: neither ZULIP_WEBHOOK_SECRET or ZULIP_TOKEN are set."
+    );
+    anyhow::bail!("Cannot communicate with Zulip.");
+}
+
 /// Processes a Zulip webhook.
 ///
 /// Returns a string of the response, or None if no response is needed.
 async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Option<String>> {
-    let expected_token = std::env::var("ZULIP_TOKEN").expect("`ZULIP_TOKEN` set for authorization");
-
+    let expected_token = get_token_from_env()?;
     if !bool::from(req.token.as_bytes().ct_eq(expected_token.as_bytes())) {
         anyhow::bail!("Invalid authorization.");
     }
