@@ -548,7 +548,10 @@ async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::
 
 /// Tries to find a Zulip username from a GitHub username.
 async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Result<String> {
-    async fn lookup_from_zulip(ctx: &Context, gh_username: &str) -> anyhow::Result<Option<String>> {
+    async fn lookup_zulip_id_from_zulip(
+        ctx: &Context,
+        gh_username: &str,
+    ) -> anyhow::Result<Option<u64>> {
         let username_lowercase = gh_username.to_lowercase();
         let users = get_zulip_users(ctx.github.raw()).await?;
         Ok(users
@@ -559,10 +562,13 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
                     .as_deref()
                     == Some(username_lowercase.as_str())
             })
-            .map(|u| u.name))
+            .map(|u| u.user_id))
     }
 
-    async fn lookup_from_team(ctx: &Context, gh_username: &str) -> anyhow::Result<Option<String>> {
+    async fn lookup_zulip_id_from_team(
+        ctx: &Context,
+        gh_username: &str,
+    ) -> anyhow::Result<Option<u64>> {
         let people = people(&ctx.github).await?.people;
 
         // Lookup the person in the team DB
@@ -579,16 +585,13 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
         let Some(zulip_id) = to_zulip_id(&ctx.github, person.github_id).await? else {
             return Ok(None);
         };
-        let Ok(zulip_user) = get_zulip_user(&ctx.github.raw(), zulip_id).await else {
-            return Ok(None);
-        };
-        Ok(Some(zulip_user.name))
+        Ok(Some(zulip_id))
     }
 
-    let zulip_username = match lookup_from_team(ctx, gh_username).await? {
-        Some(username) => username,
-        None => match lookup_from_zulip(ctx, gh_username).await? {
-            Some(username) => username,
+    let zulip_id = match lookup_zulip_id_from_team(ctx, gh_username).await? {
+        Some(id) => id,
+        None => match lookup_zulip_id_from_zulip(ctx, gh_username).await? {
+            Some(id) => id,
             None => {
                 return Ok(format!(
                     "No Zulip account found for GitHub username `{gh_username}`."
@@ -596,8 +599,10 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
             }
         },
     };
+    // @**|<zulip-id>** is Zulip syntax that will render as the username (and a link) of the user
+    // with the given Zulip ID.
     Ok(format!(
-        "The GitHub user `{gh_username}` has the following Zulip account: @**{zulip_username}**"
+        "The GitHub user `{gh_username}` has the following Zulip account: @**|{zulip_id}**"
     ))
 }
 
@@ -655,29 +660,6 @@ async fn get_zulip_users(client: &reqwest::Client) -> anyhow::Result<Vec<ZulipUs
         anyhow::bail!(body)
     } else {
         Ok(resp.json::<ZulipUsers>().await.map(|users| users.members)?)
-    }
-}
-
-async fn get_zulip_user(client: &reqwest::Client, zulip_id: u64) -> anyhow::Result<ZulipUser> {
-    let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
-
-    let resp = client
-        .get(&format!("{}/api/v1/users/{zulip_id}", *ZULIP_URL))
-        .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
-        .send()
-        .await?;
-
-    let status = resp.status();
-
-    if !status.is_success() {
-        let body = resp
-            .text()
-            .await
-            .context("fail receiving Zulip API response (when getting Zulip user)")?;
-
-        anyhow::bail!(body)
-    } else {
-        Ok(resp.json::<ZulipUser>().await?)
     }
 }
 
