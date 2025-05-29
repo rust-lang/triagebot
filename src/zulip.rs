@@ -617,7 +617,9 @@ pub(crate) struct ZulipUser {
 }
 
 impl ZulipUser {
-    // The GitHub profile data key is 3873
+    // The custom profile field ID for GitHub profiles on the Rust Zulip
+    // is 3873. This is likely not portable across different Zulip instance,
+    // but we assume that triagebot will only be used on this Zulip instance anyway.
     pub(crate) fn get_github_username(&self) -> Option<&str> {
         self.profile_data.get("3873").map(|v| v.value.as_str())
     }
