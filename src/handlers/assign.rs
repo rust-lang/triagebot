@@ -111,7 +111,7 @@ struct Reviewers {
 }
 
 /// Assignment data stored in the issue/PR body.
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 struct AssignData {
     user: Option<String>,
 }
@@ -624,7 +624,10 @@ pub(super) async fn handle_command(
 
         set_assignee(ctx, issue, &ctx.github, &assignee).await?;
     } else {
-        let e = EditIssueBody::new(&issue, "ASSIGN");
+        let mut client = ctx.db.get().await;
+        let mut e: EditIssueBody<'_, AssignData> =
+            EditIssueBody::load(&mut client, &issue, "ASSIGN").await?;
+        let d = e.data_mut();
 
         let to_assign = match cmd {
             AssignCommand::Claim => event.user().login.clone(),
@@ -635,14 +638,14 @@ pub(super) async fn handle_command(
                 username.clone()
             }
             AssignCommand::ReleaseAssignment => {
-                if let Some(AssignData {
+                if let AssignData {
                     user: Some(current),
-                }) = e.current_data()
+                } = d
                 {
-                    if current == event.user().login || is_team_member {
+                    if *current == event.user().login || is_team_member {
                         issue.remove_assignees(&ctx.github, Selection::All).await?;
-                        e.apply(&ctx.github, String::new(), AssignData { user: None })
-                            .await?;
+                        *d = AssignData { user: None };
+                        e.apply(&ctx.github, String::new()).await?;
                         return Ok(());
                     } else {
                         bail!("Cannot release another user's assignment");
@@ -653,8 +656,8 @@ pub(super) async fn handle_command(
                         issue
                             .remove_assignees(&ctx.github, Selection::One(&current))
                             .await?;
-                        e.apply(&ctx.github, String::new(), AssignData { user: None })
-                            .await?;
+                        *d = AssignData { user: None };
+                        e.apply(&ctx.github, String::new()).await?;
                         return Ok(());
                     } else {
                         bail!("Cannot release unassigned issue");
@@ -672,14 +675,15 @@ pub(super) async fn handle_command(
             );
             return Ok(());
         }
-        let data = AssignData {
+        *d = AssignData {
             user: Some(to_assign.clone()),
         };
 
-        e.apply(&ctx.github, String::new(), &data).await?;
-
         match issue.set_assignee(&ctx.github, &to_assign).await {
-            Ok(()) => return Ok(()), // we are done
+            Ok(()) => {
+                e.apply(&ctx.github, String::new()).await?;
+                return Ok(());
+            } // we are done
             Err(github::AssignmentError::InvalidAssignee) => {
                 issue
                     .set_assignee(&ctx.github, &ctx.username)
@@ -690,7 +694,7 @@ pub(super) async fn handle_command(
                     to_assign,
                     event.html_url().unwrap()
                 );
-                e.apply(&ctx.github, cmt_body, &data).await?;
+                e.apply(&ctx.github, cmt_body).await?;
             }
             Err(e) => return Err(e.into()),
         }
