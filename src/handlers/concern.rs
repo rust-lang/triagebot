@@ -13,12 +13,12 @@ use parser::command::concern::ConcernCommand;
 
 const CONCERN_ISSUE_KEY: &str = "CONCERN-ISSUE";
 
-#[derive(Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, Default, Clone, serde::Serialize, serde::Deserialize)]
 struct ConcernData {
     concerns: Vec<Concern>,
 }
 
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 struct Concern {
     title: String,
     author: String,
@@ -26,7 +26,7 @@ struct Concern {
     status: ConcernStatus,
 }
 
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 enum ConcernStatus {
     Active,
     Resolved { comment_url: String },
@@ -84,8 +84,10 @@ pub(super) async fn handle_command(
         return Ok(());
     }
 
-    let edit = EditIssueBody::new(&issue, CONCERN_ISSUE_KEY);
-    let mut concern_data: ConcernData = edit.current_data().unwrap_or_default();
+    let mut client = ctx.db.get().await;
+    let mut edit: EditIssueBody<'_, ConcernData> =
+        EditIssueBody::load(&mut client, &issue, CONCERN_ISSUE_KEY).await?;
+    let concern_data = edit.data_mut();
 
     // Process the command by either adding a new comment or "deactivating" the old one
     match cmd {
@@ -142,7 +144,7 @@ pub(super) async fn handle_command(
     }
 
     // Apply the new markdown concerns list to the issue
-    edit.apply(&ctx.github, new_content, concern_data)
+    edit.apply(&ctx.github, new_content)
         .await
         .context("failed to apply the new concerns section markdown")?;
 
