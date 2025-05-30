@@ -165,38 +165,48 @@ fn markdown_content(concerns: &[Concern], bot: &str) -> String {
         return "".to_string();
     }
 
+    let active_concerns = concerns
+        .iter()
+        .filter(|c| matches!(c.status, ConcernStatus::Active))
+        .count();
+
     let mut md = String::new();
 
-    let _ = writeln!(md, "\n# Concerns");
     let _ = writeln!(md, "");
+
+    if active_concerns > 0 {
+        let _ = writeln!(md, "> [!CAUTION]");
+    } else {
+        let _ = writeln!(md, "> [!NOTE]");
+    }
+
+    let _ = writeln!(md, "> # Concerns ({active_concerns} active)");
+    let _ = writeln!(md, ">");
 
     for &Concern {
         ref title,
-        ref author,
+        author: _,
         ref status,
         ref comment_url,
     } in concerns
     {
         let _ = match status {
             ConcernStatus::Active => {
-                writeln!(
-                    md,
-                    " - [{title}]({comment_url}) by [{author}](https://github.com/{author})"
-                )
+                writeln!(md, "> - [{title}]({comment_url})")
             }
             ConcernStatus::Resolved {
                 comment_url: resolved_comment_url,
             } => {
                 writeln!(
                     md,
-                    " - ~~[{title}]({comment_url}) by [{author}](https://github.com/{author})~~ resolved [in this comment]({resolved_comment_url})"
+                    "> - ~~[{title}]({comment_url})~~ resolved [in this comment]({resolved_comment_url})"
                 )
             }
         };
     }
 
-    let _ = writeln!(md, "");
-    let _ = writeln!(md, "*Managed by `@{bot}`—see [help](https://forge.rust-lang.org/triagebot/concern.html) for details.*");
+    let _ = writeln!(md, ">");
+    let _ = writeln!(md, "> *Managed by `@{bot}`—see [help](https://forge.rust-lang.org/triagebot/concern.html) for details.*");
 
     md
 }
@@ -223,12 +233,37 @@ fn simple_markdown_content() {
     assert_eq!(
         markdown_content(concerns, "rustbot"),
         r#"
-# Concerns
+> [!CAUTION]
+> # Concerns (1 active)
+>
+> - [This is my concern about concern](https://github.com/fake-comment-1234)
+> - ~~[This is a resolved concern](https://github.com/fake-comment-4561)~~ resolved [in this comment](https:://github.com/fake-comment-8888)
+>
+> *Managed by `@rustbot`—see [help](https://forge.rust-lang.org/triagebot/concern.html) for details.*
+"#
+    );
+}
 
- - [This is my concern about concern](https://github.com/fake-comment-1234) by [Urgau](https://github.com/Urgau)
- - ~~[This is a resolved concern](https://github.com/fake-comment-4561) by [Kobzol](https://github.com/Kobzol)~~ resolved [in this comment](https:://github.com/fake-comment-8888)
+#[test]
+fn resolved_concerns_markdown_content() {
+    let concerns = &[Concern {
+        title: "This is a resolved concern".to_string(),
+        author: "Kobzol".to_string(),
+        status: ConcernStatus::Resolved {
+            comment_url: "https:://github.com/fake-comment-8888".to_string(),
+        },
+        comment_url: "https://github.com/fake-comment-4561".to_string(),
+    }];
 
-*Managed by `@rustbot`—see [help](https://forge.rust-lang.org/triagebot/concern.html) for details.*
+    assert_eq!(
+        markdown_content(concerns, "rustbot"),
+        r#"
+> [!NOTE]
+> # Concerns (0 active)
+>
+> - ~~[This is a resolved concern](https://github.com/fake-comment-4561)~~ resolved [in this comment](https:://github.com/fake-comment-8888)
+>
+> *Managed by `@rustbot`—see [help](https://forge.rust-lang.org/triagebot/concern.html) for details.*
 "#
     );
 }
