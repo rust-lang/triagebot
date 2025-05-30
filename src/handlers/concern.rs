@@ -87,14 +87,23 @@ pub(super) async fn handle_command(
     let edit = EditIssueBody::new(&issue, CONCERN_ISSUE_KEY);
     let mut concern_data: ConcernData = edit.current_data().unwrap_or_default();
 
-    // Process the command by either adding a new comment or "deactivating" the old one
+    // Process the command by either adding a new concern or resolving the old one
     match cmd {
-        ConcernCommand::Concern { title } => concern_data.concerns.push(Concern {
-            title,
-            author,
-            status: ConcernStatus::Active,
-            comment_url: comment_url.to_string(),
-        }),
+        ConcernCommand::Concern { title } => {
+            // Only add a concern if it wasn't already added, we could be in an edit
+            if !concern_data
+                .concerns
+                .iter()
+                .any(|c| c.title == title && c.comment_url == comment_url)
+            {
+                concern_data.concerns.push(Concern {
+                    title,
+                    author,
+                    status: ConcernStatus::Active,
+                    comment_url: comment_url.to_string(),
+                });
+            }
+        }
         ConcernCommand::Resolve { title } => concern_data
             .concerns
             .iter_mut()
