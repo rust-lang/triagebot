@@ -33,7 +33,7 @@ pub(super) fn issue_links_in_commits(
     } else {
         Some(format!(
             r"There are issue links (such as `#123`) in the commit messages of the following commits.
-*Please remove them as they will spam the issue with references to the commit.*
+*Please move them to the PR description, to avoid spamming the issues with references to the commit, and so this bot can automatically canonicalize them to avoid issues with subtree.*
 {issue_links_commits}",
         ))
     }
@@ -78,7 +78,7 @@ fn test_mentions_in_commits() {
         issue_links_in_commits(&config, &commits),
         Some(
             r"There are issue links (such as `#123`) in the commit messages of the following commits.
-*Please remove them as they will spam the issue with references to the commit.*
+*Please move them to the PR description, to avoid spamming the issues with references to the commit, and so this bot can automatically canonicalize them to avoid issues with subtree.*
 - d7daa17bc97df9377640b0d33cbd0bbeed703c3a
 ".to_string()
         )
@@ -103,7 +103,7 @@ fn test_mentions_in_commits() {
         issue_links_in_commits(&config, &commits),
         Some(
             r"There are issue links (such as `#123`) in the commit messages of the following commits.
-*Please remove them as they will spam the issue with references to the commit.*
+*Please move them to the PR description, to avoid spamming the issues with references to the commit, and so this bot can automatically canonicalize them to avoid issues with subtree.*
 - d7daa17bc97df9377640b0d33cbd0bbeed703c3a
 - 891f0916a07c215ae8173f782251422f1fea6acb
 ".to_string()
