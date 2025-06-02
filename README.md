@@ -50,6 +50,10 @@ The general overview of what you will need to do:
 6. Add a `triagebot.toml` file to the main branch of your GitHub repo with whichever services you want to try out.
 7. Try interacting with your repo, such as issuing `@rustbot` commands or interacting with PRs and issues (depending on which services you enabled in `triagebot.toml`). Watch the logs from the server to see what's going on.
 
+#### Skipping workqueue loading
+
+When triagebot starts, it eagerly loads the pull request workqueue for the `rust-lang/rust` repository, which can take up ~10-15 seconds. To disable this, for faster local experiments, pass the `SKIP_WORKQUEUE=1` environment variable to triagebot.
+
 ### Configure a database
 
 To use Postgres, you will need to install it and configure it:
