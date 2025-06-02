@@ -69,7 +69,7 @@ impl PartialOrd for NoteDataEntry {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default, Clone)]
 struct NoteData {
     entries_by_url: HashMap<String, NoteDataEntry>,
 }
@@ -122,9 +122,11 @@ pub(super) async fn handle_command(
     cmd: NoteCommand,
 ) -> anyhow::Result<()> {
     let issue = event.issue().unwrap();
-    let e = EditIssueBody::new(&issue, "SUMMARY");
 
-    let mut current: NoteData = e.current_data().unwrap_or_default();
+    let mut client = ctx.db.get().await;
+    let mut e: EditIssueBody<'_, NoteData> =
+        EditIssueBody::load(&mut client, &issue, "SUMMARY").await?;
+    let current = e.data_mut();
 
     let comment_url = String::from(event.html_url().unwrap());
     let author = event.user().login.to_owned();
@@ -158,7 +160,7 @@ pub(super) async fn handle_command(
     let new_markdown = current.to_markdown(&ctx.username);
     log::debug!("New MD: {:#?}", new_markdown);
 
-    e.apply(&ctx.github, new_markdown, current).await?;
+    e.apply(&ctx.github, new_markdown).await?;
 
     Ok(())
 }
