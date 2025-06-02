@@ -31,6 +31,7 @@ use crate::{
     interactions::EditIssueBody,
 };
 use anyhow::{bail, Context as _};
+use octocrab::models::AuthorAssociation;
 use parser::command::assign::AssignCommand;
 use parser::command::{Command, Input};
 use rand::seq::IteratorRandom;
@@ -195,15 +196,10 @@ pub(super) async fn handle_input(
             // want any assignments or noise.
             return Ok(());
         }
-        // This is temporarily disabled until we come up with a better
-        // solution, or decide to remove this. The `is_new_contributor` query
-        // is too expensive and takes too long to process.
-        let welcome = if false
-            && ctx
-                .github
-                .is_new_contributor(&event.repository, &event.issue.user.login)
-                .await
-        {
+        let welcome = if matches!(
+            event.issue.author_association,
+            AuthorAssociation::FirstTimer | AuthorAssociation::FirstTimeContributor
+        ) {
             let who_text = match &assignee {
                 Some(assignee) => WELCOME_WITH_REVIEWER.replace("{assignee}", &assignee.name),
                 None => WELCOME_WITHOUT_REVIEWER.to_string(),
