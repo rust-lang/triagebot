@@ -157,8 +157,8 @@ where
         let all = self.get_current_markdown()?;
         let start = self.data_section_start();
         let end = self.data_section_end();
-        let start_idx = all.find(&start).unwrap();
-        let end_idx = all.find(&end).unwrap();
+        let start_idx = all.find(&start)?;
+        let end_idx = all.find(&end)?;
         let text = &all[(start_idx + start.len())..end_idx];
         Some(serde_json::from_str(text).unwrap_or_else(|e| {
             panic!("deserializing data {:?} failed: {:?}", text, e);
