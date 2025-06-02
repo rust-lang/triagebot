@@ -211,14 +211,25 @@ pub(super) async fn handle_input(
             }
             Some(welcome)
         } else if !from_comment {
-            let welcome = match &assignee {
-                Some(assignee) => RETURNING_USER_WELCOME_MESSAGE
-                    .replace("{assignee}", &assignee.name)
-                    .replace("{bot}", &ctx.username),
-                None => RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER
-                    .replace("{author}", &event.issue.user.login),
-            };
-            Some(welcome)
+            match &assignee {
+                Some(assignee) => Some(
+                    RETURNING_USER_WELCOME_MESSAGE
+                        .replace("{assignee}", &assignee.name)
+                        .replace("{bot}", &ctx.username),
+                ),
+                None => {
+                    // If the assign fallback group is empty, then we don't expect any automatic
+                    // assignment, and this message would just be spam.
+                    if config.fallback_review_group().is_some() {
+                        Some(
+                            RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER
+                                .replace("{author}", &event.issue.user.login),
+                        )
+                    } else {
+                        None
+                    }
+                }
+            }
         } else {
             // No welcome is posted if they are not new and they used `r?` in the opening body.
             None
@@ -412,7 +423,7 @@ async fn determine_assignee(
         }
     }
 
-    if let Some(fallback) = config.adhoc_groups.get("fallback") {
+    if let Some(fallback) = config.fallback_review_group() {
         match find_reviewer_from_names(
             &mut db_client,
             ctx.workqueue.clone(),

@@ -127,6 +127,12 @@ impl AssignConfig {
             .iter()
             .any(|vacationer| name_lower == vacationer.to_lowercase())
     }
+
+    /// Return a "fallback" adhoc group, which is used for assigning reviewers if no other
+    /// reviewer was found.
+    pub(crate) fn fallback_review_group(&self) -> Option<&[String]> {
+        self.adhoc_groups.get("fallback").map(|v| v.as_slice())
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
