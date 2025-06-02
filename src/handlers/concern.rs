@@ -21,7 +21,6 @@ struct ConcernData {
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 struct Concern {
     title: String,
-    author: String,
     comment_url: String,
     status: ConcernStatus,
 }
@@ -44,7 +43,6 @@ pub(super) async fn handle_command(
     let Some(comment_url) = event.html_url() else {
         bail!("unable to retrieve the comment url")
     };
-    let author = event.user().login.to_owned();
     let issue = &issue_comment.issue;
 
     // Verify that this issue isn't a rfcbot FCP, skip if it is
@@ -100,7 +98,6 @@ pub(super) async fn handle_command(
             {
                 concern_data.concerns.push(Concern {
                     title,
-                    author,
                     status: ConcernStatus::Active,
                     comment_url: comment_url.to_string(),
                 });
@@ -185,7 +182,6 @@ fn markdown_content(concerns: &[Concern], bot: &str) -> String {
 
     for &Concern {
         ref title,
-        author: _,
         ref status,
         ref comment_url,
     } in concerns
@@ -216,13 +212,11 @@ fn simple_markdown_content() {
     let concerns = &[
         Concern {
             title: "This is my concern about concern".to_string(),
-            author: "Urgau".to_string(),
             status: ConcernStatus::Active,
             comment_url: "https://github.com/fake-comment-1234".to_string(),
         },
         Concern {
             title: "This is a resolved concern".to_string(),
-            author: "Kobzol".to_string(),
             status: ConcernStatus::Resolved {
                 comment_url: "https:://github.com/fake-comment-8888".to_string(),
             },
@@ -248,7 +242,6 @@ fn simple_markdown_content() {
 fn resolved_concerns_markdown_content() {
     let concerns = &[Concern {
         title: "This is a resolved concern".to_string(),
-        author: "Kobzol".to_string(),
         status: ConcernStatus::Resolved {
             comment_url: "https:://github.com/fake-comment-8888".to_string(),
         },
