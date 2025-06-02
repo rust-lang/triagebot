@@ -130,11 +130,7 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&AssignConfig>,
 ) -> Result<Option<AssignInput>, String> {
-    let config = match config {
-        Some(config) => config,
-        None => return Ok(None),
-    };
-    if config.owners.is_empty() || !event.issue.is_pr() {
+    if config.is_none() || !event.issue.is_pr() {
         return Ok(None);
     }
 

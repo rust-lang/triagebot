@@ -144,3 +144,10 @@ fn basic_gitignore_pattern() {
     let diff = make_fake_diff(&[("src/librustdoc/html/static/js/settings.js", 10, 1)]);
     test_from_diff(&diff, config, &["javascript-reviewers"]);
 }
+
+#[test]
+fn empty_owners_table() {
+    let config = toml::toml!([owners]);
+    let diff = make_fake_diff(&[("src.js", 10, 1)]);
+    test_from_diff(&diff, config, &[]);
+}
