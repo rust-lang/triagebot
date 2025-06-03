@@ -97,6 +97,16 @@ pub(crate) struct PingTeamConfig {
 pub(crate) struct AssignReviewPrefsConfig {}
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AssignCustomWelcomeMessages {
+    /// Welcome message with reviewer automaticaly chosen (`{assignee}`)
+    pub(crate) welcome_message: String,
+    /// Welcome message without a reviewer automaticaly chosen
+    pub(crate) welcome_message_no_reviewer: String,
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AssignConfig {
     /// If enabled, then posts a warning comment if the PR is opened against a
@@ -118,6 +128,9 @@ pub(crate) struct AssignConfig {
     /// Should review preferences be taken into account when deciding who to assign to a PR?
     #[serde(default)]
     pub(crate) review_prefs: Option<AssignReviewPrefsConfig>,
+    /// Custom welcome messages
+    #[serde(default)]
+    pub(crate) custom_welcome_messages: Option<AssignCustomWelcomeMessages>,
 }
 
 impl AssignConfig {
@@ -677,6 +690,7 @@ mod tests {
                     owners: HashMap::new(),
                     users_on_vacation: HashSet::from(["jyn514".into()]),
                     review_prefs: None,
+                    custom_welcome_messages: None,
                 }),
                 note: Some(NoteConfig { _empty: () }),
                 ping: Some(PingConfig { teams: ping_teams }),
@@ -722,6 +736,10 @@ mod tests {
             [assign]
             warn_non_default_branch.enable = true
 
+            [assign.custom_welcome_messages]
+            welcome-message = "Welcome message, assigning {assignee}!"
+            welcome-message-no-reviewer = "Welcome message for when no reviewer could be found!"
+
             [[assign.warn_non_default_branch.exceptions]]
             title = "[beta"
             branch = "beta"
@@ -755,6 +773,11 @@ mod tests {
                             },
                         ],
                     },
+                    custom_welcome_messages: Some(AssignCustomWelcomeMessages {
+                        welcome_message: "Welcome message, assigning {assignee}!".to_string(),
+                        welcome_message_no_reviewer:
+                            "Welcome message for when no reviewer could be found!".to_string()
+                    }),
                     contributing_url: None,
                     adhoc_groups: HashMap::new(),
                     owners: HashMap::new(),

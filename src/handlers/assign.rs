@@ -192,7 +192,38 @@ pub(super) async fn handle_input(
             // want any assignments or noise.
             return Ok(());
         }
-        let welcome = if matches!(
+        let welcome = if let Some(custom_welcome_messages) = &config.custom_welcome_messages {
+            if !from_comment {
+                let mut welcome = match &assignee {
+                    Some(assignee) => custom_welcome_messages
+                        .welcome_message
+                        .trim()
+                        .replace("{assignee}", &assignee.name),
+                    None => custom_welcome_messages
+                        .welcome_message_no_reviewer
+                        .trim()
+                        .to_string(),
+                };
+
+                if let Some(contrib) = &config.contributing_url {
+                    if matches!(
+                        event.issue.author_association,
+                        AuthorAssociation::FirstTimer | AuthorAssociation::FirstTimeContributor
+                    ) {
+                        welcome.push_str("\n\n");
+                        welcome.push_str(
+                            &CONTRIBUTION_MESSAGE
+                                .replace("{contributing_url}", contrib)
+                                .replace("{bot}", &ctx.username),
+                        );
+                    }
+                }
+                Some(welcome)
+            } else {
+                // No welcome is posted if they used `r?` in the opening body.
+                None
+            }
+        } else if matches!(
             event.issue.author_association,
             AuthorAssociation::FirstTimer | AuthorAssociation::FirstTimeContributor
         ) {
