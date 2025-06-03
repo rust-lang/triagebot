@@ -904,31 +904,8 @@ struct AddReaction<'a> {
 }
 
 impl<'a> AddReaction<'a> {
-    pub async fn send(self, client: &reqwest::Client) -> anyhow::Result<()> {
-        let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
-
-        let resp = client
-            .post(&format!(
-                "{}/api/v1/messages/{}/reactions",
-                *ZULIP_URL, self.message_id
-            ))
-            .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
-            .form(&self)
-            .send()
-            .await?;
-
-        let status = resp.status();
-
-        if !status.is_success() {
-            let body = resp
-                .text()
-                .await
-                .context("fail receiving Zulip API response (when adding a reaction)")?;
-
-            anyhow::bail!(body)
-        }
-
-        Ok(())
+    pub async fn send(self, client: &ZulipClient) -> anyhow::Result<()> {
+        client.add_reaction(self.message_id, self.emoji_name).await
     }
 }
 
@@ -989,7 +966,7 @@ async fn post_waiter(
             message_id: posted.message_id,
             emoji_name: reaction,
         }
-        .send(&ctx.github.raw())
+        .send(&ctx.zulip)
         .await
         .context("emoji reaction failed")?;
     }

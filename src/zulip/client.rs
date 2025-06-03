@@ -127,6 +127,41 @@ impl ZulipClient {
         Ok(())
     }
 
+    pub(crate) async fn add_reaction(
+        &self,
+        message_id: u64,
+        emoji_name: &str,
+    ) -> anyhow::Result<()> {
+        #[derive(serde::Serialize)]
+        struct AddReaction<'a> {
+            message_id: u64,
+            emoji_name: &'a str,
+        }
+
+        let resp = self
+            .make_request(Method::POST, &format!("messages/{message_id}/reactions"))
+            .form(&AddReaction {
+                message_id,
+                emoji_name,
+            })
+            .send()
+            .await
+            .context("failed to add reaction to a Zulip message")?;
+
+        let status = resp.status();
+
+        if !status.is_success() {
+            let body = resp
+                .text()
+                .await
+                .context("fail receiving Zulip API response (when adding a reaction)")?;
+
+            anyhow::bail!(body)
+        }
+
+        Ok(())
+    }
+
     fn make_request(&self, method: Method, url: &str) -> RequestBuilder {
         let api_token = self.get_api_token();
         self.client
