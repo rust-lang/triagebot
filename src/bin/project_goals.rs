@@ -1,4 +1,5 @@
 use structopt::StructOpt;
+use triagebot::zulip::client::ZulipClient;
 use triagebot::{github::GithubClient, handlers::project_goals};
 
 /// A basic example
@@ -22,8 +23,10 @@ async fn main() -> anyhow::Result<()> {
 
     let opt = Opt::from_args();
     let gh = GithubClient::new_from_env();
+    let zulip = ZulipClient::new_from_env();
     project_goals::ping_project_goals_owners(
         &gh,
+        &zulip,
         opt.dry_run,
         opt.days_threshold,
         &opt.next_meeting_date,

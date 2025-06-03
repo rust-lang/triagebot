@@ -3,6 +3,7 @@ use crate::db::users::record_username;
 use crate::db::{make_client, ClientPool, PooledClient};
 use crate::github::GithubClient;
 use crate::handlers::Context;
+use crate::zulip::client::ZulipClient;
 use octocrab::Octocrab;
 use std::future::Future;
 use std::sync::Arc;
@@ -67,8 +68,13 @@ impl TestContext {
             "https://api.github.com/graphql".to_string(),
             "https://raw.githubusercontent.com".to_string(),
         );
+        let zulip = ZulipClient::new(
+            "https://rust-fake.zulipchat.com".to_string(),
+            "test-bot@zulipchat.com".to_string(),
+        );
         let ctx = Context {
             github,
+            zulip,
             db: pool,
             username: "triagebot-test".to_string(),
             octocrab,

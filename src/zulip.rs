@@ -15,10 +15,8 @@ use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
 use anyhow::{format_err, Context as _};
 use rust_team_data::v1::TeamKind;
-use std::env;
 use std::fmt::Write as _;
 use std::str::FromStr;
-use std::sync::LazyLock;
 use subtle::ConstantTimeEq;
 use tracing as log;
 

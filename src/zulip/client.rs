@@ -25,7 +25,7 @@ impl ZulipClient {
         Self::new(instance_url, bot_email)
     }
 
-    fn new(instance_url: String, bot_email: String) -> Self {
+    pub fn new(instance_url: String, bot_email: String) -> Self {
         let client = Client::new();
         Self {
             client,
