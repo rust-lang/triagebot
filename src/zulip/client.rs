@@ -35,6 +35,10 @@ impl ZulipClient {
         }
     }
 
+    pub fn instance_url(&self) -> &str {
+        &self.instance_url
+    }
+
     // Taken from https://github.com/kobzol/team/blob/0f68ffc8b0d438d88ef4573deb54446d57e1eae6/src/api/zulip.rs#L45
     pub(crate) async fn get_zulip_users(&self) -> anyhow::Result<Vec<ZulipUser>> {
         let resp = self

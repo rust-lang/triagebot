@@ -1,4 +1,4 @@
-use crate::zulip::ZULIP_URL;
+use crate::zulip::client::ZulipClient;
 use std::collections::HashMap;
 
 /// A collection of Zulip users, as returned from '/users'
@@ -85,8 +85,8 @@ impl Recipient<'_> {
         }
     }
 
-    pub fn url(&self) -> String {
-        format!("{}/#narrow/{}", *ZULIP_URL, self.narrow())
+    pub fn url(&self, zulip: &ZulipClient) -> String {
+        format!("{}/#narrow/{}", zulip.instance_url(), self.narrow())
     }
 }
 

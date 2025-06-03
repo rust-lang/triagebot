@@ -22,9 +22,6 @@ use std::sync::LazyLock;
 use subtle::ConstantTimeEq;
 use tracing as log;
 
-static ZULIP_URL: LazyLock<String> =
-    LazyLock::new(|| env::var("ZULIP_URL").unwrap_or("https://rust-lang.zulipchat.com".into()));
-
 #[derive(Debug, serde::Deserialize)]
 pub struct Request {
     /// Markdown body of the sent message.
@@ -702,8 +699,8 @@ pub(crate) struct MessageApiRequest<'a> {
 }
 
 impl<'a> MessageApiRequest<'a> {
-    pub fn url(&self) -> String {
-        self.recipient.url()
+    pub fn url(&self, zulip: &ZulipClient) -> String {
+        self.recipient.url(zulip)
     }
 
     pub(crate) async fn send(&self, client: &ZulipClient) -> anyhow::Result<MessageApiResponse> {

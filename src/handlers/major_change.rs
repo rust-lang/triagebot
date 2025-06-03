@@ -148,7 +148,7 @@ pub(super) async fn handle_input(
                 id: config.zulip_stream,
                 topic: &new_topic,
             }
-            .url();
+            .url(&ctx.zulip);
             let breadcrumb_comment = format!(
                 "The associated GitHub issue has been renamed. Please see the [renamed Zulip topic]({}).",
                 new_topic_url
@@ -256,7 +256,7 @@ async fn handle(
     };
 
     if new_proposal {
-        let topic_url = zulip_req.url();
+        let topic_url = zulip_req.url(&ctx.zulip);
         let comment = format!(
             r#"> [!IMPORTANT]
 > This issue is *not meant to be used for technical discussion*. There is a **Zulip [stream]** for that.
