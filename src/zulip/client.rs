@@ -1,4 +1,4 @@
-use crate::zulip::{ZulipUser, ZulipUsers};
+use crate::zulip::api::{ZulipUser, ZulipUsers};
 use anyhow::Context;
 use reqwest::{Client, RequestBuilder, Response};
 use serde::de::DeserializeOwned;
@@ -31,6 +31,17 @@ impl ZulipClient {
             bot_email,
             bot_api_token: OnceLock::new(),
         }
+    }
+
+    // Taken from https://github.com/kobzol/team/blob/0f68ffc8b0d438d88ef4573deb54446d57e1eae6/src/api/zulip.rs#L45
+    pub(crate) async fn get_zulip_users(&self) -> anyhow::Result<Vec<ZulipUser>> {
+        let resp = self
+            .make_request("api/v1/users?include_custom_profile_fields=true")
+            .send()
+            .await?;
+        deserialize_response::<ZulipUsers>(resp)
+            .await
+            .map(|users| users.members)
     }
 
     fn make_request(&self, url: &str) -> RequestBuilder {

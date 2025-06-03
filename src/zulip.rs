@@ -1,3 +1,6 @@
+mod api;
+pub mod client;
+
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
 use crate::db::review_prefs::{get_review_prefs, upsert_review_prefs, RotationMode};
@@ -8,9 +11,9 @@ use crate::handlers::project_goals::{self, ping_project_goals_owners};
 use crate::handlers::Context;
 use crate::team_data::{people, teams};
 use crate::utils::pluralize;
+use crate::zulip::client::ZulipClient;
 use anyhow::{format_err, Context as _};
 use rust_team_data::v1::TeamKind;
-use std::collections::HashMap;
 use std::env;
 use std::fmt::Write as _;
 use std::str::FromStr;
@@ -513,7 +516,9 @@ async fn lookup_cmd(
 async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::Result<String> {
     let username_lowercase = zulip_username.to_lowercase();
 
-    let users = get_zulip_users(&ctx.github.raw())
+    let users = ctx
+        .zulip
+        .get_zulip_users()
         .await
         .context("Cannot get Zulip users")?;
     let Some(zulip_user) = users
@@ -560,11 +565,11 @@ fn render_zulip_username(zulip_id: u64) -> String {
 /// Tries to find a Zulip username from a GitHub username.
 async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Result<String> {
     async fn lookup_zulip_id_from_zulip(
-        ctx: &Context,
+        zulip: &ZulipClient,
         gh_username: &str,
     ) -> anyhow::Result<Option<u64>> {
         let username_lowercase = gh_username.to_lowercase();
-        let users = get_zulip_users(ctx.github.raw()).await?;
+        let users = zulip.get_zulip_users().await?;
         Ok(users
             .into_iter()
             .find(|user| {
@@ -601,7 +606,7 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
 
     let zulip_id = match lookup_zulip_id_from_team(ctx, gh_username).await? {
         Some(id) => id,
-        None => match lookup_zulip_id_from_zulip(ctx, gh_username).await? {
+        None => match lookup_zulip_id_from_zulip(&ctx.zulip, gh_username).await? {
             Some(id) => id,
             None => {
                 return Ok(format!(
@@ -614,63 +619,6 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
         "The GitHub user `{gh_username}` has the following Zulip account: {}",
         render_zulip_username(zulip_id)
     ))
-}
-
-#[derive(Clone, serde::Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct ProfileValue {
-    value: String,
-}
-
-/// A single Zulip user
-#[derive(Clone, serde::Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct ZulipUser {
-    pub(crate) user_id: u64,
-    #[serde(rename = "full_name")]
-    pub(crate) name: String,
-    #[serde(default)]
-    pub(crate) profile_data: HashMap<String, ProfileValue>,
-}
-
-impl ZulipUser {
-    // The custom profile field ID for GitHub profiles on the Rust Zulip
-    // is 3873. This is likely not portable across different Zulip instance,
-    // but we assume that triagebot will only be used on this Zulip instance anyway.
-    pub(crate) fn get_github_username(&self) -> Option<&str> {
-        self.profile_data.get("3873").map(|v| v.value.as_str())
-    }
-}
-
-/// A collection of Zulip users, as returned from '/users'
-#[derive(serde::Deserialize)]
-struct ZulipUsers {
-    members: Vec<ZulipUser>,
-}
-
-// From https://github.com/kobzol/team/blob/0f68ffc8b0d438d88ef4573deb54446d57e1eae6/src/api/zulip.rs#L45
-async fn get_zulip_users(client: &reqwest::Client) -> anyhow::Result<Vec<ZulipUser>> {
-    let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
-
-    let resp = client
-        .get(&format!(
-            "{}/api/v1/users?include_custom_profile_fields=true",
-            *ZULIP_URL
-        ))
-        .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
-        .send()
-        .await?;
-
-    let status = resp.status();
-
-    if !status.is_success() {
-        let body = resp
-            .text()
-            .await
-            .context("fail receiving Zulip API response (when getting Zulip users)")?;
-
-        anyhow::bail!(body)
-    } else {
-        Ok(resp.json::<ZulipUsers>().await.map(|users| users.members)?)
-    }
 }
 
 // This does two things:
@@ -705,18 +653,10 @@ async fn execute_for_other_user(
         assert_eq!(command.pop(), Some(' ')); // pop trailing space
         command
     };
-    let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
 
     let members = ctx
-        .github
-        .raw()
-        .get(format!("{}/api/v1/users", *ZULIP_URL))
-        .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
-        .send()
-        .await
-        .map_err(|e| format_err!("Failed to get list of zulip users: {e:?}."))?;
-    let members = members
-        .json::<MembersApiResponse>()
+        .zulip
+        .get_zulip_users()
         .await
         .map_err(|e| format_err!("Failed to get list of zulip users: {e:?}."))?;
 
@@ -728,7 +668,6 @@ async fn execute_for_other_user(
     };
 
     let user = members
-        .members
         .iter()
         .find(|m| m.user_id == zulip_user_id)
         .ok_or_else(|| format_err!("Could not find Zulip user email."))?;
@@ -756,17 +695,6 @@ async fn execute_for_other_user(
     }
 
     Ok(Some(output))
-}
-
-#[derive(serde::Deserialize)]
-pub struct MembersApiResponse {
-    pub members: Vec<Member>,
-}
-
-#[derive(serde::Deserialize)]
-pub struct Member {
-    pub email: String,
-    pub user_id: u64,
 }
 
 #[derive(Copy, Clone, serde::Serialize)]
