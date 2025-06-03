@@ -1,15 +1,16 @@
+use super::Context;
 use crate::github::{
     self, GithubClient, IssueCommentAction, IssueCommentEvent, IssuesAction, IssuesEvent, User,
 };
 use crate::github::{Event, Issue};
 use crate::jobs::Job;
+use crate::zulip::api::Recipient;
+use crate::zulip::client::ZulipClient;
 use crate::zulip::to_zulip_id;
 use anyhow::Context as _;
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDate, Utc};
 use tracing::{self as log};
-
-use super::Context;
 
 const MAX_ZULIP_TOPIC: usize = 60;
 const RUST_PROJECT_GOALS_REPO: &'static str = "rust-lang/rust-project-goals";
@@ -39,7 +40,7 @@ impl Job for ProjectGoalsUpdateJob {
     }
 
     async fn run(&self, ctx: &super::Context, _metadata: &serde_json::Value) -> anyhow::Result<()> {
-        ping_project_goals_owners_automatically(&ctx.github).await
+        ping_project_goals_owners_automatically(&ctx.github, &ctx.zulip).await
     }
 }
 
@@ -71,7 +72,10 @@ pub async fn check_project_goal_acl(gh: &GithubClient, gh_id: u64) -> anyhow::Re
         .is_some())
 }
 
-async fn ping_project_goals_owners_automatically(gh: &GithubClient) -> anyhow::Result<()> {
+async fn ping_project_goals_owners_automatically(
+    gh: &GithubClient,
+    zulip: &ZulipClient,
+) -> anyhow::Result<()> {
     // Predicted schedule is to author a blog post on the 3rd week of the month.
     // We start pinging when the month starts until we see an update in this month
     // or the last 7 days of previous month.
@@ -91,7 +95,7 @@ async fn ping_project_goals_owners_automatically(gh: &GithubClient) -> anyhow::R
             .format("on %b-%d")
             .to_string();
 
-    ping_project_goals_owners(gh, false, days_threshold as i64, &third_monday).await
+    ping_project_goals_owners(gh, zulip, false, days_threshold as i64, &third_monday).await
 }
 
 /// Sends a ping message to all project goal owners if
@@ -101,6 +105,7 @@ async fn ping_project_goals_owners_automatically(gh: &GithubClient) -> anyhow::R
 /// will be drafted (e.g., `"on Sep 5"`).
 pub async fn ping_project_goals_owners(
     gh: &GithubClient,
+    zulip: &ZulipClient,
     dry_run: bool,
     days_threshold: i64,
     next_update: &str,
@@ -156,7 +161,7 @@ pub async fn ping_project_goals_owners(
             .replace("$NEXT_UPDATE", next_update);
 
         let zulip_req = crate::zulip::MessageApiRequest {
-            recipient: crate::zulip::Recipient::Stream {
+            recipient: Recipient::Stream {
                 id: GOALS_STREAM,
                 topic: &zulip_topic_name,
             },
@@ -167,7 +172,7 @@ pub async fn ping_project_goals_owners(
         log::debug!("message = {message:#?}");
 
         if !dry_run {
-            zulip_req.send(&gh.raw()).await?;
+            zulip_req.send(&zulip).await?;
         } else {
             eprintln!();
             eprintln!("-- Dry Run ------------------------------------");
@@ -253,7 +258,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             let title = &issue.title;
             let goalnum = issue.number;
             let zulip_req = crate::zulip::MessageApiRequest {
-                recipient: crate::zulip::Recipient::Stream {
+                recipient: Recipient::Stream {
                     id: GOALS_STREAM,
                     topic: &zulip_topic_name,
                 },
@@ -261,7 +266,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                     r#"New tracking issue goals#{goalnum}.\n* Goal title: {title}\n* Goal owners: {zulip_owners}"#
                 ),
             };
-            zulip_req.send(&gh.raw()).await?;
+            zulip_req.send(&ctx.zulip).await?;
             Ok(())
         }
 
@@ -297,7 +302,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             match action {
                 IssueCommentAction::Created | IssueCommentAction::Edited => {
                     let zulip_req = crate::zulip::MessageApiRequest {
-                        recipient: crate::zulip::Recipient::Stream {
+                        recipient: Recipient::Stream {
                             id: GOALS_STREAM,
                             topic: &zulip_topic_name,
                         },
@@ -308,7 +313,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                             {ticks}"
                         ),
                     };
-                    zulip_req.send(&gh.raw()).await?;
+                    zulip_req.send(&ctx.zulip).await?;
                 }
 
                 IssueCommentAction::Deleted => {

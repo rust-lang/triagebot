@@ -1,3 +1,4 @@
+use crate::zulip::api::Recipient;
 use crate::{
     config::MajorChangeConfig,
     github::{Event, Issue, IssuesAction, IssuesEvent, Label, ZulipGitHubReference},
@@ -119,14 +120,14 @@ pub(super) async fn handle_input(
             let new_topic = zulip_topic_from_issue(&partial_issue);
 
             let zulip_send_req = crate::zulip::MessageApiRequest {
-                recipient: crate::zulip::Recipient::Stream {
+                recipient: Recipient::Stream {
                     id: config.zulip_stream,
                     topic: &prev_topic,
                 },
                 content: "The associated GitHub issue has been renamed. Renaming this Zulip topic.",
             };
             let zulip_send_res = zulip_send_req
-                .send(&ctx.github.raw())
+                .send(&ctx.zulip)
                 .await
                 .context("zulip post failed")?;
 
@@ -143,7 +144,7 @@ pub(super) async fn handle_input(
 
             // after renaming the zulip topic, post an additional comment under the old topic with a url to the new, renamed topic
             // this is necessary due to the lack of topic permalinks, see https://github.com/zulip/zulip/issues/15290
-            let new_topic_url = crate::zulip::Recipient::Stream {
+            let new_topic_url = Recipient::Stream {
                 id: config.zulip_stream,
                 topic: &new_topic,
             }
@@ -153,14 +154,14 @@ pub(super) async fn handle_input(
                 new_topic_url
             );
             let zulip_send_breadcrumb_req = crate::zulip::MessageApiRequest {
-                recipient: crate::zulip::Recipient::Stream {
+                recipient: Recipient::Stream {
                     id: config.zulip_stream,
                     topic: &prev_topic,
                 },
                 content: &breadcrumb_comment,
             };
             zulip_send_breadcrumb_req
-                .send(&ctx.github.raw())
+                .send(&ctx.zulip)
                 .await
                 .context("zulip post failed")?;
 
@@ -247,7 +248,7 @@ async fn handle(
     let zulip_topic = zulip_topic_from_issue(&partial_issue);
 
     let zulip_req = crate::zulip::MessageApiRequest {
-        recipient: crate::zulip::Recipient::Stream {
+        recipient: Recipient::Stream {
             id: config.zulip_stream,
             topic: &zulip_topic,
         },
@@ -289,7 +290,7 @@ See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/c
             .context("post major change comment")?;
     }
 
-    let zulip_req = zulip_req.send(&ctx.github.raw());
+    let zulip_req = zulip_req.send(&ctx.zulip);
 
     let (gh_res, zulip_res) = futures::join!(github_req, zulip_req);
     zulip_res.context("zulip post failed")?;

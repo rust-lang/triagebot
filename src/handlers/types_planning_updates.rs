@@ -1,6 +1,7 @@
 use crate::db::schedule_job;
 use crate::github;
 use crate::jobs::Job;
+use crate::zulip::api::Recipient;
 use anyhow::Context as _;
 use async_trait::async_trait;
 use chrono::{Datelike, Duration, NaiveTime, TimeZone, Utc};
@@ -32,13 +33,13 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
             This is a reminder to update the current [roadmap tracking issues](https://github.com/rust-lang/types-team/issues?q=is%3Aissue+is%3Aopen+label%3Aroadmap-tracking-issue).\n\
             Extra reminders will be sent later this week.");
         let zulip_req = crate::zulip::MessageApiRequest {
-            recipient: crate::zulip::Recipient::Stream {
+            recipient: Recipient::Stream {
                 id: TYPES_MEETINGS_STREAM,
                 topic: &format!("{meeting_date_string} planning meeting"),
             },
             content: &message,
         };
-        zulip_req.send(&ctx.github.raw()).await?;
+        zulip_req.send(&ctx.zulip).await?;
 
         // Then, we want to schedule the next Thursday after this
         let mut thursday = today;
@@ -158,13 +159,13 @@ pub async fn request_updates(
 
     let meeting_date_string = metadata.date_string;
     let zulip_req = crate::zulip::MessageApiRequest {
-        recipient: crate::zulip::Recipient::Stream {
+        recipient: Recipient::Stream {
             id: TYPES_MEETINGS_STREAM,
             topic: &format!("{meeting_date_string} planning meeting"),
         },
         content: &message,
     };
-    zulip_req.send(&ctx.github.raw()).await?;
+    zulip_req.send(&ctx.zulip).await?;
 
     Ok(())
 }

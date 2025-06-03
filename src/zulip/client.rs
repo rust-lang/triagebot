@@ -1,10 +1,12 @@
-use crate::zulip::api::{ZulipUser, ZulipUsers};
+use crate::zulip::api::{MessageApiResponse, ZulipUser, ZulipUsers};
+use crate::zulip::Recipient;
 use anyhow::Context;
-use reqwest::{Client, RequestBuilder, Response};
+use reqwest::{Client, Method, RequestBuilder, Response};
 use serde::de::DeserializeOwned;
 use std::env;
 use std::sync::OnceLock;
 
+#[derive(Clone)]
 pub struct ZulipClient {
     client: Client,
     instance_url: String,
@@ -36,7 +38,7 @@ impl ZulipClient {
     // Taken from https://github.com/kobzol/team/blob/0f68ffc8b0d438d88ef4573deb54446d57e1eae6/src/api/zulip.rs#L45
     pub(crate) async fn get_zulip_users(&self) -> anyhow::Result<Vec<ZulipUser>> {
         let resp = self
-            .make_request("api/v1/users?include_custom_profile_fields=true")
+            .make_request(Method::GET, "users?include_custom_profile_fields=true")
             .send()
             .await?;
         deserialize_response::<ZulipUsers>(resp)
@@ -44,10 +46,49 @@ impl ZulipClient {
             .map(|users| users.members)
     }
 
-    fn make_request(&self, url: &str) -> RequestBuilder {
+    pub(crate) async fn send_message<'a>(
+        &self,
+        recipient: Recipient<'a>,
+        content: &'a str,
+    ) -> anyhow::Result<MessageApiResponse> {
+        #[derive(serde::Serialize)]
+        struct SerializedApi<'a> {
+            #[serde(rename = "type")]
+            type_: &'static str,
+            to: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            topic: Option<&'a str>,
+            content: &'a str,
+        }
+
+        let response = self
+            .make_request(Method::POST, "messages")
+            .form(&SerializedApi {
+                type_: match recipient {
+                    Recipient::Stream { .. } => "stream",
+                    Recipient::Private { .. } => "private",
+                },
+                to: match recipient {
+                    Recipient::Stream { id, .. } => id.to_string(),
+                    Recipient::Private { email, .. } => email.to_string(),
+                },
+                topic: match recipient {
+                    Recipient::Stream { topic, .. } => Some(topic),
+                    Recipient::Private { .. } => None,
+                },
+                content,
+            })
+            .send()
+            .await
+            .context("fail sending Zulip message")?;
+
+        deserialize_response::<MessageApiResponse>(response).await
+    }
+
+    fn make_request(&self, method: Method, url: &str) -> RequestBuilder {
         let api_token = self.get_api_token();
         self.client
-            .get(&format!("{}/{url}", self.instance_url))
+            .request(method, &format!("{}/api/v1/{url}", self.instance_url))
             .basic_auth(&self.bot_email, Some(api_token))
     }
 
