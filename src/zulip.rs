@@ -24,9 +24,6 @@ use tracing as log;
 
 static ZULIP_URL: LazyLock<String> =
     LazyLock::new(|| env::var("ZULIP_URL").unwrap_or("https://rust-lang.zulipchat.com".into()));
-static ZULIP_BOT_EMAIL: LazyLock<String> = LazyLock::new(|| {
-    env::var("ZULIP_BOT_EMAIL").unwrap_or("triage-rust-lang-bot@zulipchat.com".into())
-});
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Request {
