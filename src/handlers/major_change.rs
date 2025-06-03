@@ -138,7 +138,7 @@ pub(super) async fn handle_input(
                 content: None,
             };
             zulip_update_req
-                .send(&ctx.github.raw())
+                .send(&ctx.zulip)
                 .await
                 .context("zulip message update failed")?;
 

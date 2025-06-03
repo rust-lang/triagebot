@@ -85,6 +85,48 @@ impl ZulipClient {
         deserialize_response::<MessageApiResponse>(response).await
     }
 
+    pub(crate) async fn update_message<'a>(
+        &self,
+        message_id: u64,
+        topic: Option<&'a str>,
+        propagate_mode: Option<&'a str>,
+        content: Option<&'a str>,
+    ) -> anyhow::Result<()> {
+        #[derive(serde::Serialize)]
+        struct SerializedApi<'a> {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            topic: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            propagate_mode: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            content: Option<&'a str>,
+        }
+
+        let resp = self
+            .make_request(Method::PATCH, &format!("messages/{message_id}"))
+            .form(&SerializedApi {
+                topic,
+                propagate_mode,
+                content,
+            })
+            .send()
+            .await
+            .context("failed to send Zulip API Update Message")?;
+
+        let status = resp.status();
+
+        if !status.is_success() {
+            let body = resp
+                .text()
+                .await
+                .context("fail receiving Zulip API response (when updating the message)")?;
+
+            anyhow::bail!(body)
+        }
+
+        Ok(())
+    }
+
     fn make_request(&self, method: Method, url: &str) -> RequestBuilder {
         let api_token = self.get_api_token();
         self.client

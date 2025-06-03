@@ -723,46 +723,15 @@ pub struct UpdateMessageApiRequest<'a> {
 }
 
 impl<'a> UpdateMessageApiRequest<'a> {
-    pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<()> {
-        let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
-
-        #[derive(serde::Serialize)]
-        struct SerializedApi<'a> {
-            #[serde(skip_serializing_if = "Option::is_none")]
-            pub topic: Option<&'a str>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            pub propagate_mode: Option<&'a str>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            pub content: Option<&'a str>,
-        }
-
-        let resp = client
-            .patch(&format!(
-                "{}/api/v1/messages/{}",
-                *ZULIP_URL, self.message_id
-            ))
-            .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
-            .form(&SerializedApi {
-                topic: self.topic,
-                propagate_mode: self.propagate_mode,
-                content: self.content,
-            })
-            .send()
+    pub async fn send(&self, client: &ZulipClient) -> anyhow::Result<()> {
+        client
+            .update_message(
+                self.message_id,
+                self.topic,
+                self.propagate_mode,
+                self.content,
+            )
             .await
-            .context("failed to send Zulip API Update Message")?;
-
-        let status = resp.status();
-
-        if !status.is_success() {
-            let body = resp
-                .text()
-                .await
-                .context("fail receiving Zulip API response (when updating the message)")?;
-
-            anyhow::bail!(body)
-        }
-
-        Ok(())
     }
 }
 
