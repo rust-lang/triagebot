@@ -49,33 +49,42 @@ mod tests {
     mod tests_from_diff;
 }
 
-const NEW_USER_WELCOME_MESSAGE: &str = "Thanks for the pull request, and welcome! \
+fn new_user_welcome_message(who: &str) -> String {
+    format!("Thanks for the pull request, and welcome! \
 The Rust team is excited to review your changes, and you should hear from {who} \
-some time within the next two weeks.";
+some time within the next two weeks.")
+}
 
-const CONTRIBUTION_MESSAGE: &str = "Please see [the contribution \
+fn contribution_message(contributing_url: &str, bot: &str) -> String {
+    format!("Please see [the contribution \
 instructions]({contributing_url}) for more information. Namely, in order to ensure the \
 minimum review times lag, PR authors and assigned reviewers should ensure that the review \
 label (`S-waiting-on-review` and `S-waiting-on-author`) stays updated, invoking these commands \
 when appropriate:
 
 - `@{bot} author`: the review is finished, PR author should check the comments and take action accordingly
-- `@{bot} review`: the author is ready for a review, this PR will be queued again in the reviewer's queue";
+- `@{bot} review`: the author is ready for a review, this PR will be queued again in the reviewer's queue")
+}
 
-const WELCOME_WITH_REVIEWER: &str = "@{assignee} (or someone else)";
+fn welcome_with_reviewer(assignee: &str) -> String {
+    format!("@{assignee} (or someone else)")
+}
 
 const WELCOME_WITHOUT_REVIEWER: &str = "@Mark-Simulacrum (NB. this repo may be misconfigured)";
 
-const RETURNING_USER_WELCOME_MESSAGE: &str = "r? @{assignee}
+fn returning_user_welcome_message(assignee: &str, bot: &str) -> String {
+    format!("r? @{assignee}
 
 {bot} has assigned @{assignee}.
 They will have a look at your PR within the next two weeks and either review your PR or \
 reassign to another reviewer.
 
-Use `r?` to explicitly pick a reviewer";
+Use `r?` to explicitly pick a reviewer")
+}
 
-const RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER: &str =
-    "@{author}: no appropriate reviewer found, use `r?` to override";
+fn returning_user_welcome_message_no_reviewer(author: &str) -> String {
+    format!("@{author}: no appropriate reviewer found, use `r?` to override")
+}
 
 fn reviewer_off_rotation_message(username: &str) -> String {
     format!(
@@ -85,18 +94,23 @@ Please choose another assignee."
     )
 }
 
-const REVIEWER_IS_PR_AUTHOR: &str = "Pull request author cannot be assigned as reviewer.
+fn reviewer_is_pr_author_message(_username: &str) -> String {
+    format!("Pull request author cannot be assigned as reviewer.
 
-Please choose another assignee.";
+Please choose another assignee.")
+}
 
-const REVIEWER_ALREADY_ASSIGNED: &str =
-    "Requested reviewer is already assigned to this pull request.
+fn reviewer_already_assigned_message(_username: &str) -> String {
+    format!("Requested reviewer is already assigned to this pull request.
 
-Please choose another assignee.";
+Please choose another assignee.")
+}
 
-const REVIEWER_ASSIGNED_BEFORE: &str = "Requested reviewer @{username} was already assigned before.
+fn reviewer_assigned_before_message(username: &str) -> String {
+    format!("Requested reviewer @{username} was already assigned before.
 
-Please choose another assignee by using `r? @reviewer`.";
+Please choose another assignee by using `r? @reviewer`.")
+}
 
 // Special account that we use to prevent assignment.
 const GHOST_ACCOUNT: &str = "ghost";
@@ -212,9 +226,7 @@ pub(super) async fn handle_input(
                     ) {
                         welcome.push_str("\n\n");
                         welcome.push_str(
-                            &CONTRIBUTION_MESSAGE
-                                .replace("{contributing_url}", contrib)
-                                .replace("{bot}", &ctx.username),
+                            &contribution_message(contrib, &ctx.username),
                         );
                     }
                 }
@@ -228,33 +240,28 @@ pub(super) async fn handle_input(
             AuthorAssociation::FirstTimer | AuthorAssociation::FirstTimeContributor
         ) {
             let who_text = match &assignee {
-                Some(assignee) => WELCOME_WITH_REVIEWER.replace("{assignee}", &assignee.name),
+                Some(assignee) => welcome_with_reviewer(&assignee.name),
                 None => WELCOME_WITHOUT_REVIEWER.to_string(),
             };
-            let mut welcome = NEW_USER_WELCOME_MESSAGE.replace("{who}", &who_text);
+            let mut welcome = new_user_welcome_message(&who_text);
             if let Some(contrib) = &config.contributing_url {
                 welcome.push_str("\n\n");
                 welcome.push_str(
-                    &CONTRIBUTION_MESSAGE
-                        .replace("{contributing_url}", contrib)
-                        .replace("{bot}", &ctx.username),
+                    &contribution_message(contrib, &ctx.username),
                 );
             }
             Some(welcome)
         } else if !from_comment {
             match &assignee {
                 Some(assignee) => Some(
-                    RETURNING_USER_WELCOME_MESSAGE
-                        .replace("{assignee}", &assignee.name)
-                        .replace("{bot}", &ctx.username),
+                    returning_user_welcome_message(&assignee.name, &ctx.username),
                 ),
                 None => {
                     // If the assign fallback group is empty, then we don't expect any automatic
                     // assignment, and this message would just be spam.
                     if config.fallback_review_group().is_some() {
                         Some(
-                            RETURNING_USER_WELCOME_MESSAGE_NO_REVIEWER
-                                .replace("{author}", &event.issue.user.login),
+                            returning_user_welcome_message_no_reviewer(&event.issue.user.login),
                         )
                     } else {
                         None
@@ -809,21 +816,21 @@ impl fmt::Display for FindReviewerError {
                 write!(
                     f,
                     "{}",
-                    REVIEWER_IS_PR_AUTHOR.replace("{username}", username)
+                    reviewer_is_pr_author_message(username)
                 )
             }
             FindReviewerError::ReviewerAlreadyAssigned { username } => {
                 write!(
                     f,
                     "{}",
-                    REVIEWER_ALREADY_ASSIGNED.replace("{username}", username)
+                    reviewer_already_assigned_message(username)
                 )
             }
             FindReviewerError::ReviewerPreviouslyAssigned { username } => {
                 write!(
                     f,
                     "{}",
-                    REVIEWER_ASSIGNED_BEFORE.replace("{username}", username)
+                    reviewer_assigned_before_message(username)
                 )
             }
             FindReviewerError::DatabaseError(error) => {
