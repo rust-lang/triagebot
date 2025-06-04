@@ -477,8 +477,6 @@ pub struct Comment {
     pub html_url: String,
     pub user: User,
     #[serde(default, alias = "submitted_at")] // for pull request reviews
-    pub created_at: chrono::DateTime<Utc>,
-    #[serde(default, alias = "submitted_at")] // for pull request reviews
     pub updated_at: chrono::DateTime<Utc>,
     #[serde(default, rename = "state")]
     pub pr_review_state: Option<PullRequestReviewState>,
