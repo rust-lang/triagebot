@@ -1,3 +1,6 @@
+pub mod api;
+pub mod client;
+
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
 use crate::db::review_prefs::{get_review_prefs, upsert_review_prefs, RotationMode};
@@ -8,21 +11,14 @@ use crate::handlers::project_goals::{self, ping_project_goals_owners};
 use crate::handlers::Context;
 use crate::team_data::{people, teams};
 use crate::utils::pluralize;
+use crate::zulip::api::{MessageApiResponse, Recipient};
+use crate::zulip::client::ZulipClient;
 use anyhow::{format_err, Context as _};
 use rust_team_data::v1::TeamKind;
-use std::collections::HashMap;
-use std::env;
 use std::fmt::Write as _;
 use std::str::FromStr;
-use std::sync::LazyLock;
 use subtle::ConstantTimeEq;
 use tracing as log;
-
-static ZULIP_URL: LazyLock<String> =
-    LazyLock::new(|| env::var("ZULIP_URL").unwrap_or("https://rust-lang.zulipchat.com".into()));
-static ZULIP_BOT_EMAIL: LazyLock<String> = LazyLock::new(|| {
-    env::var("ZULIP_BOT_EMAIL").unwrap_or("triage-rust-lang-bot@zulipchat.com".into())
-});
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Request {
@@ -262,7 +258,7 @@ fn handle_command<'a>(
                                 };
 
                                 if project_goals::check_project_goal_acl(&ctx.github, gh_id).await? {
-                                    ping_project_goals_owners(&ctx.github, false, threshold, &format!("on {next_update}"))
+                                    ping_project_goals_owners(&ctx.github, &ctx.zulip, false, threshold, &format!("on {next_update}"))
                                         .await
                                         .map_err(|e| format_err!("Failed to await at this time: {e:?}"))?;
                                     return Ok(None);
@@ -272,7 +268,7 @@ fn handle_command<'a>(
                                     ));
                                 }
                             }
-                            Some("docs-update") => return trigger_docs_update(message_data),
+                            Some("docs-update") => return trigger_docs_update(message_data, &ctx.zulip),
                             _ => {}
                         }
                     }
@@ -513,7 +509,9 @@ async fn lookup_cmd(
 async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::Result<String> {
     let username_lowercase = zulip_username.to_lowercase();
 
-    let users = get_zulip_users(&ctx.github.raw())
+    let users = ctx
+        .zulip
+        .get_zulip_users()
         .await
         .context("Cannot get Zulip users")?;
     let Some(zulip_user) = users
@@ -560,11 +558,11 @@ fn render_zulip_username(zulip_id: u64) -> String {
 /// Tries to find a Zulip username from a GitHub username.
 async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Result<String> {
     async fn lookup_zulip_id_from_zulip(
-        ctx: &Context,
+        zulip: &ZulipClient,
         gh_username: &str,
     ) -> anyhow::Result<Option<u64>> {
         let username_lowercase = gh_username.to_lowercase();
-        let users = get_zulip_users(ctx.github.raw()).await?;
+        let users = zulip.get_zulip_users().await?;
         Ok(users
             .into_iter()
             .find(|user| {
@@ -601,7 +599,7 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
 
     let zulip_id = match lookup_zulip_id_from_team(ctx, gh_username).await? {
         Some(id) => id,
-        None => match lookup_zulip_id_from_zulip(ctx, gh_username).await? {
+        None => match lookup_zulip_id_from_zulip(&ctx.zulip, gh_username).await? {
             Some(id) => id,
             None => {
                 return Ok(format!(
@@ -614,63 +612,6 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
         "The GitHub user `{gh_username}` has the following Zulip account: {}",
         render_zulip_username(zulip_id)
     ))
-}
-
-#[derive(Clone, serde::Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct ProfileValue {
-    value: String,
-}
-
-/// A single Zulip user
-#[derive(Clone, serde::Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct ZulipUser {
-    pub(crate) user_id: u64,
-    #[serde(rename = "full_name")]
-    pub(crate) name: String,
-    #[serde(default)]
-    pub(crate) profile_data: HashMap<String, ProfileValue>,
-}
-
-impl ZulipUser {
-    // The custom profile field ID for GitHub profiles on the Rust Zulip
-    // is 3873. This is likely not portable across different Zulip instance,
-    // but we assume that triagebot will only be used on this Zulip instance anyway.
-    pub(crate) fn get_github_username(&self) -> Option<&str> {
-        self.profile_data.get("3873").map(|v| v.value.as_str())
-    }
-}
-
-/// A collection of Zulip users, as returned from '/users'
-#[derive(serde::Deserialize)]
-struct ZulipUsers {
-    members: Vec<ZulipUser>,
-}
-
-// From https://github.com/kobzol/team/blob/0f68ffc8b0d438d88ef4573deb54446d57e1eae6/src/api/zulip.rs#L45
-async fn get_zulip_users(client: &reqwest::Client) -> anyhow::Result<Vec<ZulipUser>> {
-    let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
-
-    let resp = client
-        .get(&format!(
-            "{}/api/v1/users?include_custom_profile_fields=true",
-            *ZULIP_URL
-        ))
-        .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
-        .send()
-        .await?;
-
-    let status = resp.status();
-
-    if !status.is_success() {
-        let body = resp
-            .text()
-            .await
-            .context("fail receiving Zulip API response (when getting Zulip users)")?;
-
-        anyhow::bail!(body)
-    } else {
-        Ok(resp.json::<ZulipUsers>().await.map(|users| users.members)?)
-    }
 }
 
 // This does two things:
@@ -705,18 +646,10 @@ async fn execute_for_other_user(
         assert_eq!(command.pop(), Some(' ')); // pop trailing space
         command
     };
-    let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
 
     let members = ctx
-        .github
-        .raw()
-        .get(format!("{}/api/v1/users", *ZULIP_URL))
-        .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
-        .send()
-        .await
-        .map_err(|e| format_err!("Failed to get list of zulip users: {e:?}."))?;
-    let members = members
-        .json::<MembersApiResponse>()
+        .zulip
+        .get_zulip_users()
         .await
         .map_err(|e| format_err!("Failed to get list of zulip users: {e:?}."))?;
 
@@ -728,7 +661,6 @@ async fn execute_for_other_user(
     };
 
     let user = members
-        .members
         .iter()
         .find(|m| m.user_id == zulip_user_id)
         .ok_or_else(|| format_err!("Could not find Zulip user email."))?;
@@ -748,7 +680,7 @@ async fn execute_for_other_user(
         },
         content: &message,
     }
-    .send(ctx.github.raw())
+    .send(&ctx.zulip)
     .await;
 
     if let Err(err) = res {
@@ -758,164 +690,20 @@ async fn execute_for_other_user(
     Ok(Some(output))
 }
 
-#[derive(serde::Deserialize)]
-pub struct MembersApiResponse {
-    pub members: Vec<Member>,
-}
-
-#[derive(serde::Deserialize)]
-pub struct Member {
-    pub email: String,
-    pub user_id: u64,
-}
-
-#[derive(Copy, Clone, serde::Serialize)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-pub enum Recipient<'a> {
-    Stream {
-        #[serde(rename = "to")]
-        id: u64,
-        topic: &'a str,
-    },
-    Private {
-        #[serde(skip)]
-        id: u64,
-        #[serde(rename = "to")]
-        email: &'a str,
-    },
-}
-
-impl Recipient<'_> {
-    pub fn narrow(&self) -> String {
-        match self {
-            Recipient::Stream { id, topic } => {
-                // See
-                // https://github.com/zulip/zulip/blob/46247623fc279/zerver/lib/url_encoding.py#L9
-                // ALWAYS_SAFE without `.` from
-                // https://github.com/python/cpython/blob/113e2b0a07c/Lib/urllib/parse.py#L772-L775
-                //
-                // ALWAYS_SAFE doesn't contain `.` because Zulip actually encodes them to be able
-                // to use `.` instead of `%` in the encoded strings
-                const ALWAYS_SAFE: &str =
-                    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-~";
-
-                let mut encoded_topic = String::new();
-                for ch in topic.bytes() {
-                    if !(ALWAYS_SAFE.contains(ch as char)) {
-                        write!(encoded_topic, ".{:02X}", ch).unwrap();
-                    } else {
-                        encoded_topic.push(ch as char);
-                    }
-                }
-                format!("stream/{}-xxx/topic/{}", id, encoded_topic)
-            }
-            Recipient::Private { id, .. } => format!("pm-with/{}-xxx", id),
-        }
-    }
-
-    pub fn url(&self) -> String {
-        format!("{}/#narrow/{}", *ZULIP_URL, self.narrow())
-    }
-}
-
-#[cfg(test)]
-fn check_encode(topic: &str, expected: &str) {
-    const PREFIX: &str = "stream/0-xxx/topic/";
-    let computed = Recipient::Stream { id: 0, topic }.narrow();
-    assert_eq!(&computed[..PREFIX.len()], PREFIX);
-    assert_eq!(&computed[PREFIX.len()..], expected);
-}
-
-#[test]
-fn test_encode() {
-    check_encode("some text with spaces", "some.20text.20with.20spaces");
-    check_encode(
-        " !\"#$%&'()*+,-./",
-        ".20.21.22.23.24.25.26.27.28.29.2A.2B.2C-.2E.2F",
-    );
-    check_encode("0123456789:;<=>?", "0123456789.3A.3B.3C.3D.3E.3F");
-    check_encode(
-        "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_",
-        ".40ABCDEFGHIJKLMNOPQRSTUVWXYZ.5B.5C.5D.5E_",
-    );
-    check_encode(
-        "`abcdefghijklmnopqrstuvwxyz{|}~",
-        ".60abcdefghijklmnopqrstuvwxyz.7B.7C.7D~.7F",
-    );
-    check_encode("áé…", ".C3.A1.C3.A9.E2.80.A6");
-}
-
 #[derive(serde::Serialize)]
-pub struct MessageApiRequest<'a> {
-    pub recipient: Recipient<'a>,
-    pub content: &'a str,
+pub(crate) struct MessageApiRequest<'a> {
+    pub(crate) recipient: Recipient<'a>,
+    pub(crate) content: &'a str,
 }
 
 impl<'a> MessageApiRequest<'a> {
-    pub fn url(&self) -> String {
-        self.recipient.url()
+    pub fn url(&self, zulip: &ZulipClient) -> String {
+        self.recipient.url(zulip)
     }
 
-    pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<MessageApiResponse> {
-        let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
-
-        #[derive(serde::Serialize)]
-        struct SerializedApi<'a> {
-            #[serde(rename = "type")]
-            type_: &'static str,
-            to: String,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            topic: Option<&'a str>,
-            content: &'a str,
-        }
-
-        let resp = client
-            .post(format!("{}/api/v1/messages", *ZULIP_URL))
-            .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
-            .form(&SerializedApi {
-                type_: match self.recipient {
-                    Recipient::Stream { .. } => "stream",
-                    Recipient::Private { .. } => "private",
-                },
-                to: match self.recipient {
-                    Recipient::Stream { id, .. } => id.to_string(),
-                    Recipient::Private { email, .. } => email.to_string(),
-                },
-                topic: match self.recipient {
-                    Recipient::Stream { topic, .. } => Some(topic),
-                    Recipient::Private { .. } => None,
-                },
-                content: self.content,
-            })
-            .send()
-            .await
-            .context("fail sending Zulip message")?;
-
-        let status = resp.status();
-
-        if !status.is_success() {
-            let body = resp
-                .text()
-                .await
-                .context("fail receiving Zulip API response (when sending a message)")?;
-
-            anyhow::bail!(body)
-        }
-
-        let resp: MessageApiResponse = resp
-            .json()
-            .await
-            .context("fail receiving the JSON Zulip Api reponse (when sending a message)")?;
-
-        Ok(resp)
+    pub(crate) async fn send(&self, client: &ZulipClient) -> anyhow::Result<MessageApiResponse> {
+        client.send_message(self.recipient, self.content).await
     }
-}
-
-#[derive(Debug, serde::Deserialize)]
-pub struct MessageApiResponse {
-    #[serde(rename = "id")]
-    pub message_id: u64,
 }
 
 #[derive(Debug)]
@@ -927,46 +715,15 @@ pub struct UpdateMessageApiRequest<'a> {
 }
 
 impl<'a> UpdateMessageApiRequest<'a> {
-    pub async fn send(&self, client: &reqwest::Client) -> anyhow::Result<()> {
-        let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
-
-        #[derive(serde::Serialize)]
-        struct SerializedApi<'a> {
-            #[serde(skip_serializing_if = "Option::is_none")]
-            pub topic: Option<&'a str>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            pub propagate_mode: Option<&'a str>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            pub content: Option<&'a str>,
-        }
-
-        let resp = client
-            .patch(&format!(
-                "{}/api/v1/messages/{}",
-                *ZULIP_URL, self.message_id
-            ))
-            .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
-            .form(&SerializedApi {
-                topic: self.topic,
-                propagate_mode: self.propagate_mode,
-                content: self.content,
-            })
-            .send()
+    pub async fn send(&self, client: &ZulipClient) -> anyhow::Result<()> {
+        client
+            .update_message(
+                self.message_id,
+                self.topic,
+                self.propagate_mode,
+                self.content,
+            )
             .await
-            .context("failed to send Zulip API Update Message")?;
-
-        let status = resp.status();
-
-        if !status.is_success() {
-            let body = resp
-                .text()
-                .await
-                .context("fail receiving Zulip API response (when updating the message)")?;
-
-            anyhow::bail!(body)
-        }
-
-        Ok(())
     }
 }
 
@@ -1139,31 +896,8 @@ struct AddReaction<'a> {
 }
 
 impl<'a> AddReaction<'a> {
-    pub async fn send(self, client: &reqwest::Client) -> anyhow::Result<()> {
-        let bot_api_token = env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN");
-
-        let resp = client
-            .post(&format!(
-                "{}/api/v1/messages/{}/reactions",
-                *ZULIP_URL, self.message_id
-            ))
-            .basic_auth(&*ZULIP_BOT_EMAIL, Some(&bot_api_token))
-            .form(&self)
-            .send()
-            .await?;
-
-        let status = resp.status();
-
-        if !status.is_success() {
-            let body = resp
-                .text()
-                .await
-                .context("fail receiving Zulip API response (when adding a reaction)")?;
-
-            anyhow::bail!(body)
-        }
-
-        Ok(())
+    pub async fn send(self, client: &ZulipClient) -> anyhow::Result<()> {
+        client.add_reaction(self.message_id, self.emoji_name).await
     }
 }
 
@@ -1216,7 +950,7 @@ async fn post_waiter(
         },
         content: waiting.primary,
     }
-    .send(ctx.github.raw())
+    .send(&ctx.zulip)
     .await?;
 
     for reaction in waiting.emoji {
@@ -1224,7 +958,7 @@ async fn post_waiter(
             message_id: posted.message_id,
             emoji_name: reaction,
         }
-        .send(&ctx.github.raw())
+        .send(&ctx.zulip)
         .await
         .context("emoji reaction failed")?;
     }
@@ -1232,10 +966,11 @@ async fn post_waiter(
     Ok(None)
 }
 
-fn trigger_docs_update(message: &Message) -> anyhow::Result<Option<String>> {
+fn trigger_docs_update(message: &Message, zulip: &ZulipClient) -> anyhow::Result<Option<String>> {
     let message = message.clone();
     // The default Zulip timeout of 10 seconds can be too short, so process in
     // the background.
+    let zulip = zulip.clone();
     tokio::task::spawn(async move {
         let response = match docs_update().await {
             Ok(None) => "No updates found.".to_string(),
@@ -1251,7 +986,7 @@ fn trigger_docs_update(message: &Message) -> anyhow::Result<Option<String>> {
             recipient,
             content: &response,
         };
-        if let Err(e) = message.send(&reqwest::Client::new()).await {
+        if let Err(e) = message.send(&zulip).await {
             log::error!("failed to send Zulip response: {e:?}\nresponse was:\n{response}");
         }
     });

@@ -17,6 +17,7 @@ use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
 use triagebot::jobs::{
     default_jobs, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS,
 };
+use triagebot::zulip::client::ZulipClient;
 use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
 
 async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
@@ -248,6 +249,7 @@ async fn serve_req(
 
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     let gh = github::GithubClient::new_from_env();
+    let zulip = ZulipClient::new_from_env();
     let oc = octocrab::OctocrabBuilder::new()
         .personal_token(github::default_token_from_env())
         .build()
@@ -291,6 +293,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         github: gh,
         octocrab: oc,
         workqueue: Arc::new(RwLock::new(workqueue)),
+        zulip,
     });
 
     // Run all jobs that have a schedule (recurring jobs)

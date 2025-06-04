@@ -1,3 +1,4 @@
+use crate::zulip::api::Recipient;
 use crate::{
     config::{NotifyZulipConfig, NotifyZulipLabelConfig, NotifyZulipTablesConfig},
     github::{Issue, IssuesAction, IssuesEvent, Label},
@@ -208,7 +209,7 @@ pub(super) async fn handle_input<'a>(
                 NotificationType::Reopened => &config.messages_on_reopen,
             };
 
-            let recipient = crate::zulip::Recipient::Stream {
+            let recipient = Recipient::Stream {
                 id: config.zulip_stream,
                 topic: &topic,
             };
@@ -222,7 +223,7 @@ pub(super) async fn handle_input<'a>(
                     recipient,
                     content: &msg,
                 }
-                .send(&ctx.github.raw())
+                .send(&ctx.zulip)
                 .await;
 
                 if let Err(err) = req {
