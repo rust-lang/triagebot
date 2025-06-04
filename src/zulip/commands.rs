@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 /// Command sent in a DM with triagebot on Zulip.
 #[derive(clap::Parser, Debug)]
+#[clap(override_usage("<command>"))]
 pub enum ChatCommand {
     /// Acknowledge a notification
     #[clap(alias = "ack")]
@@ -137,6 +138,7 @@ impl FromStr for IdentifierCli {
 
 /// Command sent in a Zulip stream after `@**triagebot**`.
 #[derive(clap::Parser, Debug)]
+#[clap(override_usage = "`@triagebot <command>`")]
 pub enum StreamCommand {
     /// End the current topic.
     #[clap(alias = "await")]
