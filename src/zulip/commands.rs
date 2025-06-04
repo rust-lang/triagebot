@@ -1,11 +1,12 @@
 use crate::db::notifications::Identifier;
 use crate::db::review_prefs::RotationMode;
+use clap::{ColorChoice, Parser};
 use std::num::NonZeroU32;
 use std::str::FromStr;
 
 /// Command sent in a DM with triagebot on Zulip.
 #[derive(clap::Parser, Debug)]
-#[clap(override_usage("<command>"))]
+#[clap(override_usage("<command>"), disable_colored_help(true))]
 pub enum ChatCommand {
     /// Acknowledge a notification
     #[clap(alias = "ack")]
@@ -138,7 +139,7 @@ impl FromStr for IdentifierCli {
 
 /// Command sent in a Zulip stream after `@**triagebot**`.
 #[derive(clap::Parser, Debug)]
-#[clap(override_usage = "`@triagebot <command>`")]
+#[clap(override_usage("`@triagebot <command>`"), disable_colored_help(true))]
 pub enum StreamCommand {
     /// End the current topic.
     #[clap(alias = "await")]
@@ -156,4 +157,13 @@ pub enum StreamCommand {
     },
     /// Update docs
     DocsUpdate,
+}
+
+/// Helper function to parse CLI arguments without any colored help or error output.
+pub fn parse_no_color<'a, T: Parser, I: Iterator<Item = &'a str>>(input: I) -> anyhow::Result<T> {
+    let matches = T::command()
+        .color(ColorChoice::Never)
+        .try_get_matches_from(input)?;
+    let value = T::from_arg_matches(&matches)?;
+    Ok(value)
 }
