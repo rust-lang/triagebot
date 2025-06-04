@@ -11,6 +11,12 @@ pub enum ChatCommand {
         /// Notification identifier. `*`, `all`, non-zero index or a URL.
         identifier: IdentifierCli,
     },
+    /// Add a notification
+    Add {
+        url: String,
+        #[clap(trailing_var_args(true))]
+        description: Vec<String>,
+    },
     /// Output your membership in Rust teams.
     Whoami,
     /// Perform lookup of GitHub or Zulip username.

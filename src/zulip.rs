@@ -17,6 +17,7 @@ use crate::zulip::client::ZulipClient;
 use crate::zulip::commands::{ChatCommand, LookupCmd, WorkqueueCmd, WorkqueueLimit};
 use anyhow::{format_err, Context as _};
 use clap::Parser;
+use postgres_types::ToSql;
 use rust_team_data::v1::TeamKind;
 use std::fmt::Write as _;
 use std::str::FromStr;
@@ -199,6 +200,9 @@ fn handle_command<'a>(
             match cmd {
                 ChatCommand::Acknowledge { identifier } => {
                     acknowledge(&ctx, gh_id, identifier.into()).await
+                }
+                ChatCommand::Add { url, description } => {
+                    add_notification(&ctx, gh_id, &url, &description.join(" ")).await
                 }
                 ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
                 ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
@@ -730,22 +734,14 @@ async fn acknowledge(
 async fn add_notification(
     ctx: &Context,
     gh_id: u64,
-    mut words: impl Iterator<Item = &str>,
+    url: &str,
+    description: &str,
 ) -> anyhow::Result<Option<String>> {
-    let url = match words.next() {
-        Some(idx) => idx,
-        None => anyhow::bail!("url not present"),
-    };
-    let mut description = words.fold(String::new(), |mut acc, piece| {
-        acc.push_str(piece);
-        acc.push(' ');
-        acc
-    });
+    let description = description.trim();
     let description = if description.is_empty() {
         None
     } else {
-        assert_eq!(description.pop(), Some(' ')); // pop trailing space
-        Some(description)
+        Some(description.to_string())
     };
     match record_ping(
         &*ctx.db.get().await,
