@@ -5,7 +5,7 @@ use std::num::NonZeroU32;
 use std::str::FromStr;
 
 /// Command sent in a DM with triagebot on Zulip.
-#[derive(clap::Parser, Debug)]
+#[derive(clap::Parser, Debug, PartialEq)]
 #[clap(override_usage("<command>"), disable_colored_help(true))]
 pub enum ChatCommand {
     /// Acknowledge a notification
@@ -38,7 +38,7 @@ pub enum ChatCommand {
     Work(WorkqueueCmd),
 }
 
-#[derive(clap::Parser, Debug)]
+#[derive(clap::Parser, Debug, PartialEq)]
 pub enum LookupCmd {
     /// Try to find the Zulip name of a user with the provided GitHub username.
     Zulip {
@@ -54,7 +54,7 @@ pub enum LookupCmd {
     },
 }
 
-#[derive(clap::Parser, Debug)]
+#[derive(clap::Parser, Debug, PartialEq)]
 pub enum WorkqueueCmd {
     /// Show the current state of your workqueue
     Show,
@@ -70,7 +70,7 @@ pub enum WorkqueueCmd {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum WorkqueueLimit {
     Unlimited,
     Limit(u32),
@@ -82,14 +82,16 @@ impl FromStr for WorkqueueLimit {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "unlimited" => Ok(Self::Unlimited),
-            v => v.parse::<u32>().map_err(|_|
-                                              "Wrong parameter format. Must be a positive integer or `unlimited` to unset the limit.".to_string(),
-            ).map(WorkqueueLimit::Limit)
+            v => {
+                v.parse::<u32>()
+                    .map_err(|_| "Wrong parameter format. Must be a positive integer or `unlimited` to unset the limit.".to_string())
+                    .map(WorkqueueLimit::Limit)
+            }
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RotationModeCli(pub RotationMode);
 
 impl FromStr for RotationModeCli {
@@ -104,7 +106,7 @@ impl FromStr for RotationModeCli {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IdentifierCli {
     Url(String),
     Index(NonZeroU32),
@@ -138,7 +140,7 @@ impl FromStr for IdentifierCli {
 }
 
 /// Command sent in a Zulip stream after `@**triagebot**`.
-#[derive(clap::Parser, Debug)]
+#[derive(clap::Parser, Debug, PartialEq)]
 #[clap(override_usage("`@triagebot <command>`"), disable_colored_help(true))]
 pub enum StreamCommand {
     /// End the current topic.
@@ -160,10 +162,102 @@ pub enum StreamCommand {
 }
 
 /// Helper function to parse CLI arguments without any colored help or error output.
-pub fn parse_no_color<'a, T: Parser, I: Iterator<Item = &'a str>>(input: I) -> anyhow::Result<T> {
+pub fn parse_cli<'a, T: Parser, I: Iterator<Item = &'a str>>(input: I) -> anyhow::Result<T> {
+    // Add a fake first argument, which is expected by clap
+    let input = std::iter::once("triagebot").chain(input);
+
     let matches = T::command()
         .color(ColorChoice::Never)
         .try_get_matches_from(input)?;
     let value = T::from_arg_matches(&matches)?;
     Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn acknowledge_command() {
+        assert_eq!(
+            parse_chat(&["acknowledge", "1"]),
+            ChatCommand::Acknowledge {
+                identifier: IdentifierCli::Index(NonZeroU32::new(1).unwrap())
+            }
+        );
+    }
+
+    #[test]
+    fn add_command() {
+        assert_eq!(
+            parse_chat(&["add", "https://example.com", "test", "description"]),
+            ChatCommand::Add {
+                url: "https://example.com".to_string(),
+                description: vec!["test".to_string(), "description".to_string()]
+            }
+        );
+    }
+
+    #[test]
+    fn move_command() {
+        assert_eq!(
+            parse_chat(&["move", "1", "2"]),
+            ChatCommand::Move { from: 1, to: 2 }
+        );
+    }
+
+    #[test]
+    fn meta_command() {
+        assert_eq!(
+            parse_chat(&["meta", "1", "test", "meta"]),
+            ChatCommand::Meta {
+                index: 1,
+                description: vec!["test".to_string(), "meta".to_string()]
+            }
+        );
+    }
+
+    #[test]
+    fn whoami_command() {
+        assert_eq!(parse_chat(&["whoami"]), ChatCommand::Whoami);
+    }
+
+    #[test]
+    fn lookup_command() {
+        assert_eq!(
+            parse_chat(&["lookup", "zulip", "username"]),
+            ChatCommand::Lookup(LookupCmd::Zulip {
+                github_username: "username".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn work_command() {
+        assert_eq!(
+            parse_chat(&["work", "show"]),
+            ChatCommand::Work(WorkqueueCmd::Show)
+        );
+
+        assert_eq!(
+            parse_chat(&["work", "set-pr-limit", "unlimited"]),
+            ChatCommand::Work(WorkqueueCmd::SetPrLimit {
+                limit: WorkqueueLimit::Unlimited
+            })
+        );
+    }
+
+    #[test]
+    fn end_meeting_command() {
+        assert_eq!(parse_stream(&["end-meeting"]), StreamCommand::EndMeeting);
+        assert_eq!(parse_stream(&["await"]), StreamCommand::EndTopic);
+    }
+
+    fn parse_chat(input: &[&str]) -> ChatCommand {
+        parse_cli::<ChatCommand, _>(input.into_iter().copied()).unwrap()
+    }
+
+    fn parse_stream(input: &[&str]) -> StreamCommand {
+        parse_cli::<StreamCommand, _>(input.into_iter().copied()).unwrap()
+    }
 }

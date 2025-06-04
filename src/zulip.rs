@@ -15,7 +15,7 @@ use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
 use crate::zulip::commands::{
-    parse_no_color, ChatCommand, LookupCmd, StreamCommand, WorkqueueCmd, WorkqueueLimit,
+    parse_cli, ChatCommand, LookupCmd, StreamCommand, WorkqueueCmd, WorkqueueLimit,
 };
 use anyhow::{format_err, Context as _};
 use rust_team_data::v1::TeamKind;
@@ -193,7 +193,7 @@ fn handle_command<'a>(
 
         // Missing stream means that this is a direct message
         if message_data.stream_id.is_none() {
-            let cmd = parse_no_color::<ChatCommand, _>(words.into_iter())?;
+            let cmd = parse_cli::<ChatCommand, _>(words.into_iter())?;
             match cmd {
                 ChatCommand::Acknowledge { identifier } => {
                     acknowledge(&ctx, gh_id, (&identifier).into()).await
@@ -219,7 +219,7 @@ fn handle_command<'a>(
             if cmd_index >= words.len() {
                 return Ok(Some("Unknown command".to_string()));
             }
-            let cmd = parse_no_color::<StreamCommand, _>(words[cmd_index..].into_iter().copied())?;
+            let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].into_iter().copied())?;
             match cmd {
                 StreamCommand::EndTopic => {
                     post_waiter(&ctx, message_data, WaitingMessage::end_topic())
