@@ -14,7 +14,7 @@ use crate::team_data::{people, teams};
 use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
-use crate::zulip::commands::{ChatCommand, LookupCmd, WorkqueueCmd, WorkqueueLimit};
+use crate::zulip::commands::{ChatCommand, LookupCmd, StreamCommand, WorkqueueCmd, WorkqueueLimit};
 use anyhow::{format_err, Context as _};
 use clap::Parser;
 use rust_team_data::v1::TeamKind;
@@ -180,12 +180,10 @@ fn handle_command<'a>(
 {
     Box::pin(async move {
         log::trace!("handling zulip command {:?}", command);
-        let mut words = command.split_whitespace().peekable();
-        let mut next = words.peek();
+        let words: Vec<&str> = command.split_whitespace().collect();
 
-        if let Some(&"as") = next {
-            words.next(); // skip `as`
-            return execute_for_other_user(&ctx, words, message_data)
+        if let Some(&"as") = words.get(0) {
+            return execute_for_other_user(&ctx, words.iter().skip(1).copied(), message_data)
                 .await
                 .map_err(|e| {
                     format_err!("Failed to parse; expected `as <username> <command...>`: {e:?}.")
@@ -211,97 +209,56 @@ fn handle_command<'a>(
                 ChatCommand::Work(cmd) => workqueue_commands(ctx, gh_id, cmd).await,
             }
         } else {
-            todo!()
+            // We are in a stream, where someone wrote `@**triagebot** <command(s)>`
+            let cmd_index = words
+                .iter()
+                .position(|w| *w == "@**triagebot**")
+                .unwrap_or(words.len());
+            let cmd_index = cmd_index + 1;
+            if cmd_index >= words.len() {
+                return Ok(Some("Unknown command".to_string()));
+            }
+            let cmd = StreamCommand::try_parse_from(&words[cmd_index..])?;
+            match cmd {
+                StreamCommand::EndTopic => {
+                    post_waiter(&ctx, message_data, WaitingMessage::end_topic())
+                        .await
+                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                }
+                StreamCommand::EndMeeting => {
+                    post_waiter(&ctx, message_data, WaitingMessage::end_meeting())
+                        .await
+                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                }
+                StreamCommand::Read => {
+                    post_waiter(&ctx, message_data, WaitingMessage::start_reading())
+                        .await
+                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                }
+                StreamCommand::PingGoals {
+                    threshold,
+                    next_update,
+                } => {
+                    if project_goals::check_project_goal_acl(&ctx.github, gh_id).await? {
+                        ping_project_goals_owners(
+                            &ctx.github,
+                            &ctx.zulip,
+                            false,
+                            threshold as i64,
+                            &format!("on {next_update}"),
+                        )
+                        .await
+                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))?;
+                        Ok(None)
+                    } else {
+                        Err(format_err!(
+                            "That command is only permitted for those running the project-goal program.",
+                        ))
+                    }
+                }
+                StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
+            }
         }
-
-        // match next {
-        //     Some("acknowledge") | Some("ack") => acknowledge(&ctx, gh_id, words).await
-        //         .map_err(|e| format_err!("Failed to parse acknowledgement, expected `(acknowledge|ack) <identifier>`: {e:?}.")),
-        //     Some("add") => add_notification(&ctx, gh_id, words).await
-        //         .map_err(|e| format_err!("Failed to parse description addition, expected `add <url> <description (multiple words)>`: {e:?}.")),
-        //     Some("move") => move_notification(&ctx, gh_id, words).await
-        //         .map_err(|e| format_err!("Failed to parse movement, expected `move <from> <to>`: {e:?}.")),
-        //     Some("meta") => add_meta_notification(&ctx, gh_id, words).await
-        //         .map_err(|e| format_err!("Failed to parse `meta` command. Synopsis: meta <num> <text>: Add <text> to your notification identified by <num> (>0)\n\nError: {e:?}")),
-        //     Some("whoami") => whoami_cmd(&ctx, gh_id, words).await
-        //         .map_err(|e| format_err!("Failed to run the `whoami` command. Synopsis: whoami: Show to which Rust teams you are a part of\n\nError: {e:?}")),
-        //     Some("lookup") => lookup_cmd(&ctx, words).await
-        //         .map_err(|e| format_err!("Failed to run the `lookup` command. Synopsis: lookup (github <zulip-username>|zulip <github-username>): Show the GitHub username of a Zulip <user> or the Zulip username of a GitHub user\n\nError: {e:?}")),
-        //     Some("work") => workqueue_commands(ctx, gh_id, words).await
-        //                                                             .map_err(|e| format_err!("Failed to parse `work` command. Help: {WORKQUEUE_HELP}\n\nError: {e:?}")),
-        //     _ => {
-        //         while let Some(word) = next {
-        //             if word == "@**triagebot**" {
-        //                 let next = words.next();
-        //                 match next {
-        //                     Some("end-topic") | Some("await") => {
-        //                         return post_waiter(&ctx, message_data, WaitingMessage::end_topic())
-        //                             .await
-        //                             .map_err(|e| {
-        //                                 format_err!("Failed to await at this time: {e:?}")
-        //                             })
-        //                     }
-        //                     Some("end-meeting") => {
-        //                         return post_waiter(
-        //                             &ctx,
-        //                             message_data,
-        //                             WaitingMessage::end_meeting(),
-        //                         )
-        //                         .await
-        //                         .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
-        //                     }
-        //                     Some("read") => {
-        //                         return post_waiter(
-        //                             &ctx,
-        //                             message_data,
-        //                             WaitingMessage::start_reading(),
-        //                         )
-        //                         .await
-        //                         .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
-        //                     }
-        //                     Some("ping-goals") => {
-        //                         let usage_err = |description: &str| Err(format_err!(
-        //                             "Error: {description}\n\
-        //                             \n\
-        //                             Usage: triagebot ping-goals D N, where:\n\
-        //                             \n\
-        //                              * D is the number of days before an update is considered stale\n\
-        //                              * N is the date of next update, like \"Sep-5\"\n",
-        //                         ));
-        //
-        //                         let Some(threshold) = words.next() else {
-        //                             return usage_err("expected number of days");
-        //                         };
-        //                         let threshold = match i64::from_str(threshold) {
-        //                             Ok(v) => v,
-        //                             Err(e) => return usage_err(&format!("ill-formed number of days, {e}")),
-        //                         };
-        //
-        //                         let Some(next_update) = words.next() else {
-        //                             return usage_err("expected date of next update");
-        //                         };
-        //
-        //                         if project_goals::check_project_goal_acl(&ctx.github, gh_id).await? {
-        //                             ping_project_goals_owners(&ctx.github, &ctx.zulip, false, threshold, &format!("on {next_update}"))
-        //                                 .await
-        //                                 .map_err(|e| format_err!("Failed to await at this time: {e:?}"))?;
-        //                             return Ok(None);
-        //                         } else {
-        //                             return Err(format_err!(
-        //                                 "That command is only permitted for those running the project-goal program.",
-        //                             ));
-        //                         }
-        //                     }
-        //                     Some("docs-update") => return trigger_docs_update(message_data, &ctx.zulip),
-        //                     _ => {}
-        //                 }
-        //             }
-        //             next = words.next();
-        //         }
-        //
-        //         Ok(Some(String::from("Unknown command")))
-        //     }
-        // }
     })
 }
 

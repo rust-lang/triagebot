@@ -3,6 +3,7 @@ use crate::db::review_prefs::RotationMode;
 use std::num::NonZeroU32;
 use std::str::FromStr;
 
+/// Command sent in a DM with triagebot on Zulip.
 #[derive(clap::Parser, Debug)]
 pub enum ChatCommand {
     /// Acknowledge a notification
@@ -132,4 +133,25 @@ impl FromStr for IdentifierCli {
             },
         }
     }
+}
+
+/// Command sent in a Zulip stream after `@**triagebot**`.
+#[derive(clap::Parser, Debug)]
+pub enum StreamCommand {
+    /// End the current topic.
+    #[clap(alias = "await")]
+    EndTopic,
+    /// End the current meeting.
+    EndMeeting,
+    /// Read a document.
+    Read,
+    /// Ping project goal owners.
+    PingGoals {
+        /// Number of days before an update is considered stale
+        threshold: u64,
+        /// Date of next update
+        next_update: String,
+    },
+    /// Update docs
+    DocsUpdate,
 }
