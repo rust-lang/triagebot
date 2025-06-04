@@ -204,6 +204,7 @@ fn handle_command<'a>(
                 ChatCommand::Add { url, description } => {
                     add_notification(&ctx, gh_id, &url, &description.join(" ")).await
                 }
+                ChatCommand::Move { from, to } => move_notification(&ctx, gh_id, from, to).await,
                 ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
                 ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
                 ChatCommand::Work(cmd) => workqueue_commands(ctx, gh_id, cmd).await,
@@ -796,24 +797,13 @@ async fn add_meta_notification(
 async fn move_notification(
     ctx: &Context,
     gh_id: u64,
-    mut words: impl Iterator<Item = &str>,
+    from: u32,
+    to: u32,
 ) -> anyhow::Result<Option<String>> {
-    let from = match words.next() {
-        Some(idx) => idx,
-        None => anyhow::bail!("from idx not present"),
-    };
-    let to = match words.next() {
-        Some(idx) => idx,
-        None => anyhow::bail!("from idx not present"),
-    };
     let from = from
-        .parse::<u32>()
-        .context("from index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
     let to = to
-        .parse::<u32>()
-        .context("to index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
     match move_indices(&mut *ctx.db.get().await, gh_id, from, to).await {

@@ -17,6 +17,8 @@ pub enum ChatCommand {
         #[clap(trailing_var_args(true))]
         description: Vec<String>,
     },
+    /// Move a notification
+    Move { from: u32, to: u32 },
     /// Output your membership in Rust teams.
     Whoami,
     /// Perform lookup of GitHub or Zulip username.
