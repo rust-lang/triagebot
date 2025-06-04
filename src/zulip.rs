@@ -205,16 +205,16 @@ async fn handle_command<'a>(
         }
 
         let cmd = parse_cli::<ChatCommand, _>(words.into_iter())?;
-        let output = match cmd {
+        let output = match &cmd {
             ChatCommand::Acknowledge { identifier } => {
-                acknowledge(&ctx, gh_id, (&identifier).into()).await
+                acknowledge(&ctx, gh_id, identifier.into()).await
             }
             ChatCommand::Add { url, description } => {
                 add_notification(&ctx, gh_id, &url, &description.join(" ")).await
             }
-            ChatCommand::Move { from, to } => move_notification(&ctx, gh_id, from, to).await,
+            ChatCommand::Move { from, to } => move_notification(&ctx, gh_id, *from, *to).await,
             ChatCommand::Meta { index, description } => {
-                add_meta_notification(&ctx, gh_id, index, &description.join(" ")).await
+                add_meta_notification(&ctx, gh_id, *index, &description.join(" ")).await
             }
             ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
             ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
@@ -223,8 +223,8 @@ async fn handle_command<'a>(
 
         let output = output?;
 
-        // Let the impersonated person know about the impersonation
-        if impersonated {
+        // Let the impersonated person know about the impersonation if the command was sensitive
+        if impersonated && is_sensitive_command(&cmd) {
             let impersonated_zulip_id = to_zulip_id(&ctx.github, gh_id)
                 .await?
                 .ok_or_else(|| anyhow::anyhow!("Zulip user for GitHub ID {gh_id} was not found"))?;
@@ -301,12 +301,30 @@ async fn handle_command<'a>(
     }
 }
 
+/// Returns true if we should notify user who was impersonated by someone who executed this command.
+/// More or less, the following holds: `sensitive` == `not read-only`.
+fn is_sensitive_command(cmd: &ChatCommand) -> bool {
+    match cmd {
+        ChatCommand::Acknowledge { .. }
+        | ChatCommand::Add { .. }
+        | ChatCommand::Move { .. }
+        | ChatCommand::Meta { .. } => true,
+        ChatCommand::Whoami => false,
+        ChatCommand::Lookup(_) => false,
+        ChatCommand::Work(cmd) => match cmd {
+            WorkqueueCmd::Show => false,
+            WorkqueueCmd::SetPrLimit { .. } => true,
+            WorkqueueCmd::SetRotationMode { .. } => true,
+        },
+    }
+}
+
 /// Commands for working with the workqueue, e.g. showing how many PRs are assigned
 /// or modifying the PR review assignment limit.
 async fn workqueue_commands(
     ctx: &Context,
     gh_id: u64,
-    cmd: WorkqueueCmd,
+    cmd: &WorkqueueCmd,
 ) -> anyhow::Result<Option<String>> {
     let db_client = ctx.db.get().await;
 
@@ -364,7 +382,7 @@ async fn workqueue_commands(
         WorkqueueCmd::SetPrLimit { limit } => {
             let max_assigned_prs = match limit {
                 WorkqueueLimit::Unlimited => None,
-                WorkqueueLimit::Limit(limit) => Some(limit),
+                WorkqueueLimit::Limit(limit) => Some(*limit),
             };
             upsert_review_prefs(
                 &db_client,
@@ -457,7 +475,7 @@ async fn whoami_cmd(ctx: &Context, gh_id: u64) -> anyhow::Result<Option<String>>
     Ok(Some(output))
 }
 
-async fn lookup_cmd(ctx: &Context, cmd: LookupCmd) -> anyhow::Result<Option<String>> {
+async fn lookup_cmd(ctx: &Context, cmd: &LookupCmd) -> anyhow::Result<Option<String>> {
     let username = match &cmd {
         LookupCmd::Zulip { github_username } => github_username.clone(),
         // Usernames could contain spaces, so rejoin everything to serve as the username.
