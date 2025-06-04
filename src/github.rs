@@ -3,7 +3,6 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::{future::BoxFuture, FutureExt};
-use hyper::header::HeaderValue;
 use octocrab::models::{Author, AuthorAssociation};
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
@@ -476,8 +475,6 @@ pub struct Comment {
     pub body: String,
     pub html_url: String,
     pub user: User,
-    #[serde(default, alias = "submitted_at")] // for pull request reviews
-    pub created_at: chrono::DateTime<Utc>,
     #[serde(default, alias = "submitted_at")] // for pull request reviews
     pub updated_at: chrono::DateTime<Utc>,
     #[serde(default, rename = "state")]
@@ -2398,7 +2395,8 @@ trait RequestSend: Sized {
 
 impl RequestSend for RequestBuilder {
     fn configure(self, g: &GithubClient) -> RequestBuilder {
-        let mut auth = HeaderValue::from_maybe_shared(format!("token {}", g.token)).unwrap();
+        let mut auth =
+            reqwest::header::HeaderValue::from_maybe_shared(format!("token {}", g.token)).unwrap();
         auth.set_sensitive(true);
         self.header(USER_AGENT, "rust-lang-triagebot")
             .header(AUTHORIZATION, &auth)
