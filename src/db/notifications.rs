@@ -27,7 +27,7 @@ pub async fn record_ping(db: &DbClient, notification: &Notification) -> anyhow::
     Ok(())
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Identifier<'a> {
     Url(&'a str),
     Index(std::num::NonZeroU32),

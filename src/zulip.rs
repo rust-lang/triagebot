@@ -197,7 +197,9 @@ fn handle_command<'a>(
         if message_data.stream_id.is_none() {
             let cmd = ChatCommand::try_parse_from(words)?;
             match cmd {
-                ChatCommand::Acknowledge => acknowledge(&ctx, gh_id).await,
+                ChatCommand::Acknowledge { identifier } => {
+                    acknowledge(&ctx, gh_id, identifier.into()).await
+                }
                 ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
                 ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
                 ChatCommand::Work(cmd) => workqueue_commands(ctx, gh_id, cmd).await,
@@ -695,37 +697,15 @@ impl<'a> UpdateMessageApiRequest<'a> {
 async fn acknowledge(
     ctx: &Context,
     gh_id: u64,
-    mut words: impl Iterator<Item = &str>,
+    ident: Identifier,
 ) -> anyhow::Result<Option<String>> {
-    let filter = match words.next() {
-        Some(filter) => {
-            if words.next().is_some() {
-                anyhow::bail!("too many words");
-            }
-            filter
-        }
-        None => anyhow::bail!("not enough words"),
-    };
-    let ident = if let Ok(number) = filter.parse::<u32>() {
-        Identifier::Index(
-            std::num::NonZeroU32::new(number)
-                .ok_or_else(|| anyhow::anyhow!("index must be at least 1"))?,
-        )
-    } else if filter == "all" || filter == "*" {
-        Identifier::All
-    } else {
-        Identifier::Url(filter)
-    };
     let mut db = ctx.db.get().await;
     let deleted = delete_ping(&mut *db, gh_id, ident)
         .await
         .map_err(|e| format_err!("Failed to acknowledge {filter}: {e:?}."))?;
 
     let resp = if deleted.is_empty() {
-        format!(
-            "No notifications matched `{}`, so none were deleted.",
-            filter
-        )
+        format!("No notifications matched `{ident:?}`, so none were deleted.")
     } else {
         let mut resp = String::from("Acknowledged:\n");
         for deleted in deleted {

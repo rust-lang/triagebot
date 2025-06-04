@@ -1,8 +1,16 @@
+use crate::db::notifications::Identifier;
 use crate::db::review_prefs::RotationMode;
+use std::num::NonZeroU32;
 use std::str::FromStr;
 
 #[derive(clap::Parser, Debug)]
 pub enum ChatCommand {
+    /// Acknowledge a notification
+    #[clap(alias = "ack")]
+    Acknowledge {
+        /// Notification identifier. `*`, `all`, non-zero index or a URL.
+        identifier: IdentifierCli,
+    },
     /// Output your membership in Rust teams.
     Whoami,
     /// Perform lookup of GitHub or Zulip username.
@@ -75,6 +83,39 @@ impl FromStr for RotationModeCli {
             "on" => Ok(Self(RotationMode::OnRotation)),
             "off" => Ok(Self(RotationMode::OffRotation)),
             _ => Err("Invalid value for rotation mode. Must be `on` or `off`.".to_string()),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum IdentifierCli {
+    Url(String),
+    Index(NonZeroU32),
+    All,
+}
+
+impl<'a> From<&'a IdentifierCli> for Identifier<'a> {
+    fn from(value: &'a IdentifierCli) -> Self {
+        match value {
+            IdentifierCli::Url(url) => Self::Url(&url),
+            IdentifierCli::Index(index) => Self::Index(*index),
+            IdentifierCli::All => Self::All,
+        }
+    }
+}
+
+impl FromStr for IdentifierCli {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "all" | "*" => Ok(Self::All),
+            v => match v.parse::<u32>() {
+                Ok(v) => NonZeroU32::new(v)
+                    .ok_or_else(|e| "index must be at least 1".to_string())
+                    .map(Self::Index),
+                Err(_) => Ok(Self::Url(v.to_string())),
+            },
         }
     }
 }
