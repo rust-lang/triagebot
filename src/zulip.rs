@@ -151,14 +151,18 @@ async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Op
         anyhow::bail!("Invalid authorization.");
     }
 
-    log::trace!("zulip hook: {:?}", req);
+    log::trace!("zulip hook: {req:?}");
+
+    // Zulip commands are only available to users in the team database
     let gh_id = match to_github_id(&ctx.github, req.message.sender_id).await {
-        Ok(Some(gh_id)) => Ok(gh_id),
-        Ok(None) => Err(format_err!(
-            "Unknown Zulip user. Please add `zulip-id = {}` to your file in \
+        Ok(Some(gh_id)) => gh_id,
+        Ok(None) => {
+            return Err(anyhow::anyhow!(
+                "Unknown Zulip user. Please add `zulip-id = {}` to your file in \
                 [rust-lang/team](https://github.com/rust-lang/team).",
-            req.message.sender_id
-        )),
+                req.message.sender_id
+            ))
+        }
         Err(e) => anyhow::bail!("Failed to query team API: {e:?}"),
     };
 
@@ -171,7 +175,7 @@ const WORKQUEUE_HELP: &str = r#"`work show`: show your assigned PRs
 
 fn handle_command<'a>(
     ctx: &'a Context,
-    gh_id: anyhow::Result<u64>,
+    gh_id: u64,
     words: &'a str,
     message_data: &'a Message,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Option<String>>> + Send + 'a>>
@@ -188,7 +192,6 @@ fn handle_command<'a>(
                     format_err!("Failed to parse; expected `as <username> <command...>`: {e:?}.")
                 });
         }
-        let gh_id = gh_id?;
 
         match next {
             Some("acknowledge") | Some("ack") => acknowledge(&ctx, gh_id, words).await
@@ -665,7 +668,7 @@ async fn execute_for_other_user(
         .find(|m| m.user_id == zulip_user_id)
         .ok_or_else(|| format_err!("Could not find Zulip user email."))?;
 
-    let output = handle_command(ctx, Ok(user_id), &command, message_data)
+    let output = handle_command(ctx, user_id, &command, message_data)
         .await?
         .unwrap_or_default();
 
