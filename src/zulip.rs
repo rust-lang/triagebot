@@ -172,95 +172,133 @@ async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Op
     handle_command(ctx, gh_id, &req.data, &req.message).await
 }
 
-fn handle_command<'a>(
+async fn handle_command<'a>(
     ctx: &'a Context,
-    gh_id: u64,
+    mut gh_id: u64,
     command: &'a str,
     message_data: &'a Message,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Option<String>>> + Send + 'a>>
-{
-    Box::pin(async move {
-        log::trace!("handling zulip command {:?}", command);
-        let words: Vec<&str> = command.split_whitespace().collect();
+) -> anyhow::Result<Option<String>> {
+    log::trace!("handling zulip command {:?}", command);
+    let words: Vec<&str> = command.split_whitespace().collect();
 
+    // Missing stream means that this is a direct message
+    if message_data.stream_id.is_none() {
+        // Handle impersonation
+        let mut impersonated = false;
         if let Some(&"as") = words.get(0) {
-            return execute_for_other_user(&ctx, words.iter().skip(1).copied(), message_data)
-                .await
-                .map_err(|e| {
-                    format_err!("Failed to parse; expected `as <username> <command...>`: {e:?}.")
-                });
+            if let Some(username) = words.get(1) {
+                impersonated = true;
+
+                // Impersonate => change actual gh_id
+                gh_id = match get_id_for_username(&ctx.github, username)
+                    .await
+                    .context("getting ID of github user")?
+                {
+                    Some(id) => id.try_into().unwrap(),
+                    None => anyhow::bail!("Can only authorize for other GitHub users."),
+                };
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Failed to parse command; expected `as <username> <command...>`."
+                ));
+            }
         }
 
-        // Missing stream means that this is a direct message
-        if message_data.stream_id.is_none() {
-            let cmd = parse_cli::<ChatCommand, _>(words.into_iter())?;
-            match cmd {
-                ChatCommand::Acknowledge { identifier } => {
-                    acknowledge(&ctx, gh_id, (&identifier).into()).await
-                }
-                ChatCommand::Add { url, description } => {
-                    add_notification(&ctx, gh_id, &url, &description.join(" ")).await
-                }
-                ChatCommand::Move { from, to } => move_notification(&ctx, gh_id, from, to).await,
-                ChatCommand::Meta { index, description } => {
-                    add_meta_notification(&ctx, gh_id, index, &description.join(" ")).await
-                }
-                ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
-                ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
-                ChatCommand::Work(cmd) => workqueue_commands(ctx, gh_id, cmd).await,
+        let cmd = parse_cli::<ChatCommand, _>(words.into_iter())?;
+        let output = match cmd {
+            ChatCommand::Acknowledge { identifier } => {
+                acknowledge(&ctx, gh_id, (&identifier).into()).await
             }
-        } else {
-            // We are in a stream, where someone wrote `@**triagebot** <command(s)>`
-            let cmd_index = words
+            ChatCommand::Add { url, description } => {
+                add_notification(&ctx, gh_id, &url, &description.join(" ")).await
+            }
+            ChatCommand::Move { from, to } => move_notification(&ctx, gh_id, from, to).await,
+            ChatCommand::Meta { index, description } => {
+                add_meta_notification(&ctx, gh_id, index, &description.join(" ")).await
+            }
+            ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
+            ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
+            ChatCommand::Work(cmd) => workqueue_commands(ctx, gh_id, cmd).await,
+        };
+
+        let output = output?;
+
+        // Let the impersonated person know about the impersonation
+        if impersonated {
+            let impersonated_zulip_id = to_zulip_id(&ctx.github, gh_id)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Zulip user for GitHub ID {gh_id} was not found"))?;
+            let users = ctx.zulip.get_zulip_users().await?;
+            let user = users
                 .iter()
-                .position(|w| *w == "@**triagebot**")
-                .unwrap_or(words.len());
-            let cmd_index = cmd_index + 1;
-            if cmd_index >= words.len() {
-                return Ok(Some("Unknown command".to_string()));
+                .find(|m| m.user_id == impersonated_zulip_id)
+                .ok_or_else(|| format_err!("Could not find Zulip user email."))?;
+
+            let sender = &message_data.sender_full_name;
+            let message = format!(
+                "{sender} ran `{command}` on your behalf. Output:\n{}",
+                output.as_deref().unwrap_or("<empty>")
+            );
+
+            MessageApiRequest {
+                recipient: Recipient::Private {
+                    id: user.user_id,
+                    email: &user.email,
+                },
+                content: &message,
             }
-            let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].into_iter().copied())?;
-            match cmd {
-                StreamCommand::EndTopic => {
-                    post_waiter(&ctx, message_data, WaitingMessage::end_topic())
-                        .await
-                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
-                }
-                StreamCommand::EndMeeting => {
-                    post_waiter(&ctx, message_data, WaitingMessage::end_meeting())
-                        .await
-                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
-                }
-                StreamCommand::Read => {
-                    post_waiter(&ctx, message_data, WaitingMessage::start_reading())
-                        .await
-                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
-                }
-                StreamCommand::PingGoals {
-                    threshold,
-                    next_update,
-                } => {
-                    if project_goals::check_project_goal_acl(&ctx.github, gh_id).await? {
-                        ping_project_goals_owners(
-                            &ctx.github,
-                            &ctx.zulip,
-                            false,
-                            threshold as i64,
-                            &format!("on {next_update}"),
-                        )
-                        .await
-                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))?;
-                        Ok(None)
-                    } else {
-                        Err(format_err!(
+            .send(&ctx.zulip)
+            .await?;
+        }
+
+        Ok(output)
+    } else {
+        // We are in a stream, where someone wrote `@**triagebot** <command(s)>`
+        let cmd_index = words
+            .iter()
+            .position(|w| *w == "@**triagebot**")
+            .unwrap_or(words.len());
+        let cmd_index = cmd_index + 1;
+        if cmd_index >= words.len() {
+            return Ok(Some("Unknown command".to_string()));
+        }
+        let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].into_iter().copied())?;
+        match cmd {
+            StreamCommand::EndTopic => post_waiter(&ctx, message_data, WaitingMessage::end_topic())
+                .await
+                .map_err(|e| format_err!("Failed to await at this time: {e:?}")),
+            StreamCommand::EndMeeting => {
+                post_waiter(&ctx, message_data, WaitingMessage::end_meeting())
+                    .await
+                    .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+            }
+            StreamCommand::Read => post_waiter(&ctx, message_data, WaitingMessage::start_reading())
+                .await
+                .map_err(|e| format_err!("Failed to await at this time: {e:?}")),
+            StreamCommand::PingGoals {
+                threshold,
+                next_update,
+            } => {
+                if project_goals::check_project_goal_acl(&ctx.github, gh_id).await? {
+                    ping_project_goals_owners(
+                        &ctx.github,
+                        &ctx.zulip,
+                        false,
+                        threshold as i64,
+                        &format!("on {next_update}"),
+                    )
+                    .await
+                    .map_err(|e| format_err!("Failed to await at this time: {e:?}"))?;
+                    Ok(None)
+                } else {
+                    Err(format_err!(
                             "That command is only permitted for those running the project-goal program.",
                         ))
-                    }
                 }
-                StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
             }
+            StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
         }
-    })
+    }
 }
 
 /// Commands for working with the workqueue, e.g. showing how many PRs are assigned
@@ -543,82 +581,6 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
         "The GitHub user `{gh_username}` has the following Zulip account: {}",
         render_zulip_username(zulip_id)
     ))
-}
-
-// This does two things:
-//  * execute the command for the other user
-//  * tell the user executed for that a command was run as them by the user
-//    given.
-async fn execute_for_other_user(
-    ctx: &Context,
-    mut words: impl Iterator<Item = &str>,
-    message_data: &Message,
-) -> anyhow::Result<Option<String>> {
-    // username is a GitHub username, not a Zulip username
-    let username = match words.next() {
-        Some(username) => username,
-        None => anyhow::bail!("no username provided"),
-    };
-    let user_id = match get_id_for_username(&ctx.github, username)
-        .await
-        .context("getting ID of github user")?
-    {
-        Some(id) => id.try_into().unwrap(),
-        None => anyhow::bail!("Can only authorize for other GitHub users."),
-    };
-    let mut command = words.fold(String::new(), |mut acc, piece| {
-        acc.push_str(piece);
-        acc.push(' ');
-        acc
-    });
-    let command = if command.is_empty() {
-        anyhow::bail!("no command provided")
-    } else {
-        assert_eq!(command.pop(), Some(' ')); // pop trailing space
-        command
-    };
-
-    let members = ctx
-        .zulip
-        .get_zulip_users()
-        .await
-        .map_err(|e| format_err!("Failed to get list of zulip users: {e:?}."))?;
-
-    // Map GitHub `user_id` to `zulip_user_id`.
-    let zulip_user_id = match to_zulip_id(&ctx.github, user_id).await {
-        Ok(Some(id)) => id as u64,
-        Ok(None) => anyhow::bail!("Could not find Zulip ID for GitHub ID: {user_id}"),
-        Err(e) => anyhow::bail!("Could not find Zulip ID for GitHub id {user_id}: {e:?}"),
-    };
-
-    let user = members
-        .iter()
-        .find(|m| m.user_id == zulip_user_id)
-        .ok_or_else(|| format_err!("Could not find Zulip user email."))?;
-
-    let output = handle_command(ctx, user_id, &command, message_data)
-        .await?
-        .unwrap_or_default();
-
-    // At this point, the command has been run.
-    let sender = &message_data.sender_full_name;
-    let message = format!("{sender} ran `{command}` with output `{output}` as you.");
-
-    let res = MessageApiRequest {
-        recipient: Recipient::Private {
-            id: user.user_id,
-            email: &user.email,
-        },
-        content: &message,
-    }
-    .send(&ctx.zulip)
-    .await;
-
-    if let Err(err) = res {
-        log::error!("Failed to notify real user about command: {:?}", err);
-    }
-
-    Ok(Some(output))
 }
 
 #[derive(serde::Serialize)]
