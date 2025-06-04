@@ -17,10 +17,8 @@ use crate::zulip::client::ZulipClient;
 use crate::zulip::commands::{ChatCommand, LookupCmd, WorkqueueCmd, WorkqueueLimit};
 use anyhow::{format_err, Context as _};
 use clap::Parser;
-use postgres_types::ToSql;
 use rust_team_data::v1::TeamKind;
 use std::fmt::Write as _;
-use std::str::FromStr;
 use subtle::ConstantTimeEq;
 use tracing as log;
 
@@ -199,12 +197,15 @@ fn handle_command<'a>(
             let cmd = ChatCommand::try_parse_from(words)?;
             match cmd {
                 ChatCommand::Acknowledge { identifier } => {
-                    acknowledge(&ctx, gh_id, identifier.into()).await
+                    acknowledge(&ctx, gh_id, (&identifier).into()).await
                 }
                 ChatCommand::Add { url, description } => {
                     add_notification(&ctx, gh_id, &url, &description.join(" ")).await
                 }
                 ChatCommand::Move { from, to } => move_notification(&ctx, gh_id, from, to).await,
+                ChatCommand::Meta { index, description } => {
+                    add_meta_notification(&ctx, gh_id, index, &description.join(" ")).await
+                }
                 ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
                 ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
                 ChatCommand::Work(cmd) => workqueue_commands(ctx, gh_id, cmd).await,
@@ -699,15 +700,15 @@ impl<'a> UpdateMessageApiRequest<'a> {
     }
 }
 
-async fn acknowledge(
+async fn acknowledge<'a>(
     ctx: &Context,
     gh_id: u64,
-    ident: Identifier,
+    ident: Identifier<'a>,
 ) -> anyhow::Result<Option<String>> {
     let mut db = ctx.db.get().await;
     let deleted = delete_ping(&mut *db, gh_id, ident)
         .await
-        .map_err(|e| format_err!("Failed to acknowledge {filter}: {e:?}."))?;
+        .map_err(|e| format_err!("Failed to acknowledge {ident:?}: {e:?}."))?;
 
     let resp = if deleted.is_empty() {
         format!("No notifications matched `{ident:?}`, so none were deleted.")
@@ -765,27 +766,16 @@ async fn add_notification(
 async fn add_meta_notification(
     ctx: &Context,
     gh_id: u64,
-    mut words: impl Iterator<Item = &str>,
+    idx: u32,
+    description: &str,
 ) -> anyhow::Result<Option<String>> {
-    let idx = match words.next() {
-        Some(idx) => idx,
-        None => anyhow::bail!("idx not present"),
-    };
     let idx = idx
-        .parse::<u32>()
-        .context("index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
-    let mut description = words.fold(String::new(), |mut acc, piece| {
-        acc.push_str(piece);
-        acc.push(' ');
-        acc
-    });
     let description = if description.is_empty() {
         None
     } else {
-        assert_eq!(description.pop(), Some(' ')); // pop trailing space
-        Some(description)
+        Some(description.to_string())
     };
     let mut db = ctx.db.get().await;
     match add_metadata(&mut db, gh_id, idx, description.as_deref()).await {

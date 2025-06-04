@@ -14,11 +14,17 @@ pub enum ChatCommand {
     /// Add a notification
     Add {
         url: String,
-        #[clap(trailing_var_args(true))]
+        #[clap(trailing_var_arg(true))]
         description: Vec<String>,
     },
     /// Move a notification
     Move { from: u32, to: u32 },
+    /// Add meta notification
+    Meta {
+        index: u32,
+        #[clap(trailing_var_arg(true))]
+        description: Vec<String>,
+    },
     /// Output your membership in Rust teams.
     Whoami,
     /// Perform lookup of GitHub or Zulip username.
@@ -120,7 +126,7 @@ impl FromStr for IdentifierCli {
             "all" | "*" => Ok(Self::All),
             v => match v.parse::<u32>() {
                 Ok(v) => NonZeroU32::new(v)
-                    .ok_or_else(|e| "index must be at least 1".to_string())
+                    .ok_or_else(|| "index must be at least 1".to_string())
                     .map(Self::Index),
                 Err(_) => Ok(Self::Url(v.to_string())),
             },
