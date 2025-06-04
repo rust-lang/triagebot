@@ -14,6 +14,8 @@ pub(super) enum Invocation {
     NewProposal,
     AcceptedProposal,
     Rename { prev_issue: ZulipGitHubReference },
+    ConcernsAdded,
+    ConcernsResolved,
 }
 
 pub(super) async fn parse_input(
@@ -61,6 +63,21 @@ pub(super) async fn parse_input(
         return Ok(Some(Invocation::AcceptedProposal));
     }
 
+    // If the concerns label was added, then considered that the
+    // major change is blocked
+    if matches!(&event.action, IssuesAction::Labeled { label } if Some(&label.name) == config.concerns_label.as_ref())
+    {
+        return Ok(Some(Invocation::ConcernsAdded));
+    }
+
+    // If the concerns label was removed, then considered that
+    // all concerns have been resolved; the major change is no
+    // longer blocked.
+    if matches!(&event.action, IssuesAction::Unlabeled { label: Some(label) } if Some(&label.name) == config.concerns_label.as_ref())
+    {
+        return Ok(Some(Invocation::ConcernsResolved));
+    }
+
     // Opening an issue with a label assigned triggers both
     // "Opened" and "Labeled" events.
     //
@@ -99,18 +116,24 @@ pub(super) async fn handle_input(
         cmnt.post(&ctx.github).await?;
         return Ok(());
     }
-    let zulip_msg = match cmd {
-        Invocation::NewProposal => format!(
-            "A new proposal has been announced: [{} #{}]({}). It will be \
-            announced at the next meeting to try and draw attention to it, \
-            but usually MCPs are not discussed during triage meetings. If \
-            you think this would benefit from discussion amongst the \
-            team, consider proposing a design meeting.",
-            event.issue.title, event.issue.number, event.issue.html_url,
+    let (zulip_msg, label_to_add) = match cmd {
+        Invocation::NewProposal => (
+            format!(
+                "A new proposal has been announced: [{} #{}]({}). It will be \
+                announced at the next meeting to try and draw attention to it, \
+                but usually MCPs are not discussed during triage meetings. If \
+                you think this would benefit from discussion amongst the \
+                team, consider proposing a design meeting.",
+                event.issue.title, event.issue.number, event.issue.html_url,
+            ),
+            Some(&config.meeting_label),
         ),
-        Invocation::AcceptedProposal => format!(
-            "This proposal has been accepted: [#{}]({}).",
-            event.issue.number, event.issue.html_url,
+        Invocation::AcceptedProposal => (
+            format!(
+                "This proposal has been accepted: [#{}]({}).",
+                event.issue.number, event.issue.html_url,
+            ),
+            Some(&config.meeting_label),
         ),
         Invocation::Rename { prev_issue } => {
             let issue = &event.issue;
@@ -167,13 +190,32 @@ pub(super) async fn handle_input(
 
             return Ok(());
         }
+        Invocation::ConcernsAdded => (
+            // Ideally, we would remove the `enabled_label` (if present) and add it back once all concerns are resolved.
+            //
+            // However, since this handler is stateless, we can't track when to re-add it, it's also a bit unclear if it
+            // should be re-added at all. Also historically the `enable_label` wasn't removed either, so we don't touch it.
+            format!("Concern(s) have been raised on the [associated GitHub issue]({}). This proposal is now blocked until those concerns are fully resolved.", event.issue.html_url),
+            None
+        ),
+        Invocation::ConcernsResolved => (
+            if event.issue.labels().contains(&Label {
+                name: config.enabling_label.to_string(),
+            }) {
+                format!("All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked, and will be approved in 10 days if no (new) objections are raised.", event.issue.html_url)
+            } else {
+                format!("All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked.", event.issue.html_url)
+            },
+            None
+        )
     };
+
     handle(
         ctx,
         config,
         &event.issue,
         zulip_msg,
-        config.meeting_label.clone(),
+        label_to_add.cloned(),
         cmd == Invocation::NewProposal,
     )
     .await
@@ -228,7 +270,7 @@ pub(super) async fn handle_command(
         config,
         issue,
         zulip_msg,
-        config.second_label.clone(),
+        Some(config.second_label.clone()),
         false,
     )
     .await
@@ -239,10 +281,11 @@ async fn handle(
     config: &MajorChangeConfig,
     issue: &Issue,
     zulip_msg: String,
-    label_to_add: String,
+    label_to_add: Option<String>,
     new_proposal: bool,
 ) -> anyhow::Result<()> {
-    let github_req = issue.add_labels(&ctx.github, vec![Label { name: label_to_add }]);
+    let github_req = label_to_add
+        .map(|label_to_add| issue.add_labels(&ctx.github, vec![Label { name: label_to_add }]));
 
     let partial_issue = issue.to_zulip_github_reference();
     let zulip_topic = zulip_topic_from_issue(&partial_issue);
@@ -292,9 +335,13 @@ See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/c
 
     let zulip_req = zulip_req.send(&ctx.zulip);
 
-    let (gh_res, zulip_res) = futures::join!(github_req, zulip_req);
-    zulip_res.context("zulip post failed")?;
-    gh_res.context("label setting failed")?;
+    if let Some(github_req) = github_req {
+        let (gh_res, zulip_res) = futures::join!(github_req, zulip_req);
+        zulip_res.context("zulip post failed")?;
+        gh_res.context("label setting failed")?;
+    } else {
+        zulip_req.await.context("zulip post failed")?;
+    }
     Ok(())
 }
 
