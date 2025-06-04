@@ -1,12 +1,12 @@
-use structopt::StructOpt;
+use clap::Parser;
 use triagebot::zulip::client::ZulipClient;
 use triagebot::{github::GithubClient, handlers::project_goals};
 
 /// A basic example
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct Opt {
     /// If specified, no messages are sent.
-    #[structopt(long)]
+    #[arg(long)]
     dry_run: bool,
 
     /// Goals with an updated within this threshold will not be pinged.
@@ -21,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
     let gh = GithubClient::new_from_env();
     let zulip = ZulipClient::new_from_env();
     project_goals::ping_project_goals_owners(
