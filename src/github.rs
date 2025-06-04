@@ -248,22 +248,18 @@ impl User {
         let is_triager = map
             .get("wg-triage")
             .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
-        let is_pri_member = map
-            .get("wg-prioritization")
-            .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
         let is_async_member = map
             .get("wg-async")
             .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
         let in_all = map["all"].members.iter().any(|g| g.github == self.login);
         log::trace!(
-            "{:?} is all?={:?}, triager?={:?}, prioritizer?={:?}, async?={:?}",
+            "{:?} is all?={:?}, triager?={:?}, async?={:?}",
             self.login,
             in_all,
             is_triager,
-            is_pri_member,
             is_async_member,
         );
-        Ok(in_all || is_triager || is_pri_member || is_async_member)
+        Ok(in_all || is_triager || is_async_member)
     }
 }
 
