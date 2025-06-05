@@ -22,6 +22,67 @@ impl TeamApiClient {
         }
     }
 
+    pub async fn zulip_to_github_id(&self, zulip_id: u64) -> anyhow::Result<Option<u64>> {
+        let map = self.zulip_map().await?;
+        Ok(map.users.get(&zulip_id).copied())
+    }
+
+    pub async fn username_from_gh_id(&self, github_id: u64) -> anyhow::Result<Option<String>> {
+        let people_map = self.people().await?;
+        Ok(people_map
+            .people
+            .into_iter()
+            .filter(|(_, p)| p.github_id == github_id)
+            .map(|p| p.0)
+            .next())
+    }
+
+    // Returns the ID of the given user, if the user is in the `all` team.
+    pub async fn get_gh_id_from_username(&self, login: &str) -> anyhow::Result<Option<u64>> {
+        let permission = self.teams().await?;
+        let map = permission.teams;
+        let login = login.to_lowercase();
+        Ok(map["all"]
+            .members
+            .iter()
+            .find(|g| g.github.to_lowercase() == login)
+            .map(|u| u.github_id))
+    }
+
+    pub async fn github_to_zulip_id(&self, github_id: u64) -> anyhow::Result<Option<u64>> {
+        let map = self.zulip_map().await?;
+        Ok(map
+            .users
+            .iter()
+            .find(|&(_, &github)| github == github_id)
+            .map(|v| *v.0))
+    }
+
+    pub async fn get_team(&self, team: &str) -> anyhow::Result<Option<rust_team_data::v1::Team>> {
+        let permission = self.teams().await?;
+        let mut map = permission.teams;
+        Ok(map.swap_remove(team))
+    }
+
+    /// Fetches a Rust team via its GitHub team name.
+    pub async fn get_team_by_github_name(
+        &self,
+        org: &str,
+        team: &str,
+    ) -> anyhow::Result<Option<rust_team_data::v1::Team>> {
+        let teams = self.teams().await?;
+        for rust_team in teams.teams.into_values() {
+            if let Some(github) = &rust_team.github {
+                for gh_team in &github.teams {
+                    if gh_team.org == org && gh_team.name == team {
+                        return Ok(Some(rust_team));
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
     pub async fn zulip_map(&self) -> anyhow::Result<ZulipMapping> {
         download(&self.client, &self.base_url, "/zulip-map.json")
             .await

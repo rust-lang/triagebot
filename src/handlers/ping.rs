@@ -49,7 +49,7 @@ pub(super) async fn handle_command(
             return Ok(());
         }
     };
-    let team = github::get_team(&ctx.team_api, &gh_team).await?;
+    let team = ctx.team_api.get_team(&gh_team).await?;
     let team = match team {
         Some(team) => team,
         None => {

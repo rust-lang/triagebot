@@ -5,7 +5,6 @@
 //! Parsing is done in the `parser::command::ping` module.
 
 use crate::db::{notifications, users};
-use crate::github::get_id_for_username;
 use crate::{
     github::{self, Event},
     handlers::Context,
@@ -69,7 +68,11 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     //
     // If the user intended to ping themselves, they can add the GitHub comment
     // via the Zulip interface.
-    match get_id_for_username(&ctx.team_api, &event.user().login).await {
+    match ctx
+        .team_api
+        .get_gh_id_from_username(&event.user().login)
+        .await
+    {
         Ok(Some(id)) => {
             users_notified.insert(id.try_into().unwrap());
         }
@@ -136,7 +139,7 @@ async fn id_from_user(
         //
         // We may also want to be able to categorize into these buckets
         // *after* the ping occurs and is initially processed.
-        let team = match github::get_team_by_github_name(&ctx.team_api, org, team).await {
+        let team = match ctx.team_api.get_team_by_github_name(org, team).await {
             Ok(Some(team)) => team,
             Ok(None) => {
                 // If the team is in rust-lang*, then this is probably an error (potentially user
@@ -170,7 +173,9 @@ async fn id_from_user(
             Some(team.name),
         )))
     } else {
-        let id = get_id_for_username(&ctx.team_api, login)
+        let id = ctx
+            .team_api
+            .get_gh_id_from_username(login)
             .await
             .with_context(|| format!("failed to get user {} ID", login))?;
         let Some(id) = id else {

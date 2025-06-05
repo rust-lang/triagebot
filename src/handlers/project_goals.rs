@@ -7,7 +7,6 @@ use crate::jobs::Job;
 use crate::team_data::TeamApiClient;
 use crate::zulip::api::Recipient;
 use crate::zulip::client::ZulipClient;
-use crate::zulip::to_zulip_id;
 use anyhow::Context as _;
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDate, Utc};
@@ -63,7 +62,7 @@ pub async fn check_project_goal_acl(
 ) -> anyhow::Result<bool> {
     const GOALS_TEAM: &str = "goals";
 
-    let team = match github::get_team(team_api_client, GOALS_TEAM).await {
+    let team = match team_api_client.get_team(GOALS_TEAM).await {
         Ok(Some(team)) => team,
         Ok(None) => {
             log::info!("team ({}) failed to resolve to a known team", GOALS_TEAM);
@@ -245,8 +244,8 @@ async fn zulip_owners(
     })
 }
 
-async fn owner_string(team_api_client: &TeamApiClient, assignee: &User) -> anyhow::Result<String> {
-    if let Some(zulip_id) = to_zulip_id(team_api_client, assignee.id).await? {
+async fn owner_string(team_api: &TeamApiClient, assignee: &User) -> anyhow::Result<String> {
+    if let Some(zulip_id) = team_api.github_to_zulip_id(assignee.id).await? {
         Ok(format!("@**|{zulip_id}**"))
     } else {
         // No zulip-id? Fallback to github user name.

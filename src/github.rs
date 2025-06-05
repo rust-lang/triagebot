@@ -263,49 +263,6 @@ impl User {
     }
 }
 
-// Returns the ID of the given user, if the user is in the `all` team.
-pub async fn get_id_for_username(
-    client: &TeamApiClient,
-    login: &str,
-) -> anyhow::Result<Option<u64>> {
-    let permission = client.teams().await?;
-    let map = permission.teams;
-    let login = login.to_lowercase();
-    Ok(map["all"]
-        .members
-        .iter()
-        .find(|g| g.github.to_lowercase() == login)
-        .map(|u| u.github_id))
-}
-
-pub async fn get_team(
-    client: &TeamApiClient,
-    team: &str,
-) -> anyhow::Result<Option<rust_team_data::v1::Team>> {
-    let permission = client.teams().await?;
-    let mut map = permission.teams;
-    Ok(map.swap_remove(team))
-}
-
-/// Fetches a Rust team via its GitHub team name.
-pub async fn get_team_by_github_name(
-    client: &TeamApiClient,
-    org: &str,
-    team: &str,
-) -> anyhow::Result<Option<rust_team_data::v1::Team>> {
-    let teams = client.teams().await?;
-    for rust_team in teams.teams.into_values() {
-        if let Some(github) = &rust_team.github {
-            for gh_team in &github.teams {
-                if gh_team.org == org && gh_team.name == team {
-                    return Ok(Some(rust_team));
-                }
-            }
-        }
-    }
-    Ok(None)
-}
-
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 pub struct Label {
     pub name: String,
