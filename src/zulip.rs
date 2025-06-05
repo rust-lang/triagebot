@@ -187,16 +187,19 @@ async fn handle_command<'a>(
         let mut impersonated = false;
         if let Some(&"as") = words.get(0) {
             if let Some(username) = words.get(1) {
-                impersonated = true;
-
-                // Impersonate => change actual gh_id
-                gh_id = match get_id_for_username(&ctx.github, username)
+                let impersonated_gh_id = match get_id_for_username(&ctx.github, username)
                     .await
                     .context("getting ID of github user")?
                 {
-                    Some(id) => id.try_into().unwrap(),
+                    Some(id) => id.try_into()?,
                     None => anyhow::bail!("Can only authorize for other GitHub users."),
                 };
+
+                // Impersonate => change actual gh_id
+                if impersonated_gh_id != gh_id {
+                    impersonated = true;
+                    gh_id = impersonated_gh_id;
+                }
             } else {
                 return Err(anyhow::anyhow!(
                     "Failed to parse command; expected `as <username> <command...>`."
