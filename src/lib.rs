@@ -20,7 +20,7 @@ pub mod jobs;
 pub mod notification_listing;
 pub mod payload;
 mod rfcbot;
-mod team_data;
+pub mod team_data;
 pub mod triage;
 mod utils;
 pub mod zulip;

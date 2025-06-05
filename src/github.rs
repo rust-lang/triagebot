@@ -1,3 +1,4 @@
+use crate::team_data::TeamApiClient;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -240,9 +241,9 @@ impl User {
             .await
     }
 
-    pub async fn is_team_member<'a>(&'a self, client: &'a GithubClient) -> anyhow::Result<bool> {
+    pub async fn is_team_member<'a>(&'a self, client: &'a TeamApiClient) -> anyhow::Result<bool> {
         log::trace!("Getting team membership for {:?}", self.login);
-        let permission = crate::team_data::teams(client).await?;
+        let permission = client.teams().await?;
         let map = permission.teams;
         let is_triager = map
             .get("wg-triage")
@@ -268,10 +269,10 @@ impl User {
 
 // Returns the ID of the given user, if the user is in the `all` team.
 pub async fn get_id_for_username(
-    client: &GithubClient,
+    client: &TeamApiClient,
     login: &str,
 ) -> anyhow::Result<Option<u64>> {
-    let permission = crate::team_data::teams(client).await?;
+    let permission = client.teams().await?;
     let map = permission.teams;
     let login = login.to_lowercase();
     Ok(map["all"]
@@ -282,21 +283,21 @@ pub async fn get_id_for_username(
 }
 
 pub async fn get_team(
-    client: &GithubClient,
+    client: &TeamApiClient,
     team: &str,
 ) -> anyhow::Result<Option<rust_team_data::v1::Team>> {
-    let permission = crate::team_data::teams(client).await?;
+    let permission = client.teams().await?;
     let mut map = permission.teams;
     Ok(map.swap_remove(team))
 }
 
 /// Fetches a Rust team via its GitHub team name.
 pub async fn get_team_by_github_name(
-    client: &GithubClient,
+    client: &TeamApiClient,
     org: &str,
     team: &str,
 ) -> anyhow::Result<Option<rust_team_data::v1::Team>> {
-    let teams = crate::team_data::teams(client).await?;
+    let teams = client.teams().await?;
     for rust_team in teams.teams.into_values() {
         if let Some(github) = &rust_team.github {
             for gh_team in &github.teams {
@@ -2059,10 +2060,11 @@ impl<'q> IssuesQuery for Query<'q> {
         repo: &'a Repository,
         include_fcp_details: bool,
         include_mcp_details: bool,
-        client: &'a GithubClient,
+        gh_client: &'a GithubClient,
+        team_api_client: &'a TeamApiClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         let issues = repo
-            .get_issues(&client, self)
+            .get_issues(&gh_client, self)
             .await
             .with_context(|| "Unable to get issues.")?;
 
@@ -2075,7 +2077,7 @@ impl<'q> IssuesQuery for Query<'q> {
         };
 
         let zulip_map = if include_fcp_details {
-            Some(crate::team_data::zulip_map(client).await?)
+            Some(team_api_client.zulip_map().await?)
         } else {
             None
         };
@@ -2111,7 +2113,7 @@ impl<'q> IssuesQuery for Query<'q> {
                             ("".to_string(), "".to_string())
                         } else {
                             let comment = issue
-                                .get_comment(&client, fk_initiating_comment.try_into()?)
+                                .get_comment(&gh_client, fk_initiating_comment.try_into()?)
                                 .await
                                 .with_context(|| {
                                     format!(
@@ -2176,7 +2178,7 @@ impl<'q> IssuesQuery for Query<'q> {
             };
 
             let mcp_details = if include_mcp_details {
-                let first100_comments = issue.get_first100_comments(&client).await?;
+                let first100_comments = issue.get_first100_comments(&gh_client).await?;
                 let (zulip_link, concerns) = if !first100_comments.is_empty() {
                     let split = re_zulip_link
                         .split(&first100_comments[0].body)
@@ -2891,7 +2893,8 @@ pub trait IssuesQuery {
         repo: &'a Repository,
         include_fcp_details: bool,
         include_mcp_details: bool,
-        client: &'a GithubClient,
+        gh_client: &'a GithubClient,
+        team_api_client: &'a TeamApiClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>>;
 }
 
@@ -2904,6 +2907,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
         _include_fcp_details: bool,
         _include_mcp_details: bool,
         client: &'a GithubClient,
+        _team_api_client: &'a TeamApiClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         use cynic::QueryBuilder;
         use github_graphql::queries;
@@ -3122,6 +3126,7 @@ impl IssuesQuery for DesignMeetings {
         _include_fcp_details: bool,
         _include_mcp_details: bool,
         client: &'a GithubClient,
+        _team_api_client: &'a TeamApiClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         use github_graphql::project_items::ProjectV2ItemContent;
 
