@@ -200,7 +200,7 @@ pub(super) async fn handle_input(
         ),
         Invocation::ConcernsResolved => (
             if event.issue.labels().contains(&Label {
-                name: config.enabling_label.to_string(),
+                name: config.second_label.to_string(),
             }) {
                 format!("All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked, and will be approved in 10 days if no (new) objections are raised.", event.issue.html_url)
             } else {
