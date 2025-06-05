@@ -1,5 +1,6 @@
 pub mod api;
 pub mod client;
+mod commands;
 
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
@@ -13,10 +14,12 @@ use crate::team_data::{people, teams};
 use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
+use crate::zulip::commands::{
+    parse_cli, ChatCommand, LookupCmd, StreamCommand, WorkqueueCmd, WorkqueueLimit,
+};
 use anyhow::{format_err, Context as _};
 use rust_team_data::v1::TeamKind;
 use std::fmt::Write as _;
-use std::str::FromStr;
 use subtle::ConstantTimeEq;
 use tracing as log;
 
@@ -151,131 +154,110 @@ async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Op
         anyhow::bail!("Invalid authorization.");
     }
 
-    log::trace!("zulip hook: {:?}", req);
+    log::trace!("zulip hook: {req:?}");
+
+    // Zulip commands are only available to users in the team database
     let gh_id = match to_github_id(&ctx.github, req.message.sender_id).await {
-        Ok(Some(gh_id)) => Ok(gh_id),
-        Ok(None) => Err(format_err!(
-            "Unknown Zulip user. Please add `zulip-id = {}` to your file in \
+        Ok(Some(gh_id)) => gh_id,
+        Ok(None) => {
+            return Err(anyhow::anyhow!(
+                "Unknown Zulip user. Please add `zulip-id = {}` to your file in \
                 [rust-lang/team](https://github.com/rust-lang/team).",
-            req.message.sender_id
-        )),
+                req.message.sender_id
+            ))
+        }
         Err(e) => anyhow::bail!("Failed to query team API: {e:?}"),
     };
 
     handle_command(ctx, gh_id, &req.data, &req.message).await
 }
 
-const WORKQUEUE_HELP: &str = r#"`work show`: show your assigned PRs
-`work set-pr-limit <number>|unlimited`: set the maximum number of PRs you can be assigned to
-`work set-rotation-mode <off|on>`: configure if you are *on* rotation or *off* rotation (e.g. when you are on a vacation)"#;
-
 fn handle_command<'a>(
     ctx: &'a Context,
-    gh_id: anyhow::Result<u64>,
-    words: &'a str,
+    gh_id: u64,
+    command: &'a str,
     message_data: &'a Message,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Option<String>>> + Send + 'a>>
 {
     Box::pin(async move {
-        log::trace!("handling zulip command {:?}", words);
-        let mut words = words.split_whitespace();
-        let mut next = words.next();
+        log::trace!("handling zulip command {:?}", command);
+        let words: Vec<&str> = command.split_whitespace().collect();
 
-        if let Some("as") = next {
-            return execute_for_other_user(&ctx, words, message_data)
+        if let Some(&"as") = words.get(0) {
+            return execute_for_other_user(&ctx, words.iter().skip(1).copied(), message_data)
                 .await
                 .map_err(|e| {
                     format_err!("Failed to parse; expected `as <username> <command...>`: {e:?}.")
                 });
         }
-        let gh_id = gh_id?;
 
-        match next {
-            Some("acknowledge") | Some("ack") => acknowledge(&ctx, gh_id, words).await
-                .map_err(|e| format_err!("Failed to parse acknowledgement, expected `(acknowledge|ack) <identifier>`: {e:?}.")),
-            Some("add") => add_notification(&ctx, gh_id, words).await
-                .map_err(|e| format_err!("Failed to parse description addition, expected `add <url> <description (multiple words)>`: {e:?}.")),
-            Some("move") => move_notification(&ctx, gh_id, words).await
-                .map_err(|e| format_err!("Failed to parse movement, expected `move <from> <to>`: {e:?}.")),
-            Some("meta") => add_meta_notification(&ctx, gh_id, words).await
-                .map_err(|e| format_err!("Failed to parse `meta` command. Synopsis: meta <num> <text>: Add <text> to your notification identified by <num> (>0)\n\nError: {e:?}")),
-            Some("whoami") => whoami_cmd(&ctx, gh_id, words).await
-                .map_err(|e| format_err!("Failed to run the `whoami` command. Synopsis: whoami: Show to which Rust teams you are a part of\n\nError: {e:?}")),
-            Some("lookup") => lookup_cmd(&ctx, words).await
-                .map_err(|e| format_err!("Failed to run the `lookup` command. Synopsis: lookup (github <zulip-username>|zulip <github-username>): Show the GitHub username of a Zulip <user> or the Zulip username of a GitHub user\n\nError: {e:?}")),
-            Some("work") => workqueue_commands(ctx, gh_id, words).await
-                                                                    .map_err(|e| format_err!("Failed to parse `work` command. Help: {WORKQUEUE_HELP}\n\nError: {e:?}")),
-            _ => {
-                while let Some(word) = next {
-                    if word == "@**triagebot**" {
-                        let next = words.next();
-                        match next {
-                            Some("end-topic") | Some("await") => {
-                                return post_waiter(&ctx, message_data, WaitingMessage::end_topic())
-                                    .await
-                                    .map_err(|e| {
-                                        format_err!("Failed to await at this time: {e:?}")
-                                    })
-                            }
-                            Some("end-meeting") => {
-                                return post_waiter(
-                                    &ctx,
-                                    message_data,
-                                    WaitingMessage::end_meeting(),
-                                )
-                                .await
-                                .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
-                            }
-                            Some("read") => {
-                                return post_waiter(
-                                    &ctx,
-                                    message_data,
-                                    WaitingMessage::start_reading(),
-                                )
-                                .await
-                                .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
-                            }
-                            Some("ping-goals") => {
-                                let usage_err = |description: &str| Err(format_err!(
-                                    "Error: {description}\n\
-                                    \n\
-                                    Usage: triagebot ping-goals D N, where:\n\
-                                    \n\
-                                     * D is the number of days before an update is considered stale\n\
-                                     * N is the date of next update, like \"Sep-5\"\n",
-                                ));
-
-                                let Some(threshold) = words.next() else {
-                                    return usage_err("expected number of days");
-                                };
-                                let threshold = match i64::from_str(threshold) {
-                                    Ok(v) => v,
-                                    Err(e) => return usage_err(&format!("ill-formed number of days, {e}")),
-                                };
-
-                                let Some(next_update) = words.next() else {
-                                    return usage_err("expected date of next update");
-                                };
-
-                                if project_goals::check_project_goal_acl(&ctx.github, gh_id).await? {
-                                    ping_project_goals_owners(&ctx.github, &ctx.zulip, false, threshold, &format!("on {next_update}"))
-                                        .await
-                                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))?;
-                                    return Ok(None);
-                                } else {
-                                    return Err(format_err!(
-                                        "That command is only permitted for those running the project-goal program.",
-                                    ));
-                                }
-                            }
-                            Some("docs-update") => return trigger_docs_update(message_data, &ctx.zulip),
-                            _ => {}
-                        }
-                    }
-                    next = words.next();
+        // Missing stream means that this is a direct message
+        if message_data.stream_id.is_none() {
+            let cmd = parse_cli::<ChatCommand, _>(words.into_iter())?;
+            match cmd {
+                ChatCommand::Acknowledge { identifier } => {
+                    acknowledge(&ctx, gh_id, (&identifier).into()).await
                 }
-
-                Ok(Some(String::from("Unknown command")))
+                ChatCommand::Add { url, description } => {
+                    add_notification(&ctx, gh_id, &url, &description.join(" ")).await
+                }
+                ChatCommand::Move { from, to } => move_notification(&ctx, gh_id, from, to).await,
+                ChatCommand::Meta { index, description } => {
+                    add_meta_notification(&ctx, gh_id, index, &description.join(" ")).await
+                }
+                ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
+                ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
+                ChatCommand::Work(cmd) => workqueue_commands(ctx, gh_id, cmd).await,
+            }
+        } else {
+            // We are in a stream, where someone wrote `@**triagebot** <command(s)>`
+            let cmd_index = words
+                .iter()
+                .position(|w| *w == "@**triagebot**")
+                .unwrap_or(words.len());
+            let cmd_index = cmd_index + 1;
+            if cmd_index >= words.len() {
+                return Ok(Some("Unknown command".to_string()));
+            }
+            let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].into_iter().copied())?;
+            match cmd {
+                StreamCommand::EndTopic => {
+                    post_waiter(&ctx, message_data, WaitingMessage::end_topic())
+                        .await
+                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                }
+                StreamCommand::EndMeeting => {
+                    post_waiter(&ctx, message_data, WaitingMessage::end_meeting())
+                        .await
+                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                }
+                StreamCommand::Read => {
+                    post_waiter(&ctx, message_data, WaitingMessage::start_reading())
+                        .await
+                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                }
+                StreamCommand::PingGoals {
+                    threshold,
+                    next_update,
+                } => {
+                    if project_goals::check_project_goal_acl(&ctx.github, gh_id).await? {
+                        ping_project_goals_owners(
+                            &ctx.github,
+                            &ctx.zulip,
+                            false,
+                            threshold as i64,
+                            &format!("on {next_update}"),
+                        )
+                        .await
+                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))?;
+                        Ok(None)
+                    } else {
+                        Err(format_err!(
+                            "That command is only permitted for those running the project-goal program.",
+                        ))
+                    }
+                }
+                StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
             }
         }
     })
@@ -286,13 +268,8 @@ fn handle_command<'a>(
 async fn workqueue_commands(
     ctx: &Context,
     gh_id: u64,
-    mut words: impl Iterator<Item = &str>,
+    cmd: WorkqueueCmd,
 ) -> anyhow::Result<Option<String>> {
-    let subcommand = match words.next() {
-        Some(subcommand) => subcommand,
-        None => anyhow::bail!("no subcommand provided"),
-    };
-
     let db_client = ctx.db.get().await;
 
     let gh_username = username_from_gh_id(&ctx.github, gh_id)
@@ -306,8 +283,8 @@ async fn workqueue_commands(
         .await
         .context("Unable to retrieve your review preferences.")?;
 
-    let response = match subcommand {
-        "show" => {
+    let response = match cmd {
+        WorkqueueCmd::Show => {
             let mut assigned_prs = get_assigned_prs(ctx, gh_id)
                 .await
                 .into_iter()
@@ -346,21 +323,10 @@ async fn workqueue_commands(
             writeln!(response, "*Note that only certain PRs that are assigned to you are included in your review queue.*")?;
             response
         }
-        "set-pr-limit" => {
-            let max_assigned_prs = match words.next() {
-                Some(value) => {
-                    if words.next().is_some() {
-                        anyhow::bail!("Too many parameters.");
-                    }
-                    if value == "unlimited" {
-                        None
-                    } else {
-                        Some(value.parse::<u32>().context(
-                            "Wrong parameter format. Must be a positive integer or `unlimited` to unset the limit.",
-                        )?)
-                    }
-                }
-                None => anyhow::bail!("Missing parameter."),
+        WorkqueueCmd::SetPrLimit { limit } => {
+            let max_assigned_prs = match limit {
+                WorkqueueLimit::Unlimited => None,
+                WorkqueueLimit::Limit(limit) => Some(limit),
             };
             upsert_review_prefs(
                 &db_client,
@@ -379,20 +345,8 @@ async fn workqueue_commands(
                 }
             )
         }
-        "set-rotation-mode" => {
-            let rotation_mode = match words.next() {
-                Some(value) => {
-                    if words.next().is_some() {
-                        anyhow::bail!("Too many parameters.");
-                    }
-                    match value {
-                        "on" => RotationMode::OnRotation,
-                        "off" => RotationMode::OffRotation,
-                        _ => anyhow::bail!("Unknown rotation mode {value}. Use `on` or `off`."),
-                    }
-                }
-                None => anyhow::bail!("Missing parameter."),
-            };
+        WorkqueueCmd::SetRotationMode { rotation_mode } => {
+            let rotation_mode = rotation_mode.0;
             upsert_review_prefs(
                 &db_client,
                 user,
@@ -410,23 +364,13 @@ async fn workqueue_commands(
                 }
             )
         }
-        "help" => WORKQUEUE_HELP.to_string(),
-        _ => anyhow::bail!("Invalid subcommand."),
     };
 
     Ok(Some(response))
 }
 
 /// The `whoami` command displays the user's membership in Rust teams.
-async fn whoami_cmd(
-    ctx: &Context,
-    gh_id: u64,
-    mut words: impl Iterator<Item = &str>,
-) -> anyhow::Result<Option<String>> {
-    if words.next().is_some() {
-        return Err(anyhow::anyhow!("Unexpected argument"));
-    }
-
+async fn whoami_cmd(ctx: &Context, gh_id: u64) -> anyhow::Result<Option<String>> {
     let gh_username = username_from_gh_id(&ctx.github, gh_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Cannot find your GitHub username in the team database"))?;
@@ -475,33 +419,20 @@ async fn whoami_cmd(
     Ok(Some(output))
 }
 
-/// The lookup command has two forms:
-/// - `lookup github <zulip-username>`: displays the GitHub username of a Zulip user.
-/// - `lookup zulip <github-username>`: displays the Zulip username of a GitHub user.
-async fn lookup_cmd(
-    ctx: &Context,
-    mut words: impl Iterator<Item = &str>,
-) -> anyhow::Result<Option<String>> {
-    let subcommand = match words.next() {
-        Some(subcommand) => subcommand,
-        None => return Err(anyhow::anyhow!("no subcommand provided")),
+async fn lookup_cmd(ctx: &Context, cmd: LookupCmd) -> anyhow::Result<Option<String>> {
+    let username = match &cmd {
+        LookupCmd::Zulip { github_username } => github_username.clone(),
+        // Usernames could contain spaces, so rejoin everything to serve as the username.
+        LookupCmd::GitHub { zulip_username } => zulip_username.join(" "),
     };
-
-    // Usernames could contain spaces, so rejoin everything after `whois` to serve as the username.
-    let args = words.collect::<Vec<_>>();
-    if args.is_empty() {
-        return Err(anyhow::anyhow!("no username provided"));
-    }
-    let args = args.join(" ");
 
     // The username could be a mention, which looks like this: `@**<username>**`, so strip the
     // extra sigils.
-    let username = args.trim_matches(&['@', '*']);
+    let username = username.trim_matches(&['@', '*']);
 
-    match subcommand {
-        "github" => Ok(Some(lookup_github_username(ctx, username).await?)),
-        "zulip" => Ok(Some(lookup_zulip_username(ctx, username).await?)),
-        _ => Err(anyhow::anyhow!("Unknown subcommand {subcommand}")),
+    match cmd {
+        LookupCmd::GitHub { .. } => Ok(Some(lookup_github_username(ctx, username).await?)),
+        LookupCmd::Zulip { .. } => Ok(Some(lookup_zulip_username(ctx, username).await?)),
     }
 }
 
@@ -665,7 +596,7 @@ async fn execute_for_other_user(
         .find(|m| m.user_id == zulip_user_id)
         .ok_or_else(|| format_err!("Could not find Zulip user email."))?;
 
-    let output = handle_command(ctx, Ok(user_id), &command, message_data)
+    let output = handle_command(ctx, user_id, &command, message_data)
         .await?
         .unwrap_or_default();
 
@@ -727,40 +658,18 @@ impl<'a> UpdateMessageApiRequest<'a> {
     }
 }
 
-async fn acknowledge(
+async fn acknowledge<'a>(
     ctx: &Context,
     gh_id: u64,
-    mut words: impl Iterator<Item = &str>,
+    ident: Identifier<'a>,
 ) -> anyhow::Result<Option<String>> {
-    let filter = match words.next() {
-        Some(filter) => {
-            if words.next().is_some() {
-                anyhow::bail!("too many words");
-            }
-            filter
-        }
-        None => anyhow::bail!("not enough words"),
-    };
-    let ident = if let Ok(number) = filter.parse::<u32>() {
-        Identifier::Index(
-            std::num::NonZeroU32::new(number)
-                .ok_or_else(|| anyhow::anyhow!("index must be at least 1"))?,
-        )
-    } else if filter == "all" || filter == "*" {
-        Identifier::All
-    } else {
-        Identifier::Url(filter)
-    };
     let mut db = ctx.db.get().await;
     let deleted = delete_ping(&mut *db, gh_id, ident)
         .await
-        .map_err(|e| format_err!("Failed to acknowledge {filter}: {e:?}."))?;
+        .map_err(|e| format_err!("Failed to acknowledge {ident:?}: {e:?}."))?;
 
     let resp = if deleted.is_empty() {
-        format!(
-            "No notifications matched `{}`, so none were deleted.",
-            filter
-        )
+        format!("No notifications matched `{ident:?}`, so none were deleted.")
     } else {
         let mut resp = String::from("Acknowledged:\n");
         for deleted in deleted {
@@ -785,22 +694,14 @@ async fn acknowledge(
 async fn add_notification(
     ctx: &Context,
     gh_id: u64,
-    mut words: impl Iterator<Item = &str>,
+    url: &str,
+    description: &str,
 ) -> anyhow::Result<Option<String>> {
-    let url = match words.next() {
-        Some(idx) => idx,
-        None => anyhow::bail!("url not present"),
-    };
-    let mut description = words.fold(String::new(), |mut acc, piece| {
-        acc.push_str(piece);
-        acc.push(' ');
-        acc
-    });
+    let description = description.trim();
     let description = if description.is_empty() {
         None
     } else {
-        assert_eq!(description.pop(), Some(' ')); // pop trailing space
-        Some(description)
+        Some(description.to_string())
     };
     match record_ping(
         &*ctx.db.get().await,
@@ -823,27 +724,16 @@ async fn add_notification(
 async fn add_meta_notification(
     ctx: &Context,
     gh_id: u64,
-    mut words: impl Iterator<Item = &str>,
+    idx: u32,
+    description: &str,
 ) -> anyhow::Result<Option<String>> {
-    let idx = match words.next() {
-        Some(idx) => idx,
-        None => anyhow::bail!("idx not present"),
-    };
     let idx = idx
-        .parse::<u32>()
-        .context("index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
-    let mut description = words.fold(String::new(), |mut acc, piece| {
-        acc.push_str(piece);
-        acc.push(' ');
-        acc
-    });
     let description = if description.is_empty() {
         None
     } else {
-        assert_eq!(description.pop(), Some(' ')); // pop trailing space
-        Some(description)
+        Some(description.to_string())
     };
     let mut db = ctx.db.get().await;
     match add_metadata(&mut db, gh_id, idx, description.as_deref()).await {
@@ -855,24 +745,13 @@ async fn add_meta_notification(
 async fn move_notification(
     ctx: &Context,
     gh_id: u64,
-    mut words: impl Iterator<Item = &str>,
+    from: u32,
+    to: u32,
 ) -> anyhow::Result<Option<String>> {
-    let from = match words.next() {
-        Some(idx) => idx,
-        None => anyhow::bail!("from idx not present"),
-    };
-    let to = match words.next() {
-        Some(idx) => idx,
-        None => anyhow::bail!("from idx not present"),
-    };
     let from = from
-        .parse::<u32>()
-        .context("from index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
     let to = to
-        .parse::<u32>()
-        .context("to index")?
         .checked_sub(1)
         .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
     match move_indices(&mut *ctx.db.get().await, gh_id, from, to).await {
