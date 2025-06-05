@@ -18,9 +18,14 @@ use octocrab::models::IssueState;
 use octocrab::params::pulls::Sort;
 use octocrab::params::{Direction, State};
 use octocrab::Octocrab;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use tokio::sync::RwLockWriteGuard;
 use tracing as log;
+
+#[derive(Clone, Debug)]
+pub struct AssignedPullRequest {
+    pub title: String,
+}
 
 /// Maps users to a set of currently assigned open non-draft pull requests.
 /// We store this map in memory, rather than in the DB, because it can get desynced when webhooks
@@ -29,11 +34,13 @@ use tracing as log;
 /// in the DB.
 #[derive(Debug, Default)]
 pub struct ReviewerWorkqueue {
-    reviewers: HashMap<UserId, HashSet<PullRequestNumber>>,
+    reviewers: HashMap<UserId, HashMap<PullRequestNumber, AssignedPullRequest>>,
 }
 
 impl ReviewerWorkqueue {
-    pub fn new(reviewers: HashMap<UserId, HashSet<PullRequestNumber>>) -> Self {
+    pub fn new(
+        reviewers: HashMap<UserId, HashMap<PullRequestNumber, AssignedPullRequest>>,
+    ) -> Self {
         Self { reviewers }
     }
 
@@ -112,6 +119,10 @@ pub(super) async fn handle_input<'a>(
         return Ok(());
     }
 
+    let assigned_pr = AssignedPullRequest {
+        title: pr.title.clone(),
+    };
+
     match input {
         // The PR was assigned to a specific user, and it is waiting for a review.
         ReviewPrefsInput::Assigned { assignee } => {
@@ -120,7 +131,7 @@ pub(super) async fn handle_input<'a>(
                 assignee.login
             );
 
-            upsert_pr_into_user_queue(&mut workqueue, assignee.id, pr_number);
+            upsert_pr_into_user_queue(&mut workqueue, assignee.id, pr_number, assigned_pr);
         }
         ReviewPrefsInput::Unassigned { assignee } => {
             log::info!(
@@ -139,7 +150,12 @@ pub(super) async fn handle_input<'a>(
         // receive.
         ReviewPrefsInput::OtherChange => {
             for assignee in &event.issue.assignees {
-                if upsert_pr_into_user_queue(&mut workqueue, assignee.id, pr_number) {
+                if upsert_pr_into_user_queue(
+                    &mut workqueue,
+                    assignee.id,
+                    pr_number,
+                    assigned_pr.clone(),
+                ) {
                     log::info!("Adding PR {pr_number} to workqueue of {}.", assignee.login);
                 }
             }
@@ -155,10 +171,11 @@ pub async fn load_workqueue(client: &Octocrab) -> anyhow::Result<ReviewerWorkque
     let prs = retrieve_pull_request_assignments("rust-lang", "rust", &client).await?;
 
     // Aggregate PRs by user
-    let aggregated: HashMap<UserId, HashSet<PullRequestNumber>> =
-        prs.into_iter().fold(HashMap::new(), |mut acc, (user, pr)| {
+    let aggregated: HashMap<UserId, HashMap<PullRequestNumber, AssignedPullRequest>> = prs
+        .into_iter()
+        .fold(HashMap::new(), |mut acc, (user, pr_number, pr)| {
             let prs = acc.entry(user.id).or_default();
-            prs.insert(pr);
+            prs.insert(pr_number, pr);
             acc
         });
     tracing::debug!("PR assignments\n{aggregated:?}");
@@ -174,7 +191,7 @@ pub async fn retrieve_pull_request_assignments(
     owner: &str,
     repository: &str,
     client: &Octocrab,
-) -> anyhow::Result<Vec<(User, PullRequestNumber)>> {
+) -> anyhow::Result<Vec<(User, PullRequestNumber, AssignedPullRequest)>> {
     let mut assignments = vec![];
 
     // We use the REST API to fetch open pull requests, as it is much (~5-10x)
@@ -224,6 +241,9 @@ pub async fn retrieve_pull_request_assignments(
                         id: (*user.id).into(),
                     },
                     pr.number,
+                    AssignedPullRequest {
+                        title: pr.title.clone().unwrap_or_default(),
+                    },
                 ));
             }
         }
@@ -234,7 +254,10 @@ pub async fn retrieve_pull_request_assignments(
 }
 
 /// Get pull request assignments for a team member
-pub async fn get_assigned_prs(ctx: &Context, user_id: UserId) -> HashSet<PullRequestNumber> {
+pub async fn get_assigned_prs(
+    ctx: &Context,
+    user_id: UserId,
+) -> HashMap<PullRequestNumber, AssignedPullRequest> {
     ctx.workqueue
         .read()
         .await
@@ -245,6 +268,7 @@ pub async fn get_assigned_prs(ctx: &Context, user_id: UserId) -> HashSet<PullReq
 }
 
 /// Add a PR to the workqueue of a team member.
+/// Updates data of the pull request if it already was in the workqueue.
 /// Ensures no accidental PR duplicates.
 ///
 /// Returns true if the PR was actually inserted.
@@ -252,8 +276,14 @@ fn upsert_pr_into_user_queue(
     workqueue: &mut RwLockWriteGuard<ReviewerWorkqueue>,
     user_id: UserId,
     pr: PullRequestNumber,
+    assigned_pr: AssignedPullRequest,
 ) -> bool {
-    workqueue.reviewers.entry(user_id).or_default().insert(pr)
+    workqueue
+        .reviewers
+        .entry(user_id)
+        .or_default()
+        .insert(pr, assigned_pr)
+        .is_none()
 }
 
 /// Delete a PR from the workqueue of a team member.
@@ -270,7 +300,7 @@ fn delete_pr_from_user_queue(
 /// Delete a PR from the workqueue completely.
 fn delete_pr_from_all_queues(workqueue: &mut ReviewerWorkqueue, pr: PullRequestNumber) {
     for queue in workqueue.reviewers.values_mut() {
-        queue.retain(|pr_number| *pr_number != pr);
+        queue.retain(|pr_number, _| *pr_number != pr);
     }
 }
 
@@ -308,7 +338,9 @@ mod tests {
     use crate::config::Config;
     use crate::github::{Issue, IssuesAction, IssuesEvent, Repository, User};
     use crate::github::{Label, PullRequestNumber};
-    use crate::handlers::pr_tracking::{handle_input, parse_input, upsert_pr_into_user_queue};
+    use crate::handlers::pr_tracking::{
+        handle_input, parse_input, upsert_pr_into_user_queue, AssignedPullRequest,
+    };
     use crate::tests::github::{default_test_user, issue, pull_request, user};
     use crate::tests::{run_db_test, TestContext};
 
@@ -504,7 +536,7 @@ mod tests {
             .get(&user.id)
             .cloned()
             .unwrap_or_default()
-            .into_iter()
+            .into_keys()
             .collect::<Vec<_>>();
         assigned.sort();
         assert_eq!(assigned, expected_prs);
@@ -514,7 +546,14 @@ mod tests {
         {
             let mut workqueue = ctx.handler_ctx().workqueue.write().await;
             for &pr in prs {
-                upsert_pr_into_user_queue(&mut workqueue, user.id, pr);
+                upsert_pr_into_user_queue(
+                    &mut workqueue,
+                    user.id,
+                    pr,
+                    AssignedPullRequest {
+                        title: format!("PR {pr}"),
+                    },
+                );
             }
         }
         check_assigned_prs(&ctx, user, prs).await;
