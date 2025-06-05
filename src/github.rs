@@ -1274,7 +1274,6 @@ pub struct CommitBase {
 #[derive(Debug, serde::Deserialize)]
 pub struct IssueSearchResult {
     pub total_count: u64,
-    pub incomplete_results: bool,
     pub items: Vec<Issue>,
 }
 
