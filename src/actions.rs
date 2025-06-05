@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
 
 use crate::github::{self, GithubClient, Repository};
+use crate::team_data::TeamApiClient;
 
 #[async_trait]
 pub trait Action {
@@ -106,6 +107,7 @@ impl<'a> Action for Step<'a> {
     async fn call(&self) -> anyhow::Result<String> {
         let mut gh = GithubClient::new_from_env();
         gh.set_retry_rate_limit(true);
+        let team_api = TeamApiClient::new_from_env();
 
         let mut context = Context::new();
         let mut results = HashMap::new();
@@ -130,6 +132,7 @@ impl<'a> Action for Step<'a> {
                     let kind = *kind;
                     let repository = repository.clone();
                     let gh = gh.clone();
+                    let team_api = team_api.clone();
                     let query = query.clone();
                     handles.push(tokio::task::spawn(async move {
                         let _permit = semaphore.acquire().await?;
@@ -148,6 +151,7 @@ impl<'a> Action for Step<'a> {
                                 mcps_groups.contains(&name.as_str())
                                     && repository.full_name.contains("rust-lang/compiler-team"),
                                 &gh,
+                                &team_api,
                             )
                             .await?;
                         Ok((name, kind, issues))

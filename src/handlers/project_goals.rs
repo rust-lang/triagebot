@@ -4,6 +4,7 @@ use crate::github::{
 };
 use crate::github::{Event, Issue};
 use crate::jobs::Job;
+use crate::team_data::TeamApiClient;
 use crate::zulip::api::Recipient;
 use crate::zulip::client::ZulipClient;
 use crate::zulip::to_zulip_id;
@@ -50,16 +51,19 @@ impl Job for ProjectGoalsUpdateJob {
     }
 
     async fn run(&self, ctx: &super::Context, _metadata: &serde_json::Value) -> anyhow::Result<()> {
-        ping_project_goals_owners_automatically(&ctx.github, &ctx.zulip).await
+        ping_project_goals_owners_automatically(&ctx.github, &ctx.zulip, &ctx.team_api).await
     }
 }
 
 /// Returns true if the user with the given github id is allowed to ping all group people
 /// and do other "project group adminstrative" tasks.
-pub async fn check_project_goal_acl(gh: &GithubClient, gh_id: u64) -> anyhow::Result<bool> {
+pub async fn check_project_goal_acl(
+    team_api_client: &TeamApiClient,
+    gh_id: u64,
+) -> anyhow::Result<bool> {
     const GOALS_TEAM: &str = "goals";
 
-    let team = match github::get_team(gh, GOALS_TEAM).await {
+    let team = match github::get_team(team_api_client, GOALS_TEAM).await {
         Ok(Some(team)) => team,
         Ok(None) => {
             log::info!("team ({}) failed to resolve to a known team", GOALS_TEAM);
@@ -85,6 +89,7 @@ pub async fn check_project_goal_acl(gh: &GithubClient, gh_id: u64) -> anyhow::Re
 async fn ping_project_goals_owners_automatically(
     gh: &GithubClient,
     zulip: &ZulipClient,
+    team_api: &TeamApiClient,
 ) -> anyhow::Result<()> {
     // Predicted schedule is to author a blog post on the 3rd week of the month.
     // We start pinging when the month starts until we see an update in this month
@@ -105,7 +110,15 @@ async fn ping_project_goals_owners_automatically(
             .format("on %b-%d")
             .to_string();
 
-    ping_project_goals_owners(gh, zulip, false, days_threshold as i64, &third_monday).await
+    ping_project_goals_owners(
+        gh,
+        zulip,
+        team_api,
+        false,
+        days_threshold as i64,
+        &third_monday,
+    )
+    .await
 }
 
 /// Sends a ping message to all project goal owners if
@@ -116,6 +129,7 @@ async fn ping_project_goals_owners_automatically(
 pub async fn ping_project_goals_owners(
     gh: &GithubClient,
     zulip: &ZulipClient,
+    team_api_client: &TeamApiClient,
     dry_run: bool,
     days_threshold: i64,
     next_update: &str,
@@ -151,7 +165,7 @@ pub async fn ping_project_goals_owners(
         }
 
         let zulip_topic_name = zulip_topic_name(&issue);
-        let Some(zulip_owners) = zulip_owners(gh, &issue).await? else {
+        let Some(zulip_owners) = zulip_owners(team_api_client, &issue).await? else {
             log::debug!("no owners assigned");
             continue;
         };
@@ -206,30 +220,33 @@ fn zulip_topic_name(issue: &Issue) -> String {
     title
 }
 
-async fn zulip_owners(gh: &GithubClient, issue: &Issue) -> anyhow::Result<Option<String>> {
+async fn zulip_owners(
+    team_api_client: &TeamApiClient,
+    issue: &Issue,
+) -> anyhow::Result<Option<String>> {
     use std::fmt::Write;
 
     Ok(match &issue.assignees[..] {
         [] => None,
-        [string0] => Some(owner_string(gh, string0).await?),
+        [string0] => Some(owner_string(team_api_client, string0).await?),
         [string0, string1] => Some(format!(
             "{} and {}",
-            owner_string(gh, string0).await?,
-            owner_string(gh, string1).await?
+            owner_string(team_api_client, string0).await?,
+            owner_string(team_api_client, string1).await?
         )),
         [string0 @ .., string1] => {
             let mut out = String::new();
             for s in string0 {
-                write!(out, "{}, ", owner_string(gh, s).await?).unwrap();
+                write!(out, "{}, ", owner_string(team_api_client, s).await?).unwrap();
             }
-            write!(out, "{}, ", owner_string(gh, string1).await?).unwrap();
+            write!(out, "{}, ", owner_string(team_api_client, string1).await?).unwrap();
             Some(out)
         }
     })
 }
 
-async fn owner_string(gh: &GithubClient, assignee: &User) -> anyhow::Result<String> {
-    if let Some(zulip_id) = to_zulip_id(gh, assignee.id).await? {
+async fn owner_string(team_api_client: &TeamApiClient, assignee: &User) -> anyhow::Result<String> {
+    if let Some(zulip_id) = to_zulip_id(team_api_client, assignee.id).await? {
         Ok(format!("@**|{zulip_id}**"))
     } else {
         // No zulip-id? Fallback to github user name.
@@ -241,8 +258,6 @@ async fn owner_string(gh: &GithubClient, assignee: &User) -> anyhow::Result<Stri
 }
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
-    let gh = &ctx.github;
-
     if event.repo().full_name != RUST_PROJECT_GOALS_REPO {
         return Ok(());
     }
@@ -259,7 +274,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 return Ok(());
             }
             let zulip_topic_name = zulip_topic_name(issue);
-            let zulip_owners = match zulip_owners(gh, issue).await? {
+            let zulip_owners = match zulip_owners(&ctx.team_api, issue).await? {
                 Some(names) => names,
                 None => format!("(no owners assigned)"),
             };
@@ -300,7 +315,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             let zulip_topic_name = zulip_topic_name(issue);
             let url = &comment.html_url;
             let text = &comment.body;
-            let zulip_author = owner_string(gh, &comment.user).await?;
+            let zulip_author = owner_string(&ctx.team_api, &comment.user).await?;
 
             let mut ticks = "````".to_string();
             while text.contains(&ticks) {
