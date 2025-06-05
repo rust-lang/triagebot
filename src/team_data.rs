@@ -1,12 +1,17 @@
-use anyhow::Context as _;
 use reqwest::Client;
 use rust_team_data::v1::{People, Teams, ZulipMapping, BASE_URL};
 use serde::de::DeserializeOwned;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct TeamApiClient {
     base_url: String,
     client: Client,
+    teams: CachedTeamItem<Teams>,
+    people: CachedTeamItem<People>,
+    zulip_mapping: CachedTeamItem<ZulipMapping>,
 }
 
 impl TeamApiClient {
@@ -19,6 +24,9 @@ impl TeamApiClient {
         Self {
             base_url,
             client: Client::new(),
+            teams: CachedTeamItem::new("/teams.json"),
+            people: CachedTeamItem::new("/people.json"),
+            zulip_mapping: CachedTeamItem::new("/zulip-map.json"),
         }
     }
 
@@ -84,22 +92,66 @@ impl TeamApiClient {
     }
 
     pub async fn zulip_map(&self) -> anyhow::Result<ZulipMapping> {
-        download(&self.client, &self.base_url, "/zulip-map.json")
-            .await
-            .context("team-api: zulip-map.json")
+        self.zulip_mapping.get(&self.client, &self.base_url).await
     }
 
     pub async fn teams(&self) -> anyhow::Result<Teams> {
-        download(&self.client, &self.base_url, "/teams.json")
-            .await
-            .context("team-api: teams.json")
+        self.teams.get(&self.client, &self.base_url).await
     }
 
     pub async fn people(&self) -> anyhow::Result<People> {
-        download(&self.client, &self.base_url, "/people.json")
-            .await
-            .context("team-api: people.json")
+        self.people.get(&self.client, &self.base_url).await
     }
+}
+
+/// How long should downloaded team data items be cached in memory.
+const CACHE_DURATION: Duration = Duration::from_secs(2 * 60);
+
+#[derive(Clone)]
+struct CachedTeamItem<T> {
+    value: Arc<RwLock<CachedValue<T>>>,
+    url_path: String,
+}
+
+impl<T: DeserializeOwned + Clone> CachedTeamItem<T> {
+    fn new(url_path: &str) -> Self {
+        Self {
+            value: Arc::new(RwLock::new(CachedValue::Empty)),
+            url_path: url_path.to_string(),
+        }
+    }
+
+    async fn get(&self, client: &Client, base_url: &str) -> anyhow::Result<T> {
+        let now = Instant::now();
+        {
+            let value = self.value.read().await;
+            if let CachedValue::Present {
+                value,
+                last_download,
+            } = &*value
+            {
+                if *last_download + CACHE_DURATION > now {
+                    return Ok(value.clone());
+                }
+            }
+        }
+        match download::<T>(client, base_url, &self.url_path).await {
+            Ok(v) => {
+                let mut value = self.value.write().await;
+                *value = CachedValue::Present {
+                    value: v.clone(),
+                    last_download: Instant::now(),
+                };
+                Ok(v)
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
+
+enum CachedValue<T> {
+    Empty,
+    Present { value: T, last_download: Instant },
 }
 
 async fn download<T: DeserializeOwned>(
