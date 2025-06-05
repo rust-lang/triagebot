@@ -267,16 +267,17 @@ impl User {
 }
 
 // Returns the ID of the given user, if the user is in the `all` team.
-pub async fn get_id_for_username<'a>(
-    client: &'a GithubClient,
+pub async fn get_id_for_username(
+    client: &GithubClient,
     login: &str,
 ) -> anyhow::Result<Option<u64>> {
     let permission = crate::team_data::teams(client).await?;
     let map = permission.teams;
+    let login = login.to_lowercase();
     Ok(map["all"]
         .members
         .iter()
-        .find(|g| g.github == login)
+        .find(|g| g.github.to_lowercase() == login)
         .map(|u| u.github_id))
 }
 
