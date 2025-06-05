@@ -398,7 +398,12 @@ pub(crate) struct MajorChangeConfig {
     /// This is the label to be added to newly opened proposals, so they can be
     /// discussed in a meeting.
     pub(crate) meeting_label: String,
+    /// This label signals there are concern(s) about the proposal.
+    pub(crate) concerns_label: Option<String>,
+    /// The Zulip stream ID where the messages about the status of
+    /// the major changed should be relayed.
     pub(crate) zulip_stream: u64,
+    /// Extra text in the opening major change.
     pub(crate) open_extra_text: Option<String>,
 }
 
