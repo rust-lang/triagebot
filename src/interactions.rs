@@ -38,26 +38,6 @@ impl<'a> ErrorComment<'a> {
     }
 }
 
-pub struct PingComment<'a> {
-    issue: &'a Issue,
-    users: &'a [&'a str],
-}
-
-impl<'a> PingComment<'a> {
-    pub fn new(issue: &'a Issue, users: &'a [&str]) -> PingComment<'a> {
-        PingComment { issue, users }
-    }
-
-    pub async fn post(&self, client: &GithubClient) -> anyhow::Result<()> {
-        let mut body = String::new();
-        for user in self.users {
-            write!(body, "@{} ", user)?;
-        }
-        self.issue.post_comment(client, &body).await?;
-        Ok(())
-    }
-}
-
 pub struct EditIssueBody<'a, T>
 where
     T: for<'t> Deserialize<'t> + Serialize + Default + std::fmt::Debug + Sync + PartialEq + Clone,
