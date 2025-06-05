@@ -318,7 +318,7 @@ async fn workqueue_commands(
                 assigned_prs.len(),
                 pluralize("PR", assigned_prs.len())
             );
-            writeln!(response, "Review capacity: {capacity}\n")?;
+            writeln!(response, "Review capacity: `{capacity}`\n")?;
             writeln!(response, "Rotation mode: *{rotation_mode}*\n")?;
             writeln!(response, "*Note that only certain PRs that are assigned to you are included in your review queue.*")?;
             response
