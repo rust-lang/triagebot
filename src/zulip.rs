@@ -179,7 +179,7 @@ async fn handle_command<'a>(
     message_data: &'a Message,
 ) -> anyhow::Result<Option<String>> {
     log::trace!("handling zulip command {:?}", command);
-    let words: Vec<&str> = command.split_whitespace().collect();
+    let mut words: Vec<&str> = command.split_whitespace().collect();
 
     // Missing stream means that this is a direct message
     if message_data.stream_id.is_none() {
@@ -200,6 +200,9 @@ async fn handle_command<'a>(
                     impersonated = true;
                     gh_id = impersonated_gh_id;
                 }
+
+                // Skip the first two arguments for the rest of CLI parsing
+                words = words[2..].iter().copied().collect();
             } else {
                 return Err(anyhow::anyhow!(
                     "Failed to parse command; expected `as <username> <command...>`."
