@@ -3,7 +3,7 @@
 use super::super::*;
 use crate::db::review_prefs::{upsert_review_prefs, RotationMode};
 use crate::github::{PullRequestNumber, User};
-use crate::handlers::pr_tracking::ReviewerWorkqueue;
+use crate::handlers::pr_tracking::{AssignedPullRequest, ReviewerWorkqueue};
 use crate::tests::github::{issue, user};
 use crate::tests::{run_db_test, TestContext};
 
@@ -13,7 +13,7 @@ struct AssignCtx {
     teams: Teams,
     config: AssignConfig,
     issue: Issue,
-    reviewer_workqueue: HashMap<UserId, HashSet<PullRequestNumber>>,
+    reviewer_workqueue: HashMap<UserId, HashMap<PullRequestNumber, AssignedPullRequest>>,
 }
 
 impl AssignCtx {
@@ -50,7 +50,16 @@ impl AssignCtx {
     }
 
     fn assign_prs(mut self, user_id: UserId, count: u64) -> Self {
-        let prs: HashSet<PullRequestNumber> = (0..count).collect();
+        let prs = (0..count)
+            .map(|pr_number| {
+                (
+                    pr_number,
+                    AssignedPullRequest {
+                        title: format!("PR {pr_number}"),
+                    },
+                )
+            })
+            .collect();
         self.reviewer_workqueue.insert(user_id, prs);
         self
     }

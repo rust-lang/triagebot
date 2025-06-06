@@ -348,13 +348,7 @@ async fn workqueue_commands(
                 .await
                 .into_iter()
                 .collect::<Vec<_>>();
-            assigned_prs.sort();
-
-            let prs = assigned_prs
-                .iter()
-                .map(|pr| format!("#{pr}"))
-                .collect::<Vec<String>>()
-                .join(", ");
+            assigned_prs.sort_by_key(|(pr_number, _)| *pr_number);
 
             let review_prefs = get_review_prefs(&db_client, gh_id)
                 .await
@@ -372,8 +366,18 @@ async fn workqueue_commands(
                 RotationMode::OffRotation => "off rotation",
             };
 
+            let prs = assigned_prs
+                .iter()
+                .map(|(pr_number, pr)| {
+                    format!(
+                        "- [#{pr_number}](https://github.com/rust-lang/rust/pull/{pr_number}) {}",
+                        pr.title
+                    )
+                })
+                .collect::<Vec<String>>()
+                .join("\n");
             let mut response = format!(
-                "`rust-lang/rust` PRs in your review queue: {prs} ({} {})\n",
+                "`rust-lang/rust` PRs in your review queue ({} {}):\n{prs}\n",
                 assigned_prs.len(),
                 pluralize("PR", assigned_prs.len())
             );
