@@ -19,7 +19,7 @@ pub(super) async fn handle_command(
     }
     if !event
         .user()
-        .is_team_member(&ctx.github)
+        .is_team_member(&ctx.team_api)
         .await
         .ok()
         .unwrap_or(false)

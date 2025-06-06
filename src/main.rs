@@ -17,6 +17,7 @@ use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
 use triagebot::jobs::{
     default_jobs, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS,
 };
+use triagebot::team_data::TeamApiClient;
 use triagebot::zulip::client::ZulipClient;
 use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
 
@@ -250,10 +251,11 @@ async fn serve_req(
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     let gh = github::GithubClient::new_from_env();
     let zulip = ZulipClient::new_from_env();
+    let team_api = TeamApiClient::new_from_env();
     let oc = octocrab::OctocrabBuilder::new()
         .personal_token(github::default_token_from_env())
         .build()
-        .expect("Failed to build octograb.");
+        .expect("Failed to build octocrab.");
 
     // Load the initial workqueue state from GitHub
     // In case this fails, we do not want to block triagebot, instead
@@ -291,6 +293,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         })?,
         db: pool,
         github: gh,
+        team_api,
         octocrab: oc,
         workqueue: Arc::new(RwLock::new(workqueue)),
         zulip,
