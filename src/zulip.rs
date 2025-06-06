@@ -366,21 +366,26 @@ async fn workqueue_commands(
                 RotationMode::OffRotation => "off rotation",
             };
 
-            let prs = assigned_prs
-                .iter()
-                .map(|(pr_number, pr)| {
-                    format!(
-                        "- [#{pr_number}](https://github.com/rust-lang/rust/pull/{pr_number}) {}",
-                        pr.title
-                    )
-                })
-                .collect::<Vec<String>>()
-                .join("\n");
-            let mut response = format!(
-                "`rust-lang/rust` PRs in your review queue ({} {}):\n{prs}\n",
-                assigned_prs.len(),
-                pluralize("PR", assigned_prs.len())
-            );
+            let mut response = if assigned_prs.is_empty() {
+                "There are no PRs in your `rust-lang/rust` review queue\n".to_string()
+            } else {
+                let prs = assigned_prs
+                    .iter()
+                    .map(|(pr_number, pr)| {
+                        format!(
+                            "- [#{pr_number}](https://github.com/rust-lang/rust/pull/{pr_number}) {}",
+                            pr.title
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n");
+                format!(
+                    "`rust-lang/rust` PRs in your review queue ({} {}):\n{prs}\n\n",
+                    assigned_prs.len(),
+                    pluralize("PR", assigned_prs.len())
+                )
+            };
+
             writeln!(response, "Review capacity: `{capacity}`\n")?;
             writeln!(response, "Rotation mode: *{rotation_mode}*\n")?;
             writeln!(response, "*Note that only certain PRs that are assigned to you are included in your review queue.*")?;
