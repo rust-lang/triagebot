@@ -397,6 +397,7 @@ async fn determine_assignee(
             &teams,
             config,
             &event.issue,
+            &event.issue.user.login,
             &[name],
         )
         .await
@@ -420,6 +421,7 @@ async fn determine_assignee(
                 &teams,
                 config,
                 &event.issue,
+                &event.issue.user.login,
                 &candidates,
             )
             .await
@@ -461,6 +463,7 @@ async fn determine_assignee(
             &teams,
             config,
             &event.issue,
+            &event.issue.user.login,
             fallback,
         )
         .await
@@ -645,6 +648,7 @@ pub(super) async fn handle_command(
             &teams,
             config,
             issue,
+            &event.user().login,
             &[assignee.to_string()],
         )
         .await
@@ -871,11 +875,12 @@ async fn find_reviewer_from_names(
     teams: &Teams,
     config: &AssignConfig,
     issue: &Issue,
+    requested_by: &str,
     names: &[String],
 ) -> Result<ReviewerSelection, FindReviewerError> {
     // Fast path for self-assign, which is always allowed.
     if let [name] = names {
-        if is_self_assign(&name, &issue.user.login) {
+        if is_self_assign(&name, requested_by) {
             return Ok(ReviewerSelection::from_name(name.clone()));
         }
     }
