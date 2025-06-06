@@ -36,6 +36,12 @@ pub enum ChatCommand {
     /// Inspect or modify your reviewer workqueue.
     #[clap(subcommand)]
     Work(WorkqueueCmd),
+    /// Print the review statistics of the given Rust team.
+    /// Shows the reviewer queue contents of the team members.
+    TeamStats {
+        /// Name of the team to query.
+        name: String,
+    },
 }
 
 #[derive(clap::Parser, Debug, PartialEq)]

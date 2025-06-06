@@ -4,13 +4,14 @@ mod commands;
 
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
-use crate::db::review_prefs::{get_review_prefs, upsert_review_prefs, RotationMode};
-use crate::github::{get_id_for_username, GithubClient, User};
+use crate::db::review_prefs::{
+    get_review_prefs, get_review_prefs_batch, upsert_review_prefs, RotationMode,
+};
+use crate::github::User;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
 use crate::handlers::project_goals::{self, ping_project_goals_owners};
 use crate::handlers::Context;
-use crate::team_data::{people, teams};
 use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
@@ -18,7 +19,8 @@ use crate::zulip::commands::{
     parse_cli, ChatCommand, LookupCmd, StreamCommand, WorkqueueCmd, WorkqueueLimit,
 };
 use anyhow::{format_err, Context as _};
-use rust_team_data::v1::TeamKind;
+use rust_team_data::v1::{TeamKind, TeamMember};
+use std::cmp::Reverse;
 use std::fmt::Write as _;
 use subtle::ConstantTimeEq;
 use tracing as log;
@@ -83,33 +85,6 @@ struct Response {
     content: String,
 }
 
-pub async fn to_github_id(client: &GithubClient, zulip_id: u64) -> anyhow::Result<Option<u64>> {
-    let map = crate::team_data::zulip_map(client).await?;
-    Ok(map.users.get(&zulip_id).copied())
-}
-
-pub async fn username_from_gh_id(
-    client: &GithubClient,
-    gh_id: u64,
-) -> anyhow::Result<Option<String>> {
-    let people_map = crate::team_data::people(client).await?;
-    Ok(people_map
-        .people
-        .into_iter()
-        .filter(|(_, p)| p.github_id == gh_id)
-        .map(|p| p.0)
-        .next())
-}
-
-pub async fn to_zulip_id(client: &GithubClient, github_id: u64) -> anyhow::Result<Option<u64>> {
-    let map = crate::team_data::zulip_map(client).await?;
-    Ok(map
-        .users
-        .iter()
-        .find(|&(_, &github)| github == github_id)
-        .map(|v| *v.0))
-}
-
 /// Top-level handler for Zulip webhooks.
 ///
 /// Returns a JSON response.
@@ -157,7 +132,7 @@ async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Op
     log::trace!("zulip hook: {req:?}");
 
     // Zulip commands are only available to users in the team database
-    let gh_id = match to_github_id(&ctx.github, req.message.sender_id).await {
+    let gh_id = match ctx.team_api.zulip_to_github_id(req.message.sender_id).await {
         Ok(Some(gh_id)) => gh_id,
         Ok(None) => {
             return Err(anyhow::anyhow!(
@@ -187,7 +162,9 @@ async fn handle_command<'a>(
         let mut impersonated = false;
         if let Some(&"as") = words.get(0) {
             if let Some(username) = words.get(1) {
-                let impersonated_gh_id = match get_id_for_username(&ctx.github, username)
+                let impersonated_gh_id = match ctx
+                    .team_api
+                    .get_gh_id_from_username(username)
                     .await
                     .context("getting ID of github user")?
                 {
@@ -225,13 +202,16 @@ async fn handle_command<'a>(
             ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
             ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
             ChatCommand::Work(cmd) => workqueue_commands(ctx, gh_id, cmd).await,
+            ChatCommand::TeamStats { name } => team_status_cmd(ctx, &name).await,
         };
 
         let output = output?;
 
         // Let the impersonated person know about the impersonation if the command was sensitive
         if impersonated && is_sensitive_command(&cmd) {
-            let impersonated_zulip_id = to_zulip_id(&ctx.github, gh_id)
+            let impersonated_zulip_id = ctx
+                .team_api
+                .github_to_zulip_id(gh_id)
                 .await?
                 .ok_or_else(|| anyhow::anyhow!("Zulip user for GitHub ID {gh_id} was not found"))?;
             let users = ctx.zulip.get_zulip_users().await?;
@@ -285,10 +265,11 @@ async fn handle_command<'a>(
                 threshold,
                 next_update,
             } => {
-                if project_goals::check_project_goal_acl(&ctx.github, gh_id).await? {
+                if project_goals::check_project_goal_acl(&ctx.team_api, gh_id).await? {
                     ping_project_goals_owners(
                         &ctx.github,
                         &ctx.zulip,
+                        &ctx.team_api,
                         false,
                         threshold as i64,
                         &format!("on {next_update}"),
@@ -307,6 +288,104 @@ async fn handle_command<'a>(
     }
 }
 
+async fn team_status_cmd(ctx: &Context, team_name: &str) -> anyhow::Result<Option<String>> {
+    use std::fmt::Write;
+
+    let Some(team) = ctx.team_api.get_team(team_name).await? else {
+        return Ok(Some(format!("Team {team_name} not found")));
+    };
+
+    let mut members = team.members;
+    members.sort_by(|a, b| a.github.cmp(&b.github));
+
+    let usernames: Vec<&str> = members
+        .iter()
+        .map(|member| member.github.as_str())
+        .collect();
+
+    let db = ctx.db.get().await;
+    let review_prefs = get_review_prefs_batch(&db, &usernames)
+        .await
+        .context("cannot load review preferences")?;
+
+    let workqueue = ctx.workqueue.read().await;
+    let total_assigned: u64 = members
+        .iter()
+        .map(|member| workqueue.assigned_pr_count(member.github_id))
+        .sum();
+
+    let table_header = |title: &str| {
+        format!(
+            r"### {title}
+| Username | Name | Assigned PRs | Review capacity |
+|----------|------|-------------:|----------------:|"
+        )
+    };
+
+    let format_member_row = |member: &TeamMember| {
+        let review_prefs = review_prefs.get(member.github.as_str());
+        let max_capacity = review_prefs
+            .as_ref()
+            .and_then(|prefs| prefs.max_assigned_prs);
+        let assigned_prs = workqueue.assigned_pr_count(member.github_id);
+
+        let max_capacity = max_capacity
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "unlimited".to_string());
+        format!(
+            "| `{}` | {} | `{assigned_prs}` | `{max_capacity}` |",
+            member.github, member.name
+        )
+    };
+
+    let (mut on_rotation, mut off_rotation): (Vec<&TeamMember>, Vec<&TeamMember>) =
+        members.iter().partition(|member| {
+            let rotation_mode = review_prefs
+                .get(member.github.as_str())
+                .map(|prefs| prefs.rotation_mode)
+                .unwrap_or_default();
+            matches!(rotation_mode, RotationMode::OnRotation)
+        });
+    on_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
+    off_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
+
+    let on_rotation = on_rotation
+        .into_iter()
+        .map(format_member_row)
+        .collect::<Vec<_>>();
+    let off_rotation = off_rotation
+        .into_iter()
+        .map(format_member_row)
+        .collect::<Vec<_>>();
+
+    // e.g. 2 members, 5 PRs assigned
+    let mut msg = format!(
+        "{} {}, {} {} assigned\n\n",
+        members.len(),
+        pluralize("member", members.len()),
+        total_assigned,
+        pluralize("PR", total_assigned as usize)
+    );
+    if !on_rotation.is_empty() {
+        writeln!(
+            msg,
+            "{}",
+            table_header(&format!("ON rotation ({})", on_rotation.len()))
+        )?;
+        writeln!(msg, "{}\n", on_rotation.join("\n"))?;
+    }
+    if !off_rotation.is_empty() {
+        writeln!(
+            msg,
+            "{}",
+            table_header(&format!("OFF rotation ({})", on_rotation.len()))
+        )?;
+        writeln!(msg, "{}\n", off_rotation.join("\n"))?;
+    }
+
+    Ok(Some(msg))
+}
+
 /// Returns true if we should notify user who was impersonated by someone who executed this command.
 /// More or less, the following holds: `sensitive` == `not read-only`.
 fn is_sensitive_command(cmd: &ChatCommand) -> bool {
@@ -315,8 +394,7 @@ fn is_sensitive_command(cmd: &ChatCommand) -> bool {
         | ChatCommand::Add { .. }
         | ChatCommand::Move { .. }
         | ChatCommand::Meta { .. } => true,
-        ChatCommand::Whoami => false,
-        ChatCommand::Lookup(_) => false,
+        ChatCommand::Whoami | ChatCommand::Lookup(_) | ChatCommand::TeamStats { .. } => false,
         ChatCommand::Work(cmd) => match cmd {
             WorkqueueCmd::Show => false,
             WorkqueueCmd::SetPrLimit { .. } => true,
@@ -334,7 +412,9 @@ async fn workqueue_commands(
 ) -> anyhow::Result<Option<String>> {
     let db_client = ctx.db.get().await;
 
-    let gh_username = username_from_gh_id(&ctx.github, gh_id)
+    let gh_username = ctx
+        .team_api
+        .username_from_gh_id(gh_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Cannot find your GitHub username in the team database"))?;
     let user = User {
@@ -442,10 +522,14 @@ async fn workqueue_commands(
 
 /// The `whoami` command displays the user's membership in Rust teams.
 async fn whoami_cmd(ctx: &Context, gh_id: u64) -> anyhow::Result<Option<String>> {
-    let gh_username = username_from_gh_id(&ctx.github, gh_id)
+    let gh_username = ctx
+        .team_api
+        .username_from_gh_id(gh_id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Cannot find your GitHub username in the team database"))?;
-    let teams = teams(&ctx.github)
+    let teams = ctx
+        .team_api
+        .teams()
         .await
         .context("cannot load team information")?;
     let mut entries = teams
@@ -531,10 +615,10 @@ async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::
         Some(name) => name.to_string(),
         None => {
             let zulip_id = zulip_user.user_id;
-            let Some(gh_id) = to_github_id(&ctx.github, zulip_id).await? else {
+            let Some(gh_id) = ctx.team_api.zulip_to_github_id(zulip_id).await? else {
                 return Ok(format!("Zulip user {zulip_username} was not found in team Zulip mapping. Maybe they do not have zulip-id configured in team."));
             };
-            let Some(username) = username_from_gh_id(&ctx.github, gh_id).await? else {
+            let Some(username) = ctx.team_api.username_from_gh_id(gh_id).await? else {
                 return Ok(format!(
                     "Zulip user {zulip_username} was not found in the team database."
                 ));
@@ -580,7 +664,7 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
         ctx: &Context,
         gh_username: &str,
     ) -> anyhow::Result<Option<u64>> {
-        let people = people(&ctx.github).await?.people;
+        let people = ctx.team_api.people().await?.people;
 
         // Lookup the person in the team DB
         let Some(person) = people.get(gh_username).or_else(|| {
@@ -593,7 +677,7 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
             return Ok(None);
         };
 
-        let Some(zulip_id) = to_zulip_id(&ctx.github, person.github_id).await? else {
+        let Some(zulip_id) = ctx.team_api.github_to_zulip_id(person.github_id).await? else {
             return Ok(None);
         };
         Ok(Some(zulip_id))

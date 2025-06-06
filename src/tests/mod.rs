@@ -3,6 +3,7 @@ use crate::db::users::record_username;
 use crate::db::{make_client, ClientPool, PooledClient};
 use crate::github::GithubClient;
 use crate::handlers::Context;
+use crate::team_data::TeamApiClient;
 use crate::zulip::client::ZulipClient;
 use octocrab::Octocrab;
 use std::future::Future;
@@ -72,9 +73,11 @@ impl TestContext {
             "https://rust-fake.zulipchat.com".to_string(),
             "test-bot@zulipchat.com".to_string(),
         );
+        let team_api = TeamApiClient::new_from_env();
         let ctx = Context {
             github,
             zulip,
+            team_api,
             db: pool,
             username: "triagebot-test".to_string(),
             octocrab,
