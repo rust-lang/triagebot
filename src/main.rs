@@ -255,23 +255,37 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .build()
         .expect("Failed to build octograb.");
 
+    // Loading the workqueue takes ~10-15s, and it's annoying for local rebuilds.
+    // Allow users to opt out of it.
+    let skip_loading_workqueue = env::var("SKIP_WORKQUEUE")
+        .ok()
+        .map(|v| v == "1")
+        .unwrap_or(false);
+
     // Load the initial workqueue state from GitHub
     // In case this fails, we do not want to block triagebot, instead
     // we use an empty workqueue and let it be updated later through
     // webhooks and the `PullRequestAssignmentUpdate` cron job.
-    tracing::info!("Loading reviewer workqueue for rust-lang/rust");
-    let workqueue = match tokio::time::timeout(Duration::from_secs(60), load_workqueue(&oc)).await {
-        Ok(Ok(workqueue)) => workqueue,
-        Ok(Err(error)) => {
-            tracing::error!("Cannot load initial workqueue: {error:?}");
-            ReviewerWorkqueue::default()
-        }
-        Err(_) => {
-            tracing::error!("Cannot load initial workqueue, timeouted after a minute");
-            ReviewerWorkqueue::default()
-        }
+    let workqueue = if skip_loading_workqueue {
+        tracing::warn!("Skipping workqueue loading");
+        ReviewerWorkqueue::default()
+    } else {
+        tracing::info!("Loading reviewer workqueue for rust-lang/rust");
+        let workqueue =
+            match tokio::time::timeout(Duration::from_secs(60), load_workqueue(&oc)).await {
+                Ok(Ok(workqueue)) => workqueue,
+                Ok(Err(error)) => {
+                    tracing::error!("Cannot load initial workqueue: {error:?}");
+                    ReviewerWorkqueue::default()
+                }
+                Err(_) => {
+                    tracing::error!("Cannot load initial workqueue, timeouted after a minute");
+                    ReviewerWorkqueue::default()
+                }
+            };
+        tracing::info!("Workqueue loaded");
+        workqueue
     };
-    tracing::info!("Workqueue loaded");
 
     // Only run the migrations after the workqueue has been loaded, immediately
     // before starting the HTTP server.
