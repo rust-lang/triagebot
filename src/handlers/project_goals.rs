@@ -17,19 +17,29 @@ const RUST_PROJECT_GOALS_REPO: &'static str = "rust-lang/rust-project-goals";
 const GOALS_STREAM: u64 = 435869; // #project-goals
 const C_TRACKING_ISSUE: &str = "C-tracking-issue";
 
-const MESSAGE: &str = r#"
-Dear $OWNERS, it's been $DAYS days since the last update to your goal *$GOAL*.
+fn message(
+    zulip_owners: &str,
+    days: &str,
+    issue_number: u64,
+    issue_title: &str,
+    next_update: &str,
+) -> String {
+    format!(
+        r#"
+Dear {zulip_owners}, it's been {days} days since the last update to your goal *{issue_title}*.
 
-We will begin drafting the next blog post collecting goal updates $NEXT_UPDATE.
+We will begin drafting the next blog post collecting goal updates {next_update}.
 
-Please comment on the github tracking issue goals#$GOALNUM before then. Thanks! <3
+Please comment on the github tracking issue goals#{issue_number} before then. Thanks! <3
 
 Here is a suggested template for updates (feel free to drop the items that don't apply):
 
 * **Key developments:** *What has happened since the last time. It's perfectly ok to list "nothing" if that's the truth, we know people get busy.*
 * **Blockers:** *List any Rust teams you are waiting on and what you are waiting for.*
 * **Help wanted:** *Are there places where you are looking for contribution or feedback from the broader community?*
-"#;
+"#
+    )
+}
 
 pub struct ProjectGoalsUpdateJob;
 
@@ -146,19 +156,17 @@ pub async fn ping_project_goals_owners(
             continue;
         };
 
-        let message = MESSAGE
-            .replace("$OWNERS", &zulip_owners)
-            .replace(
-                "$DAYS",
-                &if comments <= 1 {
-                    "∞".to_string()
-                } else {
-                    days_since_last_comment.to_string()
-                },
-            )
-            .replace("$GOALNUM", &issue.number.to_string())
-            .replace("$GOAL", &issue.title)
-            .replace("$NEXT_UPDATE", next_update);
+        let message = message(
+            &zulip_owners,
+            &if comments <= 1 {
+                "∞".to_string()
+            } else {
+                days_since_last_comment.to_string()
+            },
+            issue.number,
+            &issue.title,
+            next_update,
+        );
 
         let zulip_req = crate::zulip::MessageApiRequest {
             recipient: Recipient::Stream {
