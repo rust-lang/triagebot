@@ -49,7 +49,10 @@ use cron::Schedule;
 use crate::handlers::pull_requests_assignment_update::PullRequestAssignmentUpdate;
 use crate::{
     db::jobs::JobSchedule,
-    handlers::{docs_update::DocsUpdateJob, rustc_commits::RustcCommitsJob, Context},
+    handlers::{
+        docs_update::DocsUpdateJob, major_change::MajorChangeAcceptenceJob,
+        rustc_commits::RustcCommitsJob, Context,
+    },
 };
 
 /// How often new cron-based jobs will be placed in the queue.
@@ -66,6 +69,7 @@ pub fn jobs() -> Vec<Box<dyn Job + Send + Sync>> {
         Box::new(DocsUpdateJob),
         Box::new(RustcCommitsJob),
         Box::new(PullRequestAssignmentUpdate),
+        Box::new(MajorChangeAcceptenceJob),
     ]
 }
 

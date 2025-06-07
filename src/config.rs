@@ -400,6 +400,9 @@ pub(crate) struct MajorChangeConfig {
     pub(crate) meeting_label: String,
     /// This label signals there are concern(s) about the proposal.
     pub(crate) concerns_label: Option<String>,
+    /// An optional duration (in days) for the waiting period after second for the
+    /// major change to become automaticaly accepted.
+    pub(crate) waiting_period: Option<u16>,
     /// The Zulip stream ID where the messages about the status of
     /// the major changed should be relayed.
     pub(crate) zulip_stream: u64,
