@@ -15,7 +15,7 @@ use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
 use crate::zulip::commands::{
-    parse_cli, ChatCommand, LookupCmd, StreamCommand, WorkqueueCmd, WorkqueueLimit,
+    parse_cli, ChatCommand, LookupCmd, PingGoalsArgs, StreamCommand, WorkqueueCmd, WorkqueueLimit,
 };
 use anyhow::{format_err, Context as _};
 use rust_team_data::v1::TeamKind;
@@ -225,6 +225,8 @@ async fn handle_command<'a>(
             ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
             ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
             ChatCommand::Work(cmd) => workqueue_commands(ctx, gh_id, cmd).await,
+            ChatCommand::PingGoals(args) => ping_goals_cmd(ctx, gh_id, &args).await,
+            ChatCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
         };
 
         let output = output?;
@@ -281,29 +283,32 @@ async fn handle_command<'a>(
             StreamCommand::Read => post_waiter(&ctx, message_data, WaitingMessage::start_reading())
                 .await
                 .map_err(|e| format_err!("Failed to await at this time: {e:?}")),
-            StreamCommand::PingGoals {
-                threshold,
-                next_update,
-            } => {
-                if project_goals::check_project_goal_acl(&ctx.github, gh_id).await? {
-                    ping_project_goals_owners(
-                        &ctx.github,
-                        &ctx.zulip,
-                        false,
-                        threshold as i64,
-                        &format!("on {next_update}"),
-                    )
-                    .await
-                    .map_err(|e| format_err!("Failed to await at this time: {e:?}"))?;
-                    Ok(None)
-                } else {
-                    Err(format_err!(
-                            "That command is only permitted for those running the project-goal program.",
-                        ))
-                }
-            }
+            StreamCommand::PingGoals(args) => ping_goals_cmd(ctx, gh_id, &args).await,
             StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
         }
+    }
+}
+
+async fn ping_goals_cmd(
+    ctx: &Context,
+    gh_id: u64,
+    args: &PingGoalsArgs,
+) -> anyhow::Result<Option<String>> {
+    if project_goals::check_project_goal_acl(&ctx.github, gh_id).await? {
+        ping_project_goals_owners(
+            &ctx.github,
+            &ctx.zulip,
+            false,
+            args.threshold as i64,
+            &format!("on {}", args.next_update),
+        )
+        .await
+        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))?;
+        Ok(None)
+    } else {
+        Err(format_err!(
+            "That command is only permitted for those running the project-goal program.",
+        ))
     }
 }
 
@@ -315,8 +320,10 @@ fn is_sensitive_command(cmd: &ChatCommand) -> bool {
         | ChatCommand::Add { .. }
         | ChatCommand::Move { .. }
         | ChatCommand::Meta { .. } => true,
-        ChatCommand::Whoami => false,
-        ChatCommand::Lookup(_) => false,
+        ChatCommand::Whoami
+        | ChatCommand::DocsUpdate
+        | ChatCommand::PingGoals(_)
+        | ChatCommand::Lookup(_) => false,
         ChatCommand::Work(cmd) => match cmd {
             WorkqueueCmd::Show => false,
             WorkqueueCmd::SetPrLimit { .. } => true,

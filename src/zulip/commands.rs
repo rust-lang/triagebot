@@ -36,6 +36,10 @@ pub enum ChatCommand {
     /// Inspect or modify your reviewer workqueue.
     #[clap(subcommand)]
     Work(WorkqueueCmd),
+    /// Ping project goal owners.
+    PingGoals(PingGoalsArgs),
+    /// Update docs
+    DocsUpdate,
 }
 
 #[derive(clap::Parser, Debug, PartialEq)]
@@ -151,14 +155,17 @@ pub enum StreamCommand {
     /// Read a document.
     Read,
     /// Ping project goal owners.
-    PingGoals {
-        /// Number of days before an update is considered stale
-        threshold: u64,
-        /// Date of next update
-        next_update: String,
-    },
+    PingGoals(PingGoalsArgs),
     /// Update docs
     DocsUpdate,
+}
+
+#[derive(clap::Parser, Debug, PartialEq)]
+pub struct PingGoalsArgs {
+    /// Number of days before an update is considered stale
+    pub threshold: u64,
+    /// Date of next update
+    pub next_update: String,
 }
 
 /// Helper function to parse CLI arguments without any colored help or error output.
