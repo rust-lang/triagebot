@@ -34,7 +34,7 @@ mod concern;
 pub mod docs_update;
 mod github_releases;
 mod issue_links;
-mod major_change;
+pub(crate) mod major_change;
 mod mentions;
 mod merge_conflicts;
 mod milestone_prs;
