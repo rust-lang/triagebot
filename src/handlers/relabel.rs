@@ -8,7 +8,7 @@
 //! If the command was successful, there will be no feedback beyond the label change to reduce
 //! notification noise.
 
-use crate::team_data::TeamApiClient;
+use crate::team_data::TeamClient;
 use crate::{
     config::RelabelConfig,
     github::UnknownLabels,
@@ -28,7 +28,7 @@ pub(super) async fn handle_command(
     let mut to_add = vec![];
     for delta in &input.0 {
         let name = delta.label().as_str();
-        let err = match check_filter(name, config, is_member(&event.user(), &ctx.team_api).await) {
+        let err = match check_filter(name, config, is_member(&event.user(), &ctx.team).await) {
             Ok(CheckFilterResult::Allow) => None,
             Ok(CheckFilterResult::Deny) => Some(format!(
                 "Label {} can only be set by Rust team members",
@@ -106,7 +106,7 @@ enum TeamMembership {
     Unknown,
 }
 
-async fn is_member(user: &github::User, client: &TeamApiClient) -> TeamMembership {
+async fn is_member(user: &github::User, client: &TeamClient) -> TeamMembership {
     match user.is_team_member(client).await {
         Ok(true) => TeamMembership::Member,
         Ok(false) => TeamMembership::Outsider,

@@ -1,7 +1,7 @@
 use crate::config::{self, Config, ConfigurationError};
 use crate::github::{Event, GithubClient, IssueCommentAction, IssuesAction, IssuesEvent};
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
-use crate::team_data::TeamApiClient;
+use crate::team_data::TeamClient;
 use crate::zulip::client::ZulipClient;
 use octocrab::Octocrab;
 use parser::command::{assign::AssignCommand, Command, Input};
@@ -375,7 +375,7 @@ command_handlers! {
 pub struct Context {
     pub github: GithubClient,
     pub zulip: ZulipClient,
-    pub team_api: TeamApiClient,
+    pub team: TeamClient,
     pub db: crate::db::ClientPool,
     pub username: String,
     pub octocrab: Octocrab,

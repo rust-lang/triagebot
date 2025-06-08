@@ -1,4 +1,4 @@
-use crate::team_data::TeamApiClient;
+use crate::team_data::TeamClient;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -241,7 +241,7 @@ impl User {
             .await
     }
 
-    pub async fn is_team_member<'a>(&'a self, client: &'a TeamApiClient) -> anyhow::Result<bool> {
+    pub async fn is_team_member<'a>(&'a self, client: &'a TeamClient) -> anyhow::Result<bool> {
         log::trace!("Getting team membership for {:?}", self.login);
         let permission = client.teams().await?;
         let map = permission.teams;
@@ -2014,7 +2014,7 @@ impl<'q> IssuesQuery for Query<'q> {
         include_fcp_details: bool,
         include_mcp_details: bool,
         gh_client: &'a GithubClient,
-        team_api_client: &'a TeamApiClient,
+        team_client: &'a TeamClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         let issues = repo
             .get_issues(&gh_client, self)
@@ -2030,7 +2030,7 @@ impl<'q> IssuesQuery for Query<'q> {
         };
 
         let zulip_map = if include_fcp_details {
-            Some(team_api_client.zulip_map().await?)
+            Some(team_client.zulip_map().await?)
         } else {
             None
         };
@@ -2841,7 +2841,7 @@ pub trait IssuesQuery {
         include_fcp_details: bool,
         include_mcp_details: bool,
         gh_client: &'a GithubClient,
-        team_api_client: &'a TeamApiClient,
+        team_client: &'a TeamClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>>;
 }
 
@@ -2854,7 +2854,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
         _include_fcp_details: bool,
         _include_mcp_details: bool,
         client: &'a GithubClient,
-        _team_api_client: &'a TeamApiClient,
+        _team_client: &'a TeamClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         use cynic::QueryBuilder;
         use github_graphql::queries;
@@ -3073,7 +3073,7 @@ impl IssuesQuery for DesignMeetings {
         _include_fcp_details: bool,
         _include_mcp_details: bool,
         client: &'a GithubClient,
-        _team_api_client: &'a TeamApiClient,
+        _team_client: &'a TeamClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         use github_graphql::project_items::ProjectV2ItemContent;
 

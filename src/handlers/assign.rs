@@ -331,7 +331,7 @@ async fn determine_assignee(
     diff: &[FileDiff],
 ) -> anyhow::Result<(Option<ReviewerSelection>, bool)> {
     let mut db_client = ctx.db.get().await;
-    let teams = &ctx.team_api.teams().await?;
+    let teams = &ctx.team.teams().await?;
     if let Some(name) = assign_command {
         // User included `r?` in the opening PR body.
         match find_reviewer_from_names(
@@ -510,12 +510,11 @@ pub(super) async fn handle_command(
     event: &Event,
     cmd: AssignCommand,
 ) -> anyhow::Result<()> {
-    let is_team_member =
-        if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.team_api).await {
-            false
-        } else {
-            true
-        };
+    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.team).await {
+        false
+    } else {
+        true
+    };
 
     // Don't handle commands in comments from the bot. Some of the comments it
     // posts contain commands to instruct the user, not things that the bot
@@ -545,7 +544,7 @@ pub(super) async fn handle_command(
             return Ok(());
         }
 
-        let teams = ctx.team_api.teams().await?;
+        let teams = ctx.team.teams().await?;
 
         let assignee = match cmd {
             AssignCommand::Claim => event.user().login.clone(),

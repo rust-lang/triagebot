@@ -247,7 +247,7 @@ pub(super) async fn handle_command(
 
     let is_team_member = event
         .user()
-        .is_team_member(&ctx.team_api)
+        .is_team_member(&ctx.team)
         .await
         .ok()
         .unwrap_or(false);

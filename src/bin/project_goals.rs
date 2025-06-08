@@ -1,5 +1,5 @@
 use clap::Parser;
-use triagebot::team_data::TeamApiClient;
+use triagebot::team_data::TeamClient;
 use triagebot::zulip::client::ZulipClient;
 use triagebot::{github::GithubClient, handlers::project_goals};
 
@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
     let opt = Opt::parse();
     let gh = GithubClient::new_from_env();
     let zulip = ZulipClient::new_from_env();
-    let team_api = TeamApiClient::new_from_env();
+    let team_api = TeamClient::new_from_env();
     project_goals::ping_project_goals_owners(
         &gh,
         &zulip,

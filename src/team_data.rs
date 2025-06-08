@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
 #[derive(Clone)]
-pub struct TeamApiClient {
+pub struct TeamClient {
     base_url: String,
     client: Client,
     teams: CachedTeamItem<Teams>,
@@ -14,7 +14,7 @@ pub struct TeamApiClient {
     zulip_mapping: CachedTeamItem<ZulipMapping>,
 }
 
-impl TeamApiClient {
+impl TeamClient {
     pub fn new_from_env() -> Self {
         let base_url = std::env::var("TEAMS_API_URL").unwrap_or(BASE_URL.to_string());
         Self::new(base_url)

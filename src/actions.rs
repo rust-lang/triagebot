@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
 
 use crate::github::{self, GithubClient, Repository};
-use crate::team_data::TeamApiClient;
+use crate::team_data::TeamClient;
 
 #[async_trait]
 pub trait Action {
@@ -107,7 +107,7 @@ impl<'a> Action for Step<'a> {
     async fn call(&self) -> anyhow::Result<String> {
         let mut gh = GithubClient::new_from_env();
         gh.set_retry_rate_limit(true);
-        let team_api = TeamApiClient::new_from_env();
+        let team_api = TeamClient::new_from_env();
 
         let mut context = Context::new();
         let mut results = HashMap::new();

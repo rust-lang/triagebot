@@ -14,12 +14,11 @@ pub(super) async fn handle_command(
     event: &Event,
     cmd: NominateCommand,
 ) -> anyhow::Result<()> {
-    let is_team_member =
-        if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.team_api).await {
-            false
-        } else {
-            true
-        };
+    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.team).await {
+        false
+    } else {
+        true
+    };
 
     if !is_team_member {
         let cmnt = ErrorComment::new(
