@@ -8,6 +8,17 @@ allow-unauthenticated = ["bug", "invalid", "question", "enhancement"]
 [concern]
 labels = ["has-concerns"]
 
+[major-change]
+enabling_label = "major-change"
+meeting_label = "to-announce"
+second_label = "final-comment-period"
+concerns_label = "has-concerns"
+accept_label = "major-change-accepted"
+waiting_period = 1
+# can be found by looking for the first number in URLs, e.g. https://rust-lang.zulipchat.com/#narrow/stream/131828-t-compiler
+zulip_stream = 224082
+zulip_ping = "Urgau"
+
 [ping.wg-meta]
 message = """\
 This is just testing some functionality, please ignore this ping.
