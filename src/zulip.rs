@@ -4,7 +4,9 @@ mod commands;
 
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
-use crate::db::review_prefs::{get_review_prefs, upsert_review_prefs, RotationMode};
+use crate::db::review_prefs::{
+    get_review_prefs, get_review_prefs_batch, upsert_review_prefs, RotationMode,
+};
 use crate::github::User;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
@@ -17,7 +19,8 @@ use crate::zulip::commands::{
     parse_cli, ChatCommand, LookupCmd, PingGoalsArgs, StreamCommand, WorkqueueCmd, WorkqueueLimit,
 };
 use anyhow::{format_err, Context as _};
-use rust_team_data::v1::TeamKind;
+use rust_team_data::v1::{TeamKind, TeamMember};
+use std::cmp::Reverse;
 use std::fmt::Write as _;
 use subtle::ConstantTimeEq;
 use tracing as log;
@@ -201,6 +204,7 @@ async fn handle_command<'a>(
             ChatCommand::Work(cmd) => workqueue_commands(ctx, gh_id, cmd).await,
             ChatCommand::PingGoals(args) => ping_goals_cmd(ctx, gh_id, &args).await,
             ChatCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
+            ChatCommand::TeamStats { name } => team_status_cmd(ctx, &name).await,
         };
 
         let output = output?;
@@ -288,6 +292,104 @@ async fn ping_goals_cmd(
     }
 }
 
+async fn team_status_cmd(ctx: &Context, team_name: &str) -> anyhow::Result<Option<String>> {
+    use std::fmt::Write;
+
+    let Some(team) = ctx.team.get_team(team_name).await? else {
+        return Ok(Some(format!("Team {team_name} not found")));
+    };
+
+    let mut members = team.members;
+    members.sort_by(|a, b| a.github.cmp(&b.github));
+
+    let usernames: Vec<&str> = members
+        .iter()
+        .map(|member| member.github.as_str())
+        .collect();
+
+    let db = ctx.db.get().await;
+    let review_prefs = get_review_prefs_batch(&db, &usernames)
+        .await
+        .context("cannot load review preferences")?;
+
+    let workqueue = ctx.workqueue.read().await;
+    let total_assigned: u64 = members
+        .iter()
+        .map(|member| workqueue.assigned_pr_count(member.github_id))
+        .sum();
+
+    let table_header = |title: &str| {
+        format!(
+            r"### {title}
+| Username | Name | Assigned PRs | Review capacity |
+|----------|------|-------------:|----------------:|"
+        )
+    };
+
+    let format_member_row = |member: &TeamMember| {
+        let review_prefs = review_prefs.get(member.github.as_str());
+        let max_capacity = review_prefs
+            .as_ref()
+            .and_then(|prefs| prefs.max_assigned_prs);
+        let assigned_prs = workqueue.assigned_pr_count(member.github_id);
+
+        let max_capacity = max_capacity
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "unlimited".to_string());
+        format!(
+            "| `{}` | {} | `{assigned_prs}` | `{max_capacity}` |",
+            member.github, member.name
+        )
+    };
+
+    let (mut on_rotation, mut off_rotation): (Vec<&TeamMember>, Vec<&TeamMember>) =
+        members.iter().partition(|member| {
+            let rotation_mode = review_prefs
+                .get(member.github.as_str())
+                .map(|prefs| prefs.rotation_mode)
+                .unwrap_or_default();
+            matches!(rotation_mode, RotationMode::OnRotation)
+        });
+    on_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
+    off_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
+
+    let on_rotation = on_rotation
+        .into_iter()
+        .map(format_member_row)
+        .collect::<Vec<_>>();
+    let off_rotation = off_rotation
+        .into_iter()
+        .map(format_member_row)
+        .collect::<Vec<_>>();
+
+    // e.g. 2 members, 5 PRs assigned
+    let mut msg = format!(
+        "{} {}, {} {} assigned\n\n",
+        members.len(),
+        pluralize("member", members.len()),
+        total_assigned,
+        pluralize("PR", total_assigned as usize)
+    );
+    if !on_rotation.is_empty() {
+        writeln!(
+            msg,
+            "{}",
+            table_header(&format!("ON rotation ({})", on_rotation.len()))
+        )?;
+        writeln!(msg, "{}\n", on_rotation.join("\n"))?;
+    }
+    if !off_rotation.is_empty() {
+        writeln!(
+            msg,
+            "{}",
+            table_header(&format!("OFF rotation ({})", on_rotation.len()))
+        )?;
+        writeln!(msg, "{}\n", off_rotation.join("\n"))?;
+    }
+
+    Ok(Some(msg))
+}
+
 /// Returns true if we should notify user who was impersonated by someone who executed this command.
 /// More or less, the following holds: `sensitive` == `not read-only`.
 fn is_sensitive_command(cmd: &ChatCommand) -> bool {
@@ -299,6 +401,7 @@ fn is_sensitive_command(cmd: &ChatCommand) -> bool {
         ChatCommand::Whoami
         | ChatCommand::DocsUpdate
         | ChatCommand::PingGoals(_)
+        | ChatCommand::TeamStats { .. }
         | ChatCommand::Lookup(_) => false,
         ChatCommand::Work(cmd) => match cmd {
             WorkqueueCmd::Show => false,

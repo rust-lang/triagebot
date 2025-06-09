@@ -40,6 +40,11 @@ pub enum ChatCommand {
     PingGoals(PingGoalsArgs),
     /// Update docs
     DocsUpdate,
+    /// Shows review queue statistics of members of the given Rust team.
+    TeamStats {
+        /// Name of the team to query.
+        name: String,
+    },
 }
 
 #[derive(clap::Parser, Debug, PartialEq)]
