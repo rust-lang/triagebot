@@ -18,8 +18,7 @@ pub(super) async fn handle_command(
     event: &Event,
     team_name: PingCommand,
 ) -> anyhow::Result<()> {
-    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
-    {
+    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.team).await {
         false
     } else {
         true
@@ -49,7 +48,7 @@ pub(super) async fn handle_command(
             return Ok(());
         }
     };
-    let team = github::get_team(&ctx.github, &gh_team).await?;
+    let team = ctx.team.get_team(&gh_team).await?;
     let team = match team {
         Some(team) => team,
         None => {

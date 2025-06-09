@@ -331,7 +331,7 @@ async fn determine_assignee(
     diff: &[FileDiff],
 ) -> anyhow::Result<(Option<ReviewerSelection>, bool)> {
     let mut db_client = ctx.db.get().await;
-    let teams = crate::team_data::teams(&ctx.github).await?;
+    let teams = &ctx.team.teams().await?;
     if let Some(name) = assign_command {
         // User included `r?` in the opening PR body.
         match find_reviewer_from_names(
@@ -510,8 +510,7 @@ pub(super) async fn handle_command(
     event: &Event,
     cmd: AssignCommand,
 ) -> anyhow::Result<()> {
-    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.github).await
-    {
+    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.team).await {
         false
     } else {
         true
@@ -545,7 +544,7 @@ pub(super) async fn handle_command(
             return Ok(());
         }
 
-        let teams = crate::team_data::teams(&ctx.github).await?;
+        let teams = ctx.team.teams().await?;
 
         let assignee = match cmd {
             AssignCommand::Claim => event.user().login.clone(),
