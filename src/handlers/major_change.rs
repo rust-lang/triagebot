@@ -1,3 +1,6 @@
+use std::fmt::Display;
+
+use crate::jobs::Job;
 use crate::zulip::api::Recipient;
 use crate::{
     config::MajorChangeConfig,
@@ -6,7 +9,10 @@ use crate::{
     interactions::ErrorComment,
 };
 use anyhow::Context as _;
+use async_trait::async_trait;
+use chrono::{DateTime, Duration, Utc};
 use parser::command::second::SecondCommand;
+use serde::{Deserialize, Serialize};
 use tracing as log;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -202,6 +208,9 @@ pub(super) async fn handle_input(
             if event.issue.labels().contains(&Label {
                 name: config.second_label.to_string(),
             }) {
+                // Re-schedule acceptence job to automaticaly close the MCP
+                schedule_acceptence_job(ctx, config, &event.issue).await?;
+
                 format!("All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked, and will be approved in 10 days if no (new) objections are raised.", event.issue.html_url)
             } else {
                 format!("All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked.", event.issue.html_url)
@@ -274,6 +283,52 @@ pub(super) async fn handle_command(
         false,
     )
     .await
+    .context("unable to process second command")?;
+
+    // Schedule acceptence job to automaticaly close the MCP
+    schedule_acceptence_job(ctx, config, issue).await?;
+
+    Ok(())
+}
+
+async fn schedule_acceptence_job(
+    ctx: &Context,
+    config: &MajorChangeConfig,
+    issue: &Issue,
+) -> anyhow::Result<()> {
+    if let Some(waiting_period) = &config.waiting_period {
+        let seconded_at = Utc::now();
+        let accept_at = if issue.repository().full_repo_name() == "rust-lang/triagebot" {
+            // Hack for the triagebot repo, so we can test more quickly
+            seconded_at + Duration::minutes(5)
+        } else {
+            seconded_at + Duration::days((*waiting_period).into())
+        };
+
+        let major_change_seconded = MajorChangeSeconded {
+            repo: issue.repository().full_repo_name(),
+            issue: issue.number,
+            seconded_at,
+            accept_at,
+        };
+
+        tracing::info!(
+            "major_change inserting to acceptence queue: {:?}",
+            &major_change_seconded
+        );
+
+        crate::db::schedule_job(
+            &*ctx.db.get().await,
+            MAJOR_CHANGE_ACCEPTENCE_JOB_NAME,
+            serde_json::to_value(major_change_seconded)
+                .context("unable to serialize the major change metadata")?,
+            accept_at,
+        )
+        .await
+        .context("failed to add the major change to the automatic acceptance queue")?;
+    }
+
+    Ok(())
 }
 
 async fn handle(
@@ -361,4 +416,184 @@ fn zulip_topic_from_issue(issue: &ZulipGitHubReference) -> String {
         }
         _ => format!("{} {}", issue.title, topic_ref),
     }
+}
+
+#[derive(Debug)]
+enum SecondedLogicError {
+    NotYetAcceptenceTime {
+        accept_at: DateTime<Utc>,
+        now: DateTime<Utc>,
+    },
+    IssueNotReady {
+        draft: bool,
+        open: bool,
+    },
+    ConcernsLabelSet,
+    NoMajorChangeConfig,
+}
+
+impl std::error::Error for SecondedLogicError {}
+
+impl Display for SecondedLogicError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SecondedLogicError::NotYetAcceptenceTime { accept_at, now } => {
+                write!(f, "not yet acceptence time ({accept_at} < {now})")
+            }
+            SecondedLogicError::IssueNotReady { draft, open } => {
+                write!(f, "issue is not ready (draft: {draft}; open: {open})")
+            }
+            SecondedLogicError::ConcernsLabelSet => write!(f, "concerns label set"),
+            SecondedLogicError::NoMajorChangeConfig => write!(f, "no `[major_change]` config"),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq, Clone))]
+struct MajorChangeSeconded {
+    repo: String,
+    issue: u64,
+    seconded_at: DateTime<Utc>,
+    accept_at: DateTime<Utc>,
+}
+
+const MAJOR_CHANGE_ACCEPTENCE_JOB_NAME: &str = "major_change_acceptence";
+
+pub(crate) struct MajorChangeAcceptenceJob;
+
+#[async_trait]
+impl Job for MajorChangeAcceptenceJob {
+    fn name(&self) -> &'static str {
+        MAJOR_CHANGE_ACCEPTENCE_JOB_NAME
+    }
+
+    async fn run(&self, ctx: &super::Context, metadata: &serde_json::Value) -> anyhow::Result<()> {
+        let major_change: MajorChangeSeconded = serde_json::from_value(metadata.clone())
+            .context("unable to deserialize the metadata in major change acceptence job")?;
+
+        let now = Utc::now();
+
+        match process_seconded(&ctx, &major_change, now).await {
+            Ok(()) => {
+                tracing::info!(
+                    "{}: major change ({:?}) as been accepted, remove from the queue",
+                    self.name(),
+                    &major_change,
+                );
+            }
+            Err(err) if err.downcast_ref::<SecondedLogicError>().is_some() => {
+                tracing::error!(
+                    "{}: major change ({:?}) has a logical error (no retry): {err}",
+                    self.name(),
+                    &major_change,
+                );
+                // exit job succesfully, so it's not retried
+            }
+            Err(err) => {
+                tracing::error!(
+                    "{}: major change ({:?}) is in error: {err}",
+                    self.name(),
+                    &major_change,
+                );
+                return Err(err); // so it is retried
+            }
+        }
+
+        Ok(())
+    }
+}
+
+async fn process_seconded(
+    ctx: &super::Context,
+    major_change: &MajorChangeSeconded,
+    now: DateTime<Utc>,
+) -> anyhow::Result<()> {
+    if major_change.accept_at < now {
+        anyhow::bail!(SecondedLogicError::NotYetAcceptenceTime {
+            accept_at: major_change.accept_at,
+            now
+        });
+    }
+
+    let repo = ctx
+        .github
+        .repository(&major_change.repo)
+        .await
+        .context("failed retrieving the repository informations")?;
+
+    let config = crate::config::get(&ctx.github, &repo)
+        .await
+        .context("failed to get triagebot configuration")?;
+
+    let config = config
+        .major_change
+        .as_ref()
+        .ok_or(SecondedLogicError::NoMajorChangeConfig)?;
+
+    let issue = repo
+        .get_issue(&ctx.github, major_change.issue)
+        .await
+        .context("unable to get the associated issue")?;
+
+    if issue
+        .labels
+        .iter()
+        .any(|l| Some(&l.name) == config.concerns_label.as_ref())
+    {
+        anyhow::bail!(SecondedLogicError::ConcernsLabelSet);
+    }
+
+    if !issue.is_open() || issue.draft {
+        anyhow::bail!(SecondedLogicError::IssueNotReady {
+            draft: issue.draft,
+            open: issue.is_open()
+        });
+    }
+
+    if !issue.labels.iter().any(|l| l.name == config.accept_label) {
+        // Only post the comment if the accept_label isn't set yet, we may be in a retry
+        issue
+            .post_comment(
+                &ctx.github,
+                "The final comment period is now complete, this major change is now accepted.\n\nAs the automated representative, I would like to thank the author for their work and everyone else who contributed to this major change proposal."
+            )
+            .await
+            .context("unable to post the acceptance comment")?;
+    }
+    issue
+        .add_labels(
+            &ctx.github,
+            vec![Label {
+                name: config.accept_label.clone(),
+            }],
+        )
+        .await
+        .context("unable to add the accept label")?;
+    issue
+        .remove_label(&ctx.github, &config.second_label)
+        .await
+        .context("unable to remove the second label")?;
+    issue
+        .close(&ctx.github)
+        .await
+        .context("unable to close the issue")?;
+
+    Ok(())
+}
+
+#[test]
+fn major_change_queue_serialize() {
+    let original = MajorChangeSeconded {
+        repo: "rust-lang/rust".to_string(),
+        issue: 1245,
+        seconded_at: Utc::now(),
+        accept_at: Utc::now(),
+    };
+
+    let value = serde_json::to_value(original.clone()).unwrap();
+
+    let deserialized = serde_json::from_value(value).unwrap();
+
+    assert_eq!(original, deserialized);
 }
