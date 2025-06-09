@@ -1930,7 +1930,7 @@ impl Repository {
     }
 
     pub async fn get_issue(&self, client: &GithubClient, issue_num: u64) -> anyhow::Result<Issue> {
-        let url = format!("{}/pulls/{issue_num}", self.url(client));
+        let url = format!("{}/issues/{issue_num}", self.url(client));
         client
             .json(client.get(&url))
             .await
