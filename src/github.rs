@@ -219,6 +219,19 @@ impl GithubClient {
             .context("failed to update pr state")?;
         Ok(())
     }
+
+    pub async fn raw_job_logs(
+        &self,
+        repo: &IssueRepository,
+        job_id: u128,
+    ) -> anyhow::Result<String> {
+        let url = format!("{}/actions/jobs/{job_id}/logs", repo.url(&self));
+        let (body, _req_dbg) = self
+            .send_req(self.get(&url))
+            .await
+            .context("failed to retrieve job logs")?;
+        Ok(String::from_utf8_lossy(&body).to_string())
+    }
 }
 
 #[derive(Debug, serde::Serialize)]
