@@ -438,7 +438,7 @@ impl Display for SecondedLogicError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SecondedLogicError::NotYetAcceptenceTime { accept_at, now } => {
-                write!(f, "not yet acceptence time ({accept_at} < {now})")
+                write!(f, "not yet acceptence time ({accept_at} > {now})")
             }
             SecondedLogicError::IssueNotReady { draft, open } => {
                 write!(f, "issue is not ready (draft: {draft}; open: {open})")
@@ -509,7 +509,7 @@ async fn process_seconded(
     major_change: &MajorChangeSeconded,
     now: DateTime<Utc>,
 ) -> anyhow::Result<()> {
-    if major_change.accept_at < now {
+    if major_change.accept_at > now {
         anyhow::bail!(SecondedLogicError::NotYetAcceptenceTime {
             accept_at: major_change.accept_at,
             now
