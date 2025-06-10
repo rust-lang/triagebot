@@ -449,7 +449,9 @@ enum SecondedLogicError {
         draft: bool,
         open: bool,
     },
-    ConcernsLabelSet,
+    NotAMajorChange,
+    SecondLabelAbsent,
+    ConcernsLabelPresent,
     NoMajorChangeConfig,
 }
 
@@ -464,7 +466,9 @@ impl Display for SecondedLogicError {
             SecondedLogicError::IssueNotReady { draft, open } => {
                 write!(f, "issue is not ready (draft: {draft}; open: {open})")
             }
-            SecondedLogicError::ConcernsLabelSet => write!(f, "concerns label set"),
+            SecondedLogicError::NotAMajorChange => write!(f, "not a major change"),
+            SecondedLogicError::SecondLabelAbsent => write!(f, "second label is absent"),
+            SecondedLogicError::ConcernsLabelPresent => write!(f, "concerns label set"),
             SecondedLogicError::NoMajorChangeConfig => write!(f, "no `[major_change]` config"),
         }
     }
@@ -557,12 +561,17 @@ async fn process_seconded(
         .await
         .context("unable to get the associated issue")?;
 
-    if issue
-        .labels
-        .iter()
-        .any(|l| Some(&l.name) == config.concerns_label.as_ref())
-    {
-        anyhow::bail!(SecondedLogicError::ConcernsLabelSet);
+    if !issue.labels.iter().any(|l| l.name == config.enabling_label) {
+        anyhow::bail!(SecondedLogicError::NotAMajorChange);
+    }
+
+    if !issue.labels.iter().any(|l| l.name == config.second_label) {
+        anyhow::bail!(SecondedLogicError::SecondLabelAbsent);
+    }
+
+    let concerns_label = config.concerns_label.as_ref();
+    if issue.labels.iter().any(|l| Some(&l.name) == concerns_label) {
+        anyhow::bail!(SecondedLogicError::ConcernsLabelPresent);
     }
 
     if !issue.is_open() || issue.draft {
