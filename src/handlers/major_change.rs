@@ -208,8 +208,8 @@ pub(super) async fn handle_input(
             if event.issue.labels().contains(&Label {
                 name: config.second_label.to_string(),
             }) {
-                // Re-schedule acceptence job to automaticaly close the MCP
-                schedule_acceptence_job(ctx, config, &event.issue).await?;
+                // Re-schedule acceptance job to automaticaly close the MCP
+                schedule_acceptance_job(ctx, config, &event.issue).await?;
 
                 format!("All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked, and will be approved in 10 days if no (new) objections are raised.", event.issue.html_url)
             } else {
@@ -267,12 +267,31 @@ pub(super) async fn handle_command(
         return Ok(());
     }
 
-    let zulip_msg = format!(
-        "@*{}*: Proposal [#{}]({}) has been seconded, and will be approved in 10 days if no objections are raised.",
-        config.zulip_ping,
-        issue.number,
-        event.html_url().unwrap()
-    );
+    let has_concerns = if let Some(concerns_label) = &config.concerns_label {
+        issue.labels().iter().any(|l| &l.name == concerns_label)
+    } else {
+        false
+    };
+
+    let waiting_period = config.waiting_period.unwrap_or(10);
+
+    let zulip_msg = if !has_concerns {
+        format!(
+            "@*{}*: Proposal [#{}]({}) has been seconded, and will be approved in {} days if no objections are raised.",
+            config.zulip_ping,
+            issue.number,
+            event.html_url().unwrap(),
+            waiting_period,
+        )
+    } else {
+        format!(
+            "@*{}*: Proposal [#{}]({}) has been seconded, but there are unresolved concerns preventing approval, use `@{} resolve concern-name` in the GitHub thread to resolve them.",
+            config.zulip_ping,
+            issue.number,
+            event.html_url().unwrap(),
+            &ctx.username,
+        )
+    };
 
     handle(
         ctx,
@@ -285,13 +304,15 @@ pub(super) async fn handle_command(
     .await
     .context("unable to process second command")?;
 
-    // Schedule acceptence job to automaticaly close the MCP
-    schedule_acceptence_job(ctx, config, issue).await?;
+    if !has_concerns {
+        // Schedule acceptance job to automaticaly close the MCP
+        schedule_acceptance_job(ctx, config, issue).await?;
+    }
 
     Ok(())
 }
 
-async fn schedule_acceptence_job(
+async fn schedule_acceptance_job(
     ctx: &Context,
     config: &MajorChangeConfig,
     issue: &Issue,
@@ -428,7 +449,9 @@ enum SecondedLogicError {
         draft: bool,
         open: bool,
     },
-    ConcernsLabelSet,
+    NotAMajorChange,
+    SecondLabelAbsent,
+    ConcernsLabelPresent,
     NoMajorChangeConfig,
 }
 
@@ -443,7 +466,9 @@ impl Display for SecondedLogicError {
             SecondedLogicError::IssueNotReady { draft, open } => {
                 write!(f, "issue is not ready (draft: {draft}; open: {open})")
             }
-            SecondedLogicError::ConcernsLabelSet => write!(f, "concerns label set"),
+            SecondedLogicError::NotAMajorChange => write!(f, "not a major change"),
+            SecondedLogicError::SecondLabelAbsent => write!(f, "second label is absent"),
+            SecondedLogicError::ConcernsLabelPresent => write!(f, "concerns label set"),
             SecondedLogicError::NoMajorChangeConfig => write!(f, "no `[major_change]` config"),
         }
     }
@@ -477,7 +502,7 @@ impl Job for MajorChangeAcceptenceJob {
         match process_seconded(&ctx, &major_change, now).await {
             Ok(()) => {
                 tracing::info!(
-                    "{}: major change ({:?}) as been accepted, remove from the queue",
+                    "{}: major change ({:?}) as been accepted",
                     self.name(),
                     &major_change,
                 );
@@ -536,12 +561,17 @@ async fn process_seconded(
         .await
         .context("unable to get the associated issue")?;
 
-    if issue
-        .labels
-        .iter()
-        .any(|l| Some(&l.name) == config.concerns_label.as_ref())
-    {
-        anyhow::bail!(SecondedLogicError::ConcernsLabelSet);
+    if !issue.labels.iter().any(|l| l.name == config.enabling_label) {
+        anyhow::bail!(SecondedLogicError::NotAMajorChange);
+    }
+
+    if !issue.labels.iter().any(|l| l.name == config.second_label) {
+        anyhow::bail!(SecondedLogicError::SecondLabelAbsent);
+    }
+
+    let concerns_label = config.concerns_label.as_ref();
+    if issue.labels.iter().any(|l| Some(&l.name) == concerns_label) {
+        anyhow::bail!(SecondedLogicError::ConcernsLabelPresent);
     }
 
     if !issue.is_open() || issue.draft {
@@ -556,7 +586,14 @@ async fn process_seconded(
         issue
             .post_comment(
                 &ctx.github,
-                "The final comment period is now complete, this major change is now accepted.\n\nAs the automated representative, I would like to thank the author for their work and everyone else who contributed to this major change proposal."
+                &*format!(
+                    "The final comment period is now complete, this major change is now **accepted**.\
+                    \
+                    As the automated representative, I would like to thank the author for their work and everyone else who contributed to this major change proposal.\
+                    \
+                    *If you think this major change shouldn't have been accepted, feel free to remove the `{}` label and reopen this issue.*",
+                    &config.accept_label,
+                ),
             )
             .await
             .context("unable to post the acceptance comment")?;
