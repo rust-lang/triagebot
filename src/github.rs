@@ -2174,12 +2174,12 @@ impl<'q> IssuesQuery for Query<'q> {
 }
 
 /// Return open concerns filed in an issue under MCP/RFC process
-/// Concerns are marked by `@rfcbot concern` and `@rfcbot resolve`
+/// Concerns are marked by `@rustbot concern` and `@rustbot resolve`
 fn find_open_concerns(comments: Vec<Comment>) -> Option<Vec<(String, String)>> {
     let re_concern_raise =
-        Regex::new(r"@rfcbot concern (?P<concern_title>.*)").expect("Invalid regexp");
+        Regex::new(r"@rustbot concern (?P<concern_title>.*)").expect("Invalid regexp");
     let re_concern_solve =
-        Regex::new(r"@rfcbot resolve (?P<concern_title>.*)").expect("Invalid regexp");
+        Regex::new(r"@rustbot resolve (?P<concern_title>.*)").expect("Invalid regexp");
     let mut raised: HashMap<String, String> = HashMap::new();
     let mut solved: HashMap<String, String> = HashMap::new();
 
@@ -2198,11 +2198,11 @@ fn find_open_concerns(comments: Vec<Comment>) -> Option<Vec<(String, String)>> {
 
             // pick the first match only
             if !r.is_empty() {
-                let x = r[0].replace("@rfcbot concern", "");
+                let x = r[0].replace("@rustbot concern", "");
                 raised.insert(x.trim().to_string(), comment.html_url.to_string());
             }
             if !s.is_empty() {
-                let x = s[0].replace("@rfcbot resolve", "");
+                let x = s[0].replace("@rustbot resolve", "");
                 solved.insert(x.trim().to_string(), comment.html_url.to_string());
             }
         }
