@@ -400,9 +400,12 @@ pub(crate) struct MajorChangeConfig {
     pub(crate) meeting_label: String,
     /// This label signals there are concern(s) about the proposal.
     pub(crate) concerns_label: Option<String>,
-    /// An optional duration (in days) for the waiting period after second for the
-    /// major change to become automaticaly accepted.
-    pub(crate) waiting_period: Option<u16>,
+    /// Waiting period after second for the major change to become accepted.
+    #[serde(default = "MajorChangeConfig::waiting_period_default")]
+    pub(crate) waiting_period: u16,
+    /// Enables automatic closing of the major change when the waiting period is completed.
+    #[serde(default)]
+    pub(crate) auto_closing: bool,
     /// The Zulip stream ID where the messages about the status of
     /// the major changed should be relayed.
     pub(crate) zulip_stream: u64,
@@ -416,6 +419,9 @@ impl MajorChangeConfig {
     }
     fn accept_label_default() -> String {
         String::from("major-change-accepted")
+    }
+    fn waiting_period_default() -> u16 {
+        10
     }
 }
 

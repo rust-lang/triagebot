@@ -211,7 +211,7 @@ pub(super) async fn handle_input(
                 // Re-schedule acceptance job to automaticaly close the MCP
                 schedule_acceptance_job(ctx, config, &event.issue).await?;
 
-                format!("All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked, and will be approved in 10 days if no (new) objections are raised.", event.issue.html_url)
+                format!("All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked, and will be approved in {} days if no (new) objections are raised.", event.issue.html_url, config.waiting_period)
             } else {
                 format!("All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked.", event.issue.html_url)
             },
@@ -273,15 +273,13 @@ pub(super) async fn handle_command(
         false
     };
 
-    let waiting_period = config.waiting_period.unwrap_or(10);
-
     let zulip_msg = if !has_concerns {
         format!(
             "@*{}*: Proposal [#{}]({}) has been seconded, and will be approved in {} days if no objections are raised.",
             config.zulip_ping,
             issue.number,
             event.html_url().unwrap(),
-            waiting_period,
+            config.waiting_period,
         )
     } else {
         format!(
@@ -317,13 +315,13 @@ async fn schedule_acceptance_job(
     config: &MajorChangeConfig,
     issue: &Issue,
 ) -> anyhow::Result<()> {
-    if let Some(waiting_period) = &config.waiting_period {
+    if config.auto_closing {
         let seconded_at = Utc::now();
         let accept_at = if issue.repository().full_repo_name() == "rust-lang/triagebot" {
             // Hack for the triagebot repo, so we can test more quickly
             seconded_at + Duration::minutes(5)
         } else {
-            seconded_at + Duration::days((*waiting_period).into())
+            seconded_at + Duration::days(config.waiting_period.into())
         };
 
         let major_change_seconded = MajorChangeSeconded {
@@ -587,11 +585,11 @@ async fn process_seconded(
             .post_comment(
                 &ctx.github,
                 &*format!(
-                    "The final comment period is now complete, this major change is now **accepted**.\
-                    \
-                    As the automated representative, I would like to thank the author for their work and everyone else who contributed to this major change proposal.\
-                    \
-                    *If you think this major change shouldn't have been accepted, feel free to remove the `{}` label and reopen this issue.*",
+r#"The final comment period is now complete, this major change is now **accepted**.
+
+As the automated representative, I would like to thank the author for their work and everyone else who contributed to this major change proposal.
+
+*If you think this major change shouldn't have been accepted, feel free to remove the `{}` label and reopen this issue.*"#,
                     &config.accept_label,
                 ),
             )
