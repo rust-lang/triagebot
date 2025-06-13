@@ -382,7 +382,7 @@ async fn team_status_cmd(ctx: &Context, team_name: &str) -> anyhow::Result<Optio
         writeln!(
             msg,
             "{}",
-            table_header(&format!("OFF rotation ({})", on_rotation.len()))
+            table_header(&format!("OFF rotation ({})", off_rotation.len()))
         )?;
         writeln!(msg, "{}\n", off_rotation.join("\n"))?;
     }
