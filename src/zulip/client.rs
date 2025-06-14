@@ -1,5 +1,5 @@
-use crate::zulip::api::{MessageApiResponse, ZulipUser, ZulipUsers};
 use crate::zulip::Recipient;
+use crate::zulip::api::{MessageApiResponse, ZulipUser, ZulipUsers};
 use anyhow::Context;
 use reqwest::{Client, Method, RequestBuilder, Response};
 use serde::de::DeserializeOwned;

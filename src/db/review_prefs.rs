@@ -2,7 +2,7 @@ use crate::db::users::record_username;
 use crate::github::{User, UserId};
 use anyhow::Context;
 use bytes::BytesMut;
-use postgres_types::{to_sql_checked, FromSql, IsNull, ToSql, Type};
+use postgres_types::{FromSql, IsNull, ToSql, Type, to_sql_checked};
 use std::collections::HashMap;
 use std::error::Error;
 
@@ -171,7 +171,7 @@ SET max_assigned_prs = excluded.max_assigned_prs,
 
 #[cfg(test)]
 mod tests {
-    use crate::db::review_prefs::{get_review_prefs, upsert_review_prefs, RotationMode};
+    use crate::db::review_prefs::{RotationMode, get_review_prefs, upsert_review_prefs};
     use crate::db::users::get_user;
     use crate::tests::github::user;
     use crate::tests::run_db_test;

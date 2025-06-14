@@ -2,7 +2,7 @@ use crate::handlers::Context;
 use chrono::{Duration, Utc};
 use hyper::{Body, Response, StatusCode};
 use serde::Serialize;
-use serde_json::value::{to_value, Value};
+use serde_json::value::{Value, to_value};
 use std::sync::Arc;
 use url::Url;
 

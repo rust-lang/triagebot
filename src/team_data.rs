@@ -1,5 +1,5 @@
 use reqwest::Client;
-use rust_team_data::v1::{People, Teams, ZulipMapping, BASE_URL};
+use rust_team_data::v1::{BASE_URL, People, Teams, ZulipMapping};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 use std::time::{Duration, Instant};

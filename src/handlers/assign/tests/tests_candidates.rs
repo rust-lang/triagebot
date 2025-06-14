@@ -1,11 +1,11 @@
 //! Tests for `candidate_reviewers_from_names`
 
 use super::super::*;
-use crate::db::review_prefs::{upsert_review_prefs, RotationMode};
+use crate::db::review_prefs::{RotationMode, upsert_review_prefs};
 use crate::github::{PullRequestNumber, User};
 use crate::handlers::pr_tracking::{AssignedPullRequest, ReviewerWorkqueue};
 use crate::tests::github::{issue, user};
-use crate::tests::{run_db_test, TestContext};
+use crate::tests::{TestContext, run_db_test};
 
 #[must_use]
 struct AssignCtx {

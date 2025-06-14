@@ -110,7 +110,10 @@ impl NoteData {
         for (_, entry) in self.entries_by_url.iter().sorted() {
             text.push_str(&entry.to_markdown());
         }
-        let _ = writeln!(text, "\n\n*Managed by `@{bot}`—see [help](https://forge.rust-lang.org/triagebot/note.html) for details*");
+        let _ = writeln!(
+            text,
+            "\n\n*Managed by `@{bot}`—see [help](https://forge.rust-lang.org/triagebot/note.html) for details*"
+        );
         text
     }
 }

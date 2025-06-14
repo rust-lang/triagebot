@@ -201,8 +201,11 @@ pub(super) async fn handle_input(
             //
             // However, since this handler is stateless, we can't track when to re-add it, it's also a bit unclear if it
             // should be re-added at all. Also historically the `enable_label` wasn't removed either, so we don't touch it.
-            format!("Concern(s) have been raised on the [associated GitHub issue]({}). This proposal is now blocked until those concerns are fully resolved.", event.issue.html_url),
-            None
+            format!(
+                "Concern(s) have been raised on the [associated GitHub issue]({}). This proposal is now blocked until those concerns are fully resolved.",
+                event.issue.html_url
+            ),
+            None,
         ),
         Invocation::ConcernsResolved => (
             if event.issue.labels().contains(&Label {
@@ -211,12 +214,18 @@ pub(super) async fn handle_input(
                 // Re-schedule acceptance job to automaticaly close the MCP
                 schedule_acceptance_job(ctx, config, &event.issue).await?;
 
-                format!("All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked, and will be approved in {} days if no (new) objections are raised.", event.issue.html_url, config.waiting_period)
+                format!(
+                    "All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked, and will be approved in {} days if no (new) objections are raised.",
+                    event.issue.html_url, config.waiting_period
+                )
             } else {
-                format!("All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked.", event.issue.html_url)
+                format!(
+                    "All concerns on the [associated GitHub issue]({}) have been resolved, this proposal is no longer blocked.",
+                    event.issue.html_url
+                )
             },
-            None
-        )
+            None,
+        ),
     };
 
     handle(

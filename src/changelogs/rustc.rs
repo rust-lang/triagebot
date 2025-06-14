@@ -1,8 +1,8 @@
 use super::Changelog;
 use anyhow::Context as _;
 use comrak::{
-    nodes::{AstNode, NodeHeading, NodeValue},
     Arena, ComrakOptions,
+    nodes::{AstNode, NodeHeading, NodeValue},
 };
 use std::collections::HashMap;
 

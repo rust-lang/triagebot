@@ -1,9 +1,9 @@
 #![allow(clippy::new_without_default)]
 
 use anyhow::Context as _;
-use futures::future::FutureExt;
 use futures::StreamExt;
-use hyper::{header, Body, Request, Response, Server, StatusCode};
+use futures::future::FutureExt;
+use hyper::{Body, Request, Response, Server, StatusCode, header};
 use route_recognizer::Router;
 use std::time::Duration;
 use std::{env, net::SocketAddr, sync::Arc};
@@ -12,14 +12,14 @@ use tokio::{task, time};
 use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
-use triagebot::handlers::pr_tracking::load_workqueue;
 use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
+use triagebot::handlers::pr_tracking::load_workqueue;
 use triagebot::jobs::{
-    default_jobs, JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS,
+    JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS, default_jobs,
 };
 use triagebot::team_data::TeamClient;
 use triagebot::zulip::client::ZulipClient;
-use triagebot::{db, github, handlers::Context, notification_listing, payload, EventName};
+use triagebot::{EventName, db, github, handlers::Context, notification_listing, payload};
 
 async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
     if req == "/agenda/lang/triage" {
@@ -78,13 +78,13 @@ async fn serve_req(
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
                     .body(Body::from(agenda))
-                    .unwrap())
+                    .unwrap());
             }
             Err(err) => {
                 return Ok(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .body(Body::from(err.to_string()))
-                    .unwrap())
+                    .unwrap());
             }
         }
     }

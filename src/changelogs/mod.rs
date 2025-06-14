@@ -1,6 +1,6 @@
 mod rustc;
 
-use comrak::{nodes::AstNode, Arena, ComrakOptions, ComrakRenderOptions};
+use comrak::{Arena, ComrakOptions, ComrakRenderOptions, nodes::AstNode};
 use std::collections::HashMap;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, serde::Deserialize)]

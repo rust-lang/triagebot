@@ -132,8 +132,8 @@ pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client>
 }
 
 fn make_certificates() -> Vec<Certificate> {
-    use x509_cert::der::pem::LineEnding;
     use x509_cert::der::EncodePem;
+    use x509_cert::der::pem::LineEnding;
 
     let certs = x509_cert::Certificate::load_pem_chain(&CERTIFICATE_PEMS[..]).unwrap();
     certs

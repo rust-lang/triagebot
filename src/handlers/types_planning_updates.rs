@@ -28,10 +28,12 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
             return Ok(());
         }
         let meeting_date_string = first_monday.format("%Y-%m-%d").to_string();
-        let message = format!("\
+        let message = format!(
+            "\
             Hello @*T-types/meetings*. Monthly planning meeting in one week.\n\
             This is a reminder to update the current [roadmap tracking issues](https://github.com/rust-lang/types-team/issues?q=is%3Aissue+is%3Aopen+label%3Aroadmap-tracking-issue).\n\
-            Extra reminders will be sent later this week.");
+            Extra reminders will be sent later this week."
+        );
         let zulip_req = crate::zulip::MessageApiRequest {
             recipient: Recipient::Stream {
                 id: TYPES_MEETINGS_STREAM,
