@@ -3,11 +3,48 @@ use crate::handlers::Context;
 use anyhow::Context as _;
 use hyper::header::{CONTENT_SECURITY_POLICY, CONTENT_TYPE};
 use hyper::{Body, Response, StatusCode};
+use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
 const ANSI_UP_URL: &str = "https://cdn.jsdelivr.net/npm/ansi_up@6.0.6/+esm";
+const MAX_CACHE_CAPACITY_BYTES: u64 = 50 * 1024 * 1024; // 50 Mb
+
+#[derive(Default)]
+pub struct GitHubActionLogsCache {
+    capacity: u64,
+    entries: VecDeque<(String, Arc<String>)>,
+}
+
+impl GitHubActionLogsCache {
+    pub fn get(&mut self, key: &String) -> Option<&Arc<String>> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            let entry = self.entries.remove(pos).unwrap();
+            self.entries.push_front(entry);
+            Some(&self.entries.front().unwrap().1)
+        } else {
+            None
+        }
+    }
+
+    pub fn put(&mut self, key: String, value: Arc<String>) -> &Arc<String> {
+        let removed = if let Some(pos) = self.entries.iter().position(|(k, _)| k == &key) {
+            self.entries.remove(pos)
+        } else if self.capacity + value.len() as u64 >= MAX_CACHE_CAPACITY_BYTES {
+            self.entries.pop_back()
+        } else {
+            None
+        };
+        if let Some(removed) = removed {
+            self.capacity -= removed.1.len() as u64;
+        }
+        // Insert at the front (most recently used)
+        self.capacity += value.len() as u64;
+        self.entries.push_front((key, value));
+        &self.entries.front().unwrap().1
+    }
+}
 
 pub async fn gha_logs(
     ctx: Arc<Context>,
@@ -52,19 +89,35 @@ async fn process_logs(
         anyhow::bail!("Repository `{repo}` is not part of team repos");
     }
 
-    let logs = ctx
-        .github
-        .raw_job_logs(
-            &github::IssueRepository {
-                organization: owner.to_string(),
-                repository: repo.to_string(),
-            },
-            log_id,
-        )
-        .await
-        .context("unable to get the raw logs")?;
+    let log_uuid = format!("{owner}/{repo}${log_id}");
 
-    let json_logs = serde_json::to_string(&logs).context("unable to JSON-ify the raw logs")?;
+    let logs = 'logs: {
+        if let Some(logs) = ctx.gha_logs.write().await.get(&log_uuid) {
+            tracing::info!("Cache found for {log_uuid}");
+            break 'logs logs.clone();
+        }
+
+        tracing::info!("Cache NOT found for {log_uuid}");
+        let logs = ctx
+            .github
+            .raw_job_logs(
+                &github::IssueRepository {
+                    organization: owner.to_string(),
+                    repository: repo.to_string(),
+                },
+                log_id,
+            )
+            .await
+            .context("unable to get the raw logs")?;
+
+        ctx.gha_logs
+            .write()
+            .await
+            .put(log_uuid.clone(), logs.into())
+            .clone()
+    };
+
+    let json_logs = serde_json::to_string(&*logs).context("unable to JSON-ify the raw logs")?;
 
     let nonce = Uuid::new_v4().to_hyphenated().to_string();
 
@@ -72,7 +125,7 @@ async fn process_logs(
         r#"<!DOCTYPE html>
 <html>
 <head>
-    <title>{owner}/{repo}${log_id} - triagebot</title>
+    <title>{log_uuid} - triagebot</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" sizes="32x32" type="image/png" href="https://rust-lang.org/static/images/favicon-32x32.png">    
@@ -101,7 +154,7 @@ async fn process_logs(
 </html>"#,
     );
 
-    tracing::info!("Serving GHA Logs for {owner}/{repo}#{log_id}");
+    tracing::info!("Serving GHA Logs for {log_uuid}");
 
     return Ok(Response::builder()
         .status(StatusCode::OK)
