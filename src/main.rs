@@ -12,6 +12,7 @@ use tokio::{task, time};
 use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
+use triagebot::gha_logs::GitHubActionLogsCache;
 use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
 use triagebot::handlers::pr_tracking::load_workqueue;
 use triagebot::jobs::{
@@ -44,6 +45,7 @@ async fn serve_req(
     let mut router = Router::new();
     router.add("/triage", "index".to_string());
     router.add("/triage/:owner/:repo", "pulls".to_string());
+    router.add("/gha-logs/:owner/:repo/:log-id", "gha-logs".to_string());
     let (req, body_stream) = req.into_parts();
 
     if let Ok(matcher) = router.recognize(req.uri.path()) {
@@ -52,8 +54,14 @@ async fn serve_req(
             let owner = params.find("owner");
             let repo = params.find("repo");
             return triagebot::triage::pulls(ctx, owner.unwrap(), repo.unwrap()).await;
-        } else {
+        } else if matcher.handler().as_str() == "index" {
             return triagebot::triage::index();
+        } else if matcher.handler().as_str() == "gha-logs" {
+            let params = matcher.params();
+            let owner = params.find("owner").unwrap();
+            let repo = params.find("repo").unwrap();
+            let log_id = params.find("log-id").unwrap();
+            return triagebot::gha_logs::gha_logs(ctx, owner, repo, log_id).await;
         }
     }
 
@@ -310,6 +318,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         team: team_api,
         octocrab: oc,
         workqueue: Arc::new(RwLock::new(workqueue)),
+        gha_logs: Arc::new(RwLock::new(GitHubActionLogsCache::default())),
         zulip,
     });
 

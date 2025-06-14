@@ -13,6 +13,7 @@ pub mod agenda;
 mod changelogs;
 mod config;
 pub mod db;
+pub mod gha_logs;
 pub mod github;
 pub mod handlers;
 mod interactions;
