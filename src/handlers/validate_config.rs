@@ -3,7 +3,7 @@
 //! It won't validate anything unless the PR is open and has changed.
 
 use crate::{
-    config::{ValidateConfig, CONFIG_FILE_NAME},
+    config::{CONFIG_FILE_NAME, ValidateConfig},
     github::IssuesAction,
     handlers::{Context, IssuesEvent},
 };

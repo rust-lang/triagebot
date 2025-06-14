@@ -4,7 +4,7 @@ use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::team_data::TeamClient;
 use crate::zulip::client::ZulipClient;
 use octocrab::Octocrab;
-use parser::command::{assign::AssignCommand, Command, Input};
+use parser::command::{Command, Input, assign::AssignCommand};
 use std::fmt;
 use std::sync::Arc;
 use tracing as log;

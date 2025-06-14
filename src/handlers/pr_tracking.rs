@@ -14,10 +14,10 @@ use crate::{
     handlers::Context,
 };
 use futures::TryStreamExt;
+use octocrab::Octocrab;
 use octocrab::models::IssueState;
 use octocrab::params::pulls::Sort;
 use octocrab::params::{Direction, State};
-use octocrab::Octocrab;
 use std::collections::HashMap;
 use tokio::sync::RwLockWriteGuard;
 use tracing as log;
@@ -339,10 +339,10 @@ mod tests {
     use crate::github::{Issue, IssuesAction, IssuesEvent, Repository, User};
     use crate::github::{Label, PullRequestNumber};
     use crate::handlers::pr_tracking::{
-        handle_input, parse_input, upsert_pr_into_user_queue, AssignedPullRequest,
+        AssignedPullRequest, handle_input, parse_input, upsert_pr_into_user_queue,
     };
     use crate::tests::github::{default_test_user, issue, pull_request, user};
-    use crate::tests::{run_db_test, TestContext};
+    use crate::tests::{TestContext, run_db_test};
 
     #[tokio::test]
     async fn add_pr_to_workqueue_on_assign() {

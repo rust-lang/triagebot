@@ -50,8 +50,8 @@ use crate::handlers::pull_requests_assignment_update::PullRequestAssignmentUpdat
 use crate::{
     db::jobs::JobSchedule,
     handlers::{
-        docs_update::DocsUpdateJob, major_change::MajorChangeAcceptenceJob,
-        rustc_commits::RustcCommitsJob, Context,
+        Context, docs_update::DocsUpdateJob, major_change::MajorChangeAcceptenceJob,
+        rustc_commits::RustcCommitsJob,
     },
 };
 

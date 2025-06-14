@@ -3,22 +3,22 @@ pub mod client;
 mod commands;
 
 use crate::db::notifications::add_metadata;
-use crate::db::notifications::{self, delete_ping, move_indices, record_ping, Identifier};
+use crate::db::notifications::{self, Identifier, delete_ping, move_indices, record_ping};
 use crate::db::review_prefs::{
-    get_review_prefs, get_review_prefs_batch, upsert_review_prefs, RotationMode,
+    RotationMode, get_review_prefs, get_review_prefs_batch, upsert_review_prefs,
 };
 use crate::github::User;
+use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
 use crate::handlers::project_goals::{self, ping_project_goals_owners};
-use crate::handlers::Context;
 use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
 use crate::zulip::commands::{
-    parse_cli, ChatCommand, LookupCmd, PingGoalsArgs, StreamCommand, WorkqueueCmd, WorkqueueLimit,
+    ChatCommand, LookupCmd, PingGoalsArgs, StreamCommand, WorkqueueCmd, WorkqueueLimit, parse_cli,
 };
-use anyhow::{format_err, Context as _};
+use anyhow::{Context as _, format_err};
 use rust_team_data::v1::{TeamKind, TeamMember};
 use std::cmp::Reverse;
 use std::fmt::Write as _;
@@ -139,7 +139,7 @@ async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Op
                 "Unknown Zulip user. Please add `zulip-id = {}` to your file in \
                 [rust-lang/team](https://github.com/rust-lang/team).",
                 req.message.sender_id
-            ))
+            ));
         }
         Err(e) => anyhow::bail!("Failed to query team API: {e:?}"),
     };
@@ -478,7 +478,10 @@ async fn workqueue_commands(
 
             writeln!(response, "Review capacity: `{capacity}`\n")?;
             writeln!(response, "Rotation mode: *{rotation_mode}*\n")?;
-            writeln!(response, "*Note that only certain PRs that are assigned to you are included in your review queue.*")?;
+            writeln!(
+                response,
+                "*Note that only certain PRs that are assigned to you are included in your review queue.*"
+            )?;
             response
         }
         WorkqueueCmd::SetPrLimit { limit } => {
@@ -622,7 +625,9 @@ async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::
         None => {
             let zulip_id = zulip_user.user_id;
             let Some(gh_id) = ctx.team.zulip_to_github_id(zulip_id).await? else {
-                return Ok(format!("Zulip user {zulip_username} was not found in team Zulip mapping. Maybe they do not have zulip-id configured in team."));
+                return Ok(format!(
+                    "Zulip user {zulip_username} was not found in team Zulip mapping. Maybe they do not have zulip-id configured in team."
+                ));
             };
             let Some(username) = ctx.team.username_from_gh_id(gh_id).await? else {
                 return Ok(format!(
@@ -696,7 +701,7 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
             None => {
                 return Ok(format!(
                     "No Zulip account found for GitHub username `{gh_username}`."
-                ))
+                ));
             }
         },
     };

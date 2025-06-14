@@ -21,7 +21,7 @@
 //! the PR modifies.
 
 use crate::db::issue_data::IssueData;
-use crate::db::review_prefs::{get_review_prefs_batch, RotationMode};
+use crate::db::review_prefs::{RotationMode, get_review_prefs_batch};
 use crate::github::UserId;
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::{
@@ -30,7 +30,7 @@ use crate::{
     handlers::{Context, GithubClient, IssuesEvent},
     interactions::EditIssueBody,
 };
-use anyhow::{bail, Context as _};
+use anyhow::{Context as _, bail};
 use octocrab::models::AuthorAssociation;
 use parser::command::assign::AssignCommand;
 use parser::command::{Command, Input};

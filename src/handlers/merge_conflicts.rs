@@ -15,8 +15,8 @@
 
 use crate::{
     config::MergeConflictConfig,
-    db::issue_data::IssueData,
     db::PooledClient,
+    db::issue_data::IssueData,
     github::{
         Event, GithubClient, Issue, IssuesAction, IssuesEvent, Label, MergeConflictInfo,
         MergeableState, PushEvent, ReportedContentClassifiers, Repository,

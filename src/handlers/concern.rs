@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use anyhow::{bail, Context as _};
+use anyhow::{Context as _, bail};
 use octocrab::models::AuthorAssociation;
 
 use crate::{
@@ -202,7 +202,10 @@ fn markdown_content(concerns: &[Concern], bot: &str) -> String {
     }
 
     let _ = writeln!(md, ">");
-    let _ = writeln!(md, "> *Managed by `@{bot}`—see [help](https://forge.rust-lang.org/triagebot/concern.html) for details.*");
+    let _ = writeln!(
+        md,
+        "> *Managed by `@{bot}`—see [help](https://forge.rust-lang.org/triagebot/concern.html) for details.*"
+    );
 
     md
 }

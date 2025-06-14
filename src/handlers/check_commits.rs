@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use anyhow::bail;
 use anyhow::Context as _;
+use anyhow::bail;
 
 use super::Context;
 use crate::{

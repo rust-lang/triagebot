@@ -185,7 +185,7 @@ fn match_pattern(pattern: &str, label: &str) -> anyhow::Result<MatchPatternResul
 #[cfg(test)]
 mod tests {
     use super::{
-        check_filter, match_pattern, CheckFilterResult, MatchPatternResult, TeamMembership,
+        CheckFilterResult, MatchPatternResult, TeamMembership, check_filter, match_pattern,
     };
     use crate::config::RelabelConfig;
 

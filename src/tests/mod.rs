@@ -1,6 +1,6 @@
 use crate::db;
 use crate::db::users::record_username;
-use crate::db::{make_client, ClientPool, PooledClient};
+use crate::db::{ClientPool, PooledClient, make_client};
 use crate::github::GithubClient;
 use crate::handlers::Context;
 use crate::team_data::TeamClient;
@@ -9,8 +9,8 @@ use octocrab::Octocrab;
 use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tokio_postgres::config::Host;
 use tokio_postgres::Config;
+use tokio_postgres::config::Host;
 
 pub(crate) mod github;
 
