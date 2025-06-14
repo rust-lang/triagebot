@@ -12,6 +12,7 @@ use tokio::{task, time};
 use tower::{Service, ServiceExt};
 use tracing as log;
 use tracing::Instrument;
+use triagebot::gha_logs::GitHubActionLogsCache;
 use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
 use triagebot::handlers::pr_tracking::load_workqueue;
 use triagebot::jobs::{
@@ -318,6 +319,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         team: team_api,
         octocrab: oc,
         workqueue: Arc::new(RwLock::new(workqueue)),
+        gha_logs: Arc::new(RwLock::new(GitHubActionLogsCache::default())),
         zulip,
     });
 
