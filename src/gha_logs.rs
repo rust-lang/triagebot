@@ -1,14 +1,14 @@
 use crate::github;
 use crate::handlers::Context;
 use anyhow::Context as _;
-use hyper::header::{CONTENT_SECURITY_POLICY, CONTENT_TYPE};
+use hyper::header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE};
 use hyper::{Body, Response, StatusCode};
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
-const ANSI_UP_URL: &str = "https://cdn.jsdelivr.net/npm/ansi_up@6.0.6/+esm";
+pub const ANSI_UP_URL: &str = "/gha_logs/ansi_up@6.0.6.min.js";
 const MAX_CACHE_CAPACITY_BYTES: u64 = 50 * 1024 * 1024; // 50 Mb
 
 #[derive(Default)]
@@ -171,4 +171,15 @@ async fn process_logs(
             format!("script-src 'nonce-{nonce}' {ANSI_UP_URL}"),
         )
         .body(Body::from(html))?);
+}
+
+pub fn ansi_up_min_js() -> anyhow::Result<Response<Body>, hyper::Error> {
+    const ANSI_UP_MIN_JS: &str = include_str!("gha_logs/ansi_up@6.0.6.min.js");
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(CACHE_CONTROL, "public, max-age=15552000, immutable")
+        .header(CONTENT_TYPE, "text/javascript; charset=utf-8")
+        .body(Body::from(ANSI_UP_MIN_JS))
+        .unwrap())
 }
