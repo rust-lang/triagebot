@@ -19,13 +19,17 @@ mod modified_submodule;
 mod no_mentions;
 mod no_merges;
 mod non_default_branch;
+mod validate_config;
 
 /// Key for the state in the database
-const CHECK_COMMITS_WARNINGS_KEY: &str = "check-commits-warnings";
+const CHECK_COMMITS_KEY: &str = "check-commits-warnings";
 
 /// State stored in the database
 #[derive(Debug, Default, serde::Deserialize, serde::Serialize, Clone, PartialEq)]
-struct CheckCommitsWarningsState {
+struct CheckCommitsState {
+    /// List of the last errors (comment body, comment node-id).
+    #[serde(default)]
+    last_errors: Vec<(String, String)>,
     /// List of the last warnings in the most recent comment.
     last_warnings: Vec<String>,
     /// ID of the most recent warning comment.
@@ -41,7 +45,10 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
 
     if !matches!(
         event.action,
-        IssuesAction::Opened | IssuesAction::Synchronize | IssuesAction::ReadyForReview
+        IssuesAction::Opened
+            | IssuesAction::Reopened
+            | IssuesAction::Synchronize
+            | IssuesAction::ReadyForReview
     ) || !event.issue.is_pr()
     {
         return Ok(());
@@ -61,6 +68,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
     let commits = event.issue.commits(&ctx.github).await?;
     let diff = &compare.files;
 
+    let mut errors = Vec::new();
     let mut warnings = Vec::new();
     let mut labels = Vec::new();
 
@@ -108,20 +116,51 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
         }
     }
 
-    handle_warnings_and_labels(ctx, event, warnings, labels).await
+    // Check if the `triagebot.toml` config is valid
+    errors.extend(
+        validate_config::validate_config(ctx, &event, diff)
+            .await
+            .context("validating the the triagebot config")?,
+    );
+
+    handle_new_state(ctx, event, errors, warnings, labels).await
 }
 
 // Add, hide or hide&add a comment with the warnings.
-async fn handle_warnings_and_labels(
+async fn handle_new_state(
     ctx: &Context,
     event: &IssuesEvent,
+    errors: Vec<String>,
     warnings: Vec<String>,
     labels: Vec<String>,
 ) -> anyhow::Result<()> {
     // Get the state of the warnings for this PR in the database.
     let mut db = ctx.db.get().await;
-    let mut state: IssueData<'_, CheckCommitsWarningsState> =
-        IssueData::load(&mut db, &event.issue, CHECK_COMMITS_WARNINGS_KEY).await?;
+    let mut state: IssueData<'_, CheckCommitsState> =
+        IssueData::load(&mut db, &event.issue, CHECK_COMMITS_KEY).await?;
+
+    // Handles the errors, post the new ones, hide resolved ones and don't touch the one still active
+    if !state.data.last_errors.is_empty() || !errors.is_empty() {
+        let (errors_to_remove, errors_to_add) =
+            calculate_error_changes(&state.data.last_errors, &errors);
+
+        for error_to_remove in errors_to_remove {
+            event
+                .issue
+                .hide_comment(
+                    &ctx.github,
+                    &error_to_remove.1,
+                    ReportedContentClassifiers::Resolved,
+                )
+                .await?;
+            state.data.last_errors.retain(|e| e != &error_to_remove);
+        }
+
+        for error_to_add in errors_to_add {
+            let comment = event.issue.post_comment(&ctx.github, &error_to_add).await?;
+            state.data.last_errors.push((error_to_add, comment.node_id));
+        }
+    }
 
     // We only post a new comment when we haven't posted one with the same warnings before.
     if !warnings.is_empty() && state.data.last_warnings != warnings {
@@ -221,6 +260,28 @@ fn calculate_label_changes(
 
     let removals = previous_set.difference(&current_set).cloned().collect();
     let additions = current_set.difference(&previous_set).cloned().collect();
+
+    (removals, additions)
+}
+
+// Calculate the error changes
+fn calculate_error_changes(
+    previous: &Vec<(String, String)>,
+    current: &Vec<String>,
+) -> (Vec<(String, String)>, Vec<String>) {
+    let previous_set: HashSet<(String, String)> = previous.into_iter().cloned().collect();
+    let current_set: HashSet<String> = current.into_iter().cloned().collect();
+
+    let removals = previous_set
+        .iter()
+        .filter(|(e, _)| !current_set.contains(e))
+        .cloned()
+        .collect();
+    let additions = current_set
+        .iter()
+        .filter(|e| !previous_set.iter().any(|(e2, _)| e == &e2))
+        .cloned()
+        .collect();
 
     (removals, additions)
 }

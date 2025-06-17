@@ -38,9 +38,6 @@ pub(crate) struct Config {
     pub(crate) concern: Option<ConcernConfig>,
     pub(crate) mentions: Option<MentionsConfig>,
     pub(crate) no_merges: Option<NoMergesConfig>,
-    // We want this validation to run even without the entry in the config file
-    #[serde(default = "ValidateConfig::default")]
-    pub(crate) validate_config: Option<ValidateConfig>,
     pub(crate) pr_tracking: Option<ReviewPrefsConfig>,
     pub(crate) transfer: Option<TransferConfig>,
     pub(crate) merge_conflicts: Option<MergeConflictConfig>,
@@ -252,15 +249,6 @@ pub(crate) struct ShortcutConfig {
 #[serde(deny_unknown_fields)]
 pub(crate) struct PrioritizeConfig {
     pub(crate) label: String,
-}
-
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
-pub(crate) struct ValidateConfig {}
-
-impl ValidateConfig {
-    fn default() -> Option<Self> {
-        Some(ValidateConfig {})
-    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -722,7 +710,6 @@ mod tests {
                 review_requested: None,
                 mentions: None,
                 no_merges: None,
-                validate_config: Some(ValidateConfig {}),
                 pr_tracking: None,
                 transfer: None,
                 merge_conflicts: None,
@@ -813,7 +800,6 @@ mod tests {
                 review_requested: None,
                 mentions: None,
                 no_merges: None,
-                validate_config: Some(ValidateConfig {}),
                 pr_tracking: None,
                 transfer: None,
                 merge_conflicts: None,
