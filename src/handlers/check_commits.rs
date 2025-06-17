@@ -19,6 +19,7 @@ mod modified_submodule;
 mod no_mentions;
 mod no_merges;
 mod non_default_branch;
+mod validate_config;
 
 /// Key for the state in the database
 const CHECK_COMMITS_KEY: &str = "check-commits-warnings";
@@ -44,7 +45,10 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
 
     if !matches!(
         event.action,
-        IssuesAction::Opened | IssuesAction::Synchronize | IssuesAction::ReadyForReview
+        IssuesAction::Opened
+            | IssuesAction::Reopened
+            | IssuesAction::Synchronize
+            | IssuesAction::ReadyForReview
     ) || !event.issue.is_pr()
     {
         return Ok(());
@@ -111,6 +115,13 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
             warnings.push(warning);
         }
     }
+
+    // Check if the `triagebot.toml` config is valid
+    errors.extend(
+        validate_config::validate_config(ctx, &event, diff)
+            .await
+            .context("validating the the triagebot config")?,
+    );
 
     handle_new_state(ctx, event, errors, warnings, labels).await
 }
