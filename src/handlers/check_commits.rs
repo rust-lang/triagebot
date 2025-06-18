@@ -4,6 +4,7 @@ use anyhow::Context as _;
 use anyhow::bail;
 
 use super::Context;
+use crate::interactions::ErrorComment;
 use crate::{
     config::Config,
     db::issue_data::IssueData,
@@ -157,7 +158,8 @@ async fn handle_new_state(
         }
 
         for error_to_add in errors_to_add {
-            let comment = event.issue.post_comment(&ctx.github, &error_to_add).await?;
+            let error_comment = ErrorComment::new(&event.issue, &error_to_add);
+            let comment = error_comment.post(&ctx.github).await?;
             state.data.last_errors.push((error_to_add, comment.node_id));
         }
     }

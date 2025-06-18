@@ -4,7 +4,7 @@ use tokio_postgres::Client as DbClient;
 
 use crate::{
     db::issue_data::IssueData,
-    github::{GithubClient, Issue},
+    github::{Comment, GithubClient, Issue},
 };
 use std::fmt::Write;
 
@@ -24,7 +24,7 @@ impl<'a> ErrorComment<'a> {
         }
     }
 
-    pub async fn post(&self, client: &GithubClient) -> anyhow::Result<()> {
+    pub async fn post(&self, client: &GithubClient) -> anyhow::Result<Comment> {
         let mut body = String::new();
         writeln!(body, "**Error**: {}", self.message)?;
         writeln!(body)?;
@@ -33,8 +33,7 @@ impl<'a> ErrorComment<'a> {
             "Please file an issue on GitHub at [triagebot](https://github.com/rust-lang/triagebot) if there's \
             a problem with this bot, or reach out on [#t-infra](https://rust-lang.zulipchat.com/#narrow/stream/242791-t-infra) on Zulip."
         )?;
-        self.issue.post_comment(client, &body).await?;
-        Ok(())
+        self.issue.post_comment(client, &body).await
     }
 }
 
