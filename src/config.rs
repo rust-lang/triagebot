@@ -1,5 +1,6 @@
 use crate::changelogs::ChangelogFormat;
 use crate::github::{GithubClient, Repository};
+use octocrab::Octocrab;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::{Arc, LazyLock, RwLock};
@@ -7,7 +8,7 @@ use std::time::{Duration, Instant};
 use tracing as log;
 
 pub(crate) static CONFIG_FILE_NAME: &str = "triagebot.toml";
-const REFRESH_EVERY: Duration = Duration::from_secs(2 * 60); // Every two minutes
+const REFRESH_EVERY_SECS: Duration = Duration::from_secs(2 * 60); // Every two minutes
 
 static CONFIG_CACHE: LazyLock<
     RwLock<HashMap<String, (Result<Arc<Config>, ConfigurationError>, Instant)>>,
@@ -432,7 +433,7 @@ pub(crate) struct ReviewRequestedConfig {
 }
 
 pub(crate) async fn get(
-    gh: &GithubClient,
+    octo_ctx: &Octocrab,
     repo: &Repository,
 ) -> Result<Arc<Config>, ConfigurationError> {
     if let Some(config) = get_cached_config(&repo.full_name) {
@@ -440,7 +441,7 @@ pub(crate) async fn get(
         config
     } else {
         log::trace!("fetching fresh config for {}", repo.full_name);
-        let res = get_fresh_config(gh, repo).await;
+        let res = get_fresh_config2(&octo_ctx, repo).await;
         CONFIG_CACHE
             .write()
             .unwrap()
@@ -525,12 +526,38 @@ fn default_true() -> bool {
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
-        if fetch_time.elapsed() < REFRESH_EVERY {
+        if fetch_time.elapsed() < REFRESH_EVERY_SECS {
             Some(config.clone())
         } else {
             None
         }
     })
+}
+
+async fn get_fresh_config2(
+    octo_ctx: &Octocrab,
+    repo: &Repository,
+) -> Result<Arc<Config>, ConfigurationError> {
+    let mut content_items = octo_ctx
+        .repos(repo.owner(), repo.name())
+        .get_content()
+        .path(CONFIG_FILE_NAME)
+        .r#ref(&repo.default_branch)
+        .send()
+        .await
+        .map_err(|e| ConfigurationError::Http(Arc::new(e.into())))?;
+
+    let contents = content_items.take_items();
+    let c = &contents[0];
+
+    let contents = c
+        .decoded_content()
+        .ok_or(ConfigurationError::Missing)
+        .map_err(|e| e)?;
+
+    let config = Arc::new(toml::from_str::<Config>(&contents).map_err(ConfigurationError::Toml)?);
+    log::debug!("fresh configuration for {}: {:?}", repo.full_name, config);
+    Ok(config)
 }
 
 async fn get_fresh_config(
