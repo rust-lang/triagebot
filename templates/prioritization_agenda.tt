@@ -43,11 +43,11 @@ note_id: xxx
 
 ## Backport nominations
 
-[T-compiler beta](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-compiler) / [T-compiler stable](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-compiler)
+[T-compiler beta](https://github.com/rust-lang/rust/issues?q=is%3Apr+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-compiler) / [T-compiler stable](https://github.com/rust-lang/rust/issues?q=is%3Apr+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-compiler)
 {{-issues::render(issues=beta_nominated_t_compiler, backport_branch=":beta: ", empty="No beta nominations for `T-compiler` this time.")}}
 {{-issues::render(issues=stable_nominated_t_compiler, backport_branch=":stable: ", empty="No stable nominations for `T-compiler` this time.")}}
 
-[T-types beta](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-types) / [T-types stable](https://github.com/rust-lang/rust/issues?q=is%3Aall+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-types)
+[T-types beta](https://github.com/rust-lang/rust/issues?q=is%3Apr+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-types) / [T-types stable](https://github.com/rust-lang/rust/issues?q=is%3Apr+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-types)
 {{-issues::render(issues=beta_nominated_t_types, backport_branch=":beta:", empty="No beta nominations for `T-types` this time.")}}
 {{-issues::render(issues=stable_nominated_t_types, backport_branch=":stable:", empty="No stable nominations for `T-types` this time.")}}
 
