@@ -1,4 +1,5 @@
 use crate::config::{self, Config, ConfigurationError};
+use crate::gha_logs::GitHubActionLogsCache;
 use crate::github::{Event, GithubClient, IssueCommentAction, IssuesAction, IssuesEvent};
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::team_data::TeamClient;
@@ -380,4 +381,5 @@ pub struct Context {
     /// Represents the workqueue (assigned open PRs) of individual reviewers.
     /// tokio's RwLock is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
     pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
+    pub gha_logs: Arc<tokio::sync::RwLock<GitHubActionLogsCache>>,
 }
