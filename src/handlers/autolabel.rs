@@ -39,7 +39,10 @@ pub(super) async fn parse_input(
     // synchronize may be straddling a rebase, which will break diff generation.
     if matches!(
         event.action,
-        IssuesAction::Opened | IssuesAction::Synchronize | IssuesAction::ReadyForReview
+        IssuesAction::Opened
+            | IssuesAction::Synchronize
+            | IssuesAction::ReadyForReview
+            | IssuesAction::ConvertedToDraft
     ) {
         let mut db = ctx.db.get().await;
         let mut state: IssueData<'_, AutolabelState> =
@@ -55,7 +58,9 @@ pub(super) async fn parse_input(
                 log::error!("failed to fetch diff: {:?}", e);
             })
             .unwrap_or_default();
+
         let mut autolabels = Vec::new();
+        let mut to_remove = Vec::new();
 
         'outer: for (label, cfg) in config.labels.iter() {
             let exclude_patterns: Vec<glob::Pattern> = cfg
@@ -108,6 +113,14 @@ pub(super) async fn parse_input(
                     });
                     state.data.new_pr_labels_applied = true;
                 }
+
+                // If a PR is converted to draft remove all the "new PR" labels
+                if cfg.new_pr && event.action == IssuesAction::ConvertedToDraft {
+                    to_remove.push(Label {
+                        name: label.to_owned(),
+                    });
+                    state.data.new_pr_labels_applied = false;
+                }
             } else {
                 if cfg.new_issue && event.action == IssuesAction::Opened {
                     autolabels.push(Label {
@@ -119,10 +132,10 @@ pub(super) async fn parse_input(
 
         state.save().await.map_err(|e| e.to_string())?;
 
-        if !autolabels.is_empty() {
+        if !autolabels.is_empty() || !to_remove.is_empty() {
             return Ok(Some(AutolabelInput {
                 add: autolabels,
-                remove: vec![],
+                remove: to_remove,
             }));
         }
     }
