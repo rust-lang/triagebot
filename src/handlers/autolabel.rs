@@ -1,4 +1,3 @@
-use crate::db::issue_data::IssueData;
 use crate::{
     config::AutolabelConfig,
     github::{IssuesAction, IssuesEvent, Label},
@@ -6,16 +5,6 @@ use crate::{
 };
 use anyhow::Context as _;
 use tracing as log;
-
-/// Key for the state in the database
-const AUTOLABEL_KEY: &str = "autolabel";
-
-/// State stored in the database
-#[derive(Debug, Default, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
-struct AutolabelState {
-    /// If true, then `autolabel.new_pr` labels have already been applied to this PR.
-    new_pr_labels_applied: bool,
-}
 
 pub(super) struct AutolabelInput {
     add: Vec<Label>,
@@ -44,12 +33,6 @@ pub(super) async fn parse_input(
             | IssuesAction::ReadyForReview
             | IssuesAction::ConvertedToDraft
     ) {
-        let mut db = ctx.db.get().await;
-        let mut state: IssueData<'_, AutolabelState> =
-            IssueData::load(&mut db, &event.issue, AUTOLABEL_KEY)
-                .await
-                .map_err(|e| e.to_string())?;
-
         let files = event
             .issue
             .diff(&ctx.github)
@@ -102,16 +85,14 @@ pub(super) async fn parse_input(
 
                 // Treat the following situations as a "new PR":
                 // 1) New PRs opened as non-draft
-                // 2) PRs opened as draft that are marked as "ready for review" for the first time.
+                // 2) PRs opened as draft that are marked as "ready for review".
                 let is_new_non_draft_pr =
                     event.action == IssuesAction::Opened && !event.issue.draft;
-                let is_first_time_ready_for_review = event.action == IssuesAction::ReadyForReview
-                    && !state.data.new_pr_labels_applied;
-                if cfg.new_pr && (is_new_non_draft_pr || is_first_time_ready_for_review) {
+                let is_ready_for_review = event.action == IssuesAction::ReadyForReview;
+                if cfg.new_pr && (is_new_non_draft_pr || is_ready_for_review) {
                     autolabels.push(Label {
                         name: label.to_owned(),
                     });
-                    state.data.new_pr_labels_applied = true;
                 }
 
                 // If a PR is converted to draft remove all the "new PR" labels
@@ -119,7 +100,6 @@ pub(super) async fn parse_input(
                     to_remove.push(Label {
                         name: label.to_owned(),
                     });
-                    state.data.new_pr_labels_applied = false;
                 }
             } else {
                 if cfg.new_issue && event.action == IssuesAction::Opened {
@@ -129,8 +109,6 @@ pub(super) async fn parse_input(
                 }
             }
         }
-
-        state.save().await.map_err(|e| e.to_string())?;
 
         if !autolabels.is_empty() || !to_remove.is_empty() {
             return Ok(Some(AutolabelInput {
