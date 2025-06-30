@@ -82,6 +82,7 @@ impl TestContext {
             username: "triagebot-test".to_string(),
             octocrab,
             workqueue: Arc::new(RwLock::new(Default::default())),
+            gha_logs: Arc::new(RwLock::new(Default::default())),
         };
 
         Self {

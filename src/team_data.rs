@@ -1,5 +1,5 @@
 use reqwest::Client;
-use rust_team_data::v1::{BASE_URL, People, Teams, ZulipMapping};
+use rust_team_data::v1::{BASE_URL, People, Repos, Teams, ZulipMapping};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -10,6 +10,7 @@ pub struct TeamClient {
     base_url: String,
     client: Client,
     teams: CachedTeamItem<Teams>,
+    repos: CachedTeamItem<Repos>,
     people: CachedTeamItem<People>,
     zulip_mapping: CachedTeamItem<ZulipMapping>,
 }
@@ -25,6 +26,7 @@ impl TeamClient {
             base_url,
             client: Client::new(),
             teams: CachedTeamItem::new("/teams.json"),
+            repos: CachedTeamItem::new("/repos.json"),
             people: CachedTeamItem::new("/people.json"),
             zulip_mapping: CachedTeamItem::new("/zulip-map.json"),
         }
@@ -97,6 +99,10 @@ impl TeamClient {
 
     pub async fn teams(&self) -> anyhow::Result<Teams> {
         self.teams.get(&self.client, &self.base_url).await
+    }
+
+    pub async fn repos(&self) -> anyhow::Result<Repos> {
+        self.repos.get(&self.client, &self.base_url).await
     }
 
     pub async fn people(&self) -> anyhow::Result<People> {
