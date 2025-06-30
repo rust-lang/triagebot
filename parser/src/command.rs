@@ -375,6 +375,18 @@ fn concern() {
 }
 
 #[test]
+fn concern_resolve() {
+    let input = "@bot concern resolve this is my concern";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert_eq!(
+        input.next(),
+        Some(Command::Concern(Ok(concern::ConcernCommand::Resolve {
+            title: "this is my concern".to_string()
+        })))
+    );
+}
+
+#[test]
 fn resolve() {
     let input = "@bot resolve this is my concern";
     let mut input = Input::new(input, vec!["bot"]);
