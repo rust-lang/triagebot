@@ -1116,6 +1116,7 @@ pub struct ChangeInner {
 pub struct Changes {
     pub title: Option<ChangeInner>,
     pub body: Option<ChangeInner>,
+    pub base: Option<ChangeInner>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -1226,6 +1227,13 @@ pub struct IssuesEvent {
     pub repository: Repository,
     /// The GitHub user that triggered the event.
     pub sender: User,
+}
+
+impl IssuesEvent {
+    pub fn has_base_changed(&self) -> bool {
+        matches!(self.action, IssuesAction::Edited)
+            && matches!(&self.changes, Some(changes) if changes.base.is_some())
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
