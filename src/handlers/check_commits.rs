@@ -50,7 +50,8 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
             | IssuesAction::Reopened
             | IssuesAction::Synchronize
             | IssuesAction::ReadyForReview
-    ) || !event.issue.is_pr()
+    ) || !event.has_base_changed()
+        || !event.issue.is_pr()
     {
         return Ok(());
     }

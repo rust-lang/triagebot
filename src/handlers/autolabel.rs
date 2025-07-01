@@ -20,6 +20,7 @@ pub(super) async fn parse_input(
         Some(config) => config,
         None => return Ok(None),
     };
+
     // On opening a new PR or sync'ing the branch, look at the diff and try to
     // add any appropriate labels.
     //
@@ -39,6 +40,7 @@ pub(super) async fn parse_input(
                 | IssuesAction::ReadyForReview
                 | IssuesAction::ConvertedToDraft
         )
+        || event.has_base_changed()
     {
         let files = if can_trigger_files {
             event
