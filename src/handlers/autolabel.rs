@@ -29,6 +29,8 @@ pub(super) async fn parse_input(
     if matches!(
         event.action,
         IssuesAction::Opened
+            | IssuesAction::Closed
+            | IssuesAction::Reopened
             | IssuesAction::Synchronize
             | IssuesAction::ReadyForReview
             | IssuesAction::ConvertedToDraft
@@ -84,19 +86,25 @@ pub(super) async fn parse_input(
                 }
 
                 // Treat the following situations as a "new PR":
-                // 1) New PRs opened as non-draft
-                // 2) PRs opened as draft that are marked as "ready for review".
-                let is_new_non_draft_pr =
-                    event.action == IssuesAction::Opened && !event.issue.draft;
+                // 1) PRs that were (re)opened and are not draft
+                // 2) PRs that have been converted from a draft to being "ready for review"
+                let is_opened_non_draft =
+                    matches!(event.action, IssuesAction::Opened | IssuesAction::Reopened)
+                        && !event.issue.draft;
                 let is_ready_for_review = event.action == IssuesAction::ReadyForReview;
-                if cfg.new_pr && (is_new_non_draft_pr || is_ready_for_review) {
+                if cfg.new_pr && (is_opened_non_draft || is_ready_for_review) {
                     autolabels.push(Label {
                         name: label.to_owned(),
                     });
                 }
 
-                // If a PR is converted to draft remove all the "new PR" labels
-                if cfg.new_pr && event.action == IssuesAction::ConvertedToDraft {
+                // If a PR is converted to draft or closed, remove all the "new PR" labels
+                if cfg.new_pr
+                    && matches!(
+                        event.action,
+                        IssuesAction::ConvertedToDraft | IssuesAction::Closed
+                    )
+                {
                     to_remove.push(Label {
                         name: label.to_owned(),
                     });
