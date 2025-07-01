@@ -26,23 +26,32 @@ pub(super) async fn parse_input(
     // FIXME: This will re-apply labels after a push that the user had tried to
     // remove. Not much can be done about that currently; the before/after on
     // synchronize may be straddling a rebase, which will break diff generation.
-    if matches!(
+    let can_trigger_files = matches!(
         event.action,
-        IssuesAction::Opened
-            | IssuesAction::Closed
-            | IssuesAction::Reopened
-            | IssuesAction::Synchronize
-            | IssuesAction::ReadyForReview
-            | IssuesAction::ConvertedToDraft
-    ) {
-        let files = event
-            .issue
-            .diff(&ctx.github)
-            .await
-            .map_err(|e| {
-                log::error!("failed to fetch diff: {:?}", e);
-            })
-            .unwrap_or_default();
+        IssuesAction::Opened | IssuesAction::Synchronize
+    );
+
+    if can_trigger_files
+        || matches!(
+            event.action,
+            IssuesAction::Closed
+                | IssuesAction::Reopened
+                | IssuesAction::ReadyForReview
+                | IssuesAction::ConvertedToDraft
+        )
+    {
+        let files = if can_trigger_files {
+            event
+                .issue
+                .diff(&ctx.github)
+                .await
+                .map_err(|e| {
+                    log::error!("failed to fetch diff: {:?}", e);
+                })
+                .unwrap_or_default()
+        } else {
+            Default::default()
+        };
 
         let mut autolabels = Vec::new();
         let mut to_remove = Vec::new();
