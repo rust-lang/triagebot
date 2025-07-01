@@ -1,4 +1,3 @@
-use crate::db::issue_data::IssueData;
 use crate::{
     config::AutolabelConfig,
     github::{IssuesAction, IssuesEvent, Label},
@@ -6,16 +5,6 @@ use crate::{
 };
 use anyhow::Context as _;
 use tracing as log;
-
-/// Key for the state in the database
-const AUTOLABEL_KEY: &str = "autolabel";
-
-/// State stored in the database
-#[derive(Debug, Default, PartialEq, Clone, serde::Deserialize, serde::Serialize)]
-struct AutolabelState {
-    /// If true, then `autolabel.new_pr` labels have already been applied to this PR.
-    new_pr_labels_applied: bool,
-}
 
 pub(super) struct AutolabelInput {
     add: Vec<Label>,
@@ -37,25 +26,35 @@ pub(super) async fn parse_input(
     // FIXME: This will re-apply labels after a push that the user had tried to
     // remove. Not much can be done about that currently; the before/after on
     // synchronize may be straddling a rebase, which will break diff generation.
-    if matches!(
+    let can_trigger_files = matches!(
         event.action,
-        IssuesAction::Opened | IssuesAction::Synchronize | IssuesAction::ReadyForReview
-    ) {
-        let mut db = ctx.db.get().await;
-        let mut state: IssueData<'_, AutolabelState> =
-            IssueData::load(&mut db, &event.issue, AUTOLABEL_KEY)
-                .await
-                .map_err(|e| e.to_string())?;
+        IssuesAction::Opened | IssuesAction::Synchronize
+    );
 
-        let files = event
-            .issue
-            .diff(&ctx.github)
-            .await
-            .map_err(|e| {
-                log::error!("failed to fetch diff: {:?}", e);
-            })
-            .unwrap_or_default();
+    if can_trigger_files
+        || matches!(
+            event.action,
+            IssuesAction::Closed
+                | IssuesAction::Reopened
+                | IssuesAction::ReadyForReview
+                | IssuesAction::ConvertedToDraft
+        )
+    {
+        let files = if can_trigger_files {
+            event
+                .issue
+                .diff(&ctx.github)
+                .await
+                .map_err(|e| {
+                    log::error!("failed to fetch diff: {:?}", e);
+                })
+                .unwrap_or_default()
+        } else {
+            Default::default()
+        };
+
         let mut autolabels = Vec::new();
+        let mut to_remove = Vec::new();
 
         'outer: for (label, cfg) in config.labels.iter() {
             let exclude_patterns: Vec<glob::Pattern> = cfg
@@ -96,17 +95,28 @@ pub(super) async fn parse_input(
                 }
 
                 // Treat the following situations as a "new PR":
-                // 1) New PRs opened as non-draft
-                // 2) PRs opened as draft that are marked as "ready for review" for the first time.
-                let is_new_non_draft_pr =
-                    event.action == IssuesAction::Opened && !event.issue.draft;
-                let is_first_time_ready_for_review = event.action == IssuesAction::ReadyForReview
-                    && !state.data.new_pr_labels_applied;
-                if cfg.new_pr && (is_new_non_draft_pr || is_first_time_ready_for_review) {
+                // 1) PRs that were (re)opened and are not draft
+                // 2) PRs that have been converted from a draft to being "ready for review"
+                let is_opened_non_draft =
+                    matches!(event.action, IssuesAction::Opened | IssuesAction::Reopened)
+                        && !event.issue.draft;
+                let is_ready_for_review = event.action == IssuesAction::ReadyForReview;
+                if cfg.new_pr && (is_opened_non_draft || is_ready_for_review) {
                     autolabels.push(Label {
                         name: label.to_owned(),
                     });
-                    state.data.new_pr_labels_applied = true;
+                }
+
+                // If a PR is converted to draft or closed, remove all the "new PR" labels
+                if cfg.new_pr
+                    && matches!(
+                        event.action,
+                        IssuesAction::ConvertedToDraft | IssuesAction::Closed
+                    )
+                {
+                    to_remove.push(Label {
+                        name: label.to_owned(),
+                    });
                 }
             } else {
                 if cfg.new_issue && event.action == IssuesAction::Opened {
@@ -117,12 +127,10 @@ pub(super) async fn parse_input(
             }
         }
 
-        state.save().await.map_err(|e| e.to_string())?;
-
-        if !autolabels.is_empty() {
+        if !autolabels.is_empty() || !to_remove.is_empty() {
             return Ok(Some(AutolabelInput {
                 add: autolabels,
-                remove: vec![],
+                remove: to_remove,
             }));
         }
     }
