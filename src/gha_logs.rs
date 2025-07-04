@@ -129,7 +129,7 @@ async fn process_logs(
     let nonce = Uuid::new_v4().to_hyphenated().to_string();
 
     let html = format!(
-        r#"<!DOCTYPE html>
+        r##"<!DOCTYPE html>
 <html>
 <head>
     <title>{log_uuid} - triagebot</title>
@@ -143,6 +143,13 @@ async fn process_logs(
             color: #CCCCCC;
             white-space: pre;
         }}
+        .timestamp {{
+            color: unset;
+            text-decoration: none;
+        }}
+        .timestamp:hover {{
+            text-decoration: underline;
+        }}
     </style>
     <script type="module" nonce="{nonce}">
         import {{ AnsiUp }} from '{ANSI_UP_URL}'
@@ -150,7 +157,19 @@ async fn process_logs(
         var logs = {logs};
         var ansi_up = new AnsiUp();
 
+        // 1. Tranform the ANSI escape codes to HTML
         var html = ansi_up.ansi_to_html(logs);
+
+        // 2. Remove UTF-8 useless BOM
+        if (html.charCodeAt(0) === 0xFEFF) {{
+            html = html.substr(1);
+        }}
+
+        // 3. Add a self-referencial anchor to all timestamps at the start of the lines
+        const dateRegex = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z)/gm;
+        html = html.replace(dateRegex, (ts) => 
+            `<a id="${{ts}}" href="#${{ts}}" class="timestamp">${{ts}}</a>`
+        );
 
         var cdiv = document.getElementById("console");
         cdiv.innerHTML = html;
@@ -158,7 +177,7 @@ async fn process_logs(
 </head>
 <body id="console">
 </body>
-</html>"#,
+</html>"##,
     );
 
     tracing::info!("gha_logs: serving logs for {log_uuid}");
