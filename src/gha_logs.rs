@@ -129,7 +129,7 @@ async fn process_logs(
     let nonce = Uuid::new_v4().to_hyphenated().to_string();
 
     let html = format!(
-        r##"<!DOCTYPE html>
+        r###"<!DOCTYPE html>
 <html>
 <head>
     <title>{log_uuid} - triagebot</title>
@@ -171,13 +171,28 @@ async fn process_logs(
             `<a id="${{ts}}" href="#${{ts}}" class="timestamp">${{ts}}</a>`
         );
 
+        // 4. Add a anchor around every "##[error]" string
+        let errorCounter = -1;
+        html = html.replace(/##\[error\]/g, () =>
+            `<a id="error-${{++errorCounter}}">##[error]</a>`
+        );
+
+        // 5. Add the html to the DOM
         var cdiv = document.getElementById("console");
         cdiv.innerHTML = html;
+        
+        // 6. If no anchor is given, scroll to the last error
+        if (location.hash === "" && errorCounter >= 0) {{
+            document.getElementById(`error-${{errorCounter}}`).scrollIntoView({{
+                behavior: 'smooth',
+                block: 'center'
+            }});
+        }}
     </script>
 </head>
 <body id="console">
 </body>
-</html>"##,
+</html>"###,
     );
 
     tracing::info!("gha_logs: serving logs for {log_uuid}");
