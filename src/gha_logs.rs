@@ -154,6 +154,9 @@ async fn process_logs(
             scroll-margin-bottom: 15vh;
             color: #e5534b;
         }}
+        .warning-marker {{
+            color: #c69026;
+        }}
     </style>
     <script type="module" nonce="{nonce}">
         import {{ AnsiUp }} from '{ANSI_UP_URL}'
@@ -179,6 +182,11 @@ async fn process_logs(
         let errorCounter = -1;
         html = html.replace(/##\[error\]/g, () =>
             `<a id="error-${{++errorCounter}}" class="error-marker">##[error]</a>`
+        );
+        
+        // 4.b Add a span around every "##[warning]" string
+        html = html.replace(/##\[warning\]/g, () =>
+            `<span class="warning-marker">##[warning]</span>`
         );
 
         // 5. Add the html to the DOM
