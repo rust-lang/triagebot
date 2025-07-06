@@ -207,7 +207,7 @@ async fn process_logs(
         .header(CONTENT_TYPE, "text/html; charset=utf-8")
         .header(
             CONTENT_SECURITY_POLICY,
-            format!("script-src 'nonce-{nonce}' {ANSI_UP_URL}"),
+            format!("script-src 'nonce-{nonce}' 'self'"),
         )
         .body(Body::from(html))?);
 }
