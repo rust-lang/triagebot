@@ -130,7 +130,7 @@ async fn process_logs(
 
     let html = format!(
         r###"<!DOCTYPE html>
-<html>
+<html lang="en" translate="no">
 <head>
     <title>{log_uuid} - triagebot</title>
     <meta charset="UTF-8">
