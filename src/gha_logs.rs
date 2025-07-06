@@ -150,6 +150,9 @@ async fn process_logs(
         .timestamp:hover {{
             text-decoration: underline;
         }}
+        .error-marker {{
+            scroll-margin-bottom: 15vh;
+        }}
     </style>
     <script type="module" nonce="{nonce}">
         import {{ AnsiUp }} from '{ANSI_UP_URL}'
@@ -174,7 +177,7 @@ async fn process_logs(
         // 4. Add a anchor around every "##[error]" string
         let errorCounter = -1;
         html = html.replace(/##\[error\]/g, () =>
-            `<a id="error-${{++errorCounter}}">##[error]</a>`
+            `<a id="error-${{++errorCounter}}" class="error-marker">##[error]</a>`
         );
 
         // 5. Add the html to the DOM
@@ -183,9 +186,11 @@ async fn process_logs(
         
         // 6. If no anchor is given, scroll to the last error
         if (location.hash === "" && errorCounter >= 0) {{
+            const hasSmallViewport = window.innerWidth <= 750;
             document.getElementById(`error-${{errorCounter}}`).scrollIntoView({{
-                behavior: 'smooth',
-                block: 'center'
+                behavior: 'instant',
+                block: 'end',
+                inline: hasSmallViewport ? 'start' : 'center'
             }});
         }}
     </script>
