@@ -144,7 +144,7 @@ async fn process_logs(
             white-space: pre;
         }}
         .timestamp {{
-            color: unset;
+            color: #848484;
             text-decoration: none;
         }}
         .timestamp:hover {{
