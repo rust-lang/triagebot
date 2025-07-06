@@ -132,9 +132,9 @@ async fn process_logs(
         r###"<!DOCTYPE html>
 <html lang="en" translate="no">
 <head>
-    <title>{log_uuid} - triagebot</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{log_id} - {owner}/{repo}</title>
     <link rel="icon" sizes="32x32" type="image/png" href="https://www.rust-lang.org/static/images/favicon-32x32.png">    
     <style>
         body {{
