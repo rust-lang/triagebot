@@ -135,7 +135,7 @@ async fn process_logs(
     <title>{log_uuid} - triagebot</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" sizes="32x32" type="image/png" href="https://rust-lang.org/static/images/favicon-32x32.png">    
+    <link rel="icon" sizes="32x32" type="image/png" href="https://www.rust-lang.org/static/images/favicon-32x32.png">    
     <style>
         body {{
             font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
