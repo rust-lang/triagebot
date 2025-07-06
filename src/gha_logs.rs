@@ -207,7 +207,9 @@ async fn process_logs(
         .header(CONTENT_TYPE, "text/html; charset=utf-8")
         .header(
             CONTENT_SECURITY_POLICY,
-            format!("script-src 'nonce-{nonce}' 'self'"),
+            format!(
+                "default-src 'none'; script-src 'nonce-{nonce}' 'self'; style-src 'unsafe-inline'; img-src www.rust-lang.org"
+            ),
         )
         .body(Body::from(html))?);
 }
