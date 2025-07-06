@@ -92,7 +92,7 @@ impl GithubClient {
         req: Request,
         sleep: Duration,
         remaining_attempts: u32,
-    ) -> BoxFuture<Result<Response, reqwest::Error>> {
+    ) -> BoxFuture<'_, Result<Response, reqwest::Error>> {
         #[derive(Debug, serde::Deserialize)]
         struct RateLimit {
             #[allow(unused)]

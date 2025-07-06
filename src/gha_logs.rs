@@ -130,12 +130,12 @@ async fn process_logs(
 
     let html = format!(
         r###"<!DOCTYPE html>
-<html>
+<html lang="en" translate="no">
 <head>
-    <title>{log_uuid} - triagebot</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" sizes="32x32" type="image/png" href="https://rust-lang.org/static/images/favicon-32x32.png">    
+    <title>{log_id} - {owner}/{repo}</title>
+    <link rel="icon" sizes="32x32" type="image/png" href="https://www.rust-lang.org/static/images/favicon-32x32.png">    
     <style>
         body {{
             font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
@@ -144,7 +144,7 @@ async fn process_logs(
             white-space: pre;
         }}
         .timestamp {{
-            color: unset;
+            color: #848484;
             text-decoration: none;
         }}
         .timestamp:hover {{
@@ -152,6 +152,10 @@ async fn process_logs(
         }}
         .error-marker {{
             scroll-margin-bottom: 15vh;
+            color: #e5534b;
+        }}
+        .warning-marker {{
+            color: #c69026;
         }}
     </style>
     <script type="module" nonce="{nonce}">
@@ -178,6 +182,11 @@ async fn process_logs(
         let errorCounter = -1;
         html = html.replace(/##\[error\]/g, () =>
             `<a id="error-${{++errorCounter}}" class="error-marker">##[error]</a>`
+        );
+        
+        // 4.b Add a span around every "##[warning]" string
+        html = html.replace(/##\[warning\]/g, () =>
+            `<span class="warning-marker">##[warning]</span>`
         );
 
         // 5. Add the html to the DOM
@@ -207,7 +216,9 @@ async fn process_logs(
         .header(CONTENT_TYPE, "text/html; charset=utf-8")
         .header(
             CONTENT_SECURITY_POLICY,
-            format!("script-src 'nonce-{nonce}' {ANSI_UP_URL}"),
+            format!(
+                "default-src 'none'; script-src 'nonce-{nonce}' 'self'; style-src 'unsafe-inline'; img-src www.rust-lang.org"
+            ),
         )
         .body(Body::from(html))?);
 }
