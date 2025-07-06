@@ -152,6 +152,7 @@ async fn process_logs(
         }}
         .error-marker {{
             scroll-margin-bottom: 15vh;
+            color: #e5534b;
         }}
     </style>
     <script type="module" nonce="{nonce}">
