@@ -91,11 +91,7 @@ pub(super) async fn handle_command(
     match cmd {
         ConcernCommand::Concern { title } => {
             // Only add a concern if it wasn't already added, we could be in an edit
-            if !concern_data
-                .concerns
-                .iter()
-                .any(|c| c.title == title && c.comment_url == comment_url)
-            {
+            if !concern_data.concerns.iter().any(|c| c.title == title) {
                 concern_data.concerns.push(Concern {
                     title,
                     status: ConcernStatus::Active,
