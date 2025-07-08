@@ -282,6 +282,8 @@ pub(crate) struct AutolabelLabelConfig {
     pub(crate) new_pr: bool,
     #[serde(default)]
     pub(crate) new_issue: bool,
+    #[serde(default)]
+    pub(crate) new_draft: bool,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
