@@ -73,6 +73,12 @@ pub(super) async fn handle_command(
         issue_comment.comment.author_association,
         AuthorAssociation::Member | AuthorAssociation::Owner
     ) {
+        tracing::info!(
+            "{}#{} tried to register a concern, but author association isn't right: {:?}",
+            issue_comment.repository.full_name,
+            issue.number,
+            issue_comment.comment.author_association,
+        );
         issue
             .post_comment(
                 &ctx.github,
@@ -84,7 +90,9 @@ pub(super) async fn handle_command(
 
     let mut client = ctx.db.get().await;
     let mut edit: EditIssueBody<'_, ConcernData> =
-        EditIssueBody::load(&mut client, &issue, CONCERN_ISSUE_KEY).await?;
+        EditIssueBody::load(&mut client, &issue, CONCERN_ISSUE_KEY)
+            .await
+            .context("unable to fetch the concerns data")?;
     let concern_data = edit.data_mut();
 
     // Process the command by either adding a new concern or resolving the old one
@@ -97,6 +105,11 @@ pub(super) async fn handle_command(
                     status: ConcernStatus::Active,
                     comment_url: comment_url.to_string(),
                 });
+            } else {
+                tracing::info!(
+                    "concern with the same name ({title}) already exists ({:?})",
+                    &concern_data.concerns
+                );
             }
         }
         ConcernCommand::Resolve { title } => concern_data
@@ -137,11 +150,14 @@ pub(super) async fn handle_command(
             issue.post_comment(
                 &ctx.github,
                 &format!("*Psst, I was unable to add the labels ({labels}), could someone do it for me.*"),
-            ).await?;
+            ).await.context("unable to post the comment failure it-self")?;
         }
     } else {
         for l in &config.labels {
-            issue.remove_label(&ctx.github, &l).await?;
+            issue
+                .remove_label(&ctx.github, &l)
+                .await
+                .context("unable to remove the concern labels")?;
         }
     }
 
