@@ -96,24 +96,46 @@ pub(super) async fn parse_input(
                     }
                 }
 
+                let is_opened =
+                    matches!(event.action, IssuesAction::Opened | IssuesAction::Reopened);
+
                 // Treat the following situations as a "new PR":
                 // 1) PRs that were (re)opened and are not draft
                 // 2) PRs that have been converted from a draft to being "ready for review"
-                let is_opened_non_draft =
-                    matches!(event.action, IssuesAction::Opened | IssuesAction::Reopened)
-                        && !event.issue.draft;
+                let is_opened_non_draft = is_opened && !event.issue.draft;
                 let is_ready_for_review = event.action == IssuesAction::ReadyForReview;
+
+                // Treat the following situations as a "new draft":
+                // 1) PRs that were (re)opened and are draft
+                // 2) PRs that have been converted to a draft
+                let is_opened_as_draft = is_opened && event.issue.draft;
+                let is_converted_to_draft = event.action == IssuesAction::ConvertedToDraft;
+
                 if cfg.new_pr && (is_opened_non_draft || is_ready_for_review) {
+                    autolabels.push(Label {
+                        name: label.to_owned(),
+                    });
+                } else if cfg.new_draft && (is_opened_as_draft || is_converted_to_draft) {
                     autolabels.push(Label {
                         name: label.to_owned(),
                     });
                 }
 
-                // If a PR is converted to draft or closed, remove all the "new PR" labels
+                // If a PR is converted to draft or closed, remove all the "new PR" labels.
+                // Same for "new draft" labels when the PR is ready for review or closed.
                 if cfg.new_pr
                     && matches!(
                         event.action,
                         IssuesAction::ConvertedToDraft | IssuesAction::Closed
+                    )
+                {
+                    to_remove.push(Label {
+                        name: label.to_owned(),
+                    });
+                } else if cfg.new_draft
+                    && matches!(
+                        event.action,
+                        IssuesAction::ReadyForReview | IssuesAction::Closed
                     )
                 {
                     to_remove.push(Label {
