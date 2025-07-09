@@ -11,6 +11,7 @@ use crate::{
 use anyhow::Context as _;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
+use futures::TryStreamExt as _;
 use parser::command::second::SecondCommand;
 use serde::{Deserialize, Serialize};
 use tracing as log;
@@ -452,13 +453,27 @@ enum SecondedLogicError {
         accept_at: DateTime<Utc>,
         now: DateTime<Utc>,
     },
+    IssueStateChanged {
+        at: DateTime<Utc>,
+        draft: bool,
+        open: bool,
+    },
     IssueNotReady {
         draft: bool,
         open: bool,
     },
-    NotAMajorChange,
+    EnablingLabelAbsent,
+    EnablingLabelRemoved {
+        at: DateTime<Utc>,
+    },
     SecondLabelAbsent,
+    SecondLabelRemoved {
+        at: DateTime<Utc>,
+    },
     ConcernsLabelPresent,
+    ConcernsLabelAdded {
+        at: DateTime<Utc>,
+    },
     NoMajorChangeConfig,
 }
 
@@ -470,12 +485,27 @@ impl Display for SecondedLogicError {
             SecondedLogicError::NotYetAcceptenceTime { accept_at, now } => {
                 write!(f, "not yet acceptence time ({accept_at} > {now})")
             }
+            SecondedLogicError::IssueStateChanged { at, draft, open } => {
+                write!(
+                    f,
+                    "issue state changed at {at} (draft: {draft}; open: {open})"
+                )
+            }
             SecondedLogicError::IssueNotReady { draft, open } => {
                 write!(f, "issue is not ready (draft: {draft}; open: {open})")
             }
-            SecondedLogicError::NotAMajorChange => write!(f, "not a major change"),
+            SecondedLogicError::EnablingLabelAbsent => write!(f, "enabling label is absent"),
+            SecondedLogicError::EnablingLabelRemoved { at } => {
+                write!(f, "enabling label removed at {at}")
+            }
             SecondedLogicError::SecondLabelAbsent => write!(f, "second label is absent"),
+            SecondedLogicError::SecondLabelRemoved { at } => {
+                write!(f, "second labek removed at {at}")
+            }
             SecondedLogicError::ConcernsLabelPresent => write!(f, "concerns label set"),
+            SecondedLogicError::ConcernsLabelAdded { at } => {
+                write!(f, "concerns label added at {at}")
+            }
             SecondedLogicError::NoMajorChangeConfig => write!(f, "no `[major_change]` config"),
         }
     }
@@ -568,24 +598,87 @@ async fn process_seconded(
         .await
         .context("unable to get the associated issue")?;
 
-    if !issue.labels.iter().any(|l| l.name == config.enabling_label) {
-        anyhow::bail!(SecondedLogicError::NotAMajorChange);
+    {
+        // Static checks against the timeline to block the acceptance if the state changed between
+        // the second and now (like concerns added, issue closed, ...).
+        //
+        // Note that checking the timeline is important as a concern could have been added and
+        // resolved by the time we run, missing that this job should not run.
+
+        let (org, repo) = major_change
+            .repo
+            .split_once('/')
+            .context("unable to split org/repo")?;
+        let timeline = ctx
+            .octocrab
+            .issues(org, repo)
+            .list_timeline_events(major_change.issue)
+            .per_page(100)
+            .send()
+            .await
+            .context("unable to get the timeline for the issue")?
+            .into_stream(&ctx.octocrab);
+        let mut timeline = std::pin::pin!(timeline);
+
+        while let Some(event) = timeline.try_next().await? {
+            use octocrab::models::Event;
+
+            let Some(at) = event.created_at else {
+                // event has no associated time, can't do anything about it
+                continue;
+            };
+
+            if at <= major_change.seconded_at {
+                // event is before the second, ignore it
+                continue;
+            }
+
+            if event.event == Event::Unlabeled {
+                let label = event.label.context("unlabeled event without label")?;
+
+                if label.name == config.enabling_label {
+                    anyhow::bail!(SecondedLogicError::EnablingLabelRemoved { at });
+                } else if label.name == config.second_label {
+                    anyhow::bail!(SecondedLogicError::SecondLabelRemoved { at });
+                }
+            } else if event.event == Event::Labeled {
+                let label = event.label.context("labeled event without label")?;
+
+                if Some(&label.name) == config.concerns_label.as_ref() {
+                    anyhow::bail!(SecondedLogicError::ConcernsLabelAdded { at })
+                }
+            } else if event.event == Event::Closed || event.event == Event::ConvertToDraft {
+                anyhow::bail!(SecondedLogicError::IssueStateChanged {
+                    at,
+                    draft: event.event == Event::ConvertToDraft,
+                    open: event.event == Event::Closed,
+                });
+            }
+        }
     }
 
-    if !issue.labels.iter().any(|l| l.name == config.second_label) {
-        anyhow::bail!(SecondedLogicError::SecondLabelAbsent);
-    }
+    {
+        // Sanity checks to make sure the final state is still all right
 
-    let concerns_label = config.concerns_label.as_ref();
-    if issue.labels.iter().any(|l| Some(&l.name) == concerns_label) {
-        anyhow::bail!(SecondedLogicError::ConcernsLabelPresent);
-    }
+        if !issue.labels.iter().any(|l| l.name == config.enabling_label) {
+            anyhow::bail!(SecondedLogicError::EnablingLabelAbsent);
+        }
 
-    if !issue.is_open() || issue.draft {
-        anyhow::bail!(SecondedLogicError::IssueNotReady {
-            draft: issue.draft,
-            open: issue.is_open()
-        });
+        if !issue.labels.iter().any(|l| l.name == config.second_label) {
+            anyhow::bail!(SecondedLogicError::SecondLabelAbsent);
+        }
+
+        let concerns_label = config.concerns_label.as_ref();
+        if issue.labels.iter().any(|l| Some(&l.name) == concerns_label) {
+            anyhow::bail!(SecondedLogicError::ConcernsLabelPresent);
+        }
+
+        if !issue.is_open() || issue.draft {
+            anyhow::bail!(SecondedLogicError::IssueNotReady {
+                draft: issue.draft,
+                open: issue.is_open()
+            });
+        }
     }
 
     if !issue.labels.iter().any(|l| l.name == config.accept_label) {
