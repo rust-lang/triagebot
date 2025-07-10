@@ -188,6 +188,8 @@ async fn handle_command<'a>(
         }
 
         let cmd = parse_cli::<ChatCommand, _>(words.into_iter())?;
+        tracing::info!("command parsed to {cmd:?} (impersonated: {impersonated})");
+
         let output = match &cmd {
             ChatCommand::Acknowledge { identifier } => {
                 acknowledge(&ctx, gh_id, identifier.into()).await
@@ -249,7 +251,10 @@ async fn handle_command<'a>(
         if cmd_index >= words.len() {
             return Ok(Some("Unknown command".to_string()));
         }
+
         let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].into_iter().copied())?;
+        tracing::info!("command parsed to {cmd:?}");
+
         match cmd {
             StreamCommand::EndTopic => post_waiter(&ctx, message_data, WaitingMessage::end_topic())
                 .await
