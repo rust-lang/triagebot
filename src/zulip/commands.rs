@@ -165,7 +165,7 @@ pub enum StreamCommand {
     DocsUpdate,
 }
 
-#[derive(clap::Parser, Debug, PartialEq)]
+#[derive(clap::Parser, Debug, PartialEq, Clone)]
 pub struct PingGoalsArgs {
     /// Number of days before an update is considered stale
     pub threshold: u64,

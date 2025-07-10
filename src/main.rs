@@ -168,7 +168,7 @@ async fn serve_req(
         return Ok(Response::builder()
             .status(StatusCode::OK)
             .header("Content-Type", "application/json")
-            .body(Body::from(triagebot::zulip::respond(&ctx, req).await))
+            .body(Body::from(triagebot::zulip::respond(ctx, req).await))
             .unwrap());
     }
     if req.uri.path() != "/github-hook" {
