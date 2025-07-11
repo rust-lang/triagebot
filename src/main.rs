@@ -151,6 +151,7 @@ async fn serve_req(
             payload.extend_from_slice(&chunk);
         }
 
+        log::info!("/zulip-hook request body: {:?}", str::from_utf8(&payload));
         let req = match serde_json::from_slice(&payload) {
             Ok(r) => r,
             Err(e) => {
@@ -167,7 +168,7 @@ async fn serve_req(
         return Ok(Response::builder()
             .status(StatusCode::OK)
             .header("Content-Type", "application/json")
-            .body(Body::from(triagebot::zulip::respond(&ctx, req).await))
+            .body(Body::from(triagebot::zulip::respond(ctx, req).await))
             .unwrap());
     }
     if req.uri.path() != "/github-hook" {

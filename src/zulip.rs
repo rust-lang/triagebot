@@ -22,6 +22,7 @@ use anyhow::{Context as _, format_err};
 use rust_team_data::v1::{TeamKind, TeamMember};
 use std::cmp::Reverse;
 use std::fmt::Write as _;
+use std::sync::Arc;
 use subtle::ConstantTimeEq;
 use tracing as log;
 
@@ -88,7 +89,7 @@ struct Response {
 /// Top-level handler for Zulip webhooks.
 ///
 /// Returns a JSON response.
-pub async fn respond(ctx: &Context, req: Request) -> String {
+pub async fn respond(ctx: Arc<Context>, req: Request) -> String {
     let content = match process_zulip_request(ctx, req).await {
         Ok(None) => {
             return serde_json::to_string(&ResponseNotRequired {
@@ -123,7 +124,7 @@ pub fn get_token_from_env() -> Result<String, anyhow::Error> {
 /// Processes a Zulip webhook.
 ///
 /// Returns a string of the response, or None if no response is needed.
-async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Option<String>> {
+async fn process_zulip_request(ctx: Arc<Context>, req: Request) -> anyhow::Result<Option<String>> {
     let expected_token = get_token_from_env()?;
     if !bool::from(req.token.as_bytes().ct_eq(expected_token.as_bytes())) {
         anyhow::bail!("Invalid authorization.");
@@ -148,7 +149,7 @@ async fn process_zulip_request(ctx: &Context, req: Request) -> anyhow::Result<Op
 }
 
 async fn handle_command<'a>(
-    ctx: &'a Context,
+    ctx: Arc<Context>,
     mut gh_id: u64,
     command: &'a str,
     message_data: &'a Message,
@@ -188,6 +189,8 @@ async fn handle_command<'a>(
         }
 
         let cmd = parse_cli::<ChatCommand, _>(words.into_iter())?;
+        tracing::info!("command parsed to {cmd:?} (impersonated: {impersonated})");
+
         let output = match &cmd {
             ChatCommand::Acknowledge { identifier } => {
                 acknowledge(&ctx, gh_id, identifier.into()).await
@@ -201,10 +204,12 @@ async fn handle_command<'a>(
             }
             ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
             ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
-            ChatCommand::Work(cmd) => workqueue_commands(ctx, gh_id, cmd).await,
-            ChatCommand::PingGoals(args) => ping_goals_cmd(ctx, gh_id, &args).await,
+            ChatCommand::Work(cmd) => workqueue_commands(&ctx, gh_id, cmd).await,
+            ChatCommand::PingGoals(args) => {
+                ping_goals_cmd(ctx.clone(), gh_id, message_data, &args).await
+            }
             ChatCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
-            ChatCommand::TeamStats { name } => team_status_cmd(ctx, &name).await,
+            ChatCommand::TeamStats { name } => team_status_cmd(&ctx, &name).await,
         };
 
         let output = output?;
@@ -249,7 +254,10 @@ async fn handle_command<'a>(
         if cmd_index >= words.len() {
             return Ok(Some("Unknown command".to_string()));
         }
+
         let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].into_iter().copied())?;
+        tracing::info!("command parsed to {cmd:?}");
+
         match cmd {
             StreamCommand::EndTopic => post_waiter(&ctx, message_data, WaitingMessage::end_topic())
                 .await
@@ -262,29 +270,55 @@ async fn handle_command<'a>(
             StreamCommand::Read => post_waiter(&ctx, message_data, WaitingMessage::start_reading())
                 .await
                 .map_err(|e| format_err!("Failed to await at this time: {e:?}")),
-            StreamCommand::PingGoals(args) => ping_goals_cmd(ctx, gh_id, &args).await,
+            StreamCommand::PingGoals(args) => ping_goals_cmd(ctx, gh_id, message_data, &args).await,
             StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
         }
     }
 }
 
 async fn ping_goals_cmd(
-    ctx: &Context,
+    ctx: Arc<Context>,
     gh_id: u64,
+    message: &Message,
     args: &PingGoalsArgs,
 ) -> anyhow::Result<Option<String>> {
     if project_goals::check_project_goal_acl(&ctx.team, gh_id).await? {
-        ping_project_goals_owners(
-            &ctx.github,
-            &ctx.zulip,
-            &ctx.team,
-            false,
-            args.threshold as i64,
-            &format!("on {}", args.next_update),
-        )
-        .await
-        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))?;
-        Ok(None)
+        let args = args.clone();
+        let message = message.clone();
+        tokio::spawn(async move {
+            let res = ping_project_goals_owners(
+                &ctx.github,
+                &ctx.zulip,
+                &ctx.team,
+                false,
+                args.threshold as i64,
+                &format!("on {}", args.next_update),
+            )
+            .await;
+
+            let status = match res {
+                Ok(_res) => "OK".to_string(),
+                Err(err) => {
+                    tracing::error!("ping_project_goals_owners: {err:?}");
+                    format!("ERROR\n\n```\n{err:#?}\n```\n")
+                }
+            };
+
+            let res = MessageApiRequest {
+                recipient: message.sender_to_recipient(),
+                content: &format!("End pinging project groups owners: {status}"),
+            }
+            .send(&ctx.zulip)
+            .await;
+
+            if let Err(err) = res {
+                tracing::error!(
+                    "error sending project goals ping reply: {err:?} for status: {status}"
+                );
+            }
+        });
+
+        Ok(Some("Started pinging project groups owners...".to_string()))
     } else {
         Err(format_err!(
             "That command is only permitted for those running the project-goal program.",
