@@ -44,15 +44,15 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
         return Ok(());
     };
 
-    if !matches!(
+    let should_check = matches!(
         event.action,
         IssuesAction::Opened
             | IssuesAction::Reopened
             | IssuesAction::Synchronize
             | IssuesAction::ReadyForReview
-    ) || !event.has_base_changed()
-        || !event.issue.is_pr()
-    {
+    ) || event.has_base_changed();
+
+    if !should_check || !event.issue.is_pr() {
         return Ok(());
     }
 
