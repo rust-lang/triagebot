@@ -305,10 +305,7 @@ async fn ping_goals_cmd(
             };
 
             let res = MessageApiRequest {
-                recipient: Recipient::Private {
-                    id: message.sender_id,
-                    email: &message.sender_email,
-                },
+                recipient: message.sender_to_recipient(),
                 content: &format!("End pinging project groups owners: {status}"),
             }
             .send(&ctx.zulip)
