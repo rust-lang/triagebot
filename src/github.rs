@@ -287,6 +287,7 @@ pub struct Label {
 /// and some don't. GitHub does include a few fields here, but they aren't
 /// needed at this time (merged_at, diff_url, html_url, patch_url, url).
 #[derive(Debug, serde::Deserialize)]
+#[cfg_attr(test, derive(Default))]
 pub struct PullRequestDetails {
     /// This is a slot to hold the diff for a PR.
     ///
