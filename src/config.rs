@@ -47,6 +47,7 @@ pub(crate) struct Config {
     pub(crate) issue_links: Option<IssueLinksConfig>,
     pub(crate) no_mentions: Option<NoMentionsConfig>,
     pub(crate) behind_upstream: Option<BehindUpstreamConfig>,
+    pub(crate) backport: Option<BackportTeamConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -524,6 +525,25 @@ fn default_true() -> bool {
     true
 }
 
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+pub(crate) struct BackportTeamConfig {
+    // Config identifier -> labels
+    #[serde(flatten)]
+    pub(crate) configs: HashMap<String, BackportConfig>,
+}
+
+#[derive(Default, PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct BackportConfig {
+    /// Prerequisite label(s) (one of them) to trigger this handler for a specific team
+    pub(crate) required_pr_labels: Vec<String>,
+    /// Prerequisite label for an issue to qualify as regression
+    pub(crate) required_issue_label: String,
+    /// Labels to be added to a pull request closing the regression
+    pub(crate) add_labels: Vec<String>,
+}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -657,6 +677,11 @@ mod tests {
 
             [behind-upstream]
             days-threshold = 14
+
+            [backport.teamRed]
+            required-pr-labels = ["T-libs", "T-libs-api"]
+            required-issue-label = "regression-from-stable-to-stable"
+            add-labels = ["stable-nominated"]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -681,6 +706,20 @@ mod tests {
         nominate_teams.insert("release".to_owned(), "T-release".to_owned());
         nominate_teams.insert("core".to_owned(), "T-core".to_owned());
         nominate_teams.insert("infra".to_owned(), "T-infra".to_owned());
+
+        let mut backport_configs = HashMap::new();
+        backport_configs.insert(
+            "teamRed".into(),
+            BackportConfig {
+                required_pr_labels: vec!["T-libs".into(), "T-libs-api".into()],
+                required_issue_label: "regression-from-stable-to-stable".into(),
+                add_labels: vec!["stable-nominated".into()],
+            },
+        );
+        let backport_team_config = BackportTeamConfig {
+            configs: backport_configs,
+        };
+
         assert_eq!(
             config,
             Config {
@@ -729,6 +768,7 @@ mod tests {
                 concern: Some(ConcernConfig {
                     labels: vec!["has-concerns".to_string()],
                 }),
+                backport: Some(backport_team_config)
             }
         );
     }
@@ -814,6 +854,7 @@ mod tests {
                 behind_upstream: Some(BehindUpstreamConfig {
                     days_threshold: Some(7),
                 }),
+                backport: None
             }
         );
     }
