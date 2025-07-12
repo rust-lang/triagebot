@@ -39,25 +39,42 @@ struct CheckCommitsState {
     last_labels: Vec<String>,
 }
 
-pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> anyhow::Result<()> {
-    let Event::Issue(event) = event else {
-        return Ok(());
-    };
+fn should_handle_event(event: &IssuesEvent) -> bool {
+    // Reject non-PR
+    if !event.issue.is_pr() {
+        return false;
+    }
 
-    let should_check = matches!(
+    // Reject rollups and draft pr
+    if event.issue.title.starts_with("Rollup of") || event.issue.draft {
+        return false;
+    }
+
+    // Check opened, reopened, synchronized and ready-for-review PRs
+    if matches!(
         event.action,
         IssuesAction::Opened
             | IssuesAction::Reopened
             | IssuesAction::Synchronize
             | IssuesAction::ReadyForReview
-    ) || event.has_base_changed();
-
-    if !should_check || !event.issue.is_pr() {
-        return Ok(());
+    ) {
+        return true;
     }
 
-    // Don't ping on rollups or draft PRs.
-    if event.issue.title.starts_with("Rollup of") || event.issue.draft {
+    // Also check PRs that changed their base branch (master -> beta)
+    if event.has_base_changed() {
+        return true;
+    }
+
+    false
+}
+
+pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> anyhow::Result<()> {
+    let Event::Issue(event) = event else {
+        return Ok(());
+    };
+
+    if !should_handle_event(event) {
         return Ok(());
     }
 
@@ -309,36 +326,37 @@ fn dummy_commit_from_body(sha: &str, body: &str) -> GithubCommit {
     }
 }
 
-#[test]
-#[rustfmt::skip]
-fn test_warning_from_warnings() {
-    assert_eq!(
-        warning_from_warnings(
-            &[
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[rustfmt::skip]
+    fn test_warning_from_warnings() {
+        assert_eq!(
+            warning_from_warnings(
+                &[
 r#"This line should NOT be intend with 4 spaces,
-but this line should!"#
-            .to_string()
-            ]
-        ),
+but this line should!"#.to_string()
+                ]
+            ),
 r#":warning: **Warning** :warning:
 
 * This line should NOT be intend with 4 spaces,
     but this line should!"#
-    );
+        );
 
-    assert_eq!(
-        warning_from_warnings(&[
+        assert_eq!(
+            warning_from_warnings(&[
 r#"This is warning 1.
 
 Look at this list:
  - 12
-  - 13"#
-                .to_string(),
+  - 13"#.to_string(),
 r#"This is warning 2.
  - 123456789
-"#
-            .to_string()
-        ]),
+"#.to_string()
+            ]),
 r#":warning: **Warning** :warning:
 
 * This is warning 1.
@@ -348,5 +366,141 @@ r#":warning: **Warning** :warning:
       - 13
 * This is warning 2.
      - 123456789"#
-    );
+        );
+    }
+
+    fn make_opened_pr_event() -> IssuesEvent {
+        IssuesEvent {
+            action: IssuesAction::Opened,
+            issue: crate::github::Issue {
+                number: 123,
+                body: "My PR body".to_string(),
+                created_at: Default::default(),
+                updated_at: Default::default(),
+                merge_commit_sha: Default::default(),
+                title: "Some title".to_string(),
+                html_url: Default::default(),
+                user: crate::github::User {
+                    login: "user".to_string(),
+                    id: 654123,
+                },
+                labels: Default::default(),
+                assignees: Default::default(),
+                pull_request: Some(Default::default()),
+                merged: false,
+                draft: false,
+                comments: Default::default(),
+                comments_url: Default::default(),
+                repository: Default::default(),
+                base: Some(crate::github::CommitBase {
+                    sha: "fake-sha".to_string(),
+                    git_ref: "master".to_string(),
+                    repo: None,
+                }),
+                head: Some(crate::github::CommitBase {
+                    sha: "fake-sha".to_string(),
+                    git_ref: "master".to_string(),
+                    repo: None,
+                }),
+                state: crate::github::IssueState::Open,
+                milestone: None,
+                mergeable: None,
+                author_association: octocrab::models::AuthorAssociation::Contributor,
+            },
+            changes: None,
+            repository: crate::github::Repository {
+                full_name: "rust-lang/rust".to_string(),
+                default_branch: "master".to_string(),
+                fork: false,
+                parent: None,
+            },
+            sender: crate::github::User {
+                login: "rustbot".to_string(),
+                id: 987654,
+            },
+        }
+    }
+
+    #[test]
+    fn test_pr_closed() {
+        let mut event = make_opened_pr_event();
+        event.action = IssuesAction::Closed;
+        assert!(!should_handle_event(&event));
+    }
+
+    #[test]
+    fn test_pr_opened() {
+        let event = make_opened_pr_event();
+        assert!(should_handle_event(&event));
+    }
+
+    #[test]
+    fn test_not_pr() {
+        let mut event = make_opened_pr_event();
+        event.issue.pull_request = None;
+        assert!(!should_handle_event(&event));
+    }
+
+    #[test]
+    fn test_pr_rollup() {
+        let mut event = make_opened_pr_event();
+        event.issue.title = "Rollup of 6 pull requests".to_string();
+        assert!(!should_handle_event(&event));
+    }
+
+    #[test]
+    fn test_pr_draft() {
+        let mut event = make_opened_pr_event();
+        event.issue.draft = true;
+        assert!(!should_handle_event(&event));
+    }
+
+    #[test]
+    fn test_pr_ready() {
+        let mut event = make_opened_pr_event();
+        event.action = IssuesAction::ReadyForReview;
+        assert!(should_handle_event(&event));
+    }
+
+    #[test]
+    fn test_pr_reopened() {
+        let mut event = make_opened_pr_event();
+        event.action = IssuesAction::Reopened;
+        assert!(should_handle_event(&event));
+    }
+
+    #[test]
+    fn test_pr_synchronized() {
+        let mut event = make_opened_pr_event();
+        event.action = IssuesAction::Synchronize;
+        assert!(should_handle_event(&event));
+    }
+
+    #[test]
+    fn test_pr_edited_title() {
+        let mut event = make_opened_pr_event();
+        event.action = IssuesAction::Edited;
+        event.changes = Some(crate::github::Changes {
+            base: None,
+            body: None,
+            title: Some(crate::github::ChangeInner {
+                from: "Previous title".to_string(),
+            }),
+        });
+        assert!(!should_handle_event(&event));
+    }
+
+    #[test]
+    fn test_pr_edited_base() {
+        let mut event = make_opened_pr_event();
+        event.action = IssuesAction::Edited;
+        event.changes = Some(crate::github::Changes {
+            title: None,
+            body: None,
+            base: Some(crate::github::ChangeInner {
+                from: "master".to_string(),
+            }),
+        });
+        assert!(should_handle_event(&event));
+    }
 }
