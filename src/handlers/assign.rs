@@ -145,19 +145,14 @@ pub(super) async fn handle_input(
             // want any assignments or noise.
             return Ok(());
         }
-        let welcome = if let Some(custom_welcome_messages) = &config.custom_welcome_messages {
+        let welcome = if let Some(custom_messages) = &config.custom_messages {
             if !from_comment {
                 let mut welcome = match &assignee {
-                    Some(assignee) => custom_welcome_messages
-                        .welcome_message
+                    Some(assignee) => custom_messages
+                        .auto_assign_someone
                         .as_ref()
                         .map(|wm| wm.trim().replace("{assignee}", &assignee.name)),
-                    None => Some(
-                        custom_welcome_messages
-                            .welcome_message_no_reviewer
-                            .trim()
-                            .to_string(),
-                    ),
+                    None => Some(custom_messages.auto_assign_no_one.trim().to_string()),
                 };
 
                 if let Some(ref mut welcome) = welcome

@@ -96,11 +96,13 @@ pub(crate) struct AssignReviewPrefsConfig {}
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
-pub(crate) struct AssignCustomWelcomeMessages {
-    /// Welcome message with reviewer automaticaly chosen (`{assignee}`)
-    pub(crate) welcome_message: Option<String>,
-    /// Welcome message without a reviewer automaticaly chosen
-    pub(crate) welcome_message_no_reviewer: String,
+pub(crate) struct AssignCustomMessages {
+    /// Message with reviewer automaticaly chosen (`{assignee}`)
+    #[serde(alias = "welcome-message")]
+    pub(crate) auto_assign_someone: Option<String>,
+    /// Message without a reviewer automaticaly chosen
+    #[serde(alias = "welcome-message-no-reviewer")]
+    pub(crate) auto_assign_no_one: String,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -127,7 +129,8 @@ pub(crate) struct AssignConfig {
     pub(crate) review_prefs: Option<AssignReviewPrefsConfig>,
     /// Custom welcome messages
     #[serde(default)]
-    pub(crate) custom_welcome_messages: Option<AssignCustomWelcomeMessages>,
+    #[serde(alias = "custom_welcome_messages")]
+    pub(crate) custom_messages: Option<AssignCustomMessages>,
 }
 
 impl AssignConfig {
@@ -694,7 +697,7 @@ mod tests {
                     owners: HashMap::new(),
                     users_on_vacation: HashSet::from(["jyn514".into()]),
                     review_prefs: None,
-                    custom_welcome_messages: None,
+                    custom_messages: None,
                 }),
                 note: Some(NoteConfig { _empty: () }),
                 ping: Some(PingConfig { teams: ping_teams }),
@@ -739,9 +742,9 @@ mod tests {
             [assign]
             warn_non_default_branch.enable = true
 
-            [assign.custom_welcome_messages]
-            welcome-message = "Welcome message, assigning {assignee}!"
-            welcome-message-no-reviewer = "Welcome message for when no reviewer could be found!"
+            [assign.custom_messages]
+            auto-assign-someone = "Welcome message, assigning {assignee}!"
+            auto-assign-no-one = "Welcome message for when no reviewer could be found!"
 
             [[assign.warn_non_default_branch.exceptions]]
             title = "[beta"
@@ -776,10 +779,12 @@ mod tests {
                             },
                         ],
                     },
-                    custom_welcome_messages: Some(AssignCustomWelcomeMessages {
-                        welcome_message: Some("Welcome message, assigning {assignee}!".to_string()),
-                        welcome_message_no_reviewer:
-                            "Welcome message for when no reviewer could be found!".to_string()
+                    custom_messages: Some(AssignCustomMessages {
+                        auto_assign_someone: Some(
+                            "Welcome message, assigning {assignee}!".to_string()
+                        ),
+                        auto_assign_no_one: "Welcome message for when no reviewer could be found!"
+                            .to_string()
                     }),
                     contributing_url: None,
                     adhoc_groups: HashMap::new(),
@@ -831,17 +836,17 @@ mod tests {
     }
 
     #[test]
-    fn assign_custom_welcome_messaga() {
+    fn assign_custom_welcome_message_old() {
         let config = r#"
             [assign.custom_welcome_messages]
             welcome-message-no-reviewer = "welcome message!"
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         assert_eq!(
-            config.assign.and_then(|c| c.custom_welcome_messages),
-            Some(AssignCustomWelcomeMessages {
-                welcome_message: None,
-                welcome_message_no_reviewer: "welcome message!".to_string(),
+            config.assign.and_then(|c| c.custom_messages),
+            Some(AssignCustomMessages {
+                auto_assign_someone: None,
+                auto_assign_no_one: "welcome message!".to_string(),
             })
         );
     }
