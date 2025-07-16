@@ -150,15 +150,19 @@ pub(super) async fn handle_input(
                 let mut welcome = match &assignee {
                     Some(assignee) => custom_welcome_messages
                         .welcome_message
-                        .trim()
-                        .replace("{assignee}", &assignee.name),
-                    None => custom_welcome_messages
-                        .welcome_message_no_reviewer
-                        .trim()
-                        .to_string(),
+                        .as_ref()
+                        .map(|wm| wm.trim().replace("{assignee}", &assignee.name)),
+                    None => Some(
+                        custom_welcome_messages
+                            .welcome_message_no_reviewer
+                            .trim()
+                            .to_string(),
+                    ),
                 };
 
-                if let Some(contrib) = &config.contributing_url {
+                if let Some(ref mut welcome) = welcome
+                    && let Some(contrib) = &config.contributing_url
+                {
                     if matches!(
                         event.issue.author_association,
                         AuthorAssociation::FirstTimer | AuthorAssociation::FirstTimeContributor
@@ -167,7 +171,7 @@ pub(super) async fn handle_input(
                         welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
                     }
                 }
-                Some(welcome)
+                welcome
             } else {
                 // No welcome is posted if they used `r?` in the opening body.
                 None

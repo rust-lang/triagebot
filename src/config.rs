@@ -98,7 +98,7 @@ pub(crate) struct AssignReviewPrefsConfig {}
 #[serde(deny_unknown_fields)]
 pub(crate) struct AssignCustomWelcomeMessages {
     /// Welcome message with reviewer automaticaly chosen (`{assignee}`)
-    pub(crate) welcome_message: String,
+    pub(crate) welcome_message: Option<String>,
     /// Welcome message without a reviewer automaticaly chosen
     pub(crate) welcome_message_no_reviewer: String,
 }
@@ -777,7 +777,7 @@ mod tests {
                         ],
                     },
                     custom_welcome_messages: Some(AssignCustomWelcomeMessages {
-                        welcome_message: "Welcome message, assigning {assignee}!".to_string(),
+                        welcome_message: Some("Welcome message, assigning {assignee}!".to_string()),
                         welcome_message_no_reviewer:
                             "Welcome message for when no reviewer could be found!".to_string()
                     }),
@@ -828,5 +828,21 @@ mod tests {
             config.assign.and_then(|c| c.review_prefs),
             Some(AssignReviewPrefsConfig {})
         ));
+    }
+
+    #[test]
+    fn assign_custom_welcome_messaga() {
+        let config = r#"
+            [assign.custom_welcome_messages]
+            welcome-message-no-reviewer = "welcome message!"
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        assert_eq!(
+            config.assign.and_then(|c| c.custom_welcome_messages),
+            Some(AssignCustomWelcomeMessages {
+                welcome_message: None,
+                welcome_message_no_reviewer: "welcome message!".to_string(),
+            })
+        );
     }
 }
