@@ -59,12 +59,12 @@ pub(super) async fn validate_config(
             // Error if `[assign.owners]` is not empty (ie auto-assign) and the custom welcome message for assignee isn't set.
             if let Some(assign) = config.assign
                 && !assign.owners.is_empty()
-                && let Some(custom_welcome_messages) = &assign.custom_welcome_messages
-                && custom_welcome_messages.welcome_message.is_none()
+                && let Some(custom_messages) = &assign.custom_messages
+                && custom_messages.auto_assign_someone.is_none()
             {
                 return Ok(Some(
                     "Invalid `triagebot.toml`:\n\
-                    `[assign.owners]` is populated but `[assign.custom_welcome_messages.welcome-message]` is not set!".to_string()
+                    `[assign.owners]` is populated but `[assign.custom_messages.auto-assign-someone]` is not set!".to_string()
                 ));
             }
 
