@@ -1,13 +1,12 @@
 use std::fmt::Write;
 
 use anyhow::{Context as _, bail};
-use octocrab::models::AuthorAssociation;
 
 use crate::{
     config::ConcernConfig,
     github::{Event, Label},
     handlers::Context,
-    interactions::EditIssueBody,
+    interactions::{EditIssueBody, ErrorComment},
 };
 use parser::command::concern::ConcernCommand;
 
@@ -68,22 +67,22 @@ pub(super) async fn handle_command(
         }
     }
 
-    // Verify that the comment author is at least a member of the org, error if it's not
-    if !matches!(
-        issue_comment.comment.author_association,
-        AuthorAssociation::Member | AuthorAssociation::Owner
-    ) {
+    // Verify that the comment author is a team member in our team repo
+    if !issue_comment
+        .comment
+        .user
+        .is_team_member(&ctx.team)
+        .await
+        .context("failed to verify that the user is a team member")?
+    {
         tracing::info!(
-            "{}#{} tried to register a concern, but author association isn't right: {:?}",
+            "{}#{} tried to register a concern, but comment author {:?} is not part of the team repo",
             issue_comment.repository.full_name,
             issue.number,
-            issue_comment.comment.author_association,
+            issue_comment.comment.user,
         );
-        issue
-            .post_comment(
-                &ctx.github,
-                "Only organization members can add or resolve concerns.",
-            )
+        ErrorComment::new(&issue, "Only team members in the [team repo](https://github.com/rust-lang/team) can add or resolve concerns.")
+            .post(&ctx.github)
             .await?;
         return Ok(());
     }
