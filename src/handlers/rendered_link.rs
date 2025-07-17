@@ -42,7 +42,7 @@ async fn add_rendered_link(
 
         let rendered_link = files
             .iter()
-            .find(|f| {
+            .filter(|f| {
                 config
                     .trigger_files
                     .iter()
@@ -52,7 +52,10 @@ async fn add_rendered_link(
                         .iter()
                         .any(|tf| f.filename.starts_with(tf))
             })
-            .and_then(|file| {
+            // Sort the relavant files by the total number of lines changed, as to
+            // improve our guess for the relevant file to show the link to.
+            .max_by_key(|f| f.additions + f.deletions + f.changes)
+            .map(|file| {
                 let head = e.issue.head.as_ref()?;
                 let base = e.issue.base.as_ref()?;
 
@@ -88,7 +91,8 @@ async fn add_rendered_link(
                     },
                     file.filename
                 ))
-            });
+            })
+            .flatten();
 
         let new_body: Cow<'_, str> = if !e.issue.body.contains("[Rendered]") {
             if let Some(rendered_link) = rendered_link {
