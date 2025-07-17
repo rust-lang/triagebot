@@ -176,7 +176,9 @@ pub struct PingGoalsArgs {
 /// Helper function to parse CLI arguments without any colored help or error output.
 pub fn parse_cli<'a, T: Parser, I: Iterator<Item = &'a str>>(input: I) -> anyhow::Result<T> {
     // Add a fake first argument, which is expected by clap
-    let input = std::iter::once("triagebot").chain(input);
+    let input = std::iter::once("triagebot")
+        .chain(input)
+        .map(|i| i.to_lowercase());
 
     let matches = T::command()
         .color(ColorChoice::Never)
@@ -196,6 +198,14 @@ mod tests {
             ChatCommand::Acknowledge {
                 identifier: IdentifierCli::Index(NonZeroU32::new(1).unwrap())
             }
+        );
+    }
+
+    #[test]
+    fn uppercase() {
+        assert_eq!(
+            parse_chat(&["Work", "show"]),
+            ChatCommand::Work(WorkqueueCmd::Show)
         );
     }
 
