@@ -497,6 +497,8 @@ pub(crate) struct BotPullRequests {}
 #[serde(deny_unknown_fields)]
 pub(crate) struct RenderedLinkConfig {
     pub(crate) trigger_files: Vec<String>,
+    #[serde(default)]
+    pub(crate) exclude_files: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -720,7 +722,8 @@ mod tests {
                 merge_conflicts: None,
                 bot_pull_requests: None,
                 rendered_link: Some(RenderedLinkConfig {
-                    trigger_files: vec!["posts/".to_string()]
+                    trigger_files: vec!["posts/".to_string()],
+                    exclude_files: vec![],
                 }),
                 issue_links: Some(IssueLinksConfig {
                     check_commits: true,

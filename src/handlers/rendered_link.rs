@@ -47,6 +47,10 @@ async fn add_rendered_link(
                     .trigger_files
                     .iter()
                     .any(|tf| f.filename.starts_with(tf))
+                    && !config
+                        .exclude_files
+                        .iter()
+                        .any(|tf| f.filename.starts_with(tf))
             })
             .and_then(|file| {
                 let head = e.issue.head.as_ref()?;
