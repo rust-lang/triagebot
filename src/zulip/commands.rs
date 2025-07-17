@@ -175,11 +175,25 @@ pub struct PingGoalsArgs {
 
 /// Helper function to parse CLI arguments without any colored help or error output.
 pub fn parse_cli<'a, T: Parser, I: Iterator<Item = &'a str>>(input: I) -> anyhow::Result<T> {
+    fn allow_title_case(sub: clap::Command) -> clap::Command {
+        let name = sub.get_name();
+        let alias = name
+            .chars()
+            .enumerate()
+            .map(|(i, c)| if i == 0 { c.to_ascii_uppercase() } else { c })
+            .collect::<String>();
+        sub.alias(alias)
+            // Recursively allow title-case subcommands
+            .mut_subcommands(allow_title_case)
+    }
+
     // Add a fake first argument, which is expected by clap
     let input = std::iter::once("triagebot").chain(input);
 
     let matches = T::command()
         .color(ColorChoice::Never)
+        // Allow title-case subcommands
+        .mut_subcommands(allow_title_case)
         .try_get_matches_from(input)?;
     let value = T::from_arg_matches(&matches)?;
     Ok(value)
@@ -235,6 +249,11 @@ mod tests {
     }
 
     #[test]
+    fn whoami_uppercased_command() {
+        assert_eq!(parse_chat(&["Whoami"]), ChatCommand::Whoami);
+    }
+
+    #[test]
     fn lookup_command() {
         assert_eq!(
             parse_chat(&["lookup", "zulip", "username"]),
@@ -256,6 +275,14 @@ mod tests {
             ChatCommand::Work(WorkqueueCmd::SetPrLimit {
                 limit: WorkqueueLimit::Unlimited
             })
+        );
+    }
+
+    #[test]
+    fn work_uppercased_command() {
+        assert_eq!(
+            parse_chat(&["Work", "Show"]),
+            ChatCommand::Work(WorkqueueCmd::Show)
         );
     }
 
