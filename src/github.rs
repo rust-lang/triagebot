@@ -1100,6 +1100,9 @@ pub struct PullRequestFile {
     pub sha: String,
     pub filename: String,
     pub blob_url: String,
+    pub additions: u64,
+    pub deletions: u64,
+    pub changes: u64,
 }
 
 #[derive(Debug, serde::Deserialize)]
