@@ -496,7 +496,9 @@ pub(crate) struct BotPullRequests {}
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RenderedLinkConfig {
+    /// List of paths to watch for modifications
     pub(crate) trigger_files: Vec<String>,
+    /// List of paths to exclude from watching for modifications
     #[serde(default)]
     pub(crate) exclude_files: Vec<String>,
 }
