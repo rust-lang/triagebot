@@ -3,6 +3,7 @@ use crate::handlers::Context;
 use anyhow::Context as _;
 use hyper::header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE};
 use hyper::{Body, Response, StatusCode};
+use itertools::Itertools;
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -134,13 +135,11 @@ async fn process_logs(
                 .await
                 .context("unable to fetch git tree for the repository")?;
 
-            let tree_roots: Vec<_> = trees
+            let tree_roots = trees
                 .tree
                 .iter()
                 .filter_map(|t| (t.object_type == "tree").then_some(&t.path))
-                .collect();
-            let tree_roots =
-                serde_json::to_string(&tree_roots).context("unable to serialize tree roots")?;
+                .join("|");
 
             anyhow::Result::<_>::Ok((job, tree_roots))
         };
@@ -212,8 +211,6 @@ async fn process_logs(
         import {{ AnsiUp }} from '{ANSI_UP_URL}'
 
         var logs = {logs};
-        var tree_roots = {tree_roots};
-        
         var ansi_up = new AnsiUp();
 
         // 1. Tranform the ANSI escape codes to HTML
@@ -242,20 +239,10 @@ async fn process_logs(
         );
 
         // 5. Add anchors to GitHub around some paths
-        const pathRegex = /((?:[A-Za-z]:)?[a-zA-Z0-9_.$-]*(?:[\\/][a-zA-Z0-9_$.-]+)+)(?::([0-9]*):([0-9]*))?/g;
-        html = html.replace(pathRegex, (match, path, line, col) => {{
-            const removePrefix = (value, prefix) =>
-               value.startsWith(prefix) ? value.slice(prefix.length) : value;
-
-            var path = removePrefix(removePrefix(path, "/checkout"), "/");
-            var root = path.substring(0, path.indexOf("/"));
-
-            if (tree_roots.includes(root)) {{
-                const pos = (line !== undefined) ? `#L${{line}}` : "";
-                return `<a href="https://github.com/{owner}/{repo}/blob/{sha}/${{path}}${{pos}}" class="path-marker">${{match}}</a>`;
-            }}
-
-            return match;
+        const pathRegex = /(?<boundary>[^a-zA-Z0-9.\\/])(?<inner>(?:[\\\/]?(?:checkout[\\\/])?(?<path>(?:{tree_roots})[\\\/][a-zA-Z0-9_$\-.\\\/]+))(?::(?<line>[0-9]+):(?<col>[0-9]+))?)/g;
+        html = html.replace(pathRegex, (match, boundary, inner, path, line, col) => {{
+            const pos = (line !== undefined) ? `#L${{line}}` : "";
+            return `${{boundary}}<a href="https://github.com/{owner}/{repo}/blob/{sha}/${{path}}${{pos}}" class="path-marker">${{inner}}</a>`;
         }});
 
         // 6. Add the html to the DOM
