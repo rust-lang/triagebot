@@ -68,6 +68,13 @@ async fn serve_req(
     if req.uri.path() == triagebot::gha_logs::ANSI_UP_URL {
         return triagebot::gha_logs::ansi_up_min_js();
     }
+    if req.uri.path() == triagebot::gha_logs::SUCCESS_URL {
+        return triagebot::gha_logs::success_svg();
+    }
+    if req.uri.path() == triagebot::gha_logs::FAILURE_URL {
+        return triagebot::gha_logs::failure_svg();
+    }
+
     if req.uri.path() == "/agenda" {
         return Ok(Response::builder()
             .status(StatusCode::OK)

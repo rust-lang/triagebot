@@ -10,6 +10,9 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 pub const ANSI_UP_URL: &str = "/gha_logs/ansi_up@6.0.6.min.js";
+pub const SUCCESS_URL: &str = "/gha_logs/success@1.svg";
+pub const FAILURE_URL: &str = "/gha_logs/failure@1.svg";
+
 const MAX_CACHE_CAPACITY_BYTES: u64 = 50 * 1024 * 1024; // 50 Mb
 
 #[derive(Default)]
@@ -177,7 +180,21 @@ async fn process_logs(
     };
 
     let nonce = Uuid::new_v4().to_hyphenated().to_string();
+    let job_name = &*job.name;
     let sha = &*job.head_sha;
+    let short_sha = &job.head_sha[..7];
+
+    let icon_status = match job.conclusion {
+        Some(github::JobConclusion::Failure | github::JobConclusion::TimedOut) => {
+            format!(r#"<link rel="icon" sizes="any" type="image/svg+xml" href="{FAILURE_URL}">"#)
+        }
+        Some(github::JobConclusion::Success) => {
+            format!(r#"<link rel="icon" sizes="any" type="image/svg+xml" href="{SUCCESS_URL}">"#)
+        }
+        _ => {
+            r#"<link rel="icon" sizes="32x32" type="image/png" href="https://www.rust-lang.org/static/images/favicon-32x32.png">"#.to_string()
+        }
+    };
 
     let html = format!(
         r###"<!DOCTYPE html>
@@ -185,8 +202,8 @@ async fn process_logs(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{log_id} - {owner}/{repo}</title>
-    <link rel="icon" sizes="32x32" type="image/png" href="https://www.rust-lang.org/static/images/favicon-32x32.png">    
+    <title>{job_name} - {owner}/{repo}@{short_sha}</title>
+    {icon_status}
     <style>
         body {{
             font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
@@ -290,7 +307,7 @@ async fn process_logs(
         .header(
             CONTENT_SECURITY_POLICY,
             format!(
-                "default-src 'none'; script-src 'nonce-{nonce}' 'self'; style-src 'unsafe-inline'; img-src www.rust-lang.org"
+                "default-src 'none'; script-src 'nonce-{nonce}' 'self'; style-src 'unsafe-inline'; img-src 'self' www.rust-lang.org"
             ),
         )
         .body(Body::from(html))?);
@@ -304,5 +321,27 @@ pub fn ansi_up_min_js() -> anyhow::Result<Response<Body>, hyper::Error> {
         .header(CACHE_CONTROL, "public, max-age=15552000, immutable")
         .header(CONTENT_TYPE, "text/javascript; charset=utf-8")
         .body(Body::from(ANSI_UP_MIN_JS))
+        .unwrap())
+}
+
+pub fn success_svg() -> anyhow::Result<Response<Body>, hyper::Error> {
+    const SUCCESS_SVG: &str = include_str!("gha_logs/success.svg");
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(CACHE_CONTROL, "public, max-age=15552000, immutable")
+        .header(CONTENT_TYPE, "image/svg+xml; charset=utf-8")
+        .body(Body::from(SUCCESS_SVG))
+        .unwrap())
+}
+
+pub fn failure_svg() -> anyhow::Result<Response<Body>, hyper::Error> {
+    const FAILURE_SVG: &str = include_str!("gha_logs/failure.svg");
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(CACHE_CONTROL, "public, max-age=15552000, immutable")
+        .header(CONTENT_TYPE, "image/svg+xml; charset=utf-8")
+        .body(Body::from(FAILURE_SVG))
         .unwrap())
 }
