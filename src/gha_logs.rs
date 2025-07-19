@@ -1,4 +1,4 @@
-use crate::github;
+use crate::github::{self, WorkflowRunJob};
 use crate::handlers::Context;
 use anyhow::Context as _;
 use hyper::header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE};
@@ -14,11 +14,17 @@ const MAX_CACHE_CAPACITY_BYTES: u64 = 50 * 1024 * 1024; // 50 Mb
 #[derive(Default)]
 pub struct GitHubActionLogsCache {
     capacity: u64,
-    entries: VecDeque<(String, Arc<String>)>,
+    entries: VecDeque<(String, Arc<CachedLog>)>,
+}
+
+pub struct CachedLog {
+    job: WorkflowRunJob,
+    tree_roots: String,
+    logs: String,
 }
 
 impl GitHubActionLogsCache {
-    pub fn get(&mut self, key: &String) -> Option<Arc<String>> {
+    pub fn get(&mut self, key: &String) -> Option<Arc<CachedLog>> {
         if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
             // Move previously cached entry to the front
             let entry = self.entries.remove(pos).unwrap();
@@ -29,8 +35,8 @@ impl GitHubActionLogsCache {
         }
     }
 
-    pub fn put(&mut self, key: String, value: Arc<String>) -> Arc<String> {
-        if value.len() as u64 > MAX_CACHE_CAPACITY_BYTES {
+    pub fn put(&mut self, key: String, value: Arc<CachedLog>) -> Arc<CachedLog> {
+        if value.logs.len() as u64 > MAX_CACHE_CAPACITY_BYTES {
             // Entry is too large, don't cache, return as is
             return value;
         }
@@ -38,17 +44,17 @@ impl GitHubActionLogsCache {
         // Remove duplicate or last entry when necessary
         let removed = if let Some(pos) = self.entries.iter().position(|(k, _)| k == &key) {
             self.entries.remove(pos)
-        } else if self.capacity + value.len() as u64 >= MAX_CACHE_CAPACITY_BYTES {
+        } else if self.capacity + value.logs.len() as u64 >= MAX_CACHE_CAPACITY_BYTES {
             self.entries.pop_back()
         } else {
             None
         };
         if let Some(removed) = removed {
-            self.capacity -= removed.1.len() as u64;
+            self.capacity -= removed.1.logs.len() as u64;
         }
 
         // Add entry the front of the list ane return it
-        self.capacity += value.len() as u64;
+        self.capacity += value.logs.len() as u64;
         self.entries.push_front((key, value.clone()));
         value
     }
@@ -99,34 +105,75 @@ async fn process_logs(
 
     let log_uuid = format!("{owner}/{repo}${log_id}");
 
-    let logs = 'logs: {
+    let CachedLog {
+        job,
+        tree_roots,
+        logs,
+    } = &*'logs: {
         if let Some(logs) = ctx.gha_logs.write().await.get(&log_uuid) {
             tracing::info!("gha_logs: cache hit for {log_uuid}");
             break 'logs logs;
         }
 
         tracing::info!("gha_logs: cache miss for {log_uuid}");
-        let logs = ctx
-            .github
-            .raw_job_logs(
-                &github::IssueRepository {
-                    organization: owner.to_string(),
-                    repository: repo.to_string(),
-                },
-                log_id,
-            )
-            .await
-            .context("unable to get the raw logs")?;
 
-        let json_logs = serde_json::to_string(&*logs).context("unable to JSON-ify the raw logs")?;
+        let repo = github::IssueRepository {
+            organization: owner.to_string(),
+            repository: repo.to_string(),
+        };
 
-        ctx.gha_logs
-            .write()
-            .await
-            .put(log_uuid.clone(), json_logs.into())
+        let job_and_tree_roots = async {
+            let job = ctx
+                .github
+                .workflow_run_job(&repo, log_id)
+                .await
+                .context("unable to fetch job details")?;
+            let trees = ctx
+                .github
+                .repo_git_trees(&repo, &job.head_sha)
+                .await
+                .context("unable to fetch git tree for the repository")?;
+
+            let tree_roots: Vec<_> = trees
+                .tree
+                .iter()
+                .filter_map(|t| (t.object_type == "tree").then_some(&t.path))
+                .collect();
+            let tree_roots =
+                serde_json::to_string(&tree_roots).context("unable to serialize tree roots")?;
+
+            anyhow::Result::<_>::Ok((job, tree_roots))
+        };
+
+        let logs = async {
+            let logs = ctx
+                .github
+                .raw_job_logs(&repo, log_id)
+                .await
+                .context("unable to get the raw logs")?;
+
+            let json_logs =
+                serde_json::to_string(&*logs).context("unable to JSON-ify the raw logs")?;
+
+            anyhow::Result::<_>::Ok(json_logs)
+        };
+
+        let (job_and_tree_roots, logs) = futures::join!(job_and_tree_roots, logs);
+        let ((job, tree_roots), logs) = (job_and_tree_roots?, logs?);
+
+        ctx.gha_logs.write().await.put(
+            log_uuid.clone(),
+            CachedLog {
+                job,
+                tree_roots,
+                logs,
+            }
+            .into(),
+        )
     };
 
     let nonce = Uuid::new_v4().to_hyphenated().to_string();
+    let sha = &*job.head_sha;
 
     let html = format!(
         r###"<!DOCTYPE html>
@@ -157,11 +204,16 @@ async fn process_logs(
         .warning-marker {{
             color: #c69026;
         }}
+        .path-marker {{
+            color: #26c6a8;
+        }}
     </style>
     <script type="module" nonce="{nonce}">
         import {{ AnsiUp }} from '{ANSI_UP_URL}'
 
         var logs = {logs};
+        var tree_roots = {tree_roots};
+        
         var ansi_up = new AnsiUp();
 
         // 1. Tranform the ANSI escape codes to HTML
@@ -189,11 +241,28 @@ async fn process_logs(
             `<span class="warning-marker">##[warning]</span>`
         );
 
-        // 5. Add the html to the DOM
+        // 5. Add anchors to GitHub around some paths
+        const pathRegex = /((?:[A-Za-z]:)?[a-zA-Z0-9_.$-]*(?:[\\/][a-zA-Z0-9_$.-]+)+)(?::([0-9]*):([0-9]*))?/g;
+        html = html.replace(pathRegex, (match, path, line, col) => {{
+            const removePrefix = (value, prefix) =>
+               value.startsWith(prefix) ? value.slice(prefix.length) : value;
+
+            var path = removePrefix(removePrefix(path, "/checkout"), "/");
+            var root = path.substring(0, path.indexOf("/"));
+
+            if (tree_roots.includes(root)) {{
+                const pos = (line !== undefined) ? `#L${{line}}` : "";
+                return `<a href="https://github.com/{owner}/{repo}/blob/{sha}/${{path}}${{pos}}" class="path-marker">${{match}}</a>`;
+            }}
+
+            return match;
+        }});
+
+        // 6. Add the html to the DOM
         var cdiv = document.getElementById("console");
         cdiv.innerHTML = html;
         
-        // 6. If no anchor is given, scroll to the last error
+        // 7. If no anchor is given, scroll to the last error
         if (location.hash === "" && errorCounter >= 0) {{
             const hasSmallViewport = window.innerWidth <= 750;
             document.getElementById(`error-${{errorCounter}}`).scrollIntoView({{
