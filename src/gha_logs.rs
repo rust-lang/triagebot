@@ -135,6 +135,11 @@ async fn process_logs(
                 .await
                 .context("unable to fetch git tree for the repository")?;
 
+            // To minimize false positives in paths linked to the GitHub repositories,
+            // we restrict matching to only the top-level directories of the repository.
+            // We achieve this by retrieving all "tree" objects and concatenating them
+            // into a regex OR pattern (e.g., `compiler|tests|src`) which is used in the
+            // JS regex.
             let tree_roots = trees
                 .tree
                 .iter()
@@ -238,7 +243,19 @@ async fn process_logs(
             `<span class="warning-marker">##[warning]</span>`
         );
 
-        // 5. Add anchors to GitHub around some paths
+        // 5. Add anchors around some paths
+        //  Detailed examples of what the regex does is at https://regex101.com/r/vCnx9Y/2
+        //
+        //  But simply speaking the regex tries to find absolute (with `/checkout` prefix) and
+        //  relative paths, the path must start with one of the repository top-level directory.
+        //  We also try to retrieve the lines and cols if given (`<path>:line:col`).
+        //
+        //  Some examples of paths we want to find:
+        //   - src/tools/test-float-parse/src/traits.rs:173:11
+        //   - /checkout/compiler/rustc_macros
+        //   - /checkout/src/doc/rustdoc/src/advanced-features.md
+        //
+        //  Any other paths, in particular if prefixed by `./` or `obj/` should not taken.
         const pathRegex = /(?<boundary>[^a-zA-Z0-9.\\/])(?<inner>(?:[\\\/]?(?:checkout[\\\/])?(?<path>(?:{tree_roots})[\\\/][a-zA-Z0-9_$\-.\\\/]+))(?::(?<line>[0-9]+):(?<col>[0-9]+))?)/g;
         html = html.replace(pathRegex, (match, boundary, inner, path, line, col) => {{
             const pos = (line !== undefined) ? `#L${{line}}` : "";
