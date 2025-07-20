@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" height="106" width="106" xmlns="http://www.w3.org/2000/svg">
+  <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(180, 28, 28); stroke-width: 0px;" cx="53.127" cy="52.808" rx="44.115" ry="44.307"/>
+  <g id="logo" transform="translate(53, 53)">
+    <path id="r" transform="translate(0.5, 0.5)" stroke="black" stroke-width="1" stroke-linejoin="round" d=" M -9,-15 H 4 C 12,-15 12,-7 4,-7 H -9 Z M -40,22 H 0 V 11 H -9 V 3 H 1 C 12,3 6,22 15,22 H 40 V 3 H 34 V 5 C 34,13 25,12 24,7 C 23,2 19,-2 18,-2 C 33,-10 24,-26 12,-26 H -35 V -15 H -25 V 11 H -40 Z"/>
+    <g id="gear" mask="url(#holes)">
+      <circle r="43" fill="none" stroke="black" stroke-width="9"/>
+      <g id="cogs">
+        <polygon id="cog" stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.9807852506637573, 0.19509032368659973, -0.19509032368659973, 0.9807852506637573, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.9238795042037964, 0.3826834261417389, -0.3826834261417389, 0.9238795042037964, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.8314695954322815, 0.5555702447891235, -0.5555702447891235, 0.8314695954322815, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.7071067690849304, 0.7071067690849304, -0.7071067690849304, 0.7071067690849304, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.5555702447891235, 0.8314695954322815, -0.8314695954322815, 0.5555702447891235, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.3826834261417389, 0.9238795042037964, -0.9238795042037964, 0.3826834261417389, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.19509032368659973, 0.9807852506637573, -0.9807852506637573, 0.19509032368659973, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(6.123234262925839e-17, 1, -1, 6.123234262925839e-17, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.19509032368659973, 0.9807852506637573, -0.9807852506637573, -0.19509032368659973, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.3826834261417389, 0.9238795042037964, -0.9238795042037964, -0.3826834261417389, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.5555702447891235, 0.8314695954322815, -0.8314695954322815, -0.5555702447891235, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.7071067690849304, 0.7071067690849304, -0.7071067690849304, -0.7071067690849304, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.8314695954322815, 0.5555702447891235, -0.5555702447891235, -0.8314695954322815, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.9238795042037964, 0.3826834261417389, -0.3826834261417389, -0.9238795042037964, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.9807852506637573, 0.19509032368659973, -0.19509032368659973, -0.9807852506637573, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-1, 1.2246468525851679e-16, -1.2246468525851679e-16, -1, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.9807852506637573, -0.19509032368659973, 0.19509032368659973, -0.9807852506637573, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.9238795042037964, -0.3826834261417389, 0.3826834261417389, -0.9238795042037964, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.8314695954322815, -0.5555702447891235, 0.5555702447891235, -0.8314695954322815, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.7071067690849304, -0.7071067690849304, 0.7071067690849304, -0.7071067690849304, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.5555702447891235, -0.8314695954322815, 0.8314695954322815, -0.5555702447891235, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.3826834261417389, -0.9238795042037964, 0.9238795042037964, -0.3826834261417389, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-0.19509032368659973, -0.9807852506637573, 0.9807852506637573, -0.19509032368659973, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(-1.8369701465288538e-16, -1, 1, -1.8369701465288538e-16, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.19509032368659973, -0.9807852506637573, 0.9807852506637573, 0.19509032368659973, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.3826834261417389, -0.9238795042037964, 0.9238795042037964, 0.3826834261417389, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.5555702447891235, -0.8314695954322815, 0.8314695954322815, 0.5555702447891235, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.7071067690849304, -0.7071067690849304, 0.7071067690849304, 0.7071067690849304, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.8314695954322815, -0.5555702447891235, 0.5555702447891235, 0.8314695954322815, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.9238795042037964, -0.3826834261417389, 0.3826834261417389, 0.9238795042037964, 0, 0)"/>
+        <polygon stroke="black" stroke-width="3" stroke-linejoin="round" points="46,3 51,0 46,-3" transform="matrix(0.9807852506637573, -0.19509032368659973, 0.19509032368659973, 0.9807852506637573, 0, 0)"/>
+      </g>
+      <g id="mounts">
+        <polygon id="mount" stroke="black" stroke-width="6" stroke-linejoin="round" points="-7,-42 0,-35 7,-42"/>
+        <polygon stroke="black" stroke-width="6" stroke-linejoin="round" points="-7,-42 0,-35 7,-42" transform="matrix(0.30901700258255005, 0.9510565400123596, -0.9510565400123596, 0.30901700258255005, 0, 0)"/>
+        <polygon stroke="black" stroke-width="6" stroke-linejoin="round" points="-7,-42 0,-35 7,-42" transform="matrix(-0.80901700258255, 0.5877852439880371, -0.5877852439880371, -0.80901700258255, 0, 0)"/>
+        <polygon stroke="black" stroke-width="6" stroke-linejoin="round" points="-7,-42 0,-35 7,-42" transform="matrix(-0.80901700258255, -0.5877852439880371, 0.5877852439880371, -0.80901700258255, 0, 0)"/>
+        <polygon stroke="black" stroke-width="6" stroke-linejoin="round" points="-7,-42 0,-35 7,-42" transform="matrix(0.30901700258255005, -0.9510565400123596, 0.9510565400123596, 0.30901700258255005, 0, 0)"/>
+      </g>
+    </g>
+    <mask id="holes">
+      <rect x="-60" y="-60" width="120" height="120" fill="white"/>
+      <circle id="hole" cy="-40" r="3"/>
+      <circle cy="-40" r="3" transform="matrix(0.30901700258255005, 0.9510565400123596, -0.9510565400123596, 0.30901700258255005, 0, 0)"/>
+      <circle cy="-40" r="3" transform="matrix(-0.80901700258255, 0.5877852439880371, -0.5877852439880371, -0.80901700258255, 0, 0)"/>
+      <circle cy="-40" r="3" transform="matrix(-0.80901700258255, -0.5877852439880371, 0.5877852439880371, -0.80901700258255, 0, 0)"/>
+      <circle cy="-40" r="3" transform="matrix(0.30901700258255005, -0.9510565400123596, 0.9510565400123596, 0.30901700258255005, 0, 0)"/>
+    </mask>
+  </g>
+</svg>

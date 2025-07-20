@@ -1264,7 +1264,21 @@ struct PullRequestEventFields {}
 
 #[derive(Debug, serde::Deserialize)]
 pub struct WorkflowRunJob {
+    pub name: String,
     pub head_sha: String,
+    pub conclusion: Option<JobConclusion>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JobConclusion {
+    ActionRequired,
+    Cancelled,
+    Failure,
+    Neutral,
+    Skipped,
+    Success,
+    TimedOut,
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
