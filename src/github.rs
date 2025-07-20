@@ -232,6 +232,28 @@ impl GithubClient {
             .context("failed to retrieve job logs")?;
         Ok(String::from_utf8_lossy(&body).to_string())
     }
+
+    pub async fn workflow_run_job(
+        &self,
+        repo: &IssueRepository,
+        job_id: u128,
+    ) -> anyhow::Result<WorkflowRunJob> {
+        let url = format!("{}/actions/jobs/{job_id}", repo.url(&self));
+        self.json(self.get(&url))
+            .await
+            .context("failed to retrive workflow job run details")
+    }
+
+    pub async fn repo_git_trees(
+        &self,
+        repo: &IssueRepository,
+        sha: &str,
+    ) -> anyhow::Result<GitTrees> {
+        let url = format!("{}/git/trees/{sha}", repo.url(&self));
+        self.json(self.get(&url))
+            .await
+            .context("failed to retrive git trees")
+    }
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -1239,6 +1261,11 @@ impl IssuesEvent {
 
 #[derive(Debug, serde::Deserialize)]
 struct PullRequestEventFields {}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct WorkflowRunJob {
+    pub head_sha: String,
+}
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct CommitBase {
@@ -2827,6 +2854,12 @@ pub struct GitCommitTree {
 #[derive(Debug, serde::Deserialize)]
 pub struct GitTreeObject {
     pub sha: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct GitTrees {
+    pub sha: String,
+    pub tree: Vec<GitTreeEntry>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
