@@ -496,7 +496,11 @@ pub(crate) struct BotPullRequests {}
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RenderedLinkConfig {
+    /// List of paths to watch for modifications
     pub(crate) trigger_files: Vec<String>,
+    /// List of paths to exclude from watching for modifications
+    #[serde(default)]
+    pub(crate) exclude_files: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -720,7 +724,8 @@ mod tests {
                 merge_conflicts: None,
                 bot_pull_requests: None,
                 rendered_link: Some(RenderedLinkConfig {
-                    trigger_files: vec!["posts/".to_string()]
+                    trigger_files: vec!["posts/".to_string()],
+                    exclude_files: vec![],
                 }),
                 issue_links: Some(IssueLinksConfig {
                     check_commits: true,
