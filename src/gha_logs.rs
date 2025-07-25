@@ -100,11 +100,15 @@ async fn process_logs(
         .context("unable to retrieve team repos")?;
 
     let Some(repos) = repos.repos.get(owner) else {
-        anyhow::bail!("Organization `{owner}` is not part of team repos")
+        return Ok(bad_request(format!(
+            "organization `{owner}` is not part of the Rust Project team repos"
+        )));
     };
 
     if !repos.iter().any(|r| r.name == repo) {
-        anyhow::bail!("Repository `{repo}` is not part of team repos");
+        return Ok(bad_request(format!(
+            "repository `{owner}` is not part of the Rust Project team repos"
+        )));
     }
 
     let log_uuid = format!("{owner}/{repo}${log_id}");
@@ -344,4 +348,11 @@ pub fn failure_svg() -> anyhow::Result<Response<Body>, hyper::Error> {
         .header(CONTENT_TYPE, "image/svg+xml; charset=utf-8")
         .body(Body::from(FAILURE_SVG))
         .unwrap())
+}
+
+fn bad_request(body: String) -> Response<Body> {
+    Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .body(Body::from(body))
+        .unwrap()
 }
