@@ -3,7 +3,6 @@ use crate::handlers::Context;
 use anyhow::Context as _;
 use hyper::header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE};
 use hyper::{Body, Response, StatusCode};
-use itertools::Itertools;
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -136,22 +135,57 @@ async fn process_logs(
                 .workflow_run_job(&repo, log_id)
                 .await
                 .context("unable to fetch job details")?;
-            let trees = ctx
+
+            // To minimize false positives in paths linked to the GitHub repositories, we
+            // restrict matching to only the second-level directories of the repository.
+            //
+            // We achieve this by retrieving the contents of the root repository and then
+            // retrive the content of the top-level directory which we then serialize for
+            // the JS so they can be escaped and concatenated into a regex OR pattern
+            // (e.g., `compiler/rustc_ast|tests/ui|src/version`) which is used in the JS regex.
+            let mut root_trees = ctx
                 .github
                 .repo_git_trees(&repo, &job.head_sha)
                 .await
                 .context("unable to fetch git tree for the repository")?;
 
-            // To minimize false positives in paths linked to the GitHub repositories,
-            // we restrict matching to only the top-level directories of the repository.
-            // We achieve this by retrieving all "tree" objects and concatenating them
-            // into a regex OR pattern (e.g., `compiler|tests|src`) which is used in the
-            // JS regex.
-            let tree_roots = trees
+            // Prune every entry that isn't a tree (aka directory)
+            root_trees.tree.retain(|t| t.object_type == "tree");
+
+            // Retrive all the sub-directories trees (for rust-lang/rust it's 6 API calls)
+            let roots_trees: Vec<_> = root_trees
                 .tree
                 .iter()
-                .filter_map(|t| (t.object_type == "tree").then_some(&t.path))
-                .join("|");
+                .map(|t| async { ctx.github.repo_git_trees(&repo, &t.sha).await })
+                .collect();
+
+            // Join all futures and fail fast if one of them returns an error
+            let roots_trees = futures::future::try_join_all(roots_trees)
+                .await
+                .context("unable to fetch content details")?;
+
+            // Collect and fix-up all the paths to directories and files (avoid submodules)
+            let mut tree_roots: Vec<_> = root_trees
+                .tree
+                .iter()
+                .zip(&roots_trees)
+                .map(|(root, childs)| {
+                    childs
+                        .tree
+                        .iter()
+                        .filter(|t| t.object_type == "tree" || t.object_type == "blob")
+                        .map(|t| format!("{}/{}", root.path, t.path))
+                })
+                .flatten()
+                .collect();
+
+            // We need to sort the tree roots by descending order, otherwise `library/std` will
+            // be matched before `library/stdarch`
+            tree_roots.sort_by(|a, b| b.cmp(a));
+
+            // Serialize to a JS(ON) array so we can escape them in the browser
+            let tree_roots =
+                serde_json::to_string(&tree_roots).context("unable to serialize the tree roots")?;
 
             anyhow::Result::<_>::Ok((job, tree_roots))
         };
@@ -237,6 +271,7 @@ async fn process_logs(
         import {{ AnsiUp }} from '{ANSI_UP_URL}'
 
         var logs = {logs};
+        var tree_roots = {tree_roots};
         var ansi_up = new AnsiUp();
 
         // 1. Tranform the ANSI escape codes to HTML
@@ -268,7 +303,7 @@ async fn process_logs(
         //  Detailed examples of what the regex does is at https://regex101.com/r/vCnx9Y/2
         //
         //  But simply speaking the regex tries to find absolute (with `/checkout` prefix) and
-        //  relative paths, the path must start with one of the repository top-level directory.
+        //  relative paths, the path must start with one of the repository level-2 directories.
         //  We also try to retrieve the lines and cols if given (`<path>:line:col`).
         //
         //  Some examples of paths we want to find:
@@ -277,7 +312,12 @@ async fn process_logs(
         //   - /checkout/src/doc/rustdoc/src/advanced-features.md
         //
         //  Any other paths, in particular if prefixed by `./` or `obj/` should not taken.
-        const pathRegex = /(?<boundary>[^a-zA-Z0-9.\\/])(?<inner>(?:[\\\/]?(?:checkout[\\\/])?(?<path>(?:{tree_roots})[\\\/][a-zA-Z0-9_$\-.\\\/]+))(?::(?<line>[0-9]+):(?<col>[0-9]+))?)/g;
+        const pathRegex = new RegExp(
+            "(?<boundary>[^a-zA-Z0-9.\\/])(?<inner>(?:[\\\/]?(?:checkout[\\\/])?(?<path>(?:"
+            + tree_roots.map(p => RegExp.escape(p)).join("|") +
+            ")(?:[\\\/][a-zA-Z0-9_$\\\-.\\\/]+)?))(?::(?<line>[0-9]+):(?<col>[0-9]+))?)",
+            "g"
+        );
         html = html.replace(pathRegex, (match, boundary, inner, path, line, col) => {{
             const pos = (line !== undefined) ? `#L${{line}}` : "";
             return `${{boundary}}<a href="https://github.com/{owner}/{repo}/blob/{sha}/${{path}}${{pos}}" class="path-marker">${{inner}}</a>`;
