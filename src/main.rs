@@ -316,9 +316,11 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     // and the old instance potentially runs on an newer database schema.
     let db_url = std::env::var("DATABASE_URL").expect("needs DATABASE_URL");
     let pool = db::ClientPool::new(db_url.clone());
-    db::run_migrations(&mut *pool.get().await)
-        .await
-        .context("database migrations")?;
+    if !std::env::var("SKIP_DB_MIGRATIONS").is_ok_and(|value| value == "1") {
+        db::run_migrations(&mut *pool.get().await)
+            .await
+            .context("database migrations")?;
+    }
 
     let ctx = Arc::new(Context {
         username: std::env::var("TRIAGEBOT_USERNAME").or_else(|err| match err {

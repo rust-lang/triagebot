@@ -27,6 +27,15 @@ To compile the Triagebot you need OpenSSL development library to be installed (e
 
 Run `cargo build` to compile the triagebot.
 
+## Quick start
+
+For local development/debugging for the log pages, do the following steps:
+
+ 1. Run `cp .env.sample .env`
+ 2. Change value of `SKIP_DB_MIGRATIONS` to `1`.
+ 3. Run `cargo run --bin triagebot`
+ 4. Go to this URL: <http://localhost:8000/gha-logs/rust-lang/rust/46814678314>
+
 ## Running triagebot
 
 It is possible to run triagebot yourself, and test changes against your own repository.
