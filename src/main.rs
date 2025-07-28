@@ -65,9 +65,6 @@ async fn serve_req(
         }
     }
 
-    if req.uri.path() == triagebot::gha_logs::ANSI_UP_URL {
-        return triagebot::gha_logs::ansi_up_min_js();
-    }
     if req.uri.path() == triagebot::gha_logs::SUCCESS_URL {
         return triagebot::gha_logs::success_svg();
     }

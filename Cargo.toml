@@ -47,6 +47,7 @@ clap = { version = "4", features = ["derive"] }
 hmac = "0.12.1"
 subtle = "2.6.1"
 sha2 = "0.10.9"
+anstyle-svg = { git = "https://github.com/GuillaumeGomez/anstyle", branch = "improve-internals" }
 
 [dependencies.serde]
 version = "1"
