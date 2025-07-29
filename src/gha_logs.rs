@@ -8,7 +8,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub const ANSI_UP_URL: &str = "/gha_logs/ansi_up@6.0.6.min.js";
+pub const ANSI_UP_URL: &str = "/gha_logs/ansi_up@0.0.1-custom.js";
 pub const SUCCESS_URL: &str = "/gha_logs/success@1.svg";
 pub const FAILURE_URL: &str = "/gha_logs/failure@1.svg";
 
@@ -379,7 +379,7 @@ body {{
 }
 
 pub fn ansi_up_min_js() -> anyhow::Result<Response<Body>, hyper::Error> {
-    const ANSI_UP_MIN_JS: &str = include_str!("gha_logs/ansi_up@6.0.6.min.js");
+    const ANSI_UP_MIN_JS: &str = include_str!("gha_logs/ansi_up@0.0.1-custom.js");
 
     Ok(Response::builder()
         .status(StatusCode::OK)
