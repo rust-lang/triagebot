@@ -243,36 +243,58 @@ async fn process_logs(
     <title>{job_name} - {owner}/{repo}@{short_sha}</title>
     {icon_status}
     <style>
-        body {{
-            font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
-            background: #0C0C0C;
-            color: #CCCCCC;
-            white-space: pre;
-        }}
-        .timestamp {{
-            color: #848484;
-            text-decoration: none;
-        }}
-        .timestamp:hover {{
-            text-decoration: underline;
-        }}
-        .error-marker {{
-            scroll-margin-bottom: 15vh;
-            color: #e5534b;
-        }}
-        .warning-marker {{
-            color: #c69026;
-        }}
-        .path-marker {{
-            color: #26c6a8;
-        }}
+body {{
+  font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+  background: #0C0C0C;
+  color: #CCC;
+  white-space: pre;
+}}
+.timestamp {{
+  color: #848484;
+  text-decoration: none;
+}}
+.timestamp:hover {{
+  text-decoration: underline;
+}}
+.error-marker {{
+  scroll-margin-bottom: 15vh;
+  color: #e5534b;
+}}
+.warning-marker {{
+  color: #c69026;
+}}
+.path-marker {{
+  color: #26c6a8;
+}}
+.ansi-black-fg {{ color: rgb(0, 0, 0); }}
+.ansi-red-fg {{ color: rgb(187, 0, 0); }}
+.ansi-green-fg {{ color: rgb(0, 187, 0); }}
+.ansi-yellow-fg {{ color: rgb(187, 187, 0); }}
+.ansi-blue-fg {{ color: rgb(0, 0, 187); }}
+.ansi-magenta-fg {{ color: rgb(187, 0, 187); }}
+.ansi-cyan-fg {{ color: rgb(0, 187, 187); }}
+.ansi-white-fg {{ color: rgb(255, 255, 255); }}
+.ansi-bright-black-fg {{ color: rgb(85, 85, 85); }}
+.ansi-bright-red-fg {{ color: rgb(255, 85, 85); }}
+.ansi-bright-green-fg {{ color: rgb(0, 255, 0); }}
+.ansi-bright-yellow-fg {{ color: rgb(255, 255, 85); }}
+.ansi-bright-blue-fg {{ color: rgb(85, 85, 255); }}
+.ansi-bright-magenta-fg {{ color: rgb(255, 85, 255); }}
+.ansi-bright-cyan-fg {{ color: rgb(85, 255, 255); }}
+.ansi-bright-white-fg {{ color: rgb(255, 255, 255); }}
+
+.bold {{ font-weight: bold; }}
+.faint {{ opacity: 0.7; }}
+.italic {{ font-style: italic; }}
+.underline {{ text-decoration: underline; }}
     </style>
     <script type="module" nonce="{nonce}">
         import {{ AnsiUp }} from '{ANSI_UP_URL}'
 
-        var logs = {logs};
-        var tree_roots = {tree_roots};
-        var ansi_up = new AnsiUp();
+        const logs = {logs};
+        const tree_roots = {tree_roots};
+        const ansi_up = new AnsiUp();
+        ansi_up.use_classes = true;
 
         // 1. Tranform the ANSI escape codes to HTML
         var html = ansi_up.ansi_to_html(logs);
@@ -324,9 +346,8 @@ async fn process_logs(
         }});
 
         // 6. Add the html to the DOM
-        var cdiv = document.getElementById("console");
-        cdiv.innerHTML = html;
-        
+        document.body.innerHTML = html;
+
         // 7. If no anchor is given, scroll to the last error
         if (location.hash === "" && errorCounter >= 0) {{
             const hasSmallViewport = window.innerWidth <= 750;
@@ -338,7 +359,7 @@ async fn process_logs(
         }}
     </script>
 </head>
-<body id="console">
+<body>
 </body>
 </html>"###,
     );
