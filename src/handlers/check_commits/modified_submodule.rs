@@ -4,7 +4,10 @@ use regex::{Regex, RegexBuilder};
 
 use crate::github::FileDiff;
 
-const SUBMODULE_WARNING_MSG: &str = "Some commits in this PR modify **submodules**.";
+const SUBMODULE_WARNING_MSG: &str = "Some commits in this PR modify **submodules**.
+
+If this was not intentional, see [I changed a submodule on accident](https://rustc-dev-guide.rust-lang.org/git.html#i-changed-a-submodule-by-accident) in the rustc dev guide.
+";
 
 static SUBPROJECT_COMMIT_RE: LazyLock<Regex> = LazyLock::new(|| {
     RegexBuilder::new(r"^\+Subproject commit [a-zA-Z0-9]+$")
