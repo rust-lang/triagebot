@@ -601,7 +601,11 @@ impl fmt::Display for AmbiguousLabelMatch {
             f,
             "Unsure which label to use for `{}` - could be one of: {}",
             self.requested_label,
-            self.labels.join(", ")
+            self.labels
+                .iter()
+                .map(|l| format!("`{}`", l))
+                .collect::<Vec<_>>()
+                .join(", ")
         )
     }
 }
