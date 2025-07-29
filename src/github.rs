@@ -588,6 +588,26 @@ impl fmt::Display for UnknownLabels {
 
 impl std::error::Error for UnknownLabels {}
 
+#[derive(Debug)]
+pub(crate) struct AmbiguousLabelMatch {
+    pub requested_label: String,
+    pub labels: Vec<String>,
+}
+
+// NOTE: This is used to post the Github comment; make sure it's valid markdown.
+impl fmt::Display for AmbiguousLabelMatch {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Unsure which label to use for `{}` - could be one of: {}",
+            self.requested_label,
+            self.labels.join(", ")
+        )
+    }
+}
+
+impl std::error::Error for AmbiguousLabelMatch {}
+
 impl Issue {
     pub fn to_zulip_github_reference(&self) -> ZulipGitHubReference {
         ZulipGitHubReference {
@@ -742,14 +762,24 @@ impl Issue {
             }
 
             // Try normalizing requested label (remove emoji, case insensitive, trim whitespace)
-            let normalized_requested = normalize(requested_label);
-            if let Some(found) = available_labels
+            let normalized_requested: String = normalize(requested_label);
+
+            // Find matching labels by normalized name
+            let found = available_labels
                 .iter()
-                .find(|l| normalize(&l.name) == normalized_requested)
-            {
-                found_labels.push(&found.name);
-            } else {
+                .filter(|l| normalize(&l.name) == normalized_requested)
+                .collect::<Vec<_>>();
+
+            if found.is_empty() {
                 unknown_labels.push(requested_label.as_str());
+            } else if found.len() > 1 {
+                return Err(AmbiguousLabelMatch {
+                    requested_label: requested_label.clone(),
+                    labels: found.into_iter().map(|l| l.name.clone()).collect(),
+                }
+                .into());
+            } else {
+                found_labels.push(&found.first().unwrap().name);
             }
         }
 
