@@ -6,6 +6,7 @@ use crate::handlers::Context;
 use crate::team_data::TeamClient;
 use crate::zulip::client::ZulipClient;
 use octocrab::Octocrab;
+use regex::Regex;
 use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::RwLock;

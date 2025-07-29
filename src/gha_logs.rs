@@ -3,12 +3,13 @@ use crate::handlers::Context;
 use anyhow::Context as _;
 use hyper::header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE};
 use hyper::{Body, Response, StatusCode};
+use itertools::Itertools;
+use regex::Regex;
 use std::collections::VecDeque;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use uuid::Uuid;
 
-pub const ANSI_UP_URL: &str = "/gha_logs/ansi_up@6.0.6.min.js";
 pub const SUCCESS_URL: &str = "/gha_logs/success@1.svg";
 pub const FAILURE_URL: &str = "/gha_logs/failure@1.svg";
 
@@ -22,9 +23,14 @@ pub struct GitHubActionLogsCache {
 
 pub struct CachedLog {
     job: WorkflowRunJob,
-    tree_roots: String,
+    tree_roots: Vec<String>,
     logs: String,
 }
+
+// The `>` at the beginning of the regex is to match the closing `<br>` to ensure we're only
+// matching timestamps at the beginning of each line and not some random one present in the logs.
+pub static TIMESTAMP_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r">(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)").unwrap());
 
 impl GitHubActionLogsCache {
     pub fn get(&mut self, key: &String) -> Option<Arc<CachedLog>> {
@@ -183,24 +189,14 @@ async fn process_logs(
             // be matched before `library/stdarch`
             tree_roots.sort_by(|a, b| b.cmp(a));
 
-            // Serialize to a JS(ON) array so we can escape them in the browser
-            let tree_roots =
-                serde_json::to_string(&tree_roots).context("unable to serialize the tree roots")?;
-
             anyhow::Result::<_>::Ok((job, tree_roots))
         };
 
         let logs = async {
-            let logs = ctx
-                .github
+            ctx.github
                 .raw_job_logs(&repo, log_id)
                 .await
-                .context("unable to get the raw logs")?;
-
-            let json_logs =
-                serde_json::to_string(&*logs).context("unable to JSON-ify the raw logs")?;
-
-            anyhow::Result::<_>::Ok(json_logs)
+                .context("unable to get the raw logs")
         };
 
         let (job_and_tree_roots, logs) = futures::join!(job_and_tree_roots, logs);
@@ -217,7 +213,6 @@ async fn process_logs(
         )
     };
 
-    let nonce = Uuid::new_v4().to_hyphenated().to_string();
     let job_name = &*job.name;
     let sha = &*job.head_sha;
     let short_sha = &job.head_sha[..7];
@@ -234,6 +229,93 @@ async fn process_logs(
         }
     };
 
+    let tree_roots = tree_roots.iter().map(|p| regex::escape(p)).join("|");
+    let regex = format!(
+        r#"(?<boundary>[^a-zA-Z0-9.\\/])(?<inner>(?:[\\/]?(?:checkout[\\/])?(?<path>(?:{tree_roots})(?:[\\/][a-zA-Z0-9_$\-.\\/]+)?))(?::(?<line>[0-9]+):(?<col>[0-9]+))?)"#,
+    );
+    let gha_logs_path_regex = Regex::new(&regex).unwrap();
+
+    // 1. Remove UTF-8 useless BOM
+    let logs = logs.strip_prefix('\u{FEFF}').unwrap_or(logs.as_str());
+
+    // 2. Tranform the ANSI escape codes to HTML
+    let anstyle_svg::HtmlParts { body, style } = anstyle_svg::Term::new()
+        .use_html5(true)
+        .render_html_parts(logs);
+
+    // 3. Add a self-referencial anchor to all timestamps at the start of the lines
+    let html = TIMESTAMP_REGEX.replace_all(&body, |ts: &regex::Captures| {
+        let ts = &ts[0][1..];
+        format!("><a id='{ts}' href='#{ts}' class='timestamp'>{ts}</a>")
+    });
+
+    // 4. Add a anchor around every "##[error]" string
+    let mut error_counter = -1;
+    let html = html
+        .split("##[error]")
+        .fold(String::with_capacity(html.len()), |mut acc, part| {
+            // We only push the `<a>` tag if it's not the first iteration.
+            if error_counter >= 0 {
+                acc.push_str(&format!(
+                    "<a id=\"error-{error_counter}\" class=\"error-marker\">##[error]</a>"
+                ));
+            }
+            acc.push_str(part);
+            error_counter += 1;
+            acc
+        });
+
+    // 4.b Add a span around every "##[warning]" string
+    let html = html.replace(
+        "##[warning]",
+        r#"<span class="warning-marker">##[warning]</span>"#,
+    );
+
+    // 5. Add anchors around some paths
+    //  Detailed examples of what the regex does is at https://regex101.com/r/vCnx9Y/2
+    //
+    //  But simply speaking the regex tries to find absolute (with `/checkout` prefix) and
+    //  relative paths, the path must start with one of the repository top-level directory.
+    //  We also try to retrieve the lines and cols if given (`<path>:line:col`).
+    //
+    //  Some examples of paths we want to find:
+    //   - src/tools/test-float-parse/src/traits.rs:173:11
+    //   - /checkout/compiler/rustc_macros
+    //   - /checkout/src/doc/rustdoc/src/advanced-features.md
+    //
+    //  Any other paths, in particular if prefixed by `./` or `obj/` should not taken.
+    let html = gha_logs_path_regex.replace_all(&html, |capture: &regex::Captures| {
+        let line = match capture.name("line") {
+            Some(line) => format!("#L{}", line.as_str()),
+            None => String::new(),
+        };
+        let boundary = capture.name("boundary").map_or("", |m| m.as_str());
+        let inner = capture.name("inner").map_or("", |m| m.as_str());
+        let path = &capture["path"];
+        format!(r#"{boundary}<a href="https://github.com/{owner}/{repo}/blob/{sha}/{path}{line}" class="path-marker">{inner}</a>"#)
+    });
+
+    let nonce = Uuid::new_v4().to_hyphenated().to_string();
+    let js = if error_counter >= 0 {
+        format!(
+            r#"
+<script type="module" nonce="{nonce}">
+    // 7. If no anchor is given, scroll to the last error
+    if (location.hash === "") {{
+        const hasSmallViewport = window.innerWidth <= 750;
+        document.getElementById(`error-{error_counter}`).scrollIntoView({{
+            behavior: 'instant',
+            block: 'end',
+            inline: hasSmallViewport ? 'start' : 'center'
+        }});
+    }}
+</script>"#,
+            error_counter = error_counter - 1,
+        )
+    } else {
+        String::new()
+    };
+
     let html = format!(
         r###"<!DOCTYPE html>
 <html lang="en" translate="no">
@@ -243,102 +325,35 @@ async fn process_logs(
     <title>{job_name} - {owner}/{repo}@{short_sha}</title>
     {icon_status}
     <style>
-        body {{
-            font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
-            background: #0C0C0C;
-            color: #CCCCCC;
-            white-space: pre;
-        }}
-        .timestamp {{
-            color: #848484;
-            text-decoration: none;
-        }}
-        .timestamp:hover {{
-            text-decoration: underline;
-        }}
-        .error-marker {{
-            scroll-margin-bottom: 15vh;
-            color: #e5534b;
-        }}
-        .warning-marker {{
-            color: #c69026;
-        }}
-        .path-marker {{
-            color: #26c6a8;
-        }}
+body {{
+    font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+    background: #0C0C0C;
+    color: #CCC;
+    word-break: break-all;
+}}
+.timestamp {{
+    color: #848484;
+    text-decoration: none;
+}}
+.timestamp:hover {{
+    text-decoration: underline;
+}}
+.error-marker {{
+    scroll-margin-bottom: 15vh;
+    color: #e5534b;
+}}
+.warning-marker {{
+    color: #c69026;
+}}
+.path-marker {{
+    color: #26c6a8;
+}}
+{style}
     </style>
-    <script type="module" nonce="{nonce}">
-        import {{ AnsiUp }} from '{ANSI_UP_URL}'
-
-        var logs = {logs};
-        var tree_roots = {tree_roots};
-        var ansi_up = new AnsiUp();
-
-        // 1. Tranform the ANSI escape codes to HTML
-        var html = ansi_up.ansi_to_html(logs);
-
-        // 2. Remove UTF-8 useless BOM
-        if (html.charCodeAt(0) === 0xFEFF) {{
-            html = html.substr(1);
-        }}
-
-        // 3. Add a self-referencial anchor to all timestamps at the start of the lines
-        const dateRegex = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z)/gm;
-        html = html.replace(dateRegex, (ts) => 
-            `<a id="${{ts}}" href="#${{ts}}" class="timestamp">${{ts}}</a>`
-        );
-
-        // 4. Add a anchor around every "##[error]" string
-        let errorCounter = -1;
-        html = html.replace(/##\[error\]/g, () =>
-            `<a id="error-${{++errorCounter}}" class="error-marker">##[error]</a>`
-        );
-        
-        // 4.b Add a span around every "##[warning]" string
-        html = html.replace(/##\[warning\]/g, () =>
-            `<span class="warning-marker">##[warning]</span>`
-        );
-
-        // 5. Add anchors around some paths
-        //  Detailed examples of what the regex does is at https://regex101.com/r/vCnx9Y/2
-        //
-        //  But simply speaking the regex tries to find absolute (with `/checkout` prefix) and
-        //  relative paths, the path must start with one of the repository level-2 directories.
-        //  We also try to retrieve the lines and cols if given (`<path>:line:col`).
-        //
-        //  Some examples of paths we want to find:
-        //   - src/tools/test-float-parse/src/traits.rs:173:11
-        //   - /checkout/compiler/rustc_macros
-        //   - /checkout/src/doc/rustdoc/src/advanced-features.md
-        //
-        //  Any other paths, in particular if prefixed by `./` or `obj/` should not taken.
-        const pathRegex = new RegExp(
-            "(?<boundary>[^a-zA-Z0-9.\\/])(?<inner>(?:[\\\/]?(?:checkout[\\\/])?(?<path>(?:"
-            + tree_roots.map(p => RegExp.escape(p)).join("|") +
-            ")(?:[\\\/][a-zA-Z0-9_$\\\-.\\\/]+)?))(?::(?<line>[0-9]+):(?<col>[0-9]+))?)",
-            "g"
-        );
-        html = html.replace(pathRegex, (match, boundary, inner, path, line, col) => {{
-            const pos = (line !== undefined) ? `#L${{line}}` : "";
-            return `${{boundary}}<a href="https://github.com/{owner}/{repo}/blob/{sha}/${{path}}${{pos}}" class="path-marker">${{inner}}</a>`;
-        }});
-
-        // 6. Add the html to the DOM
-        var cdiv = document.getElementById("console");
-        cdiv.innerHTML = html;
-        
-        // 7. If no anchor is given, scroll to the last error
-        if (location.hash === "" && errorCounter >= 0) {{
-            const hasSmallViewport = window.innerWidth <= 750;
-            document.getElementById(`error-${{errorCounter}}`).scrollIntoView({{
-                behavior: 'instant',
-                block: 'end',
-                inline: hasSmallViewport ? 'start' : 'center'
-            }});
-        }}
-    </script>
 </head>
-<body id="console">
+<body>
+{html}
+{js}
 </body>
 </html>"###,
     );
@@ -355,17 +370,6 @@ async fn process_logs(
             ),
         )
         .body(Body::from(html))?);
-}
-
-pub fn ansi_up_min_js() -> anyhow::Result<Response<Body>, hyper::Error> {
-    const ANSI_UP_MIN_JS: &str = include_str!("gha_logs/ansi_up@6.0.6.min.js");
-
-    Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header(CACHE_CONTROL, "public, max-age=15552000, immutable")
-        .header(CONTENT_TYPE, "text/javascript; charset=utf-8")
-        .body(Body::from(ANSI_UP_MIN_JS))
-        .unwrap())
 }
 
 pub fn success_svg() -> anyhow::Result<Response<Body>, hyper::Error> {
