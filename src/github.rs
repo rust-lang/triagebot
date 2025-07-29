@@ -565,21 +565,12 @@ impl IssueRepository {
         format!("{}/{}", self.organization, self.repository)
     }
 
-    async fn has_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<bool> {
-        #[allow(clippy::redundant_pattern_matching)]
-        let url = format!("{}/labels/{}", self.url(client), label);
-        match client.send_req(client.get(&url)).await {
-            Ok(_) => Ok(true),
-            Err(e) => {
-                if e.downcast_ref::<reqwest::Error>()
-                    .map_or(false, |e| e.status() == Some(StatusCode::NOT_FOUND))
-                {
-                    Ok(false)
-                } else {
-                    Err(e)
-                }
-            }
-        }
+    async fn labels(&self, client: &GithubClient) -> anyhow::Result<Vec<Label>> {
+        let url = format!("{}/labels", self.url(client));
+        client
+            .json(client.get(&url))
+            .await
+            .context("failed to get labels")
     }
 }
 
@@ -730,8 +721,61 @@ impl Issue {
         Ok(())
     }
 
+    async fn normalize_and_match_labels(
+        &self,
+        client: &GithubClient,
+        requested_labels: &[String],
+    ) -> anyhow::Result<Vec<String>> {
+        let available_labels = self.repository().labels(client).await.unwrap_or_default();
+
+        let emoji_regex: Regex = Regex::new(r"[\p{Emoji}\p{Emoji_Presentation}]").unwrap();
+        let normalize = |s: &str| emoji_regex.replace_all(s, "").trim().to_lowercase();
+
+        let mut found_labels = Vec::with_capacity(requested_labels.len());
+        let mut unknown_labels = Vec::new();
+
+        for requested_label in requested_labels {
+            // First look for an exact match
+            if let Some(found) = available_labels.iter().find(|l| l.name == *requested_label) {
+                found_labels.push(&found.name);
+                continue;
+            }
+
+            // Try normalizing requested label (remove emoji, case insensitive, trim whitespace)
+            let normalized_requested = normalize(requested_label);
+            if let Some(found) = available_labels
+                .iter()
+                .find(|l| normalize(&l.name) == normalized_requested)
+            {
+                found_labels.push(&found.name);
+            } else {
+                unknown_labels.push(requested_label.as_str());
+            }
+        }
+
+        if !unknown_labels.is_empty() {
+            return Err(UnknownLabels {
+                labels: unknown_labels.into_iter().map(String::from).collect(),
+            }
+            .into());
+        }
+
+        Ok(found_labels.into_iter().map(|s| s.clone()).collect())
+    }
+
     pub async fn remove_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<()> {
         log::info!("remove_label from {}: {:?}", self.global_id(), label);
+
+        let normalized_labels = self
+            .normalize_and_match_labels(client, &[label.to_string()])
+            .await?;
+        let label = normalized_labels.first().unwrap();
+        log::info!(
+            "remove_label from {}: matched label to {:?}",
+            self.global_id(),
+            label
+        );
+
         // DELETE /repos/:owner/:repo/issues/:number/labels/{name}
         let url = format!(
             "{repo_url}/issues/{number}/labels/{name}",
@@ -767,6 +811,19 @@ impl Issue {
         labels: Vec<Label>,
     ) -> anyhow::Result<()> {
         log::info!("add_labels: {} +{:?}", self.global_id(), labels);
+
+        let labels = self
+            .normalize_and_match_labels(
+                client,
+                &labels.into_iter().map(|l| l.name).collect::<Vec<_>>(),
+            )
+            .await?;
+        log::info!(
+            "add_labels: {} matched requested labels to +{:?}",
+            self.global_id(),
+            labels
+        );
+
         // POST /repos/:owner/:repo/issues/:number/labels
         // repo_url = https://api.github.com/repos/Codertocat/Hello-World
         let url = format!(
@@ -778,8 +835,7 @@ impl Issue {
         // Don't try to add labels already present on this issue.
         let labels = labels
             .into_iter()
-            .filter(|l| !self.labels().contains(&l))
-            .map(|l| l.name)
+            .filter(|l| !self.labels().iter().any(|existing| existing.name == *l))
             .collect::<Vec<_>>();
 
         log::info!("add_labels: {} filtered to {:?}", self.global_id(), labels);
@@ -788,32 +844,13 @@ impl Issue {
             return Ok(());
         }
 
-        let mut unknown_labels = vec![];
-        let mut known_labels = vec![];
-        for label in labels {
-            if !self.repository().has_label(client, &label).await? {
-                unknown_labels.push(label);
-            } else {
-                known_labels.push(label);
-            }
-        }
-
-        if !unknown_labels.is_empty() {
-            return Err(UnknownLabels {
-                labels: unknown_labels,
-            }
-            .into());
-        }
-
         #[derive(serde::Serialize)]
         struct LabelsReq {
             labels: Vec<String>,
         }
 
         client
-            .send_req(client.post(&url).json(&LabelsReq {
-                labels: known_labels,
-            }))
+            .send_req(client.post(&url).json(&LabelsReq { labels }))
             .await
             .context("failed to add labels")?;
 
