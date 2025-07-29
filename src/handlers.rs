@@ -61,7 +61,7 @@ mod transfer;
 pub mod types_planning_updates;
 
 pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
-    let config = config::get(&ctx.github, event.repo()).await;
+    let config = config::get(&ctx.octocrab, event.repo()).await;
     if let Err(e) = &config {
         log::warn!("configuration error {}: {e}", event.repo().full_name);
     }
