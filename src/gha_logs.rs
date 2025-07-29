@@ -335,14 +335,16 @@ body {{
         //
         //  Any other paths, in particular if prefixed by `./` or `obj/` should not taken.
         const pathRegex = new RegExp(
-            "(?<boundary>[^a-zA-Z0-9.\\/])(?<inner>(?:[\\\/]?(?:checkout[\\\/])?(?<path>(?:"
-            + tree_roots.map(p => RegExp.escape(p)).join("|") +
-            ")(?:[\\\/][a-zA-Z0-9_$\\\-.\\\/]+)?))(?::(?<line>[0-9]+):(?<col>[0-9]+))?)",
+            "(?<boundary_start>[^a-zA-Z0-9.\\/])"
+            + "(?<inner>(?:[\\\/]?(?:checkout[\\\/])?(?<path>(?:"
+                + tree_roots.map(p => RegExp.escape(p)).join("|")
+                + ")(?:[\\\/][a-zA-Z0-9_$\\\-.\\\/]+)?))"
+            + "(?::(?<line>[0-9]+):(?<col>[0-9]+))?)(?<boundary_end>[^a-zA-Z0-9.])",
             "g"
         );
-        html = html.replace(pathRegex, (match, boundary, inner, path, line, col) => {{
+        html = html.replace(pathRegex, (match, boundary_start, inner, path, line, col, boundary_end) => {{
             const pos = (line !== undefined) ? `#L${{line}}` : "";
-            return `${{boundary}}<a href="https://github.com/{owner}/{repo}/blob/{sha}/${{path}}${{pos}}" class="path-marker">${{inner}}</a>`;
+            return `${{boundary_start}}<a href="https://github.com/{owner}/{repo}/blob/{sha}/${{path}}${{pos}}" class="path-marker">${{inner}}</a>${{boundary_end}}`;
         }});
 
         // 6. Add the html to the DOM
