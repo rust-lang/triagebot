@@ -1,6 +1,6 @@
 use crate::{
     config::AutolabelConfig,
-    github::{IssuesAction, IssuesEvent, Label},
+    github::{IssuesAction, IssuesEvent, Label, labels::UnknownLabels},
     handlers::Context,
 };
 use anyhow::Context as _;
@@ -209,7 +209,6 @@ pub(super) async fn handle_input(
     match event.issue.add_labels(&ctx.github, input.add).await {
         Ok(()) => {}
         Err(e) => {
-            use crate::github::UnknownLabels;
             if let Some(err @ UnknownLabels { .. }) = e.downcast_ref() {
                 event
                     .issue

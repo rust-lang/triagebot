@@ -11,8 +11,7 @@
 use crate::team_data::TeamClient;
 use crate::{
     config::RelabelConfig,
-    github::UnknownLabels,
-    github::{self, Event},
+    github::{self, Event, labels::UnknownLabels},
     handlers::Context,
     interactions::ErrorComment,
 };
