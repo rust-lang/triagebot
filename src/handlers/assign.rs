@@ -24,6 +24,7 @@ use crate::db::issue_data::IssueData;
 use crate::db::review_prefs::{RotationMode, get_review_prefs_batch};
 use crate::github::UserId;
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
+use crate::labels;
 use crate::{
     config::AssignConfig,
     github::{self, Event, FileDiff, Issue, IssuesAction, Selection},
@@ -563,7 +564,7 @@ pub(super) async fn handle_command(
                         .add_labels(&ctx.github, vec![github::Label { name: t_label }])
                         .await
                     {
-                        if let Some(github::UnknownLabels { .. }) = err.downcast_ref() {
+                        if let Some(labels::UnknownLabels { .. }) = err.downcast_ref() {
                             log::warn!("Error assigning label: {}", err);
                         } else {
                             return Err(err);

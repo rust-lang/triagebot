@@ -1,24 +1,21 @@
+use crate::labels;
 use crate::team_data::TeamClient;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::{FutureExt, future::BoxFuture};
-use itertools::Itertools;
 use octocrab::models::{Author, AuthorAssociation};
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
 use std::collections::{HashMap, HashSet};
-use std::sync::{LazyLock, OnceLock};
+use std::sync::OnceLock;
 use std::{
     fmt,
     time::{Duration, SystemTime},
 };
 use tracing as log;
-
-static EMOJI_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"[\p{Emoji}\p{Emoji_Presentation}]").unwrap());
 
 pub type UserId = u64;
 pub type PullRequestNumber = u64;
@@ -578,40 +575,6 @@ impl IssueRepository {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct UnknownLabels {
-    labels: Vec<String>,
-}
-
-// NOTE: This is used to post the Github comment; make sure it's valid markdown.
-impl fmt::Display for UnknownLabels {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Unknown labels: {}", &self.labels.join(", "))
-    }
-}
-
-impl std::error::Error for UnknownLabels {}
-
-#[derive(Debug)]
-pub(crate) struct AmbiguousLabelMatch {
-    pub requested_label: String,
-    pub labels: Vec<String>,
-}
-
-// NOTE: This is used to post the Github comment; make sure it's valid markdown.
-impl fmt::Display for AmbiguousLabelMatch {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Unsure which label to use for `{}` - could be one of: {}",
-            self.requested_label,
-            self.labels.iter().map(|l| format!("`{}`", l)).join(", ")
-        )
-    }
-}
-
-impl std::error::Error for AmbiguousLabelMatch {}
-
 impl Issue {
     pub fn to_zulip_github_reference(&self) -> ZulipGitHubReference {
         ZulipGitHubReference {
@@ -756,52 +719,13 @@ impl Issue {
             .await
             .context("unable to retrieve the repository labels")?;
 
-        let normalize = |s: &str| EMOJI_REGEX.replace_all(s, "").trim().to_lowercase();
-
-        let mut found_labels = Vec::with_capacity(requested_labels.len());
-        let mut unknown_labels = Vec::new();
-
-        for requested_label in requested_labels {
-            // First look for an exact match
-            if let Some(found) = available_labels.iter().find(|l| l.name == *requested_label) {
-                found_labels.push(found.name.clone());
-                continue;
-            }
-
-            // Try normalizing requested label (remove emoji, case insensitive, trim whitespace)
-            let normalized_requested: String = normalize(requested_label);
-
-            // Find matching labels by normalized name
-            let found = available_labels
+        labels::normalize_and_match_labels(
+            &available_labels
                 .iter()
-                .filter(|l| normalize(&l.name) == normalized_requested)
-                .collect::<Vec<_>>();
-
-            match found[..] {
-                [] => {
-                    unknown_labels.push(requested_label);
-                }
-                [label] => {
-                    found_labels.push(label.name.clone());
-                }
-                [..] => {
-                    return Err(AmbiguousLabelMatch {
-                        requested_label: requested_label.to_string(),
-                        labels: found.into_iter().map(|l| l.name.clone()).collect(),
-                    }
-                    .into());
-                }
-            };
-        }
-
-        if !unknown_labels.is_empty() {
-            return Err(UnknownLabels {
-                labels: unknown_labels.into_iter().map(|s| s.to_string()).collect(),
-            }
-            .into());
-        }
-
-        Ok(found_labels)
+                .map(|l| l.name.as_str())
+                .collect::<Vec<_>>(),
+            requested_labels,
+        )
     }
 
     pub async fn remove_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<()> {
@@ -3293,18 +3217,5 @@ impl Submodule {
                 anyhow::anyhow!("expected .git suffix, got {}", self.submodule_git_url)
             })?;
         client.repository(fullname).await
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn display_labels() {
-        let x = UnknownLabels {
-            labels: vec!["A-bootstrap".into(), "xxx".into()],
-        };
-        assert_eq!(x.to_string(), "Unknown labels: A-bootstrap, xxx");
     }
 }

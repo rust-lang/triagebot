@@ -209,7 +209,7 @@ pub(super) async fn handle_input(
     match event.issue.add_labels(&ctx.github, input.add).await {
         Ok(()) => {}
         Err(e) => {
-            use crate::github::UnknownLabels;
+            use crate::labels::UnknownLabels;
             if let Some(err @ UnknownLabels { .. }) = e.downcast_ref() {
                 event
                     .issue
