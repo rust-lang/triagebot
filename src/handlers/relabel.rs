@@ -11,10 +11,9 @@
 use crate::team_data::TeamClient;
 use crate::{
     config::RelabelConfig,
-    github::{self, Event},
+    github::{self, Event, labels::UnknownLabels},
     handlers::Context,
     interactions::ErrorComment,
-    labels::UnknownLabels,
 };
 use parser::command::relabel::{LabelDelta, RelabelCommand};
 

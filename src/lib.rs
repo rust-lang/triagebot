@@ -18,7 +18,6 @@ pub mod github;
 pub mod handlers;
 mod interactions;
 pub mod jobs;
-pub mod labels;
 pub mod notification_listing;
 pub mod payload;
 mod rfcbot;

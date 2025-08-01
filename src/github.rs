@@ -1,4 +1,3 @@
-use crate::labels;
 use crate::team_data::TeamClient;
 use anyhow::{Context, anyhow};
 use async_trait::async_trait;
@@ -16,6 +15,8 @@ use std::{
     time::{Duration, SystemTime},
 };
 use tracing as log;
+
+pub mod labels;
 
 pub type UserId = u64;
 pub type PullRequestNumber = u64;

@@ -22,9 +22,8 @@
 
 use crate::db::issue_data::IssueData;
 use crate::db::review_prefs::{RotationMode, get_review_prefs_batch};
-use crate::github::UserId;
+use crate::github::{UserId, labels};
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
-use crate::labels;
 use crate::{
     config::AssignConfig,
     github::{self, Event, FileDiff, Issue, IssuesAction, Selection},
