@@ -16,8 +16,6 @@ use std::{
 };
 use tracing as log;
 
-pub mod labels;
-
 pub type UserId = u64;
 pub type PullRequestNumber = u64;
 
@@ -567,14 +565,37 @@ impl IssueRepository {
         format!("{}/{}", self.organization, self.repository)
     }
 
-    async fn labels(&self, client: &GithubClient) -> anyhow::Result<Vec<Label>> {
-        let url = format!("{}/labels", self.url(client));
-        client
-            .json(client.get(&url))
-            .await
-            .context("failed to get labels")
+    async fn has_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<bool> {
+        #[allow(clippy::redundant_pattern_matching)]
+        let url = format!("{}/labels/{}", self.url(client), label);
+        match client.send_req(client.get(&url)).await {
+            Ok(_) => Ok(true),
+            Err(e) => {
+                if e.downcast_ref::<reqwest::Error>()
+                    .map_or(false, |e| e.status() == Some(StatusCode::NOT_FOUND))
+                {
+                    Ok(false)
+                } else {
+                    Err(e)
+                }
+            }
+        }
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct UnknownLabels {
+    labels: Vec<String>,
+}
+
+// NOTE: This is used to post the Github comment; make sure it's valid markdown.
+impl fmt::Display for UnknownLabels {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Unknown labels: {}", &self.labels.join(", "))
+    }
+}
+
+impl std::error::Error for UnknownLabels {}
 
 impl Issue {
     pub fn to_zulip_github_reference(&self) -> ZulipGitHubReference {
@@ -709,39 +730,8 @@ impl Issue {
         Ok(())
     }
 
-    async fn normalize_and_match_labels(
-        &self,
-        client: &GithubClient,
-        requested_labels: &[&str],
-    ) -> anyhow::Result<Vec<String>> {
-        let available_labels = self
-            .repository()
-            .labels(client)
-            .await
-            .context("unable to retrieve the repository labels")?;
-
-        labels::normalize_and_match_labels(
-            &available_labels
-                .iter()
-                .map(|l| l.name.as_str())
-                .collect::<Vec<_>>(),
-            requested_labels,
-        )
-    }
-
     pub async fn remove_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<()> {
         log::info!("remove_label from {}: {:?}", self.global_id(), label);
-
-        let normalized_labels = self.normalize_and_match_labels(client, &[label]).await?;
-        let label = normalized_labels
-            .first()
-            .context("failed to find label on repository")?;
-        log::info!(
-            "remove_label from {}: matched label to {:?}",
-            self.global_id(),
-            label
-        );
-
         // DELETE /repos/:owner/:repo/issues/:number/labels/{name}
         let url = format!(
             "{repo_url}/issues/{number}/labels/{name}",
@@ -777,19 +767,6 @@ impl Issue {
         labels: Vec<Label>,
     ) -> anyhow::Result<()> {
         log::info!("add_labels: {} +{:?}", self.global_id(), labels);
-
-        let labels = self
-            .normalize_and_match_labels(
-                client,
-                &labels.iter().map(|l| l.name.as_str()).collect::<Vec<_>>(),
-            )
-            .await?;
-        log::info!(
-            "add_labels: {} matched requested labels to +{:?}",
-            self.global_id(),
-            labels
-        );
-
         // POST /repos/:owner/:repo/issues/:number/labels
         // repo_url = https://api.github.com/repos/Codertocat/Hello-World
         let url = format!(
@@ -801,7 +778,8 @@ impl Issue {
         // Don't try to add labels already present on this issue.
         let labels = labels
             .into_iter()
-            .filter(|l| !self.labels().iter().any(|existing| existing.name == *l))
+            .filter(|l| !self.labels().contains(&l))
+            .map(|l| l.name)
             .collect::<Vec<_>>();
 
         log::info!("add_labels: {} filtered to {:?}", self.global_id(), labels);
@@ -810,13 +788,32 @@ impl Issue {
             return Ok(());
         }
 
+        let mut unknown_labels = vec![];
+        let mut known_labels = vec![];
+        for label in labels {
+            if !self.repository().has_label(client, &label).await? {
+                unknown_labels.push(label);
+            } else {
+                known_labels.push(label);
+            }
+        }
+
+        if !unknown_labels.is_empty() {
+            return Err(UnknownLabels {
+                labels: unknown_labels,
+            }
+            .into());
+        }
+
         #[derive(serde::Serialize)]
         struct LabelsReq {
             labels: Vec<String>,
         }
 
         client
-            .send_req(client.post(&url).json(&LabelsReq { labels }))
+            .send_req(client.post(&url).json(&LabelsReq {
+                labels: known_labels,
+            }))
             .await
             .context("failed to add labels")?;
 
@@ -3218,5 +3215,18 @@ impl Submodule {
                 anyhow::anyhow!("expected .git suffix, got {}", self.submodule_git_url)
             })?;
         client.repository(fullname).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_labels() {
+        let x = UnknownLabels {
+            labels: vec!["A-bootstrap".into(), "xxx".into()],
+        };
+        assert_eq!(x.to_string(), "Unknown labels: A-bootstrap, xxx");
     }
 }
