@@ -1,10 +1,12 @@
 #![allow(clippy::new_without_default)]
 
 use anyhow::Context as _;
-use axum::Router;
 use axum::body::Body;
+use axum::error_handling::HandleErrorLayer;
 use axum::http::HeaderName;
+use axum::response::Html;
 use axum::routing::get;
+use axum::{BoxError, Router};
 use bytes::Bytes;
 use http_body_util::{BodyExt, combinators::BoxBody};
 use hyper::{Request, Response, StatusCode, header};
@@ -12,7 +14,9 @@ use std::time::Duration;
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tokio::{task, time};
-use tower::{Service, ServiceBuilder, ServiceExt};
+use tower::ServiceBuilder;
+use tower::buffer::BufferLayer;
+use tower::limit::RateLimitLayer;
 use tower_http::compression::CompressionLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
@@ -27,57 +31,10 @@ use triagebot::team_data::TeamClient;
 use triagebot::zulip::client::ZulipClient;
 use triagebot::{EventName, db, github, handlers::Context, notification_listing, payload};
 
-async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
-    if req == "/agenda/lang/triage" {
-        return triagebot::agenda::lang().call().await;
-    }
-    if req == "/agenda/lang/planning" {
-        return triagebot::agenda::lang_planning().call().await;
-    }
-    if req == "/agenda/types/planning" {
-        return triagebot::agenda::types_planning().call().await;
-    }
-
-    anyhow::bail!("Unknown agenda; see /agenda for index.")
-}
-
 async fn serve_req(
     req: Request<BoxBody<Bytes, hyper::Error>>,
     ctx: Arc<Context>,
-    mut agenda: impl Service<String, Response = String, Error = tower::BoxError>,
 ) -> Result<Response<BoxBody<Bytes, std::convert::Infallible>>, hyper::Error> {
-    if req.uri().path() == "/agenda" {
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .body(triagebot::agenda::INDEX.to_string().boxed())
-            .unwrap());
-    }
-    if req.uri().path() == "/agenda/lang/triage"
-        || req.uri().path() == "/agenda/lang/planning"
-        || req.uri().path() == "/agenda/types/planning"
-    {
-        match agenda
-            .ready()
-            .await
-            .expect("agenda keeps running")
-            .call(req.uri().path().to_owned())
-            .await
-        {
-            Ok(agenda) => {
-                return Ok(Response::builder()
-                    .status(StatusCode::OK)
-                    .body(agenda.boxed())
-                    .unwrap());
-            }
-            Err(err) => {
-                return Ok(Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(err.to_string().boxed())
-                    .unwrap());
-            }
-        }
-    }
-
     if req.uri().path() == "/bors-commit-list" {
         let res = db::rustc_commits::get_commits_with_artifacts(&*ctx.db.get().await).await;
         let res = match res {
@@ -307,22 +264,6 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         spawn_job_runner(ctx.clone());
     }
 
-    let agenda = tower::ServiceBuilder::new()
-        .buffer(10)
-        .layer_fn(|input| {
-            tower::util::MapErr::new(
-                tower::load_shed::LoadShed::new(tower::limit::RateLimit::new(
-                    input,
-                    tower::limit::rate::Rate::new(2, std::time::Duration::from_secs(60)),
-                )),
-                |e| {
-                    tracing::error!("agenda request failed: {:?}", e);
-                    anyhow::anyhow!("Rate limit of 2 request / 60 seconds exceeded")
-                },
-            )
-        })
-        .service_fn(handle_agenda_request);
-
     const REQUEST_ID_HEADER: &str = "x-request-id";
     const X_REQUEST_ID: HeaderName = HeaderName::from_static(REQUEST_ID_HEADER);
 
@@ -351,6 +292,26 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .layer(PropagateRequestIdLayer::new(X_REQUEST_ID))
         .layer(CompressionLayer::new());
 
+    let agenda = Router::new()
+        .route("/", get(|| async { Html(triagebot::agenda::INDEX) }))
+        .route("/lang/triage", get(triagebot::agenda::lang_http))
+        .route("/lang/planning", get(triagebot::agenda::lang_planning_http))
+        .route(
+            "/types/planning",
+            get(triagebot::agenda::types_planning_http),
+        )
+        .layer(
+            ServiceBuilder::new()
+                .layer(HandleErrorLayer::new(|err: BoxError| async move {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Unhandled error: {}", err),
+                    )
+                }))
+                .layer(BufferLayer::new(5))
+                .layer(RateLimitLayer::new(2, Duration::from_secs(60))),
+        );
+
     let app = Router::new()
         .route("/", get(|| async { "Triagebot is awaiting triage." }))
         .route("/triage", get(triagebot::triage::index))
@@ -371,6 +332,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             "/gha-logs/{owner}/{repo}/{log-id}",
             get(triagebot::gha_logs::gha_logs),
         )
+        .nest("/agenda", agenda)
         .layer(middleware)
         .with_state(ctx);
 
