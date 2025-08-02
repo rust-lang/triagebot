@@ -1,17 +1,22 @@
 #![allow(clippy::new_without_default)]
 
 use anyhow::Context as _;
-use futures::StreamExt;
-use futures::future::FutureExt;
-use hyper::{Body, Request, Response, Server, StatusCode, header};
-use route_recognizer::Router;
+use axum::Router;
+use axum::body::Body;
+use axum::http::HeaderName;
+use axum::routing::get;
+use bytes::Bytes;
+use http_body_util::{BodyExt, combinators::BoxBody};
+use hyper::{Request, Response, StatusCode, header};
 use std::time::Duration;
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tokio::{task, time};
-use tower::{Service, ServiceExt};
-use tracing as log;
-use tracing::Instrument;
+use tower::{Service, ServiceBuilder, ServiceExt};
+use tower_http::compression::CompressionLayer;
+use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
+use tower_http::trace::TraceLayer;
+use tracing::{self as log, info_span};
 use triagebot::gha_logs::GitHubActionLogsCache;
 use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
 use triagebot::handlers::pr_tracking::load_workqueue;
@@ -358,38 +363,62 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         })
         .service_fn(handle_agenda_request);
 
-    let svc = hyper::service::make_service_fn(move |_conn| {
-        let ctx = ctx.clone();
-        let agenda = agenda.clone();
-        async move {
-            Ok::<_, hyper::Error>(hyper::service::service_fn(move |req| {
-                let uuid = uuid::Uuid::new_v4();
-                let span = tracing::span!(tracing::Level::INFO, "request", ?uuid);
-                // Only log the webhook responses at INFO level to avoid flooding the
-                // logs with huge responses. Other responses are at DEBUG.
-                let log_info_response = matches!(req.uri().path(), "/github-hook" | "/zulip-hook");
-                serve_req(req, ctx.clone(), agenda.clone())
-                    .map(move |mut resp| {
-                        if let Ok(resp) = &mut resp {
-                            resp.headers_mut()
-                                .insert("X-Request-Id", uuid.to_string().parse().unwrap());
-                        }
-                        if log_info_response {
-                            log::info!("response = {resp:?}");
-                        } else {
-                            log::debug!("response = {resp:?}");
-                        }
-                        resp
-                    })
-                    .instrument(span)
-            }))
-        }
-    });
+    const REQUEST_ID_HEADER: &str = "x-request-id";
+    const X_REQUEST_ID: HeaderName = HeaderName::from_static(REQUEST_ID_HEADER);
+
+    let middleware = ServiceBuilder::new()
+        .layer(SetRequestIdLayer::new(
+            X_REQUEST_ID.clone(),
+            MakeRequestUuid,
+        ))
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
+                // Log the request id as generated.
+                let request_id = request.headers().get(REQUEST_ID_HEADER);
+
+                match request_id {
+                    Some(request_id) => info_span!(
+                        "request",
+                        request_id = ?request_id,
+                    ),
+                    None => {
+                        tracing::error!("could not extract request_id");
+                        info_span!("request")
+                    }
+                }
+            }),
+        )
+        .layer(PropagateRequestIdLayer::new(X_REQUEST_ID))
+        .layer(CompressionLayer::new());
+
+    let app = Router::new()
+        .route("/", get(|| async { "Triagebot is awaiting triage." }))
+        .route("/triage", get(triagebot::triage::index))
+        .route("/triage/{owner}/{repo}", get(triagebot::triage::pulls))
+        .route(
+            triagebot::gha_logs::ANSI_UP_URL,
+            get(triagebot::gha_logs::ansi_up_min_js),
+        )
+        .route(
+            triagebot::gha_logs::SUCCESS_URL,
+            get(triagebot::gha_logs::success_svg),
+        )
+        .route(
+            triagebot::gha_logs::FAILURE_URL,
+            get(triagebot::gha_logs::failure_svg),
+        )
+        .route(
+            "/gha-logs/{owner}/{repo}/{log-id}",
+            get(triagebot::gha_logs::gha_logs),
+        )
+        .layer(middleware)
+        .with_state(ctx);
+
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     log::info!("Listening on http://{}", addr);
 
-    let serve_future = Server::bind(&addr).serve(svc);
+    axum::serve(listener, app).await.unwrap();
 
-    serve_future.await?;
     Ok(())
 }
 

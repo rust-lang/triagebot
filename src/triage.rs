@@ -1,6 +1,10 @@
 use crate::handlers::Context;
+use axum::{
+    extract::{Path, State},
+    response::{Html, IntoResponse},
+};
 use chrono::{Duration, Utc};
-use hyper::{Body, Response, StatusCode};
+use hyper::StatusCode;
 use serde::Serialize;
 use serde_json::value::{Value, to_value};
 use std::sync::Arc;
@@ -9,22 +13,17 @@ use url::Url;
 const YELLOW_DAYS: i64 = 7;
 const RED_DAYS: i64 = 14;
 
-pub fn index() -> Result<Response<Body>, hyper::Error> {
-    Ok(Response::builder()
-        .header("Content-Type", "text/html")
-        .status(StatusCode::OK)
-        .body(Body::from(include_str!("../templates/triage/index.html")))
-        .unwrap())
+pub async fn index() -> Html<&'static str> {
+    Html(include_str!("../templates/triage/index.html"))
 }
 
 pub async fn pulls(
-    ctx: Arc<Context>,
-    owner: &str,
-    repo: &str,
-) -> Result<Response<Body>, hyper::Error> {
+    Path((owner, repo)): Path<(String, String)>,
+    State(ctx): State<Arc<Context>>,
+) -> impl IntoResponse {
     let octocrab = &ctx.octocrab;
     let res = octocrab
-        .pulls(owner, repo)
+        .pulls(&owner, &repo)
         .list()
         .sort(octocrab::params::pulls::Sort::Updated)
         .direction(octocrab::params::Direction::Ascending)
@@ -34,10 +33,10 @@ pub async fn pulls(
     let mut page = match res {
         Ok(page) => page,
         Err(_) => {
-            return Ok(Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(Body::from("The repository is not found."))
-                .unwrap());
+            return (
+                StatusCode::NOT_FOUND,
+                Html("The repository is not found.".to_string()),
+            );
         }
     };
     let mut base_pulls = page.take_items();
@@ -107,13 +106,9 @@ pub async fn pulls(
     context.insert("repo", &repo);
 
     let tera = tera::Tera::new("templates/triage/**/*").unwrap();
-    let body = Body::from(tera.render("pulls.html", &context).unwrap());
+    let body = tera.render("pulls.html", &context).unwrap();
 
-    Ok(Response::builder()
-        .header("Content-Type", "text/html")
-        .status(StatusCode::OK)
-        .body(body)
-        .unwrap())
+    (StatusCode::OK, Html(body))
 }
 
 #[derive(Serialize)]
