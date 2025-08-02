@@ -1,8 +1,10 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
+use axum::{extract::State, response::IntoResponse};
 use hmac::{Hmac, Mac};
+use hyper::HeaderMap;
 use sha2::Sha256;
-use std::fmt;
+use tracing::debug;
 
 use crate::{handlers::HandlerError, interactions::ErrorComment};
 
@@ -118,6 +120,64 @@ pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::R
 }
 
 pub async fn webhook(
+    headers: HeaderMap,
+    State(ctx): State<Arc<crate::handlers::Context>>,
+    body: Bytes,
+) -> axum::response::Response {
+    // Extract X-GitHub-Event header
+    let Some(ev) = headers.get("X-GitHub-Event") else {
+        return (StatusCode::BAD_REQUEST, "X-GitHub-Event header must be set").into_response();
+    };
+    let Ok(ev) = ev.to_str() else {
+        return (
+            StatusCode::BAD_REQUEST,
+            "X-GitHub-Event header must be UTF-8 encoded",
+        )
+            .into_response();
+    };
+    let Ok(event) = ev.parse::<EventName>();
+
+    debug!("event={event}");
+
+    // Extract X-Hub-Signature-256 header
+    let Some(sig) = headers.get("X-Hub-Signature-256") else {
+        return (
+            StatusCode::BAD_REQUEST,
+            "X-Hub-Signature-256 header must be set",
+        )
+            .into_response();
+    };
+    let Ok(signature) = sig.to_str() else {
+        return (
+            StatusCode::BAD_REQUEST,
+            "X-Hub-Signature-256 header must be UTF-8 encoded",
+        )
+            .into_response();
+    };
+
+    debug!("signature={signature}");
+
+    // Check signature on body
+    if let Err(_) = check_payload_signed(&signature, &body) {
+        return (StatusCode::FORBIDDEN, "Wrong signature").into_response();
+    }
+
+    let Ok(payload) = str::from_utf8(&body) else {
+        return (StatusCode::BAD_REQUEST, "Payload must be UTF-8").into_response();
+    };
+
+    match process_payload(event, payload, &ctx).await {
+        Ok(true) => ("processed request",).into_response(),
+        Ok(false) => ("ignored request",).into_response(),
+        Err(err) => {
+            tracing::error!("request failed: {:?}", err);
+            let body = format!("request failed: {:?}", err);
+            (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
+        }
+    }
+}
+
+async fn process_payload(
     event: EventName,
     payload: &str,
     ctx: &crate::handlers::Context,
@@ -254,7 +314,7 @@ impl fmt::Display for SignedPayloadError {
 
 impl std::error::Error for SignedPayloadError {}
 
-pub fn assert_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPayloadError> {
+pub fn check_payload_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPayloadError> {
     let signature = signature
         .strip_prefix("sha256=")
         .ok_or(SignedPayloadError)?;

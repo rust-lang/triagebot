@@ -7,9 +7,7 @@ use axum::http::HeaderName;
 use axum::response::Html;
 use axum::routing::{get, post};
 use axum::{BoxError, Router};
-use bytes::Bytes;
-use http_body_util::{BodyExt, combinators::BoxBody};
-use hyper::{Request, Response, StatusCode, header};
+use hyper::{Request, StatusCode};
 use std::time::Duration;
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
@@ -22,6 +20,7 @@ use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetReques
 use tower_http::trace::TraceLayer;
 use tracing::{self as log, info_span};
 use triagebot::gha_logs::GitHubActionLogsCache;
+use triagebot::handlers::Context;
 use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
 use triagebot::handlers::pr_tracking::load_workqueue;
 use triagebot::jobs::{
@@ -29,105 +28,7 @@ use triagebot::jobs::{
 };
 use triagebot::team_data::TeamClient;
 use triagebot::zulip::client::ZulipClient;
-use triagebot::{EventName, db, github, handlers::Context, payload};
-
-async fn serve_req(
-    req: Request<BoxBody<Bytes, hyper::Error>>,
-    ctx: Arc<Context>,
-) -> Result<Response<BoxBody<Bytes, std::convert::Infallible>>, hyper::Error> {
-    if req.uri().path() != "/github-hook" {
-        return Ok(Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(String::new().boxed())
-            .unwrap());
-    }
-    if req.method() != hyper::Method::POST {
-        return Ok(Response::builder()
-            .status(StatusCode::METHOD_NOT_ALLOWED)
-            .header(header::ALLOW, "POST")
-            .body(String::new().boxed())
-            .unwrap());
-    }
-    let event = if let Some(ev) = req.headers().get("X-GitHub-Event") {
-        let ev = match ev.to_str().ok() {
-            Some(v) => v,
-            None => {
-                return Ok(Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(
-                        "X-GitHub-Event header must be UTF-8 encoded"
-                            .to_string()
-                            .boxed(),
-                    )
-                    .unwrap());
-            }
-        };
-        match ev.parse::<EventName>() {
-            Ok(v) => v,
-            Err(_) => unreachable!(),
-        }
-    } else {
-        return Ok(Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(Body::from("X-GitHub-Event header must be set"))
-            .unwrap());
-    };
-    log::debug!("event={}", event);
-    let signature = if let Some(sig) = req.headers.get("X-Hub-Signature-256") {
-        match sig.to_str().ok() {
-            Some(v) => v,
-            None => {
-                return Ok(Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(Body::from(
-                        "X-Hub-Signature-256 header must be UTF-8 encoded",
-                    ))
-                    .unwrap());
-            }
-        }
-    } else {
-        return Ok(Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(Body::from("X-Hub-Signature-256 header must be set"))
-            .unwrap());
-    };
-    log::debug!("signature={}", signature);
-
-    let mut c = body_stream;
-    let mut payload = Vec::new();
-    while let Some(chunk) = c.next().await {
-        let chunk = chunk?;
-        payload.extend_from_slice(&chunk);
-    }
-
-    if let Err(_) = payload::assert_signed(signature, &payload) {
-        return Ok(Response::builder()
-            .status(StatusCode::FORBIDDEN)
-            .body(Body::from("Wrong signature"))
-            .unwrap());
-    }
-    let payload = match String::from_utf8(payload) {
-        Ok(p) => p,
-        Err(_) => {
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Body::from("Payload must be UTF-8"))
-                .unwrap());
-        }
-    };
-
-    match triagebot::webhook(event, payload, &ctx).await {
-        Ok(true) => Ok(Response::new(Body::from("processed request"))),
-        Ok(false) => Ok(Response::new(Body::from("ignored request"))),
-        Err(err) => {
-            log::error!("request failed: {:?}", err);
-            Ok(Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::from(format!("request failed: {:?}", err)))
-                .unwrap())
-        }
-    }
-}
+use triagebot::{db, github};
 
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     let gh = github::GithubClient::new_from_env();
@@ -278,6 +179,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             get(triagebot::notification_listing::notifications),
         )
         .route("/zulip-hook", post(triagebot::zulip::webhook))
+        .route("/github-hook", post(triagebot::github::webhook))
         .layer(middleware)
         .with_state(ctx);
 
