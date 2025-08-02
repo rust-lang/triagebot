@@ -113,21 +113,25 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             MakeRequestUuid,
         ))
         .layer(
-            TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
-                // Log the request id as generated.
-                let request_id = request.headers().get(REQUEST_ID_HEADER);
+            TraceLayer::new_for_http()
+                .make_span_with(|request: &Request<Body>| {
+                    // Log the request id as generated.
+                    let request_id = request.headers().get(REQUEST_ID_HEADER);
 
-                match request_id {
-                    Some(request_id) => info_span!(
-                        "request",
-                        request_id = ?request_id,
-                    ),
-                    None => {
-                        tracing::error!("could not extract request_id");
-                        info_span!("request")
+                    match request_id {
+                        Some(request_id) => info_span!(
+                            "request",
+                            request_id = ?request_id,
+                        ),
+                        None => {
+                            tracing::error!("could not extract request_id");
+                            info_span!("request")
+                        }
                     }
-                }
-            }),
+                })
+                .on_request(|request: &Request<Body>, _span: &tracing::Span| {
+                    tracing::info!(?request);
+                }),
         )
         .layer(PropagateRequestIdLayer::new(X_REQUEST_ID))
         .layer(CompressionLayer::new());
