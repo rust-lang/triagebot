@@ -29,36 +29,12 @@ use triagebot::jobs::{
 };
 use triagebot::team_data::TeamClient;
 use triagebot::zulip::client::ZulipClient;
-use triagebot::{EventName, db, github, handlers::Context, notification_listing, payload};
+use triagebot::{EventName, db, github, handlers::Context, payload};
 
 async fn serve_req(
     req: Request<BoxBody<Bytes, hyper::Error>>,
     ctx: Arc<Context>,
 ) -> Result<Response<BoxBody<Bytes, std::convert::Infallible>>, hyper::Error> {
-    if req.uri().path() == "/notifications" {
-        if let Some(query) = req.uri().query() {
-            let user = url::form_urlencoded::parse(query.as_bytes()).find(|(k, _)| k == "user");
-            if let Some((_, name)) = user {
-                return Ok(Response::builder()
-                    .status(StatusCode::OK)
-                    .body(
-                        notification_listing::render(&ctx.db.get().await, &*name)
-                            .await
-                            .boxed(),
-                    )
-                    .unwrap());
-            }
-        }
-
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .body(
-                "Please provide `?user=<username>` query param on URL."
-                    .to_string()
-                    .boxed(),
-            )
-            .unwrap());
-    }
     if req.uri().path() == "/zulip-hook" {
         let whole_body = req.collect().await?.to_bytes();
 
@@ -317,6 +293,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         )
         .nest("/agenda", agenda)
         .route("/bors-commit-list", get(triagebot::bors::bors_commit_list))
+        .route(
+            "/notifications",
+            get(triagebot::notification_listing::notifications),
+        )
         .layer(middleware)
         .with_state(ctx);
 
