@@ -10,6 +10,7 @@ use tracing as log;
 
 mod actions;
 pub mod agenda;
+pub mod bors;
 mod changelogs;
 mod config;
 pub mod db;

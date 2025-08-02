@@ -35,23 +35,6 @@ async fn serve_req(
     req: Request<BoxBody<Bytes, hyper::Error>>,
     ctx: Arc<Context>,
 ) -> Result<Response<BoxBody<Bytes, std::convert::Infallible>>, hyper::Error> {
-    if req.uri().path() == "/bors-commit-list" {
-        let res = db::rustc_commits::get_commits_with_artifacts(&*ctx.db.get().await).await;
-        let res = match res {
-            Ok(r) => r,
-            Err(e) => {
-                return Ok(Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(format!("{e:?}").boxed())
-                    .unwrap());
-            }
-        };
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header("Content-Type", "application/json")
-            .body(serde_json::to_string(&res).unwrap().boxed())
-            .unwrap());
-    }
     if req.uri().path() == "/notifications" {
         if let Some(query) = req.uri().query() {
             let user = url::form_urlencoded::parse(query.as_bytes()).find(|(k, _)| k == "user");
@@ -333,6 +316,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             get(triagebot::gha_logs::gha_logs),
         )
         .nest("/agenda", agenda)
+        .route("/bors-commit-list", get(triagebot::bors::bors_commit_list))
         .layer(middleware)
         .with_state(ctx);
 
