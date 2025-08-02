@@ -15,6 +15,7 @@ use tokio::{task, time};
 use tower::ServiceBuilder;
 use tower::buffer::BufferLayer;
 use tower::limit::RateLimitLayer;
+use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::compression::CompressionLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
@@ -134,7 +135,8 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
                 }),
         )
         .layer(PropagateRequestIdLayer::new(X_REQUEST_ID))
-        .layer(CompressionLayer::new());
+        .layer(CompressionLayer::new())
+        .layer(CatchPanicLayer::new());
 
     let agenda = Router::new()
         .route("/", get(|| async { Html(triagebot::agenda::INDEX) }))
