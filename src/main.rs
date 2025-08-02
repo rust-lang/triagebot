@@ -42,137 +42,93 @@ async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
 }
 
 async fn serve_req(
-    req: Request<Body>,
+    req: Request<BoxBody<Bytes, hyper::Error>>,
     ctx: Arc<Context>,
     mut agenda: impl Service<String, Response = String, Error = tower::BoxError>,
-) -> Result<Response<Body>, hyper::Error> {
-    log::info!("request = {:?}", req);
-    let mut router = Router::new();
-    router.add("/triage", "index".to_string());
-    router.add("/triage/:owner/:repo", "pulls".to_string());
-    router.add("/gha-logs/:owner/:repo/:log-id", "gha-logs".to_string());
-    let (req, body_stream) = req.into_parts();
-
-    if let Ok(matcher) = router.recognize(req.uri.path()) {
-        if matcher.handler().as_str() == "pulls" {
-            let params = matcher.params();
-            let owner = params.find("owner");
-            let repo = params.find("repo");
-            return triagebot::triage::pulls(ctx, owner.unwrap(), repo.unwrap()).await;
-        } else if matcher.handler().as_str() == "index" {
-            return triagebot::triage::index();
-        } else if matcher.handler().as_str() == "gha-logs" {
-            let params = matcher.params();
-            let owner = params.find("owner").unwrap();
-            let repo = params.find("repo").unwrap();
-            let log_id = params.find("log-id").unwrap();
-            return triagebot::gha_logs::gha_logs(ctx, owner, repo, log_id).await;
-        }
-    }
-
-    if req.uri.path() == triagebot::gha_logs::ANSI_UP_URL {
-        return triagebot::gha_logs::ansi_up_min_js();
-    }
-    if req.uri.path() == triagebot::gha_logs::SUCCESS_URL {
-        return triagebot::gha_logs::success_svg();
-    }
-    if req.uri.path() == triagebot::gha_logs::FAILURE_URL {
-        return triagebot::gha_logs::failure_svg();
-    }
-
-    if req.uri.path() == "/agenda" {
+) -> Result<Response<BoxBody<Bytes, std::convert::Infallible>>, hyper::Error> {
+    if req.uri().path() == "/agenda" {
         return Ok(Response::builder()
             .status(StatusCode::OK)
-            .body(Body::from(triagebot::agenda::INDEX))
+            .body(triagebot::agenda::INDEX.to_string().boxed())
             .unwrap());
     }
-    if req.uri.path() == "/agenda/lang/triage"
-        || req.uri.path() == "/agenda/lang/planning"
-        || req.uri.path() == "/agenda/types/planning"
+    if req.uri().path() == "/agenda/lang/triage"
+        || req.uri().path() == "/agenda/lang/planning"
+        || req.uri().path() == "/agenda/types/planning"
     {
         match agenda
             .ready()
             .await
             .expect("agenda keeps running")
-            .call(req.uri.path().to_owned())
+            .call(req.uri().path().to_owned())
             .await
         {
             Ok(agenda) => {
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
-                    .body(Body::from(agenda))
+                    .body(agenda.boxed())
                     .unwrap());
             }
             Err(err) => {
                 return Ok(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::from(err.to_string()))
+                    .body(err.to_string().boxed())
                     .unwrap());
             }
         }
     }
 
-    if req.uri.path() == "/" {
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .body(Body::from("Triagebot is awaiting triage."))
-            .unwrap());
-    }
-    if req.uri.path() == "/bors-commit-list" {
+    if req.uri().path() == "/bors-commit-list" {
         let res = db::rustc_commits::get_commits_with_artifacts(&*ctx.db.get().await).await;
         let res = match res {
             Ok(r) => r,
             Err(e) => {
                 return Ok(Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::from(format!("{:?}", e)))
+                    .body(format!("{e:?}").boxed())
                     .unwrap());
             }
         };
         return Ok(Response::builder()
             .status(StatusCode::OK)
             .header("Content-Type", "application/json")
-            .body(Body::from(serde_json::to_string(&res).unwrap()))
+            .body(serde_json::to_string(&res).unwrap().boxed())
             .unwrap());
     }
-    if req.uri.path() == "/notifications" {
-        if let Some(query) = req.uri.query() {
+    if req.uri().path() == "/notifications" {
+        if let Some(query) = req.uri().query() {
             let user = url::form_urlencoded::parse(query.as_bytes()).find(|(k, _)| k == "user");
             if let Some((_, name)) = user {
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
-                    .body(Body::from(
-                        notification_listing::render(&ctx.db.get().await, &*name).await,
-                    ))
+                    .body(
+                        notification_listing::render(&ctx.db.get().await, &*name)
+                            .await
+                            .boxed(),
+                    )
                     .unwrap());
             }
         }
 
         return Ok(Response::builder()
             .status(StatusCode::OK)
-            .body(Body::from(String::from(
-                "Please provide `?user=<username>` query param on URL.",
-            )))
+            .body(
+                "Please provide `?user=<username>` query param on URL."
+                    .to_string()
+                    .boxed(),
+            )
             .unwrap());
     }
-    if req.uri.path() == "/zulip-hook" {
-        let mut c = body_stream;
-        let mut payload = Vec::new();
-        while let Some(chunk) = c.next().await {
-            let chunk = chunk?;
-            payload.extend_from_slice(&chunk);
-        }
+    if req.uri().path() == "/zulip-hook" {
+        let whole_body = req.collect().await?.to_bytes();
 
-        log::info!("/zulip-hook request body: {:?}", str::from_utf8(&payload));
-        let req = match serde_json::from_slice(&payload) {
+        log::info!("/zulip-hook request body: {whole_body:?}");
+        let req = match serde_json::from_slice(&whole_body) {
             Ok(r) => r,
             Err(e) => {
                 return Ok(Response::builder()
                     .status(StatusCode::BAD_REQUEST)
-                    .body(Body::from(format!(
-                        "Did not send valid JSON request: {}",
-                        e
-                    )))
+                    .body(format!("Did not send valid JSON request: {e}").boxed())
                     .unwrap());
             }
         };
@@ -180,29 +136,33 @@ async fn serve_req(
         return Ok(Response::builder()
             .status(StatusCode::OK)
             .header("Content-Type", "application/json")
-            .body(Body::from(triagebot::zulip::respond(ctx, req).await))
+            .body(triagebot::zulip::respond(ctx, req).await.boxed())
             .unwrap());
     }
-    if req.uri.path() != "/github-hook" {
+    if req.uri().path() != "/github-hook" {
         return Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
-            .body(Body::empty())
+            .body(String::new().boxed())
             .unwrap());
     }
-    if req.method != hyper::Method::POST {
+    if req.method() != hyper::Method::POST {
         return Ok(Response::builder()
             .status(StatusCode::METHOD_NOT_ALLOWED)
             .header(header::ALLOW, "POST")
-            .body(Body::empty())
+            .body(String::new().boxed())
             .unwrap());
     }
-    let event = if let Some(ev) = req.headers.get("X-GitHub-Event") {
+    let event = if let Some(ev) = req.headers().get("X-GitHub-Event") {
         let ev = match ev.to_str().ok() {
             Some(v) => v,
             None => {
                 return Ok(Response::builder()
                     .status(StatusCode::BAD_REQUEST)
-                    .body(Body::from("X-GitHub-Event header must be UTF-8 encoded"))
+                    .body(
+                        "X-GitHub-Event header must be UTF-8 encoded"
+                            .to_string()
+                            .boxed(),
+                    )
                     .unwrap());
             }
         };
