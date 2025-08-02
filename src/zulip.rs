@@ -12,13 +12,16 @@ use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
 use crate::handlers::project_goals::{self, ping_project_goals_owners};
-use crate::utils::pluralize;
+use crate::utils::{AppError, pluralize};
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
 use crate::zulip::commands::{
     ChatCommand, LookupCmd, PingGoalsArgs, StreamCommand, WorkqueueCmd, WorkqueueLimit, parse_cli,
 };
 use anyhow::{Context as _, format_err};
+use axum::Json;
+use axum::extract::State;
+use axum::response::IntoResponse;
 use rust_team_data::v1::{TeamKind, TeamMember};
 use std::cmp::Reverse;
 use std::fmt::Write as _;
@@ -88,19 +91,24 @@ struct Response {
 
 /// Top-level handler for Zulip webhooks.
 ///
-/// Returns a JSON response.
-pub async fn respond(ctx: Arc<Context>, req: Request) -> String {
-    let content = match process_zulip_request(ctx, req).await {
-        Ok(None) => {
-            return serde_json::to_string(&ResponseNotRequired {
-                response_not_required: true,
-            })
-            .unwrap();
-        }
-        Ok(Some(s)) => s,
-        Err(e) => format!("{:?}", e),
-    };
-    serde_json::to_string(&Response { content }).unwrap()
+/// Returns a JSON response or a 400 with an error message.
+// TODO: log JsonRejection
+pub async fn webhook(
+    State(ctx): State<Arc<Context>>,
+    Json(req): Json<Request>,
+) -> axum::response::Response {
+    tracing::info!(?req);
+    let response = process_zulip_request(ctx, req).await;
+    tracing::info!(?response);
+
+    match response {
+        Ok(None) => Json(ResponseNotRequired {
+            response_not_required: true,
+        })
+        .into_response(),
+        Ok(Some(content)) => Json(Response { content }).into_response(),
+        Err(e) => AppError::from(e).into_response(),
+    }
 }
 
 pub fn get_token_from_env() -> Result<String, anyhow::Error> {

@@ -5,7 +5,7 @@ use axum::body::Body;
 use axum::error_handling::HandleErrorLayer;
 use axum::http::HeaderName;
 use axum::response::Html;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{BoxError, Router};
 use bytes::Bytes;
 use http_body_util::{BodyExt, combinators::BoxBody};
@@ -35,26 +35,6 @@ async fn serve_req(
     req: Request<BoxBody<Bytes, hyper::Error>>,
     ctx: Arc<Context>,
 ) -> Result<Response<BoxBody<Bytes, std::convert::Infallible>>, hyper::Error> {
-    if req.uri().path() == "/zulip-hook" {
-        let whole_body = req.collect().await?.to_bytes();
-
-        log::info!("/zulip-hook request body: {whole_body:?}");
-        let req = match serde_json::from_slice(&whole_body) {
-            Ok(r) => r,
-            Err(e) => {
-                return Ok(Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(format!("Did not send valid JSON request: {e}").boxed())
-                    .unwrap());
-            }
-        };
-
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header("Content-Type", "application/json")
-            .body(triagebot::zulip::respond(ctx, req).await.boxed())
-            .unwrap());
-    }
     if req.uri().path() != "/github-hook" {
         return Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
@@ -297,6 +277,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             "/notifications",
             get(triagebot::notification_listing::notifications),
         )
+        .route("/zulip-hook", post(triagebot::zulip::webhook))
         .layer(middleware)
         .with_state(ctx);
 
