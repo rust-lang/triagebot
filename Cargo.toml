@@ -17,7 +17,8 @@ parser = { path = "parser" }
 rust_team_data = { git = "https://github.com/rust-lang/team" }
 glob = "0.3.0"
 toml = "0.8.20"
-hyper = { version = "0.14.4", features = ["server", "stream", "http1", "tcp"] }
+axum = "0.8.4"
+hyper = { version = "1.6", features = ["server", "http1"] }
 tokio = { version = "1", features = ["macros", "time", "rt"] }
 futures = { version = "0.3", default-features = false, features = ["std"] }
 async-trait = "0.1.31"
@@ -37,6 +38,7 @@ route-recognizer = "0.3.0"
 cynic = "3"
 itertools = "0.14.0"
 tower = { version = "0.5", features = ["util", "limit", "buffer", "load-shed"] }
+tower-http = { version = "0.6", features = ["compression-br", "compression-gzip", "request-id"] }
 github-graphql = { path = "github-graphql" }
 rand = "0.8.5"
 ignore = "0.4.18"
