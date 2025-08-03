@@ -2225,12 +2225,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "route-recognizer"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afab94fb28594581f62d981211a9a4d53cc8130bbcbbb89a0440d9b8e81a7746"
-
-[[package]]
 name = "rust_team_data"
 version = "1.0.0"
 source = "git+https://github.com/rust-lang/team#60e38a7e8d29ac3162e70b07212a8da72c171d2c"
@@ -3075,7 +3069,6 @@ dependencies = [
  "rand",
  "regex",
  "reqwest",
- "route-recognizer",
  "rust_team_data",
  "serde",
  "serde_json",

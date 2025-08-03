@@ -34,7 +34,6 @@ x509-cert = { version = "0.2.5", features = ["pem"] }
 serde_path_to_error = "0.1.2"
 octocrab = { version = "0.44", features = ["stream"] }
 comrak = { version = "0.38", default-features = false }
-route-recognizer = "0.3.0"
 cynic = "3"
 itertools = "0.14.0"
 tower = { version = "0.5", features = ["util", "limit", "buffer", "load-shed"] }
