@@ -12,7 +12,7 @@ use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
 use crate::handlers::project_goals::{self, ping_project_goals_owners};
-use crate::utils::{AppError, pluralize};
+use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
 use crate::zulip::commands::{
@@ -107,7 +107,19 @@ pub async fn webhook(
         })
         .into_response(),
         Ok(Some(content)) => Json(Response { content }).into_response(),
-        Err(e) => AppError::from(e).into_response(),
+        Err(err) => {
+            // We are mixing network errors and "logic" error (like clap errors)
+            // so don't return a 500. Long term we should decouple those.
+
+            // Log the full error
+            tracing::error!(?err);
+
+            // Reply with a 200 and reply only with outermost error
+            Json(Response {
+                content: err.to_string(),
+            })
+            .into_response()
+        }
     }
 }
 
