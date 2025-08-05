@@ -126,9 +126,11 @@ pub async fn webhook(
 ) -> axum::response::Response {
     // Extract X-GitHub-Event header
     let Some(ev) = headers.get("X-GitHub-Event") else {
+        tracing::error!("X-GitHub-Event header must be set");
         return (StatusCode::BAD_REQUEST, "X-GitHub-Event header must be set").into_response();
     };
     let Ok(ev) = ev.to_str() else {
+        tracing::error!("X-GitHub-Event header must be UTF-8 encoded");
         return (
             StatusCode::BAD_REQUEST,
             "X-GitHub-Event header must be UTF-8 encoded",
@@ -141,6 +143,7 @@ pub async fn webhook(
 
     // Extract X-Hub-Signature-256 header
     let Some(sig) = headers.get("X-Hub-Signature-256") else {
+        tracing::error!("X-Hub-Signature-256 header must be set");
         return (
             StatusCode::BAD_REQUEST,
             "X-Hub-Signature-256 header must be set",
@@ -148,6 +151,7 @@ pub async fn webhook(
             .into_response();
     };
     let Ok(signature) = sig.to_str() else {
+        tracing::error!("X-Hub-Signature-256 header must be UTF-8 encoded");
         return (
             StatusCode::BAD_REQUEST,
             "X-Hub-Signature-256 header must be UTF-8 encoded",
@@ -158,11 +162,13 @@ pub async fn webhook(
     debug!("signature={signature}");
 
     // Check signature on body
-    if let Err(_) = check_payload_signed(&signature, &body) {
+    if let Err(err) = check_payload_signed(&signature, &body) {
+        tracing::error!("check_payload_signed: {}", err);
         return (StatusCode::FORBIDDEN, "Wrong signature").into_response();
     }
 
     let Ok(payload) = str::from_utf8(&body) else {
+        tracing::error!("payload not utf-8");
         return (StatusCode::BAD_REQUEST, "Payload must be UTF-8").into_response();
     };
 
@@ -170,7 +176,7 @@ pub async fn webhook(
         Ok(true) => ("processed request",).into_response(),
         Ok(false) => ("ignored request",).into_response(),
         Err(err) => {
-            tracing::error!("request failed: {:?}", err);
+            tracing::error!("failed to process payload: {:?}", err);
             let body = format!("request failed: {:?}", err);
             (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
         }
