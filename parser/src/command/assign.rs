@@ -68,7 +68,7 @@ impl AssignCommand {
             } else {
                 return Err(toks.error(ParseError::NoUser));
             }
-        } else if let Some(Token::Word("release-assignment")) = toks.peek_token()? {
+        } else if let Some(Token::Word("release-assignment" | "unclaim")) = toks.peek_token()? {
             toks.next_token()?;
             if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
