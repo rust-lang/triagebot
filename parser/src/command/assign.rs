@@ -181,4 +181,9 @@ mod tests {
             )
         }
     }
+
+    #[test]
+    fn unclaim() {
+        assert_eq!(parse("unclaim"), Ok(Some(AssignCommand::ReleaseAssignment)));
+    }
 }
