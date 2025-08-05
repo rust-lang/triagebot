@@ -16,7 +16,7 @@ use std::fmt;
 pub enum AssignCommand {
     /// Corresponds to `@bot claim`.
     Claim,
-    /// Corresponds to `@bot release-assignment`.
+    /// Corresponds to `@bot release-assignment` or `@bot unclaim`.
     ReleaseAssignment,
     /// Corresponds to `@bot assign @user`.
     AssignUser { username: String },
