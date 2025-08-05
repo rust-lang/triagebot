@@ -324,6 +324,9 @@ fn waits_for_a_review(
     let is_rollup = labels.iter().any(|l| l.name == "rollup");
     let is_waiting_for_reviewer = labels.iter().any(|l| l.name == "S-waiting-on-review");
     let is_assigned_to_author = assignees.contains(author);
+    let has_capacity_tracking_opt_out = labels
+        .iter()
+        .any(|l| l.name == "S-no-work-capacity-tracking");
 
     is_open
         && !is_draft
@@ -331,6 +334,7 @@ fn waits_for_a_review(
         && !is_rollup
         && is_waiting_for_reviewer
         && !is_assigned_to_author
+        && !has_capacity_tracking_opt_out
 }
 
 #[cfg(test)]
