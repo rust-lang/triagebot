@@ -1,12 +1,35 @@
-use crate::db::notifications::get_notifications;
+use std::sync::Arc;
 
-pub async fn render(db: &crate::db::PooledClient, user: &str) -> String {
-    let notifications = match get_notifications(db, user).await {
-        Ok(n) => n,
-        Err(e) => {
-            return format!("{:?}", e.context("getting notifications"));
-        }
+use anyhow::Context as _;
+use axum::{
+    extract::{Query, State},
+    response::{Html, IntoResponse, Response},
+};
+use hyper::StatusCode;
+use serde::Deserialize;
+
+use crate::{db::notifications::get_notifications, handlers::Context, utils::AppError};
+
+#[derive(Deserialize)]
+pub struct NotificationsQuery {
+    user: Option<String>,
+}
+
+pub async fn notifications(
+    Query(query): Query<NotificationsQuery>,
+    State(ctx): State<Arc<Context>>,
+) -> axum::response::Result<Response, AppError> {
+    let Some(user) = query.user else {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            "Please provide `?user=<username>` query param on URL.",
+        )
+            .into_response());
     };
+
+    let notifications = get_notifications(&*ctx.db.get().await, &user)
+        .await
+        .context("getting notifications")?;
 
     let mut out = String::new();
     out.push_str("<html>");
@@ -63,5 +86,5 @@ pub async fn render(db: &crate::db::PooledClient, user: &str) -> String {
     out.push_str("</body>");
     out.push_str("</html>");
 
-    out
+    Ok(Html(out).into_response())
 }

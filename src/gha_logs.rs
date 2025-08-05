@@ -1,10 +1,13 @@
 use crate::github::{self, WorkflowRunJob};
 use crate::handlers::Context;
+use crate::utils::AppError;
 use anyhow::Context as _;
+use axum::extract::{Path, State};
+use axum::http::HeaderValue;
+use axum::response::IntoResponse;
 use hyper::header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE};
-use hyper::{Body, Response, StatusCode};
+use hyper::{HeaderMap, StatusCode};
 use std::collections::VecDeque;
-use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -64,50 +67,29 @@ impl GitHubActionLogsCache {
 }
 
 pub async fn gha_logs(
-    ctx: Arc<Context>,
-    owner: &str,
-    repo: &str,
-    log_id: &str,
-) -> Result<Response<Body>, hyper::Error> {
-    let res = process_logs(ctx, owner, repo, log_id).await;
-    let res = match res {
-        Ok(r) => r,
-        Err(e) => {
-            tracing::error!("gha_logs: unable to serve logs for {owner}/{repo}#{log_id}: {e:?}");
-            return Ok(Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::from(format!("{:?}", e)))
-                .unwrap());
-        }
-    };
-
-    Ok(res)
-}
-
-async fn process_logs(
-    ctx: Arc<Context>,
-    owner: &str,
-    repo: &str,
-    log_id: &str,
-) -> anyhow::Result<Response<Body>> {
-    let log_id = u128::from_str(log_id).context("log_id is not a number")?;
-
+    Path((owner, repo, log_id)): Path<(String, String, u128)>,
+    State(ctx): State<Arc<Context>>,
+) -> axum::response::Result<impl IntoResponse, AppError> {
     let repos = ctx
         .team
         .repos()
         .await
         .context("unable to retrieve team repos")?;
 
-    let Some(repos) = repos.repos.get(owner) else {
-        return Ok(bad_request(format!(
-            "organization `{owner}` is not part of the Rust Project team repos"
-        )));
+    let Some(repos) = repos.repos.get(&owner) else {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            HeaderMap::new(),
+            format!("organization `{owner}` is not part of the Rust Project team repos"),
+        ));
     };
 
     if !repos.iter().any(|r| r.name == repo) {
-        return Ok(bad_request(format!(
-            "repository `{owner}` is not part of the Rust Project team repos"
-        )));
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            HeaderMap::new(),
+            format!("repository `{owner}` is not part of the Rust Project team repos"),
+        ));
     }
 
     let log_uuid = format!("{owner}/{repo}${log_id}");
@@ -368,54 +350,57 @@ body {{
 
     tracing::info!("gha_logs: serving logs for {log_uuid}");
 
-    return Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header(CONTENT_TYPE, "text/html; charset=utf-8")
-        .header(
-            CONTENT_SECURITY_POLICY,
-            format!(
-                "default-src 'none'; script-src 'nonce-{nonce}' 'self'; style-src 'unsafe-inline'; img-src 'self' www.rust-lang.org"
-            ),
-        )
-        .body(Body::from(html))?);
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        CONTENT_TYPE,
+        HeaderValue::from_static("text/html; charset=utf-8"),
+    );
+    headers.insert(
+        CONTENT_SECURITY_POLICY,
+        HeaderValue::from_str(&*
+        format!(
+            "default-src 'none'; script-src 'nonce-{nonce}' 'self'; style-src 'unsafe-inline'; img-src 'self' www.rust-lang.org"
+        )).unwrap(),
+    );
+
+    Ok((StatusCode::OK, headers, html))
 }
 
-pub fn ansi_up_min_js() -> anyhow::Result<Response<Body>, hyper::Error> {
+pub async fn ansi_up_min_js() -> impl IntoResponse {
     const ANSI_UP_MIN_JS: &str = include_str!("gha_logs/ansi_up@0.0.1-custom.js");
 
-    Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header(CACHE_CONTROL, "public, max-age=15552000, immutable")
-        .header(CONTENT_TYPE, "text/javascript; charset=utf-8")
-        .body(Body::from(ANSI_UP_MIN_JS))
-        .unwrap())
+    (
+        immutable_headers("text/javascript; charset=utf-8"),
+        ANSI_UP_MIN_JS,
+    )
 }
 
-pub fn success_svg() -> anyhow::Result<Response<Body>, hyper::Error> {
+pub async fn success_svg() -> impl IntoResponse {
     const SUCCESS_SVG: &str = include_str!("gha_logs/success.svg");
 
-    Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header(CACHE_CONTROL, "public, max-age=15552000, immutable")
-        .header(CONTENT_TYPE, "image/svg+xml; charset=utf-8")
-        .body(Body::from(SUCCESS_SVG))
-        .unwrap())
+    (
+        immutable_headers("image/svg+xml; charset=utf-8"),
+        SUCCESS_SVG,
+    )
 }
 
-pub fn failure_svg() -> anyhow::Result<Response<Body>, hyper::Error> {
+pub async fn failure_svg() -> impl IntoResponse {
     const FAILURE_SVG: &str = include_str!("gha_logs/failure.svg");
 
-    Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header(CACHE_CONTROL, "public, max-age=15552000, immutable")
-        .header(CONTENT_TYPE, "image/svg+xml; charset=utf-8")
-        .body(Body::from(FAILURE_SVG))
-        .unwrap())
+    (
+        immutable_headers("image/svg+xml; charset=utf-8"),
+        FAILURE_SVG,
+    )
 }
 
-fn bad_request(body: String) -> Response<Body> {
-    Response::builder()
-        .status(StatusCode::BAD_REQUEST)
-        .body(Body::from(body))
-        .unwrap()
+fn immutable_headers(content_type: &'static str) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+
+    headers.insert(
+        CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=15552000, immutable"),
+    );
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static(content_type));
+
+    headers
 }

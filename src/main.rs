@@ -1,18 +1,27 @@
 #![allow(clippy::new_without_default)]
 
 use anyhow::Context as _;
-use futures::StreamExt;
-use futures::future::FutureExt;
-use hyper::{Body, Request, Response, Server, StatusCode, header};
-use route_recognizer::Router;
+use axum::body::Body;
+use axum::error_handling::HandleErrorLayer;
+use axum::http::HeaderName;
+use axum::response::Html;
+use axum::routing::{get, post};
+use axum::{BoxError, Router};
+use hyper::{Request, StatusCode};
 use std::time::Duration;
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tokio::{task, time};
-use tower::{Service, ServiceExt};
-use tracing as log;
-use tracing::Instrument;
+use tower::ServiceBuilder;
+use tower::buffer::BufferLayer;
+use tower::limit::RateLimitLayer;
+use tower_http::catch_panic::CatchPanicLayer;
+use tower_http::compression::CompressionLayer;
+use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
+use tower_http::trace::TraceLayer;
+use tracing::{self as log, info_span};
 use triagebot::gha_logs::GitHubActionLogsCache;
+use triagebot::handlers::Context;
 use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
 use triagebot::handlers::pr_tracking::load_workqueue;
 use triagebot::jobs::{
@@ -20,253 +29,7 @@ use triagebot::jobs::{
 };
 use triagebot::team_data::TeamClient;
 use triagebot::zulip::client::ZulipClient;
-use triagebot::{EventName, db, github, handlers::Context, notification_listing, payload};
-
-async fn handle_agenda_request(req: String) -> anyhow::Result<String> {
-    if req == "/agenda/lang/triage" {
-        return triagebot::agenda::lang().call().await;
-    }
-    if req == "/agenda/lang/planning" {
-        return triagebot::agenda::lang_planning().call().await;
-    }
-    if req == "/agenda/types/planning" {
-        return triagebot::agenda::types_planning().call().await;
-    }
-
-    anyhow::bail!("Unknown agenda; see /agenda for index.")
-}
-
-async fn serve_req(
-    req: Request<Body>,
-    ctx: Arc<Context>,
-    mut agenda: impl Service<String, Response = String, Error = tower::BoxError>,
-) -> Result<Response<Body>, hyper::Error> {
-    log::info!("request = {:?}", req);
-    let mut router = Router::new();
-    router.add("/triage", "index".to_string());
-    router.add("/triage/:owner/:repo", "pulls".to_string());
-    router.add("/gha-logs/:owner/:repo/:log-id", "gha-logs".to_string());
-    let (req, body_stream) = req.into_parts();
-
-    if let Ok(matcher) = router.recognize(req.uri.path()) {
-        if matcher.handler().as_str() == "pulls" {
-            let params = matcher.params();
-            let owner = params.find("owner");
-            let repo = params.find("repo");
-            return triagebot::triage::pulls(ctx, owner.unwrap(), repo.unwrap()).await;
-        } else if matcher.handler().as_str() == "index" {
-            return triagebot::triage::index();
-        } else if matcher.handler().as_str() == "gha-logs" {
-            let params = matcher.params();
-            let owner = params.find("owner").unwrap();
-            let repo = params.find("repo").unwrap();
-            let log_id = params.find("log-id").unwrap();
-            return triagebot::gha_logs::gha_logs(ctx, owner, repo, log_id).await;
-        }
-    }
-
-    if req.uri.path() == triagebot::gha_logs::ANSI_UP_URL {
-        return triagebot::gha_logs::ansi_up_min_js();
-    }
-    if req.uri.path() == triagebot::gha_logs::SUCCESS_URL {
-        return triagebot::gha_logs::success_svg();
-    }
-    if req.uri.path() == triagebot::gha_logs::FAILURE_URL {
-        return triagebot::gha_logs::failure_svg();
-    }
-
-    if req.uri.path() == "/agenda" {
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .body(Body::from(triagebot::agenda::INDEX))
-            .unwrap());
-    }
-    if req.uri.path() == "/agenda/lang/triage"
-        || req.uri.path() == "/agenda/lang/planning"
-        || req.uri.path() == "/agenda/types/planning"
-    {
-        match agenda
-            .ready()
-            .await
-            .expect("agenda keeps running")
-            .call(req.uri.path().to_owned())
-            .await
-        {
-            Ok(agenda) => {
-                return Ok(Response::builder()
-                    .status(StatusCode::OK)
-                    .body(Body::from(agenda))
-                    .unwrap());
-            }
-            Err(err) => {
-                return Ok(Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::from(err.to_string()))
-                    .unwrap());
-            }
-        }
-    }
-
-    if req.uri.path() == "/" {
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .body(Body::from("Triagebot is awaiting triage."))
-            .unwrap());
-    }
-    if req.uri.path() == "/bors-commit-list" {
-        let res = db::rustc_commits::get_commits_with_artifacts(&*ctx.db.get().await).await;
-        let res = match res {
-            Ok(r) => r,
-            Err(e) => {
-                return Ok(Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::from(format!("{:?}", e)))
-                    .unwrap());
-            }
-        };
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header("Content-Type", "application/json")
-            .body(Body::from(serde_json::to_string(&res).unwrap()))
-            .unwrap());
-    }
-    if req.uri.path() == "/notifications" {
-        if let Some(query) = req.uri.query() {
-            let user = url::form_urlencoded::parse(query.as_bytes()).find(|(k, _)| k == "user");
-            if let Some((_, name)) = user {
-                return Ok(Response::builder()
-                    .status(StatusCode::OK)
-                    .body(Body::from(
-                        notification_listing::render(&ctx.db.get().await, &*name).await,
-                    ))
-                    .unwrap());
-            }
-        }
-
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .body(Body::from(String::from(
-                "Please provide `?user=<username>` query param on URL.",
-            )))
-            .unwrap());
-    }
-    if req.uri.path() == "/zulip-hook" {
-        let mut c = body_stream;
-        let mut payload = Vec::new();
-        while let Some(chunk) = c.next().await {
-            let chunk = chunk?;
-            payload.extend_from_slice(&chunk);
-        }
-
-        log::info!("/zulip-hook request body: {:?}", str::from_utf8(&payload));
-        let req = match serde_json::from_slice(&payload) {
-            Ok(r) => r,
-            Err(e) => {
-                return Ok(Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(Body::from(format!(
-                        "Did not send valid JSON request: {}",
-                        e
-                    )))
-                    .unwrap());
-            }
-        };
-
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header("Content-Type", "application/json")
-            .body(Body::from(triagebot::zulip::respond(ctx, req).await))
-            .unwrap());
-    }
-    if req.uri.path() != "/github-hook" {
-        return Ok(Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::empty())
-            .unwrap());
-    }
-    if req.method != hyper::Method::POST {
-        return Ok(Response::builder()
-            .status(StatusCode::METHOD_NOT_ALLOWED)
-            .header(header::ALLOW, "POST")
-            .body(Body::empty())
-            .unwrap());
-    }
-    let event = if let Some(ev) = req.headers.get("X-GitHub-Event") {
-        let ev = match ev.to_str().ok() {
-            Some(v) => v,
-            None => {
-                return Ok(Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(Body::from("X-GitHub-Event header must be UTF-8 encoded"))
-                    .unwrap());
-            }
-        };
-        match ev.parse::<EventName>() {
-            Ok(v) => v,
-            Err(_) => unreachable!(),
-        }
-    } else {
-        return Ok(Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(Body::from("X-GitHub-Event header must be set"))
-            .unwrap());
-    };
-    log::debug!("event={}", event);
-    let signature = if let Some(sig) = req.headers.get("X-Hub-Signature-256") {
-        match sig.to_str().ok() {
-            Some(v) => v,
-            None => {
-                return Ok(Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(Body::from(
-                        "X-Hub-Signature-256 header must be UTF-8 encoded",
-                    ))
-                    .unwrap());
-            }
-        }
-    } else {
-        return Ok(Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(Body::from("X-Hub-Signature-256 header must be set"))
-            .unwrap());
-    };
-    log::debug!("signature={}", signature);
-
-    let mut c = body_stream;
-    let mut payload = Vec::new();
-    while let Some(chunk) = c.next().await {
-        let chunk = chunk?;
-        payload.extend_from_slice(&chunk);
-    }
-
-    if let Err(_) = payload::assert_signed(signature, &payload) {
-        return Ok(Response::builder()
-            .status(StatusCode::FORBIDDEN)
-            .body(Body::from("Wrong signature"))
-            .unwrap());
-    }
-    let payload = match String::from_utf8(payload) {
-        Ok(p) => p,
-        Err(_) => {
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Body::from("Payload must be UTF-8"))
-                .unwrap());
-        }
-    };
-
-    match triagebot::webhook(event, payload, &ctx).await {
-        Ok(true) => Ok(Response::new(Body::from("processed request"))),
-        Ok(false) => Ok(Response::new(Body::from("ignored request"))),
-        Err(err) => {
-            log::error!("request failed: {:?}", err);
-            Ok(Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::from(format!("request failed: {:?}", err)))
-                .unwrap())
-        }
-    }
-}
+use triagebot::{db, github};
 
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     let gh = github::GithubClient::new_from_env();
@@ -342,54 +105,95 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         spawn_job_runner(ctx.clone());
     }
 
-    let agenda = tower::ServiceBuilder::new()
-        .buffer(10)
-        .layer_fn(|input| {
-            tower::util::MapErr::new(
-                tower::load_shed::LoadShed::new(tower::limit::RateLimit::new(
-                    input,
-                    tower::limit::rate::Rate::new(2, std::time::Duration::from_secs(60)),
-                )),
-                |e| {
-                    tracing::error!("agenda request failed: {:?}", e);
-                    anyhow::anyhow!("Rate limit of 2 request / 60 seconds exceeded")
-                },
-            )
-        })
-        .service_fn(handle_agenda_request);
+    const REQUEST_ID_HEADER: &str = "x-request-id";
+    const X_REQUEST_ID: HeaderName = HeaderName::from_static(REQUEST_ID_HEADER);
 
-    let svc = hyper::service::make_service_fn(move |_conn| {
-        let ctx = ctx.clone();
-        let agenda = agenda.clone();
-        async move {
-            Ok::<_, hyper::Error>(hyper::service::service_fn(move |req| {
-                let uuid = uuid::Uuid::new_v4();
-                let span = tracing::span!(tracing::Level::INFO, "request", ?uuid);
-                // Only log the webhook responses at INFO level to avoid flooding the
-                // logs with huge responses. Other responses are at DEBUG.
-                let log_info_response = matches!(req.uri().path(), "/github-hook" | "/zulip-hook");
-                serve_req(req, ctx.clone(), agenda.clone())
-                    .map(move |mut resp| {
-                        if let Ok(resp) = &mut resp {
-                            resp.headers_mut()
-                                .insert("X-Request-Id", uuid.to_string().parse().unwrap());
+    let middleware = ServiceBuilder::new()
+        .layer(SetRequestIdLayer::new(
+            X_REQUEST_ID.clone(),
+            MakeRequestUuid,
+        ))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(|request: &Request<Body>| {
+                    // Log the request id as generated.
+                    let request_id = request.headers().get(REQUEST_ID_HEADER);
+
+                    match request_id {
+                        Some(request_id) => info_span!(
+                            "request",
+                            request_id = ?request_id,
+                        ),
+                        None => {
+                            tracing::error!("could not extract request_id");
+                            info_span!("request")
                         }
-                        if log_info_response {
-                            log::info!("response = {resp:?}");
-                        } else {
-                            log::debug!("response = {resp:?}");
-                        }
-                        resp
-                    })
-                    .instrument(span)
-            }))
-        }
-    });
+                    }
+                })
+                .on_request(|request: &Request<Body>, _span: &tracing::Span| {
+                    tracing::info!(?request);
+                }),
+        )
+        .layer(PropagateRequestIdLayer::new(X_REQUEST_ID))
+        .layer(CompressionLayer::new())
+        .layer(CatchPanicLayer::new());
+
+    let agenda = Router::new()
+        .route("/", get(|| async { Html(triagebot::agenda::INDEX) }))
+        .route("/lang/triage", get(triagebot::agenda::lang_http))
+        .route("/lang/planning", get(triagebot::agenda::lang_planning_http))
+        .route(
+            "/types/planning",
+            get(triagebot::agenda::types_planning_http),
+        )
+        .layer(
+            ServiceBuilder::new()
+                .layer(HandleErrorLayer::new(|err: BoxError| async move {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Unhandled error: {}", err),
+                    )
+                }))
+                .layer(BufferLayer::new(5))
+                .layer(RateLimitLayer::new(2, Duration::from_secs(60))),
+        );
+
+    let app = Router::new()
+        .route("/", get(|| async { "Triagebot is awaiting triage." }))
+        .route("/triage", get(triagebot::triage::index))
+        .route("/triage/{owner}/{repo}", get(triagebot::triage::pulls))
+        .route(
+            triagebot::gha_logs::ANSI_UP_URL,
+            get(triagebot::gha_logs::ansi_up_min_js),
+        )
+        .route(
+            triagebot::gha_logs::SUCCESS_URL,
+            get(triagebot::gha_logs::success_svg),
+        )
+        .route(
+            triagebot::gha_logs::FAILURE_URL,
+            get(triagebot::gha_logs::failure_svg),
+        )
+        .route(
+            "/gha-logs/{owner}/{repo}/{log-id}",
+            get(triagebot::gha_logs::gha_logs),
+        )
+        .nest("/agenda", agenda)
+        .route("/bors-commit-list", get(triagebot::bors::bors_commit_list))
+        .route(
+            "/notifications",
+            get(triagebot::notification_listing::notifications),
+        )
+        .route("/zulip-hook", post(triagebot::zulip::webhook))
+        .route("/github-hook", post(triagebot::github::webhook))
+        .layer(middleware)
+        .with_state(ctx);
+
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     log::info!("Listening on http://{}", addr);
 
-    let serve_future = Server::bind(&addr).serve(svc);
+    axum::serve(listener, app).await.unwrap();
 
-    serve_future.await?;
     Ok(())
 }
 

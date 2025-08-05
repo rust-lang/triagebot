@@ -1,6 +1,21 @@
+use axum::response::Html;
+
 use crate::actions::{Action, Query, QueryKind, QueryMap, Step};
 use crate::github;
+use crate::utils::AppError;
 use std::sync::Arc;
+
+pub async fn lang_http() -> axum::response::Result<Html<String>, AppError> {
+    Ok(Html(lang().call().await?))
+}
+
+pub async fn lang_planning_http() -> axum::response::Result<Html<String>, AppError> {
+    Ok(Html(lang_planning().call().await?))
+}
+
+pub async fn types_planning_http() -> axum::response::Result<String, AppError> {
+    Ok(types_planning().call().await?)
+}
 
 pub fn prioritization<'a>() -> Box<dyn Action> {
     Box::new(Step {
