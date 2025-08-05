@@ -172,6 +172,8 @@ pub async fn webhook(
         return (StatusCode::BAD_REQUEST, "Payload must be UTF-8").into_response();
     };
 
+    tracing::info!(?event, ?payload);
+
     match process_payload(event, payload, &ctx).await {
         Ok(true) => ("processed request",).into_response(),
         Ok(false) => ("ignored request",).into_response(),
