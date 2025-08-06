@@ -16,7 +16,7 @@ use std::fmt;
 pub enum AssignCommand {
     /// Corresponds to `@bot claim`.
     Claim,
-    /// Corresponds to `@bot release-assignment`.
+    /// Corresponds to `@bot release-assignment` or `@bot unclaim`.
     ReleaseAssignment,
     /// Corresponds to `@bot assign @user`.
     AssignUser { username: String },
@@ -68,7 +68,7 @@ impl AssignCommand {
             } else {
                 return Err(toks.error(ParseError::NoUser));
             }
-        } else if let Some(Token::Word("release-assignment")) = toks.peek_token()? {
+        } else if let Some(Token::Word("release-assignment" | "unclaim")) = toks.peek_token()? {
             toks.next_token()?;
             if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
@@ -180,5 +180,10 @@ mod tests {
                 "failed on {input}"
             )
         }
+    }
+
+    #[test]
+    fn unclaim() {
+        assert_eq!(parse("unclaim"), Ok(Some(AssignCommand::ReleaseAssignment)));
     }
 }
