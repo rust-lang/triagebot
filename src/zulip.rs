@@ -12,6 +12,7 @@ use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
 use crate::handlers::project_goals::{self, ping_project_goals_owners};
+use crate::interactions::ErrorComment;
 use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
@@ -101,7 +102,13 @@ pub async fn webhook(
         Ok(req) => req,
         Err(rejection) => {
             tracing::error!(?rejection);
-            return rejection.into_response();
+            return Json(Response {
+                content: ErrorComment::markdown(
+                    "unable to handle this Zulip request: invalid JSON input",
+                )
+                .expect("creating a error message without fail"),
+            })
+            .into_response();
         }
     };
 
