@@ -21,6 +21,7 @@ use crate::zulip::commands::{
 use anyhow::{Context as _, format_err};
 use axum::Json;
 use axum::extract::State;
+use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
 use rust_team_data::v1::{TeamKind, TeamMember};
 use std::cmp::Reverse;
@@ -92,11 +93,18 @@ struct Response {
 /// Top-level handler for Zulip webhooks.
 ///
 /// Returns a JSON response or a 400 with an error message.
-// TODO: log JsonRejection
 pub async fn webhook(
     State(ctx): State<Arc<Context>>,
-    Json(req): Json<Request>,
+    req: Result<Json<Request>, JsonRejection>,
 ) -> axum::response::Response {
+    let Json(req) = match req {
+        Ok(req) => req,
+        Err(rejection) => {
+            tracing::error!(?rejection);
+            return rejection.into_response();
+        }
+    };
+
     tracing::info!(?req);
     let response = process_zulip_request(ctx, req).await;
     tracing::info!(?response);
