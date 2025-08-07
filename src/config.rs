@@ -515,7 +515,12 @@ pub(crate) struct IssueLinksConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
-pub(crate) struct NoMentionsConfig {}
+pub(crate) struct NoMentionsConfig {
+    /// The check will not be performed on titles that include any of these substrings (case
+    /// insensitive)
+    #[serde(default)]
+    pub(crate) exclude_titles: Vec<String>,
+}
 
 /// Configuration for PR behind commits checks
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -681,6 +686,7 @@ mod tests {
             trigger-files = ["posts/"]
 
             [no-mentions]
+            exclude-titles = ["subtree update"]
 
             [behind-upstream]
             days-threshold = 14
@@ -769,7 +775,9 @@ mod tests {
                 issue_links: Some(IssueLinksConfig {
                     check_commits: true,
                 }),
-                no_mentions: Some(NoMentionsConfig {}),
+                no_mentions: Some(NoMentionsConfig {
+                    exclude_titles: vec!["subtree update".into()],
+                }),
                 behind_upstream: Some(BehindUpstreamConfig {
                     days_threshold: Some(14),
                 }),

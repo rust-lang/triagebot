@@ -106,7 +106,11 @@ pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> any
     }
 
     if let Some(no_mentions) = &config.no_mentions {
-        warnings.extend(no_mentions::mentions_in_commits(no_mentions, &commits));
+        warnings.extend(no_mentions::mentions_in_commits(
+            &event.issue.title,
+            no_mentions,
+            &commits,
+        ));
     }
 
     if let Some(issue_links) = &config.issue_links {
