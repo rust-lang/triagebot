@@ -119,9 +119,6 @@ pub async fn webhook(
             // We are mixing network errors and "logic" error (like clap errors)
             // so don't return a 500. Long term we should decouple those.
 
-            // Log the full error
-            tracing::error!(?err);
-
             // Reply with a 200 and reply only with outermost error
             Json(Response {
                 content: err.to_string(),
@@ -157,8 +154,6 @@ async fn process_zulip_request(ctx: Arc<Context>, req: Request) -> anyhow::Resul
     if !bool::from(req.token.as_bytes().ct_eq(expected_token.as_bytes())) {
         anyhow::bail!("Invalid authorization.");
     }
-
-    log::trace!("zulip hook: {req:?}");
 
     // Zulip commands are only available to users in the team database
     let gh_id = match ctx.team.zulip_to_github_id(req.message.sender_id).await {
