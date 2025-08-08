@@ -8,6 +8,9 @@ use crate::{
 };
 use std::fmt::Write;
 
+pub const REPORT_TO: &str = "Please file an issue on GitHub at [triagebot](https://github.com/rust-lang/triagebot) if there's \
+            a problem with this bot, or reach out on [#triagebot](https://rust-lang.zulipchat.com/#narrow/channel/224082-triagebot) on Zulip.";
+
 pub struct ErrorComment<'a> {
     issue: &'a Issue,
     message: String,
@@ -28,11 +31,7 @@ impl<'a> ErrorComment<'a> {
         let mut body = String::new();
         writeln!(body, "**Error**: {message}")?;
         writeln!(body)?;
-        writeln!(
-            body,
-            "Please file an issue on GitHub at [triagebot](https://github.com/rust-lang/triagebot) if there's \
-            a problem with this bot, or reach out on [#t-infra](https://rust-lang.zulipchat.com/#narrow/stream/242791-t-infra) on Zulip."
-        )?;
+        writeln!(body, "{REPORT_TO}")?;
         Ok(body)
     }
 
