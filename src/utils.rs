@@ -1,3 +1,5 @@
+use crate::interactions::REPORT_TO;
+
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -20,7 +22,7 @@ impl IntoResponse for AppError {
         tracing::error!("{:?}", &self.0);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Something went wrong: {}", self.0),
+            format!("Something went wrong: {}\n\n{REPORT_TO}", self.0),
         )
             .into_response()
     }
