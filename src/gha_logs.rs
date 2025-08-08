@@ -302,6 +302,13 @@ body {{
         html = html.replace(/##\[warning\]/g, () =>
             `<span class="warning-marker">##[warning]</span>`
         );
+        
+        // pre-5. Polyfill the recently (2025) added `RegExp.escape` function.
+        //  Inspired by the former MDN section on escaping:
+        //  https://web.archive.org/web/20230806114646/https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions#escaping
+        const escapeRegExp = RegExp.escape || function(string) {{
+            return string.replace(/[.*+?^${{}}()|[\]\\/]/g, "\\$&");
+        }};
 
         // 5. Add anchors around some paths
         //  Detailed examples of what the regex does is at https://regex101.com/r/vCnx9Y/2
@@ -319,7 +326,7 @@ body {{
         const pathRegex = new RegExp(
             "(?<boundary_start>[^a-zA-Z0-9.\\/])"
             + "(?<inner>(?:[\\\/]?(?:checkout[\\\/])?(?<path>(?:"
-                + tree_roots.map(p => RegExp.escape(p)).join("|")
+                + tree_roots.map(p => escapeRegExp(p)).join("|")
                 + ")(?:[\\\/][a-zA-Z0-9_$\\\-.\\\/]+)?))"
             + "(?::(?<line>[0-9]+):(?<col>[0-9]+))?)(?<boundary_end>[^a-zA-Z0-9.])",
             "g"
