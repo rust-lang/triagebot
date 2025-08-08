@@ -1,5 +1,6 @@
 use crate::github::{self, WorkflowRunJob};
 use crate::handlers::Context;
+use crate::interactions::REPORT_TO;
 use crate::utils::AppError;
 use anyhow::Context as _;
 use axum::extract::{Path, State};
@@ -272,6 +273,8 @@ body {{
     </style>
     <script type="module" nonce="{nonce}">
         import {{ AnsiUp }} from '{ANSI_UP_URL}'
+        
+        try {{
 
         const logs = {logs};
         const tree_roots = {tree_roots};
@@ -347,6 +350,11 @@ body {{
                 block: 'end',
                 inline: hasSmallViewport ? 'start' : 'center'
             }});
+        }}
+
+        }} catch (e) {{
+           console.error(e);
+           document.body.innerText = `Something went wrong: ${{e}}\n\n{REPORT_TO}`;
         }}
     </script>
 </head>
