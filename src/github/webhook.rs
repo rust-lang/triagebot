@@ -94,28 +94,12 @@ impl fmt::Display for EventName {
     }
 }
 
-#[derive(Debug)]
-pub struct WebhookError(
-    #[allow(dead_code)] // Used in debug display
-    anyhow::Error,
-);
-
-impl From<anyhow::Error> for WebhookError {
-    fn from(e: anyhow::Error) -> WebhookError {
-        WebhookError(e)
-    }
-}
-
 pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::Result<T> {
     let mut deserializer = serde_json::Deserializer::from_str(&v);
     let res: Result<T, _> = serde_path_to_error::deserialize(&mut deserializer);
     match res {
         Ok(r) => Ok(r),
-        Err(e) => {
-            tracing::error!("failed to deserialize webhook payload: {v}");
-            let ctx = format!("at {:?}", e.path());
-            Err(e.into_inner()).context(ctx)
-        }
+        Err(e) => Err(anyhow::anyhow!("webhook payload: {v}").context(e)),
     }
 }
 
@@ -176,7 +160,7 @@ pub async fn webhook(
         Ok(true) => ("processed request",).into_response(),
         Ok(false) => ("ignored request",).into_response(),
         Err(err) => {
-            tracing::error!("failed to process payload: {:?}", err);
+            tracing::error!("{err:?}");
             let body = format!("request failed: {:?}", err);
             (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
         }
@@ -187,12 +171,11 @@ async fn process_payload(
     event: EventName,
     payload: &str,
     ctx: &crate::handlers::Context,
-) -> Result<bool, WebhookError> {
+) -> anyhow::Result<bool> {
     let event = match event {
         EventName::PullRequestReview => {
             let mut payload = deserialize_payload::<PullRequestReviewEvent>(payload)
-                .context("PullRequestReview failed to deserialize")
-                .map_err(anyhow::Error::from)?;
+                .context("failed to deserialize to PullRequestReviewEvent")?;
 
             log::info!("handling pull request review comment {:?}", payload);
             payload.pull_request.pull_request = Some(PullRequestDetails::new());
@@ -213,8 +196,7 @@ async fn process_payload(
         }
         EventName::PullRequestReviewComment => {
             let mut payload = deserialize_payload::<PullRequestReviewComment>(&payload)
-                .context("PullRequestReview(Comment) failed to deserialize")
-                .map_err(anyhow::Error::from)?;
+                .context("failed to deserialize to PullRequestReviewComment")?;
 
             payload.issue.pull_request = Some(PullRequestDetails::new());
 
@@ -232,8 +214,7 @@ async fn process_payload(
         }
         EventName::IssueComment => {
             let payload = deserialize_payload::<IssueCommentEvent>(&payload)
-                .context("IssueCommentEvent failed to deserialize")
-                .map_err(anyhow::Error::from)?;
+                .context("failed to deserialize IssueCommentEvent")?;
 
             log::info!("handling issue comment {:?}", payload);
 
@@ -241,8 +222,7 @@ async fn process_payload(
         }
         EventName::Issue | EventName::PullRequest => {
             let mut payload = deserialize_payload::<IssuesEvent>(&payload)
-                .context(format!("{:?} failed to deserialize", event))
-                .map_err(anyhow::Error::from)?;
+                .context("failed to deserialize IssuesEvent")?;
 
             if matches!(event, EventName::PullRequest) {
                 payload.issue.pull_request = Some(PullRequestDetails::new());
@@ -254,8 +234,7 @@ async fn process_payload(
         }
         EventName::Push => {
             let payload = deserialize_payload::<PushEvent>(&payload)
-                .with_context(|| format!("{:?} failed to deserialize", event))
-                .map_err(anyhow::Error::from)?;
+                .context("failed to deserialize to PushEvent")?;
 
             log::info!("handling push event {:?}", payload);
 
@@ -263,8 +242,7 @@ async fn process_payload(
         }
         EventName::Create => {
             let payload = deserialize_payload::<CreateEvent>(&payload)
-                .with_context(|| format!("{:?} failed to deserialize", event))
-                .map_err(anyhow::Error::from)?;
+                .context("failed to deserialize to CreateEvent")?;
 
             log::info!("handling create event {:?}", payload);
 
@@ -301,9 +279,7 @@ async fn process_payload(
         }
     }
     if other_error {
-        Err(WebhookError(anyhow::anyhow!(
-            "handling failed, error logged",
-        )))
+        Err(anyhow::anyhow!("handling failed, error logged"))
     } else {
         Ok(true)
     }
