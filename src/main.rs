@@ -4,7 +4,7 @@ use anyhow::Context as _;
 use axum::body::Body;
 use axum::error_handling::HandleErrorLayer;
 use axum::http::HeaderName;
-use axum::response::Html;
+use axum::response::{Html, Response};
 use axum::routing::{get, post};
 use axum::{BoxError, Router};
 use hyper::{Request, StatusCode};
@@ -132,6 +132,9 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
                 })
                 .on_request(|request: &Request<Body>, _span: &tracing::Span| {
                     tracing::info!(?request);
+                })
+                .on_response(|response: &Response<_>, dur, _span: &tracing::Span| {
+                    tracing::info!("response={} in {dur:?}", response.status());
                 }),
         )
         .layer(PropagateRequestIdLayer::new(X_REQUEST_ID))

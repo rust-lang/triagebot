@@ -24,15 +24,20 @@ impl<'a> ErrorComment<'a> {
         }
     }
 
-    pub async fn post(&self, client: &GithubClient) -> anyhow::Result<Comment> {
+    pub fn markdown(message: &str) -> anyhow::Result<String> {
         let mut body = String::new();
-        writeln!(body, "**Error**: {}", self.message)?;
+        writeln!(body, "**Error**: {message}")?;
         writeln!(body)?;
         writeln!(
             body,
             "Please file an issue on GitHub at [triagebot](https://github.com/rust-lang/triagebot) if there's \
             a problem with this bot, or reach out on [#t-infra](https://rust-lang.zulipchat.com/#narrow/stream/242791-t-infra) on Zulip."
         )?;
+        Ok(body)
+    }
+
+    pub async fn post(&self, client: &GithubClient) -> anyhow::Result<Comment> {
+        let body = Self::markdown(&self.message)?;
         self.issue.post_comment(client, &body).await
     }
 }

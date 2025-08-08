@@ -12,6 +12,7 @@ use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
 use crate::handlers::project_goals::{self, ping_project_goals_owners};
+use crate::interactions::ErrorComment;
 use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
@@ -21,6 +22,7 @@ use crate::zulip::commands::{
 use anyhow::{Context as _, format_err};
 use axum::Json;
 use axum::extract::State;
+use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
 use rust_team_data::v1::{TeamKind, TeamMember};
 use std::cmp::Reverse;
@@ -92,11 +94,24 @@ struct Response {
 /// Top-level handler for Zulip webhooks.
 ///
 /// Returns a JSON response or a 400 with an error message.
-// TODO: log JsonRejection
 pub async fn webhook(
     State(ctx): State<Arc<Context>>,
-    Json(req): Json<Request>,
+    req: Result<Json<Request>, JsonRejection>,
 ) -> axum::response::Response {
+    let Json(req) = match req {
+        Ok(req) => req,
+        Err(rejection) => {
+            tracing::error!(?rejection);
+            return Json(Response {
+                content: ErrorComment::markdown(
+                    "unable to handle this Zulip request: invalid JSON input",
+                )
+                .expect("creating a error message without fail"),
+            })
+            .into_response();
+        }
+    };
+
     tracing::info!(?req);
     let response = process_zulip_request(ctx, req).await;
     tracing::info!(?response);
@@ -110,9 +125,6 @@ pub async fn webhook(
         Err(err) => {
             // We are mixing network errors and "logic" error (like clap errors)
             // so don't return a 500. Long term we should decouple those.
-
-            // Log the full error
-            tracing::error!(?err);
 
             // Reply with a 200 and reply only with outermost error
             Json(Response {
@@ -149,8 +161,6 @@ async fn process_zulip_request(ctx: Arc<Context>, req: Request) -> anyhow::Resul
     if !bool::from(req.token.as_bytes().ct_eq(expected_token.as_bytes())) {
         anyhow::bail!("Invalid authorization.");
     }
-
-    log::trace!("zulip hook: {req:?}");
 
     // Zulip commands are only available to users in the team database
     let gh_id = match ctx.team.zulip_to_github_id(req.message.sender_id).await {
