@@ -470,8 +470,10 @@ pub struct Comment {
     pub body: String,
     pub html_url: String,
     pub user: User,
-    #[serde(default, alias = "submitted_at")] // for pull request reviews
-    pub updated_at: chrono::DateTime<Utc>,
+    #[serde(default, alias = "submitted_at")] // for pull-request review comments
+    pub created_at: Option<chrono::DateTime<Utc>>,
+    #[serde(default)]
+    pub updated_at: Option<chrono::DateTime<Utc>>,
     #[serde(default, rename = "state")]
     pub pr_review_state: Option<PullRequestReviewState>,
     pub author_association: AuthorAssociation,
@@ -2402,7 +2404,11 @@ impl Event {
         match self {
             Event::Create(_) => None,
             Event::Issue(e) => Some(e.issue.created_at.into()),
-            Event::IssueComment(e) => Some(e.comment.updated_at.into()),
+            Event::IssueComment(e) => e
+                .comment
+                .updated_at
+                .or(e.comment.created_at)
+                .map(Into::into),
             Event::Push(_) => None,
         }
     }
