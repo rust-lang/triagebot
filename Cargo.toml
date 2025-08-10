@@ -48,6 +48,8 @@ clap = { version = "4", features = ["derive"] }
 hmac = "0.12.1"
 subtle = "2.6.1"
 sha2 = "0.10.9"
+imara-diff = "0.2.0"
+pulldown-cmark-escape = "0.11.0"
 
 [dependencies.serde]
 version = "1"

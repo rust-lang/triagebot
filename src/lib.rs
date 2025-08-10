@@ -6,6 +6,7 @@ pub mod bors;
 mod changelogs;
 mod config;
 pub mod db;
+pub mod gh_range_diff;
 pub mod gha_logs;
 pub mod github;
 pub mod handlers;
