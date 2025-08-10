@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::fmt::{self, Write};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use anyhow::Context as _;
 use axum::{
@@ -18,8 +18,12 @@ use imara_diff::{
     Algorithm, Diff, InternedInput, Interner, Token, UnifiedDiffConfig, UnifiedDiffPrinter,
 };
 use pulldown_cmark_escape::FmtWriter;
+use regex::Regex;
 
 use crate::{github, handlers::Context, utils::AppError};
+
+static MARKER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"@@ -[\d]+,[\d]+ [+][\d]+,[\d]+ @@").unwrap());
 
 /// Compute and renders an emulated `git range-diff` between two pushes (old and new).
 ///
@@ -183,8 +187,13 @@ pub async fn gh_range_diff(
     )?;
 
     let mut process_diffs = |filename, old_patch, new_patch| -> anyhow::Result<()> {
+        // Removes diff markers to avoid false-positives
+        let new_marker = format!("@@ {filename}:");
+        let old_patch = MARKER_RE.replace_all(old_patch, &*new_marker);
+        let new_patch = MARKER_RE.replace_all(new_patch, &*new_marker);
+
         // Prepare input
-        let input: InternedInput<&str> = InternedInput::new(old_patch, new_patch);
+        let input: InternedInput<&str> = InternedInput::new(&*old_patch, &*new_patch);
 
         // Compute the diff
         let mut diff = Diff::compute(Algorithm::Histogram, &input);
