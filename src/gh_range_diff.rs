@@ -8,6 +8,7 @@ use axum::{
     http::HeaderValue,
     response::IntoResponse,
 };
+use axum_extra::extract::Host;
 use hyper::header::CACHE_CONTROL;
 use hyper::{
     HeaderMap, StatusCode,
@@ -26,6 +27,7 @@ use crate::{github, handlers::Context, utils::AppError};
 pub async fn gh_range_diff(
     Path((owner, repo, basehead)): Path<(String, String, String)>,
     State(ctx): State<Arc<Context>>,
+    Host(host): Host,
 ) -> axum::response::Result<impl IntoResponse, AppError> {
     let Some((oldhead, newhead)) = basehead.split_once("..") else {
         return Ok((
@@ -140,6 +142,9 @@ pub async fn gh_range_diff(
     // Create the HTML buffer with a very rough approximation for the capacity
     let mut html: String = String::with_capacity(800 + old.files.len() * 100);
 
+    // Compute the bookmarklet for the current host
+    let bookmarklet = bookmarklet(&host);
+
     // Write HTML header, style, ...
     writeln!(
         &mut html,
@@ -173,6 +178,7 @@ pub async fn gh_range_diff(
 </head>
 <body>
 <h3>range-diff of {oldbase}...{oldhead} {newbase}...{newhead}</h3>
+<p>Bookmarklet: <a href="{bookmarklet}" title="Drag-and-drop me on the bookmarks bar, and use me on GitHub compare page.">range-diff</a> <span title="This javascript bookmark can be used to access this page with the right URL. To use it drag-on-drop the range-diff link to your bookmarks bar and click on it when you are on GitHub's compare page to use range-diff compare.">&#128712;</span></p>
 "#
     )?;
 
@@ -313,4 +319,22 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
         }
         Ok(())
     }
+}
+
+// Create the javascript bookmarklet based on the host
+fn bookmarklet(host: &str) -> String {
+    let protocol = if host.starts_with("localhost:") {
+        "http"
+    } else {
+        "https"
+    };
+
+    format!(
+        r"javascript:(() => {{
+    const githubUrlPattern = /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/compare\/([^\/]+[.]{{2}}[^\/]+)$/;
+    const match = window.location.href.match(githubUrlPattern);
+    if (!match) {{alert('Invalid GitHub Compare URL format.\nExpected: https://github.com/ORG_NAME/REPO_NAME/compare/BASESHA..HEADSHA'); return;}}
+    const [, orgName, repoName, basehead] = match; window.location = `{protocol}://{host}/gh-range-diff/${{orgName}}/${{repoName}}/${{basehead}}`;
+}})();"
+    )
 }
