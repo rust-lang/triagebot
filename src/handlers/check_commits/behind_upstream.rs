@@ -27,7 +27,7 @@ pub(super) async fn behind_upstream(
             days_old
         );
 
-        // The message remain the same to ensure the warning is emit only once.
+        // The message remain the same to ensure the warning is emit only once for each base commit.
         Some(format!(
             r"This PR is based on an [upstream commit]({upstream_commit_url}) that is older than {age_threshold} days.
 
