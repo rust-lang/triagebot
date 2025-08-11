@@ -182,7 +182,7 @@ pub async fn gh_range_diff(
 </head>
 <body>
 <h3>range-diff of {oldbase}...{oldhead} {newbase}...{newhead}</h3>
-<p>Bookmarklet: <a href="{bookmarklet}" title="Drag-and-drop me on the bookmarks bar, and use me on GitHub compare page.">range-diff</a> <span title="This javascript bookmark can be used to access this page with the right URL. To use it drag-on-drop the range-diff link to your bookmarks bar and click on it when you are on GitHub's compare page to use range-diff compare.">&#128712;</span></p>
+<p>Bookmarklet: <a href="{bookmarklet}" title="Drag-and-drop me on the bookmarks bar, and use me on GitHub compare page.">range-diff</a> <span title="This javascript bookmark can be used to access this page with the right URL. To use it drag-on-drop the range-diff link to your bookmarks bar and click on it when you are on GitHub's compare page to use range-diff compare.">&#128712;</span> | {ADDED_BLOCK_SIGN} added  {REMOVED_BLOCK_SIGN} removed</p>
 "#
     )?;
 
@@ -277,24 +277,21 @@ pub async fn gh_range_diff(
     Ok((StatusCode::OK, headers, html))
 }
 
+const REMOVED_BLOCK_SIGN: &str = r#"<span style="background-color:red;color:white;">-</span>"#;
+const ADDED_BLOCK_SIGN: &str = r#"<span style="background-color:green;color:white;">+</span>"#;
+
 struct HtmlDiffPrinter<'a>(pub &'a Interner<&'a str>);
 
 impl HtmlDiffPrinter<'_> {
-    fn handle_hunk_token(
-        &self,
-        mut f: impl fmt::Write,
-        span_open: &str,
-        token: &str,
-    ) -> fmt::Result {
-        write!(f, "{span_open}")?;
+    fn handle_hunk_token(&self, mut f: impl fmt::Write, color: &str, token: &str) -> fmt::Result {
         // Highlight the whole the line only if it has changes it-self, otherwise
         // only highlight the `+`, `-` to avoid distracting users with context
         // changes.
         if token.starts_with('+') || token.starts_with('-') {
+            write!(f, r#"<span style="color:{color}">"#)?;
             pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
             write!(f, "</span>")?;
         } else {
-            write!(f, "</span>")?;
             pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
         }
         Ok(())
@@ -333,7 +330,8 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
         if let Some(&last) = before.last() {
             for &token in before {
                 let token = self.0[token];
-                self.handle_hunk_token(&mut f, r#"<span style="color:red;">-"#, token)?;
+                write!(f, "{REMOVED_BLOCK_SIGN}")?;
+                self.handle_hunk_token(&mut f, "red", token)?;
             }
             if !self.0[last].ends_with('\n') {
                 writeln!(f)?;
@@ -343,7 +341,8 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
         if let Some(&last) = after.last() {
             for &token in after {
                 let token = self.0[token];
-                self.handle_hunk_token(&mut f, r#"<span style="color:green;">+"#, token)?;
+                write!(f, "{ADDED_BLOCK_SIGN}")?;
+                self.handle_hunk_token(&mut f, "green", token)?;
             }
             if !self.0[last].ends_with('\n') {
                 writeln!(f)?;
