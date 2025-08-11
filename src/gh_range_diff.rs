@@ -208,9 +208,14 @@ pub async fn gh_range_diff(
             let printer = HtmlDiffPrinter(&input.interner);
             let diff = diff.unified_diff(&printer, config.clone(), &input);
 
+            let before_href =
+                format_args!("https://github.com/{owner}/{repo}/blob/{oldhead}/{filename}");
+            let after_href =
+                format_args!("https://github.com/{owner}/{repo}/blob/{newhead}/{filename}");
+
             writeln!(
                 html,
-                "<details open=\"\"><summary>{filename}</summary><pre>{diff}</pre></details>"
+                r#"<details open=""><summary>{filename} <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary><pre>{diff}</pre></details>"#
             )?;
         }
         Ok(())
