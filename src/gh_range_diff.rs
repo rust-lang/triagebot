@@ -274,6 +274,28 @@ pub async fn gh_range_diff(
 
 struct HtmlDiffPrinter<'a>(pub &'a Interner<&'a str>);
 
+impl HtmlDiffPrinter<'_> {
+    fn handle_hunk_token(
+        &self,
+        mut f: impl fmt::Write,
+        span_open: &str,
+        token: &str,
+    ) -> fmt::Result {
+        write!(f, "{span_open}")?;
+        // Highlight the whole the line only if it has changes it-self, otherwise
+        // only highlight the `+`, `-` to avoid distracting users with context
+        // changes.
+        if token.starts_with('+') || token.starts_with('-') {
+            pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
+            write!(f, "</span>")?;
+        } else {
+            write!(f, "</span>")?;
+            pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
+        }
+        Ok(())
+    }
+}
+
 impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
     fn display_header(
         &self,
@@ -306,9 +328,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
         if let Some(&last) = before.last() {
             for &token in before {
                 let token = self.0[token];
-                write!(f, r#"<span style="color:red;">-"#)?;
-                pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
-                write!(f, "</span>")?;
+                self.handle_hunk_token(&mut f, r#"<span style="color:red;">-"#, token)?;
             }
             if !self.0[last].ends_with('\n') {
                 writeln!(f)?;
@@ -318,9 +338,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
         if let Some(&last) = after.last() {
             for &token in after {
                 let token = self.0[token];
-                write!(f, r#"<span style="color:green;">+"#)?;
-                pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
-                write!(f, "</span>")?;
+                self.handle_hunk_token(&mut f, r#"<span style="color:green;">+"#, token)?;
             }
             if !self.0[last].ends_with('\n') {
                 writeln!(f)?;
