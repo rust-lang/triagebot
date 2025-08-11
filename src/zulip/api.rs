@@ -47,7 +47,7 @@ pub(crate) enum Recipient<'a> {
         id: u64,
         topic: &'a str,
     },
-    Private {
+    Direct {
         #[serde(skip)]
         id: u64,
         #[serde(rename = "to")]
@@ -81,7 +81,7 @@ impl Recipient<'_> {
                 }
                 format!("stream/{}-xxx/topic/{}", id, encoded_topic)
             }
-            Recipient::Private { id, .. } => format!("pm-with/{}-xxx", id),
+            Recipient::Direct { id, .. } => format!("pm-with/{}-xxx", id),
         }
     }
 

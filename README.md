@@ -82,7 +82,7 @@ To use Postgres, you will need to install it and configure it:
 I recommend at least skimming the [GitHub webhook documentation](https://docs.github.com/en/developers/webhooks-and-events/webhooks/about-webhooks) if you are not familiar with webhooks.
 In order for GitHub's webhooks to reach your triagebot server, you'll need to figure out some way to route them to your machine.
 There are various options on how to do this.
-You can poke holes into your firewall or use a proxy, but you shouldn't expose your machine to the the internet.
+You can poke holes into your firewall or use a proxy, but you shouldn't expose your machine to the internet.
 There are various services which help with this problem.
 These generally involve running a program on your machine that connects to an external server which relays the hooks into your machine.
 There are several to choose from:
@@ -108,36 +108,6 @@ gh webhook forward --repo=ehuss/triagebot-test --events=* \
 
 Where the value in `--secret` is the secret value you place in `GITHUB_WEBHOOK_SECRET` in the `.env` file, and `--repo` is the repo you want to test against.
 
-### Zulip testing
-
-If you are modifying code that sends message to Zulip and want to test your changes, you can register a [new free Zulip instance](https://zulip.com/new/). Before launching the triagebot locally, set the Zulip env vars to connect to your test instance (see example in `.env.sample`).
-
-You can also test Zulip webhooks locally with `curl`. For example, to test the Zulip hooks (commands sent to the
-Triagebot from the Rust lang Zulip), you start the triagebot on `localhost:8000` and then simulate a
-Zulip hook payload:
-``` sh
-curl http://localhost:8000/zulip-hook \
-    -H "Content-Type: application/json" \
-    -d '{
-        "data": "<CMD>",
-        "token": "<ZULIP_WEBHOOK_SECRET>",
-        "message": {
-            "sender_id": <YOUR_ID>,
-            "recipient_id": <YOUR_ID>,
-            "sender_full_name": "Randolph Carter",
-            "sender_email": "r.carter@rust-lang.org",
-            "type": "stream"
-            }
-        }'
-```
-
-Where:
-- `CMD` is the exact command you would issue @triagebot on Zulip (ex. open a direct chat with the
-  bot and send "work show")
-- `ZULIP_WEBHOOK_SECRET`: can be anything. Must correspond to the env var `$ZULIP_WEBHOOK_SECRET` on your workstation
-- `YOUR_ID`: your GitHub user ID. Must be existing in your local triagebot database (table `users` and as
-  foreign key also in `review_prefs`)
-
 #### ngrok
 
 The following is an example of using <https://ngrok.com/> to provide webhook forwarding.
@@ -157,6 +127,39 @@ You need to sign up for a free account, and also deal with configuring the GitHu
         * Content type: application/json
         * Secret: Enter a shared secret (some longish random text)
         * Events: "Send me everything"
+
+### Zulip testing
+
+If you want a test Zulip instance, you can [register a free one](https://zulip.com/new/). To have your local triagebot talk to this Zulip instance you need to:
+- Configure a (webhook forwarding service)[#configure-webhook-forwarding]
+- Create in your Zulip instance an outgoing webhook bot, binding it to the forwarding address created before.
+- Launch your local triagebot setting `ZULIP_WEBHOOK_SECRET` to the webhook bot `key` value (you get that as part of the Zulip bot configuration)
+- Set other Zulip env vars as needed (see example in `.env.sample`).
+
+You can also simulate a Zulip webhook payload with `cURL`. For example, this is the payload sent to the triagebot server when tagging a Zulip bot in a stream.
+``` sh
+curl http://localhost:8000/zulip-hook \
+    -H "Content-Type: application/json" \
+    -d '{
+        "data": "<CMD>",
+        "token": "<ZULIP_WEBHOOK_SECRET>",
+        "message": {
+            "sender_id": <YOUR_ZULIP_ID>,
+            "recipient_id": <BOT_ZULIP_ID>,
+            "sender_full_name": "Randolph Carter",
+            "sender_email": "r.carter@rust-lang.org",
+            "type": "stream",
+            "stream_id": 1234567,
+            "subject": "Topic subject"
+            }
+        }'
+```
+
+Where:
+- `CMD` is the full command you would issue on Zulip (ex. `@**triagebot** work show`)
+- `ZULIP_WEBHOOK_SECRET`: can be anything. Must correspond to the env var `$ZULIP_WEBHOOK_SECRET` on your workstation
+- `sender_*`: the Zulip user data sending the message. `sender_id` must be mapped to a GitHub user in this mapping: https://team-api.infra.rust-lang.org/v1/zulip-map.json
+- `recipient_id`: Zulip ID of the recipient of the message (in this case the Zulip bot)
 
 ### Cargo tests
 

@@ -52,15 +52,14 @@ struct Message {
     sender_email: String,
     /// The ID of the stream.
     ///
-    /// `None` if it is a private message.
+    /// `None` if it is a direct message.
     stream_id: Option<u64>,
     /// The topic of the incoming message. Not the stream name.
     ///
-    /// Not currently set for private messages (though Zulip may change this in
-    /// the future if it adds topics to private messages).
+    /// Not currently set for direct messages (though Zulip may change this in
+    /// the future if it adds topics to direct messages).
     subject: Option<String>,
-    /// The type of the message: stream or private.
-    #[allow(unused)]
+    /// The type of the message: stream or direct.
     #[serde(rename = "type")]
     type_: String,
 }
@@ -76,7 +75,7 @@ impl Message {
                     .as_ref()
                     .expect("stream messages should have a topic"),
             },
-            None => Recipient::Private {
+            None => Recipient::Direct {
                 id: self.sender_id,
                 email: &self.sender_email,
             },
@@ -177,8 +176,9 @@ async fn handle_command<'a>(
     log::trace!("handling zulip command {:?}", command);
     let mut words: Vec<&str> = command.split_whitespace().collect();
 
-    // Missing stream means that this is a direct message
-    if message_data.stream_id.is_none() {
+    // Is this a direct or a stream message?
+    // See: https://zulip.com/api/send-message#parameter-type
+    if message_data.type_ == "direct" {
         // Handle impersonation
         let mut impersonated = false;
         if let Some(&"as") = words.get(0) {
@@ -253,7 +253,7 @@ async fn handle_command<'a>(
             );
 
             MessageApiRequest {
-                recipient: Recipient::Private {
+                recipient: Recipient::Direct {
                     id: user.user_id,
                     email: &user.email,
                 },
@@ -965,11 +965,11 @@ async fn post_waiter(
         recipient: Recipient::Stream {
             id: message
                 .stream_id
-                .ok_or_else(|| format_err!("private waiting not supported, missing stream id"))?,
+                .ok_or_else(|| format_err!("direct waiting not supported, missing stream id"))?,
             topic: message
                 .subject
                 .as_deref()
-                .ok_or_else(|| format_err!("private waiting not supported, missing topic"))?,
+                .ok_or_else(|| format_err!("direct waiting not supported, missing topic"))?,
         },
         content: waiting.primary,
     }
