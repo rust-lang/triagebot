@@ -168,6 +168,11 @@ pub async fn gh_range_diff(
     }}
     summary {{
       font-weight: 800;
+      overflow-wrap: break-word;
+      white-space: normal;
+    }}
+    .diff-content {{
+      overflow-x: auto;
     }}
     .removed-block {{
       background-color: rgb(255, 206, 203);
@@ -241,7 +246,7 @@ pub async fn gh_range_diff(
 
             writeln!(
                 html,
-                r#"<details open=""><summary>{filename} <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary><pre>{diff}</pre></details>"#
+                r#"<details open=""><summary>{filename} <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary><pre class="diff-content">{diff}</pre></details>"#
             )?;
         }
         Ok(())
