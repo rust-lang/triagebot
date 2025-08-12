@@ -207,8 +207,8 @@ pub async fn gh_range_diff(
     </style>
 </head>
 <body>
-<h3>range-diff of {oldbase}...{oldhead} {newbase}...{newhead}</h3>
-<p>Bookmarklet: <a href="{bookmarklet}" title="Drag-and-drop me on the bookmarks bar, and use me on GitHub compare page.">range-diff</a> <span title="This javascript bookmark can be used to access this page with the right URL. To use it drag-on-drop the range-diff link to your bookmarks bar and click on it when you are on GitHub's compare page to use range-diff compare.">&#128712;</span> | {ADDED_BLOCK_SIGN} added  {REMOVED_BLOCK_SIGN} removed</p>
+<h3>range-diff of {oldbase}<wbr>...{oldhead} {newbase}<wbr>...{newhead}</h3>
+<p>Bookmarklet: <a href="{bookmarklet}" title="Drag-and-drop me on the bookmarks bar, and use me on GitHub compare page.">range-diff</a> <span title="This javascript bookmark can be used to access this page with the right URL. To use it drag-on-drop the range-diff link to your bookmarks bar and click on it when you are on GitHub's compare page to use range-diff compare.">&#128712;</span> | {ADDED_BLOCK_SIGN}&nbsp;added  {REMOVED_BLOCK_SIGN}&nbsp;removed</p>
 "#
     )?;
 
