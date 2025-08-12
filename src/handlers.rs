@@ -29,7 +29,7 @@ impl fmt::Display for HandlerError {
 
 mod assign;
 mod autolabel;
-mod backport;
+pub mod backport;
 mod bot_pull_requests;
 mod check_commits;
 mod close;

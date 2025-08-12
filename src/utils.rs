@@ -36,3 +36,7 @@ where
         AppError(err.into())
     }
 }
+
+pub fn contains_any(haystack: &[&str], needles: &[&str]) -> bool {
+    needles.iter().any(|needle| haystack.contains(needle))
+}
