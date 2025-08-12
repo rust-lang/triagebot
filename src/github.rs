@@ -258,6 +258,18 @@ impl GithubClient {
             .await
             .context("failed to retrive git trees")
     }
+
+    pub async fn compare(
+        &self,
+        repo: &IssueRepository,
+        before: &str,
+        after: &str,
+    ) -> anyhow::Result<GithubCompare> {
+        let url = format!("{}/compare/{before}...{after}", repo.url(&self));
+        self.json(self.get(&url))
+            .await
+            .context("failed to retrive the compare")
+    }
 }
 
 #[derive(Debug, serde::Serialize)]
