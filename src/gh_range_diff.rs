@@ -213,7 +213,7 @@ pub async fn gh_range_diff(
 </head>
 <body>
 <h3>range-diff of {oldbase}<wbr>...{oldhead} {newbase}<wbr>...{newhead}</h3>
-<p>Bookmarklet: <a href="{bookmarklet}" title="Drag-and-drop me on the bookmarks bar, and use me on GitHub compare page.">range-diff</a> <span title="This javascript bookmark can be used to access this page with the right URL. To use it drag-on-drop the range-diff link to your bookmarks bar and click on it when you are on GitHub's compare page to use range-diff compare.">&#128712;</span> | {ADDED_BLOCK_SIGN}&nbsp;added  {REMOVED_BLOCK_SIGN}&nbsp;removed</p>
+<p>Bookmarklet: <a href="{bookmarklet}" title="Drag-and-drop me on the bookmarks bar, and use me on GitHub compare page.">range-diff</a> <span title="This javascript bookmark can be used to access this page with the right URL. To use it drag-on-drop the range-diff link to your bookmarks bar and click on it when you are on GitHub's compare page to use range-diff compare.">&#128712;</span> | {ADDED_BLOCK_SIGN}&nbsp;<span class="added-line">+</span> adds a line | {ADDED_BLOCK_SIGN}&nbsp;<span class="removed-line">-</span> removes a line | {REMOVED_BLOCK_SIGN}&nbsp;<span class="removed-line">+</span> removes the added line | {REMOVED_BLOCK_SIGN}&nbsp;- cancel the removal</p>
 "#
     )?;
 
@@ -311,15 +311,44 @@ pub async fn gh_range_diff(
 const REMOVED_BLOCK_SIGN: &str = r#"<span class="removed-block"> - </span>"#;
 const ADDED_BLOCK_SIGN: &str = r#"<span class="added-block"> + </span>"#;
 
+enum HunkTokenStatus {
+    Added,
+    Removed,
+}
+
 struct HtmlDiffPrinter<'a>(pub &'a Interner<&'a str>);
 
 impl HtmlDiffPrinter<'_> {
-    fn handle_hunk_token(&self, mut f: impl fmt::Write, class: &str, token: &str) -> fmt::Result {
-        write!(f, " ")?;
+    fn handle_hunk_token(
+        &self,
+        mut f: impl fmt::Write,
+        hunk_token_status: HunkTokenStatus,
+        token: &str,
+    ) -> fmt::Result {
+        // Show the hunk status
+        match hunk_token_status {
+            HunkTokenStatus::Added => write!(f, "{ADDED_BLOCK_SIGN} ")?,
+            HunkTokenStatus::Removed => write!(f, "{REMOVED_BLOCK_SIGN} ")?,
+        };
+
+        let is_add = token.starts_with('+');
+        let is_remove = token.starts_with('-');
+
         // Highlight the whole the line only if it has changes it-self, otherwise
         // only highlight the `+`, `-` to avoid distracting users with context
         // changes.
-        if token.starts_with('+') || token.starts_with('-') {
+        if is_add || is_remove {
+            let class = match (hunk_token_status, is_add) {
+                // adds a line
+                (HunkTokenStatus::Added, true) => "added-line",
+                // removes a line
+                (HunkTokenStatus::Added, false) => "removed-line",
+                // removes the added line
+                (HunkTokenStatus::Removed, true) => "removed-line",
+                // removes the removed line, so nothing changed
+                (HunkTokenStatus::Removed, false) => "",
+            };
+
             write!(f, r#"<span class="{class}">"#)?;
             pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
             write!(f, "</span>")?;
@@ -362,8 +391,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
         if let Some(&last) = before.last() {
             for &token in before {
                 let token = self.0[token];
-                write!(f, "{REMOVED_BLOCK_SIGN}")?;
-                self.handle_hunk_token(&mut f, "removed-line", token)?;
+                self.handle_hunk_token(&mut f, HunkTokenStatus::Removed, token)?;
             }
             if !self.0[last].ends_with('\n') {
                 writeln!(f)?;
@@ -373,8 +401,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
         if let Some(&last) = after.last() {
             for &token in after {
                 let token = self.0[token];
-                write!(f, "{ADDED_BLOCK_SIGN}")?;
-                self.handle_hunk_token(&mut f, "added-line", token)?;
+                self.handle_hunk_token(&mut f, HunkTokenStatus::Added, token)?;
             }
             if !self.0[last].ends_with('\n') {
                 writeln!(f)?;
