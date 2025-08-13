@@ -163,6 +163,31 @@ pub async fn gh_range_diff(
     body {{
       font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
     }}
+    details {{
+      white-space: pre;
+    }}
+    summary {{
+      font-weight: 800;
+      overflow-wrap: break-word;
+      white-space: normal;
+    }}
+    .diff-content {{
+      overflow-x: auto;
+    }}
+    .removed-block {{
+      background-color: rgb(255, 206, 203);
+      white-space: pre;
+    }}
+    .added-block {{
+      background-color: rgb(172, 238, 187);
+      white-space: pre;
+    }}
+    .removed-line {{
+      color: #DE0000;
+    }}
+    .added-line {{
+      color: #2F6500;
+    }}
     @media (prefers-color-scheme: dark) {{
       body {{
         background: #0C0C0C;
@@ -171,18 +196,24 @@ pub async fn gh_range_diff(
       a {{
         color: #41a6ff;
       }}
-    }}
-    details {{
-      white-space: pre;
-    }}
-    summary {{
-      font-weight: 800;
+      .removed-block {{
+        background-color: rgba(248, 81, 73, 0.1);
+      }}
+      .added-block {{
+        background-color: rgba(46, 160, 67, 0.15);
+      }}
+      .removed-line {{
+        color: #F34848;
+      }}
+      .added-line {{
+        color: #86D03C;
+      }}
     }}
     </style>
 </head>
 <body>
-<h3>range-diff of {oldbase}...{oldhead} {newbase}...{newhead}</h3>
-<p>Bookmarklet: <a href="{bookmarklet}" title="Drag-and-drop me on the bookmarks bar, and use me on GitHub compare page.">range-diff</a> <span title="This javascript bookmark can be used to access this page with the right URL. To use it drag-on-drop the range-diff link to your bookmarks bar and click on it when you are on GitHub's compare page to use range-diff compare.">&#128712;</span> | {ADDED_BLOCK_SIGN} added  {REMOVED_BLOCK_SIGN} removed</p>
+<h3>range-diff of {oldbase}<wbr>...{oldhead} {newbase}<wbr>...{newhead}</h3>
+<p>Bookmarklet: <a href="{bookmarklet}" title="Drag-and-drop me on the bookmarks bar, and use me on GitHub compare page.">range-diff</a> <span title="This javascript bookmark can be used to access this page with the right URL. To use it drag-on-drop the range-diff link to your bookmarks bar and click on it when you are on GitHub's compare page to use range-diff compare.">&#128712;</span> | {ADDED_BLOCK_SIGN}&nbsp;added  {REMOVED_BLOCK_SIGN}&nbsp;removed</p>
 "#
     )?;
 
@@ -215,7 +246,7 @@ pub async fn gh_range_diff(
 
             writeln!(
                 html,
-                r#"<details open=""><summary>{filename} <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary><pre>{diff}</pre></details>"#
+                r#"<details open=""><summary>{filename} <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary><pre class="diff-content">{diff}</pre></details>"#
             )?;
         }
         Ok(())
@@ -277,18 +308,19 @@ pub async fn gh_range_diff(
     Ok((StatusCode::OK, headers, html))
 }
 
-const REMOVED_BLOCK_SIGN: &str = r#"<span style="background-color:red;color:white;">-</span>"#;
-const ADDED_BLOCK_SIGN: &str = r#"<span style="background-color:green;color:white;">+</span>"#;
+const REMOVED_BLOCK_SIGN: &str = r#"<span class="removed-block"> - </span>"#;
+const ADDED_BLOCK_SIGN: &str = r#"<span class="added-block"> + </span>"#;
 
 struct HtmlDiffPrinter<'a>(pub &'a Interner<&'a str>);
 
 impl HtmlDiffPrinter<'_> {
-    fn handle_hunk_token(&self, mut f: impl fmt::Write, color: &str, token: &str) -> fmt::Result {
+    fn handle_hunk_token(&self, mut f: impl fmt::Write, class: &str, token: &str) -> fmt::Result {
+        write!(f, " ")?;
         // Highlight the whole the line only if it has changes it-self, otherwise
         // only highlight the `+`, `-` to avoid distracting users with context
         // changes.
         if token.starts_with('+') || token.starts_with('-') {
-            write!(f, r#"<span style="color:{color}">"#)?;
+            write!(f, r#"<span class="{class}">"#)?;
             pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
             write!(f, "</span>")?;
         } else {
@@ -313,7 +345,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
 
     fn display_context_token(&self, mut f: impl fmt::Write, token: Token) -> fmt::Result {
         let token = self.0[token];
-        write!(f, " ")?;
+        write!(f, "    ")?;
         pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
         if !token.ends_with('\n') {
             writeln!(f)?;
@@ -331,7 +363,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
             for &token in before {
                 let token = self.0[token];
                 write!(f, "{REMOVED_BLOCK_SIGN}")?;
-                self.handle_hunk_token(&mut f, "red", token)?;
+                self.handle_hunk_token(&mut f, "removed-line", token)?;
             }
             if !self.0[last].ends_with('\n') {
                 writeln!(f)?;
@@ -342,7 +374,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
             for &token in after {
                 let token = self.0[token];
                 write!(f, "{ADDED_BLOCK_SIGN}")?;
-                self.handle_hunk_token(&mut f, "green", token)?;
+                self.handle_hunk_token(&mut f, "added-line", token)?;
             }
             if !self.0[last].ends_with('\n') {
                 writeln!(f)?;
