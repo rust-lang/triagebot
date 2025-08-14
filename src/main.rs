@@ -163,6 +163,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/", get(|| async { "Triagebot is awaiting triage." }))
+        .route(
+            "/robots.txt",
+            get(|| async { "User-Agent: *\nDisallow: /\n" }),
+        )
         .route("/triage", get(triagebot::triage::index))
         .route("/triage/{owner}/{repo}", get(triagebot::triage::pulls))
         .route(
