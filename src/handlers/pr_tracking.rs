@@ -571,6 +571,8 @@ mod tests {
             action,
             issue,
             changes: None,
+            before: None,
+            after: None,
             repository: Repository {
                 full_name: "rust-lang-test/triagebot-test".to_string(),
                 default_branch: "main".to_string(),

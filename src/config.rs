@@ -48,6 +48,7 @@ pub(crate) struct Config {
     pub(crate) no_mentions: Option<NoMentionsConfig>,
     pub(crate) behind_upstream: Option<BehindUpstreamConfig>,
     pub(crate) backport: Option<BackportConfig>,
+    pub(crate) range_diff: Option<RangeDiffConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -551,6 +552,12 @@ pub(crate) struct BackportRuleConfig {
     pub(crate) add_labels: Vec<String>,
 }
 
+/// Configuration for rebase range-diff comment
+#[derive(Default, PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RangeDiffConfig {}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -689,6 +696,8 @@ mod tests {
             required-pr-labels = ["T-libs", "T-libs-api"]
             required-issue-label = "regression-from-stable-to-stable"
             add-labels = ["stable-nominated"]
+
+            [range-diff]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -776,7 +785,8 @@ mod tests {
                 concern: Some(ConcernConfig {
                     labels: vec!["has-concerns".to_string()],
                 }),
-                backport: Some(backport_team_config)
+                backport: Some(backport_team_config),
+                range_diff: Some(RangeDiffConfig {}),
             }
         );
     }
@@ -864,7 +874,8 @@ mod tests {
                 behind_upstream: Some(BehindUpstreamConfig {
                     days_threshold: Some(7),
                 }),
-                backport: None
+                backport: None,
+                range_diff: None,
             }
         );
     }

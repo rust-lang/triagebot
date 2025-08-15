@@ -1268,6 +1268,8 @@ pub struct IssuesEvent {
     #[serde(alias = "pull_request")]
     pub issue: Issue,
     pub changes: Option<Changes>,
+    pub before: Option<String>,
+    pub after: Option<String>,
     pub repository: Repository,
     /// The GitHub user that triggered the event.
     pub sender: User,
