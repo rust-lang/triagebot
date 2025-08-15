@@ -51,10 +51,12 @@ pub(super) async fn handle_event(
     };
 
     let branch = &base.git_ref;
+    let (oldbase, oldhead) = (&compare_before.merge_base_commit.sha, before);
+    let (newbase, newhead) = (&compare_after.merge_base_commit.sha, after);
 
     // Rebase detected, post a comment to our range-diff.
     event.issue.post_comment(&ctx.github,
-        &format!(r#"This PR was rebased onto a different {branch} commit! Check out the changes with our [`range-diff`]({protocol}://{host}/gh-range-diff/{org}/{repo}/{before}..{after})."#)
+        &format!(r#"This PR was rebased onto a different {branch} commit! Check out the changes with our [`range-diff`]({protocol}://{host}/gh-range-diff/{org}/{repo}/{oldbase}..{oldhead}/{newbase}..{newhead})."#)
     ).await.context("failed to post range-diff comment")?;
 
     Ok(())
