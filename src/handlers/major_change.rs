@@ -584,7 +584,7 @@ async fn process_seconded(
         .await
         .context("failed retrieving the repository informations")?;
 
-    let config = crate::config::get(&ctx.github, &repo)
+    let config = crate::config::get(&ctx.octocrab, &repo)
         .await
         .context("failed to get triagebot configuration")?;
 
