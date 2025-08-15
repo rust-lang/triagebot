@@ -20,6 +20,7 @@ use imara_diff::{
 use pulldown_cmark_escape::FmtWriter;
 use regex::Regex;
 
+use crate::github::GithubCompare;
 use crate::{github, handlers::Context, utils::AppError};
 
 static MARKER_RE: LazyLock<Regex> =
@@ -31,7 +32,7 @@ static MARKER_RE: LazyLock<Regex> =
 pub async fn gh_range_diff(
     Path((owner, repo, basehead)): Path<(String, String, String)>,
     State(ctx): State<Arc<Context>>,
-    Host(host): Host,
+    host: Host,
 ) -> axum::response::Result<impl IntoResponse, AppError> {
     let Some((oldhead, newhead)) = basehead.split_once("..") else {
         return Ok((
@@ -40,9 +41,6 @@ pub async fn gh_range_diff(
             format!("`{basehead}` is not in the form `base..head`"),
         ));
     };
-
-    // Configure unified diff
-    let config = UnifiedDiffConfig::default();
 
     let repos = ctx
         .team
@@ -96,17 +94,13 @@ pub async fn gh_range_diff(
             .sha;
 
         // Get the comparison between the oldbase..oldhead
-        let mut old = ctx
+        let old = ctx
             .github
             .compare(&issue_repo, &oldbase, oldhead)
             .await
             .with_context(|| {
                 format!("failed to retrive the comparison between {oldbase} and {oldhead}")
             })?;
-
-        // Sort by filename, so it's consistent with GitHub UI
-        old.files
-            .sort_unstable_by(|f1, f2| f1.filename.cmp(&f2.filename));
 
         anyhow::Result::<_>::Ok((oldbase, old))
     };
@@ -125,7 +119,7 @@ pub async fn gh_range_diff(
             .sha;
 
         // Get the comparison between the newbase..newhead
-        let mut new = ctx
+        let new = ctx
             .github
             .compare(&issue_repo, &newbase, newhead)
             .await
@@ -133,15 +127,34 @@ pub async fn gh_range_diff(
                 format!("failed to retrive the comparison between {newbase} and {newhead}")
             })?;
 
-        // Sort by filename, so it's consistent with GitHub UI
-        new.files
-            .sort_unstable_by(|f1, f2| f1.filename.cmp(&f2.filename));
-
         anyhow::Result::<_>::Ok((newbase, new))
     };
 
     // Wait for both futures and early exit if there is an error
     let ((oldbase, old), (newbase, new)) = futures::try_join!(old, new)?;
+
+    process_old_new(
+        host,
+        (&owner, &repo),
+        (&oldbase, oldhead, old),
+        (&newbase, newhead, new),
+    )
+}
+
+fn process_old_new(
+    Host(host): Host,
+    (owner, repo): (&str, &str),
+    (oldbase, oldhead, mut old): (&str, &str, GithubCompare),
+    (newbase, newhead, mut new): (&str, &str, GithubCompare),
+) -> axum::response::Result<(StatusCode, HeaderMap, String), AppError> {
+    // Configure unified diff
+    let config = UnifiedDiffConfig::default();
+
+    // Sort by filename, so it's consistent with GitHub UI
+    old.files
+        .sort_unstable_by(|f1, f2| f1.filename.cmp(&f2.filename));
+    new.files
+        .sort_unstable_by(|f1, f2| f1.filename.cmp(&f2.filename));
 
     // Create the HTML buffer with a very rough approximation for the capacity
     let mut html: String = String::with_capacity(800 + old.files.len() * 100);
