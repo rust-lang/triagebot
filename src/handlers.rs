@@ -60,7 +60,7 @@ mod shortcut;
 mod transfer;
 pub mod types_planning_updates;
 
-pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
+pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo()).await;
     if let Err(e) = &config {
         log::warn!("configuration error {}: {e}", event.repo().full_name);
@@ -76,7 +76,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
     }
 
     if let Ok(config) = &config {
-        if let Err(e) = check_commits::handle(ctx, event, &config).await {
+        if let Err(e) = check_commits::handle(ctx, host, event, &config).await {
             log::error!(
                 "failed to process event {:?} with `check_commits` handler: {:?}",
                 event,

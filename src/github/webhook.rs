@@ -1,6 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use axum::{extract::State, response::IntoResponse};
+use axum_extra::extract::Host;
 use hmac::{Hmac, Mac};
 use hyper::HeaderMap;
 use sha2::Sha256;
@@ -106,6 +107,7 @@ pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::R
 pub async fn webhook(
     headers: HeaderMap,
     State(ctx): State<Arc<crate::handlers::Context>>,
+    Host(host): Host,
     body: Bytes,
 ) -> axum::response::Response {
     // Extract X-GitHub-Event header
@@ -156,7 +158,7 @@ pub async fn webhook(
         return (StatusCode::BAD_REQUEST, "Payload must be UTF-8").into_response();
     };
 
-    match process_payload(event, payload, &ctx).await {
+    match process_payload(event, payload, &ctx, &host).await {
         Ok(true) => ("processed request",).into_response(),
         Ok(false) => ("ignored request",).into_response(),
         Err(err) => {
@@ -171,6 +173,7 @@ async fn process_payload(
     event: EventName,
     payload: &str,
     ctx: &crate::handlers::Context,
+    host: &str,
 ) -> anyhow::Result<bool> {
     let event = match event {
         EventName::PullRequestReview => {
@@ -253,7 +256,7 @@ async fn process_payload(
             return Ok(false);
         }
     };
-    let errors = crate::handlers::handle(&ctx, &event).await;
+    let errors = crate::handlers::handle(&ctx, &host, &event).await;
     let mut other_error = false;
     let mut message = String::new();
     for err in errors {
