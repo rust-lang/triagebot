@@ -141,6 +141,91 @@ pub async fn gh_range_diff(
     )
 }
 
+/// Compute and renders an emulated `git range-diff` between two pushes (old and new).
+///
+/// - `oldbasehead` is `OLDBASE..OLDHEAD`
+/// - `newbasehead` is `NEWBASE..NEWHEAD`
+pub async fn gh_ranges_diff(
+    Path((owner, repo, oldbasehead, newbasehead)): Path<(String, String, String, String)>,
+    State(ctx): State<Arc<Context>>,
+    host: Host,
+) -> axum::response::Result<impl IntoResponse, AppError> {
+    let Some((oldbase, oldhead)) = oldbasehead.split_once("..") else {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            HeaderMap::new(),
+            format!("`{oldbasehead}` is not in the form `base..head`"),
+        ));
+    };
+
+    let Some((newbase, newhead)) = newbasehead.split_once("..") else {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            HeaderMap::new(),
+            format!("`{newbasehead}` is not in the form `base..head`"),
+        ));
+    };
+
+    let repos = ctx
+        .team
+        .repos()
+        .await
+        .context("unable to retrieve team repos")?;
+
+    // Verify that the request org is part of the Rust project
+    let Some(repos) = repos.repos.get(&owner) else {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            HeaderMap::new(),
+            format!("organization `{owner}` is not part of the Rust Project team repos"),
+        ));
+    };
+
+    // Verify that the request repo is part of the Rust project
+    if !repos.iter().any(|r| r.name == repo) {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            HeaderMap::new(),
+            format!("repository `{owner}` is not part of the Rust Project team repos"),
+        ));
+    }
+
+    let issue_repo = github::IssueRepository {
+        organization: owner.to_string(),
+        repository: repo.to_string(),
+    };
+
+    // Get the comparison between the oldbase..oldhead
+    let old = async {
+        ctx.github
+            .compare(&issue_repo, &oldbase, oldhead)
+            .await
+            .with_context(|| {
+                format!("failed to retrive the comparison between {oldbase} and {oldhead}")
+            })
+    };
+
+    // Get the comparison between the newbase..newhead
+    let new = async {
+        ctx.github
+            .compare(&issue_repo, &newbase, newhead)
+            .await
+            .with_context(|| {
+                format!("failed to retrive the comparison between {newbase} and {newhead}")
+            })
+    };
+
+    // Wait for both futures and early exit if there is an error
+    let (old, new) = futures::try_join!(old, new)?;
+
+    process_old_new(
+        host,
+        (&owner, &repo),
+        (&oldbase, oldhead, old),
+        (&newbase, newhead, new),
+    )
+}
+
 fn process_old_new(
     Host(host): Host,
     (owner, repo): (&str, &str),
