@@ -67,7 +67,7 @@ pub(super) async fn handle_event(
     let (newbase, newhead) = (&compare_after.merge_base_commit.sha, after);
 
     let message = format!(
-        r#"This PR was rebased onto a different {branch} commit! Check out the changes with our [`range-diff`]({protocol}://{host}/gh-range-diff/{org}/{repo}/{oldbase}..{oldhead}/{newbase}..{newhead})."#
+        r#"This PR was rebased onto a different {branch} commit! Check out the changes with our [range-diff]({protocol}://{host}/gh-range-diff/{org}/{repo}/{oldbase}..{oldhead}/{newbase}..{newhead})."#
     );
 
     // Rebase detected, post a comment linking to our range-diff.
