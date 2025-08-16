@@ -140,17 +140,17 @@ async fn rescan_pr(
     repo: Repository,
     pr_number: u64,
 ) -> anyhow::Result<()> {
-    let issue = repo.get_issue(gh, pr_number).await?;
+    let pr = repo.get_pr(gh, pr_number).await?;
     log::debug!(
         "re-scanning unknown PR {} for merge conflict after delay",
-        issue.global_id()
+        pr.global_id()
     );
-    match issue.mergeable {
-        Some(true) => maybe_hide_comment(gh, &mut db, &issue).await?,
-        Some(false) => maybe_add_comment(gh, &mut db, config, &issue, None).await?,
+    match pr.mergeable {
+        Some(true) => maybe_hide_comment(gh, &mut db, &pr).await?,
+        Some(false) => maybe_add_comment(gh, &mut db, config, &pr, None).await?,
         None => log::info!(
             "re-scan of mergeable status still unknown for {}",
-            issue.global_id()
+            pr.global_id()
         ),
     }
     Ok(())
@@ -205,8 +205,8 @@ async fn scan_prs(
         .partition(|pr| pr.mergeable == MergeableState::Conflicting);
 
     for conflict in conflicting {
-        let issue = repo.get_issue(gh, conflict.number).await?;
-        maybe_add_comment(gh, &mut db, config, &issue, possibly.as_deref()).await?;
+        let pr = repo.get_pr(gh, conflict.number).await?;
+        maybe_add_comment(gh, &mut db, config, &pr, possibly.as_deref()).await?;
     }
     if !unknowns.is_empty() {
         let config = config.clone();
@@ -243,11 +243,11 @@ async fn scan_unknowns(
         repo.full_name
     );
     for unknown in unknowns {
-        let issue = repo.get_issue(&gh, unknown.number).await?;
+        let pr = repo.get_pr(&gh, unknown.number).await?;
         // Ignore None, we don't want to repeatedly hammer GitHub asking for the answer.
-        if issue.mergeable == Some(false) {
-            maybe_add_comment(gh, &mut db, config, &issue, possibly.as_deref()).await?;
-        } else if issue.mergeable == None {
+        if pr.mergeable == Some(false) {
+            maybe_add_comment(gh, &mut db, config, &pr, possibly.as_deref()).await?;
+        } else if pr.mergeable == None {
             log::info!("unable to determine mergeable after delay for {unknown:?}");
         }
     }
