@@ -315,6 +315,8 @@ fn process_old_new(
 "#
     )?;
 
+    let mut diff_displayed = 0;
+
     let mut process_diffs = |filename, old_patch, new_patch| -> anyhow::Result<()> {
         // Removes diff markers to avoid false-positives
         let new_marker = format!("@@ {filename}:");
@@ -346,6 +348,7 @@ fn process_old_new(
                 html,
                 r#"<details open=""><summary>{filename} <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary><pre class="diff-content">{diff}</pre></details>"#
             )?;
+            diff_displayed += 1;
         }
         Ok(())
     };
@@ -377,6 +380,11 @@ fn process_old_new(
         }
 
         process_diffs(filename, "", &*new_file.patch)?;
+    }
+
+    // Print message when there aren't any differences
+    if diff_displayed == 0 {
+        writeln!(html, "<p>No differences</p>")?;
     }
 
     writeln!(
