@@ -8,7 +8,11 @@ pub(super) fn mentions_in_commits(
     conf: &NoMentionsConfig,
     commits: &[GithubCommit],
 ) -> Option<String> {
-    if conf.exclude_titles.iter().any(|s| pr_title.contains(s)) {
+    if conf
+        .exclude_titles
+        .iter()
+        .any(|s| pr_title.to_lowercase().contains(&s.to_lowercase()))
+    {
         return None;
     }
 
@@ -73,7 +77,7 @@ Co-authored-by: Baz Qux <bazqux@example.com>",
     );
 
     commits.push(dummy_commit_from_body(
-        "6565ffdd8af4ca0ec7c8faceee59c582edcd83b2",
+        "4894129179b361200c9cd733ba0e906bf98747a2",
         "This is a body that mentions @rustbot for a command! And then a user @mention",
     ));
 
@@ -82,7 +86,7 @@ Co-authored-by: Baz Qux <bazqux@example.com>",
         Some(
             r"There are username mentions (such as `@user`) in the commit messages of the following commits.
 *Please remove the mentions to avoid spamming these users.*
-- 6565ffdd8af4ca0ec7c8faceee59c582edcd83b2
+- 4894129179b361200c9cd733ba0e906bf98747a2
 ".to_string()
         )
     );
