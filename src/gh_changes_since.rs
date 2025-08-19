@@ -7,7 +7,11 @@ use axum::{
 };
 use hyper::StatusCode;
 
-use crate::{github, handlers::Context, utils::AppError};
+use crate::{
+    github,
+    handlers::Context,
+    utils::{AppError, is_repo_autorized},
+};
 
 /// Redirects to either `/gh-range-diff` (when the base changed) or to GitHub's compare
 /// page (when the base is the same).
@@ -25,26 +29,10 @@ pub async fn gh_changes_since(
             .into_response());
     };
 
-    let repos = ctx
-        .team
-        .repos()
-        .await
-        .context("unable to retrieve team repos")?;
-
-    // Verify that the request org is part of the Rust project
-    let Some(repos) = repos.repos.get(&owner) else {
+    if !is_repo_autorized(&ctx, &owner, &repo).await? {
         return Ok((
-            StatusCode::BAD_REQUEST,
-            format!("organization `{owner}` is not part of the Rust Project team repos"),
-        )
-            .into_response());
-    };
-
-    // Verify that the request repo is part of the Rust project
-    if !repos.iter().any(|r| r.name == repo) {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            format!("repository `{owner}` is not part of the Rust Project team repos"),
+            StatusCode::UNAUTHORIZED,
+            format!("repository `{owner}/{repo}` is not part of the Rust Project team repos"),
         )
             .into_response());
     }
