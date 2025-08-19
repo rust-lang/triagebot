@@ -270,6 +270,16 @@ impl GithubClient {
             .await
             .context("failed to retrive the compare")
     }
+
+    pub async fn pull_request(&self, repo: &IssueRepository, pr_num: u64) -> anyhow::Result<Issue> {
+        let url = format!("{}/pulls/{pr_num}", repo.url(&self));
+        let mut pr: Issue = self
+            .json(self.get(&url))
+            .await
+            .with_context(|| format!("{repo} failed to get pr {pr_num}"))?;
+        pr.pull_request = Some(PullRequestDetails::new());
+        Ok(pr)
+    }
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -1982,13 +1992,15 @@ impl Repository {
     }
 
     pub async fn get_pr(&self, client: &GithubClient, pr_num: u64) -> anyhow::Result<Issue> {
-        let url = format!("{}/pulls/{pr_num}", self.url(client));
-        let mut pr: Issue = client
-            .json(client.get(&url))
+        client
+            .pull_request(
+                &IssueRepository {
+                    organization: self.owner().to_string(),
+                    repository: self.name().to_string(),
+                },
+                pr_num,
+            )
             .await
-            .with_context(|| format!("{} failed to get pr {pr_num}", self.full_name))?;
-        pr.pull_request = Some(PullRequestDetails::new());
-        Ok(pr)
     }
 
     /// Fetches information about merge conflicts on open PRs.

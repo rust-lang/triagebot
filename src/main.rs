@@ -193,6 +193,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             "/gh-range-diff/{owner}/{repo}/{oldbasehead}/{newbasehead}",
             get(triagebot::gh_range_diff::gh_ranges_diff),
         )
+        .route(
+            "/gh-changes-since/{owner}/{repo}/{pr}/{oldbasehead}",
+            get(triagebot::gh_changes_since::gh_changes_since),
+        )
         .nest("/agenda", agenda)
         .route("/bors-commit-list", get(triagebot::bors::bors_commit_list))
         .route(
