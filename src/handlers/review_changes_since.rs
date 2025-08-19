@@ -6,8 +6,8 @@ use crate::{
     handlers::Context,
 };
 
-/// Checks if this event is a PR review creation and adds in the body a link our `gh-changes-since`
-/// endpoint to view changes since this review.
+/// Checks if this event is a PR review creation and adds in the body (if there is one)
+/// a link our `gh-changes-since` endpoint to view changes since this review.
 pub(crate) async fn handle(
     ctx: &Context,
     host: &str,
@@ -29,6 +29,7 @@ pub(crate) async fn handle(
             ..
         },
     ) = event
+        && !event.comment.body.is_empty()
     {
         // Add link our gh-changes-since endpoint to view changes since this review
 
