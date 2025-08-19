@@ -21,6 +21,7 @@ use pulldown_cmark_escape::FmtWriter;
 use regex::Regex;
 
 use crate::github::GithubCompare;
+use crate::utils::is_repo_autorized;
 use crate::{github, handlers::Context, utils::AppError};
 
 static MARKER_RE: LazyLock<Regex> =
@@ -42,27 +43,11 @@ pub async fn gh_range_diff(
         ));
     };
 
-    let repos = ctx
-        .team
-        .repos()
-        .await
-        .context("unable to retrieve team repos")?;
-
-    // Verify that the request org is part of the Rust project
-    let Some(repos) = repos.repos.get(&owner) else {
+    if !is_repo_autorized(&ctx, &owner, &repo).await? {
         return Ok((
-            StatusCode::BAD_REQUEST,
+            StatusCode::UNAUTHORIZED,
             HeaderMap::new(),
-            format!("organization `{owner}` is not part of the Rust Project team repos"),
-        ));
-    };
-
-    // Verify that the request repo is part of the Rust project
-    if !repos.iter().any(|r| r.name == repo) {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            HeaderMap::new(),
-            format!("repository `{owner}` is not part of the Rust Project team repos"),
+            format!("repository `{owner}/{repo}` is not part of the Rust Project team repos"),
         ));
     }
 
@@ -166,27 +151,11 @@ pub async fn gh_ranges_diff(
         ));
     };
 
-    let repos = ctx
-        .team
-        .repos()
-        .await
-        .context("unable to retrieve team repos")?;
-
-    // Verify that the request org is part of the Rust project
-    let Some(repos) = repos.repos.get(&owner) else {
+    if !is_repo_autorized(&ctx, &owner, &repo).await? {
         return Ok((
-            StatusCode::BAD_REQUEST,
+            StatusCode::UNAUTHORIZED,
             HeaderMap::new(),
-            format!("organization `{owner}` is not part of the Rust Project team repos"),
-        ));
-    };
-
-    // Verify that the request repo is part of the Rust project
-    if !repos.iter().any(|r| r.name == repo) {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            HeaderMap::new(),
-            format!("repository `{owner}` is not part of the Rust Project team repos"),
+            format!("repository `{owner}/{repo}` is not part of the Rust Project team repos"),
         ));
     }
 

@@ -270,6 +270,16 @@ impl GithubClient {
             .await
             .context("failed to retrive the compare")
     }
+
+    pub async fn pull_request(&self, repo: &IssueRepository, pr_num: u64) -> anyhow::Result<Issue> {
+        let url = format!("{}/pulls/{pr_num}", repo.url(&self));
+        let mut pr: Issue = self
+            .json(self.get(&url))
+            .await
+            .with_context(|| format!("{repo} failed to get pr {pr_num}"))?;
+        pr.pull_request = Some(PullRequestDetails::new());
+        Ok(pr)
+    }
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -707,6 +717,33 @@ impl Issue {
             .await
             .context("failed to edit comment")?;
         Ok(comment)
+    }
+
+    pub async fn edit_review(
+        &self,
+        client: &GithubClient,
+        id: u64,
+        new_body: &str,
+    ) -> anyhow::Result<()> {
+        let comment_url = format!(
+            "{}/pulls/{}/reviews/{}",
+            self.repository().url(client),
+            self.number,
+            id
+        );
+        #[derive(serde::Serialize)]
+        struct NewComment<'a> {
+            body: &'a str,
+        }
+        client
+            .send_req(
+                client
+                    .put(&comment_url)
+                    .json(&NewComment { body: new_body }),
+            )
+            .await
+            .context("failed to edit review comment")?;
+        Ok(())
     }
 
     pub async fn post_comment(&self, client: &GithubClient, body: &str) -> anyhow::Result<Comment> {
@@ -1982,13 +2019,15 @@ impl Repository {
     }
 
     pub async fn get_pr(&self, client: &GithubClient, pr_num: u64) -> anyhow::Result<Issue> {
-        let url = format!("{}/pulls/{pr_num}", self.url(client));
-        let mut pr: Issue = client
-            .json(client.get(&url))
+        client
+            .pull_request(
+                &IssueRepository {
+                    organization: self.owner().to_string(),
+                    repository: self.name().to_string(),
+                },
+                pr_num,
+            )
             .await
-            .with_context(|| format!("{} failed to get pr {pr_num}", self.full_name))?;
-        pr.pull_request = Some(PullRequestDetails::new());
-        Ok(pr)
     }
 
     /// Fetches information about merge conflicts on open PRs.

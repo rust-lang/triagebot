@@ -53,6 +53,7 @@ pub mod pull_requests_assignment_update;
 mod relabel;
 mod relnotes;
 mod rendered_link;
+mod review_changes_since;
 mod review_requested;
 mod review_submitted;
 pub mod rustc_commits;
@@ -154,6 +155,20 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         if let Err(e) = review_submitted::handle(ctx, event, config).await {
             log::error!(
                 "failed to process event {:?} with review_submitted handler: {:?}",
+                event,
+                e
+            )
+        }
+    }
+
+    if let Some(config) = config
+        .as_ref()
+        .ok()
+        .and_then(|c| c.review_changes_since.as_ref())
+    {
+        if let Err(e) = review_changes_since::handle(ctx, host, event, config).await {
+            log::error!(
+                "failed to process event {:?} with review_changes_since handler: {:?}",
                 event,
                 e
             )

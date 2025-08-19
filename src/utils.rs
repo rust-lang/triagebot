@@ -1,5 +1,6 @@
-use crate::interactions::REPORT_TO;
+use crate::{handlers::Context, interactions::REPORT_TO};
 
+use anyhow::Context as _;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -35,4 +36,28 @@ where
     fn from(err: E) -> Self {
         AppError(err.into())
     }
+}
+
+pub(crate) async fn is_repo_autorized(
+    ctx: &Context,
+    owner: &str,
+    repo: &str,
+) -> anyhow::Result<bool> {
+    let repos = ctx
+        .team
+        .repos()
+        .await
+        .context("unable to retrieve team repos")?;
+
+    // Verify that the request org is part of the Rust project
+    let Some(repos) = repos.repos.get(owner) else {
+        return Ok(false);
+    };
+
+    // Verify that the request repo is part of the Rust project
+    if !repos.iter().any(|r| r.name == repo) {
+        return Ok(false);
+    }
+
+    Ok(true)
 }

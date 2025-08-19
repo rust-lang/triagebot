@@ -1,7 +1,7 @@
 use crate::github::{self, WorkflowRunJob};
 use crate::handlers::Context;
 use crate::interactions::REPORT_TO;
-use crate::utils::AppError;
+use crate::utils::{AppError, is_repo_autorized};
 use anyhow::Context as _;
 use axum::extract::{Path, State};
 use axum::http::HeaderValue;
@@ -71,25 +71,11 @@ pub async fn gha_logs(
     Path((owner, repo, log_id)): Path<(String, String, u128)>,
     State(ctx): State<Arc<Context>>,
 ) -> axum::response::Result<impl IntoResponse, AppError> {
-    let repos = ctx
-        .team
-        .repos()
-        .await
-        .context("unable to retrieve team repos")?;
-
-    let Some(repos) = repos.repos.get(&owner) else {
+    if !is_repo_autorized(&ctx, &owner, &repo).await? {
         return Ok((
-            StatusCode::BAD_REQUEST,
+            StatusCode::UNAUTHORIZED,
             HeaderMap::new(),
-            format!("organization `{owner}` is not part of the Rust Project team repos"),
-        ));
-    };
-
-    if !repos.iter().any(|r| r.name == repo) {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            HeaderMap::new(),
-            format!("repository `{owner}` is not part of the Rust Project team repos"),
+            format!("repository `{owner}/{repo}` is not part of the Rust Project team repos"),
         ));
     }
 
