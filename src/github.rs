@@ -719,6 +719,33 @@ impl Issue {
         Ok(comment)
     }
 
+    pub async fn edit_review(
+        &self,
+        client: &GithubClient,
+        id: u64,
+        new_body: &str,
+    ) -> anyhow::Result<()> {
+        let comment_url = format!(
+            "{}/pulls/{}/reviews/{}",
+            self.repository().url(client),
+            self.number,
+            id
+        );
+        #[derive(serde::Serialize)]
+        struct NewComment<'a> {
+            body: &'a str,
+        }
+        client
+            .send_req(
+                client
+                    .put(&comment_url)
+                    .json(&NewComment { body: new_body }),
+            )
+            .await
+            .context("failed to edit review comment")?;
+        Ok(())
+    }
+
     pub async fn post_comment(&self, client: &GithubClient, body: &str) -> anyhow::Result<Comment> {
         #[derive(serde::Serialize)]
         struct PostComment<'a> {

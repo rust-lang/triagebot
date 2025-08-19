@@ -49,6 +49,7 @@ pub(crate) struct Config {
     pub(crate) behind_upstream: Option<BehindUpstreamConfig>,
     pub(crate) backport: Option<BackportConfig>,
     pub(crate) range_diff: Option<RangeDiffConfig>,
+    pub(crate) review_changes_since: Option<ReviewChangesSinceConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -563,6 +564,12 @@ pub(crate) struct BackportRuleConfig {
 #[serde(deny_unknown_fields)]
 pub(crate) struct RangeDiffConfig {}
 
+/// Configuration for the changes since link on review body
+#[derive(Default, PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ReviewChangesSinceConfig {}
+
 fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -704,6 +711,8 @@ mod tests {
             add-labels = ["stable-nominated"]
 
             [range-diff]
+
+            [review-changes-since]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -795,6 +804,7 @@ mod tests {
                 }),
                 backport: Some(backport_team_config),
                 range_diff: Some(RangeDiffConfig {}),
+                review_changes_since: Some(ReviewChangesSinceConfig {}),
             }
         );
     }
@@ -884,6 +894,7 @@ mod tests {
                 }),
                 backport: None,
                 range_diff: None,
+                review_changes_since: None,
             }
         );
     }
