@@ -242,18 +242,24 @@ fn process_old_new(
       overflow-x: auto;
     }}
     .removed-block {{
-      background-color: rgb(255, 206, 203);
+      background-color: rgba(255, 150, 150, 1);
       white-space: pre;
     }}
     .added-block {{
-      background-color: rgb(172, 238, 187);
+      background-color: rgba(150, 255, 150, 1);
       white-space: pre;
     }}
-    .removed-line {{
-      color: #DE0000;
+    .removed-line-after {{
+      color: rgb(220, 0, 0)
     }}
-    .added-line {{
-      color: #2F6500;
+    .added-line-after {{
+      color: rgb(0, 73, 0)
+    }}
+    .removed-line-before {{
+      color: rgb(192, 78, 76)
+    }}
+    .added-line-before {{
+      color: rgb(63, 128, 94)
     }}
     @media (prefers-color-scheme: dark) {{
       body {{
@@ -264,23 +270,31 @@ fn process_old_new(
         color: #41a6ff;
       }}
       .removed-block {{
-        background-color: rgba(248, 81, 73, 0.1);
+        background-color: rgba(80, 45, 45, 1);
+        white-space: pre;
       }}
       .added-block {{
-        background-color: rgba(46, 160, 67, 0.15);
+        background-color: rgba(70, 120, 70, 1);
+        white-space: pre;
       }}
-      .removed-line {{
-        color: #F34848;
+      .removed-line-after {{
+        color: rgba(255, 0, 0, 1);
       }}
-      .added-line {{
-        color: #86D03C;
+      .added-line-after {{
+        color: rgba(0, 255, 0, 1);
+      }}
+      .removed-line-before {{
+        color: rgba(100, 0, 0, 1);
+      }}
+      .added-line-before {{
+        color: rgba(0, 100, 0, 1);
       }}
     }}
     </style>
 </head>
 <body>
 <h3>range-diff of {oldbase}<wbr>...{oldhead} {newbase}<wbr>...{newhead}</h3>
-<p>Bookmarklet: <a href="{bookmarklet}" title="Drag-and-drop me on the bookmarks bar, and use me on GitHub compare page.">range-diff</a> <span title="This javascript bookmark can be used to access this page with the right URL. To use it drag-on-drop the range-diff link to your bookmarks bar and click on it when you are on GitHub's compare page to use range-diff compare.">&#128712;</span> | {ADDED_BLOCK_SIGN}&nbsp;<span class="added-line">+</span> adds a line | {ADDED_BLOCK_SIGN}&nbsp;<span class="removed-line">-</span> removes a line | {REMOVED_BLOCK_SIGN}&nbsp;<span class="removed-line">+</span> removes the added line | {REMOVED_BLOCK_SIGN}&nbsp;- cancel the removal</p>
+<p>Bookmarklet: <a href="{bookmarklet}" title="Drag-and-drop me on the bookmarks bar, and use me on GitHub compare page.">range-diff</a> <span title="This javascript bookmark can be used to access this page with the right URL. To use it drag-on-drop the range-diff link to your bookmarks bar and click on it when you are on GitHub's compare page to use range-diff compare.">&#128712;</span> | {REMOVED_BLOCK_SIGN}&nbsp;before | {ADDED_BLOCK_SIGN}&nbsp;after</p>
 "#
     )?;
 
@@ -409,19 +423,16 @@ impl HtmlDiffPrinter<'_> {
         let is_add = token.starts_with('+');
         let is_remove = token.starts_with('-');
 
-        // Highlight the whole the line only if it has changes it-self, otherwise
-        // only highlight the `+`, `-` to avoid distracting users with context
-        // changes.
+        // Highlight in the same was as `git range-diff` does for diff-lines
+        // that changed. (Contrary to `git range-diff` we don't color unchanged
+        // diff lines though, since then the coloring distracts from what is
+        // relevant.)
         if is_add || is_remove {
             let class = match (hunk_token_status, is_add) {
-                // adds a line
-                (HunkTokenStatus::Added, true) => "added-line",
-                // removes a line
-                (HunkTokenStatus::Added, false) => "removed-line",
-                // removes the added line
-                (HunkTokenStatus::Removed, true) => "removed-line",
-                // removes the removed line, so nothing changed
-                (HunkTokenStatus::Removed, false) => "",
+                (HunkTokenStatus::Removed, true) => "added-line-before",
+                (HunkTokenStatus::Removed, false) => "removed-line-before",
+                (HunkTokenStatus::Added, true) => "added-line-after",
+                (HunkTokenStatus::Added, false) => "removed-line-after",
             };
 
             write!(f, r#"<span class="{class}">"#)?;
