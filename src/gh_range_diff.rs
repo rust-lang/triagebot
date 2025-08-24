@@ -19,6 +19,7 @@ use imara_diff::{
 };
 use pulldown_cmark_escape::FmtWriter;
 use regex::Regex;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::github::GithubCompare;
 use crate::utils::is_repo_autorized;
@@ -249,17 +250,33 @@ fn process_old_new(
       background-color: rgba(150, 255, 150, 1);
       white-space: pre;
     }}
-    .removed-line-after {{
+    .line-removed-after {{
       color: rgb(220, 0, 0)
     }}
-    .added-line-after {{
+    .line-added-after {{
       color: rgb(0, 73, 0)
     }}
-    .removed-line-before {{
+    .line-removed-before {{
       color: rgb(192, 78, 76)
     }}
-    .added-line-before {{
+    .line-added-before {{
       color: rgb(63, 128, 94)
+    }}
+    .word-removed-after {{
+      color: white;
+      background-color: rgb(220, 0, 0);
+    }}
+    .word-added-after {{
+      color: white;
+      background-color: rgb(0, 73, 0);
+    }}
+    .word-removed-before {{
+      color: white;
+      background-color: rgb(192, 78, 76);
+    }}
+    .word-added-before {{
+      color: white;
+      background-color: rgb(63, 128, 94);
     }}
     @media (prefers-color-scheme: dark) {{
       body {{
@@ -277,17 +294,33 @@ fn process_old_new(
         background-color: rgba(70, 120, 70, 1);
         white-space: pre;
       }}
-      .removed-line-after {{
+      .line-removed-after {{
         color: rgba(255, 0, 0, 1);
       }}
-      .added-line-after {{
+      .line-added-after {{
         color: rgba(0, 255, 0, 1);
       }}
-      .removed-line-before {{
+      .line-removed-before {{
         color: rgba(100, 0, 0, 1);
       }}
-      .added-line-before {{
+      .line-added-before {{
         color: rgba(0, 100, 0, 1);
+      }}
+      .word-removed-after {{
+        color: black;
+        background-color: rgba(255, 0, 0, 1);
+      }}
+      .word-added-after {{
+        color: black;
+        background-color: rgba(0, 255, 0, 1);
+      }}
+      .word-removed-before {{
+        color: black;
+        background-color: rgba(100, 0, 0, 1);
+      }}
+      .word-added-before {{
+        color: black;
+        background-color: rgba(0, 100, 0, 1);
       }}
     }}
     </style>
@@ -400,6 +433,7 @@ fn process_old_new(
 const REMOVED_BLOCK_SIGN: &str = r#"<span class="removed-block"> - </span>"#;
 const ADDED_BLOCK_SIGN: &str = r#"<span class="added-block"> + </span>"#;
 
+#[derive(Copy, Clone)]
 enum HunkTokenStatus {
     Added,
     Removed,
@@ -408,11 +442,11 @@ enum HunkTokenStatus {
 struct HtmlDiffPrinter<'a>(pub &'a Interner<&'a str>);
 
 impl HtmlDiffPrinter<'_> {
-    fn handle_hunk_token(
+    fn handle_hunk_line<'a>(
         &self,
         mut f: impl fmt::Write,
         hunk_token_status: HunkTokenStatus,
-        token: &str,
+        words: impl Iterator<Item = (&'a str, bool)>,
     ) -> fmt::Result {
         // Show the hunk status
         match hunk_token_status {
@@ -420,27 +454,44 @@ impl HtmlDiffPrinter<'_> {
             HunkTokenStatus::Removed => write!(f, "{REMOVED_BLOCK_SIGN} ")?,
         };
 
-        let is_add = token.starts_with('+');
-        let is_remove = token.starts_with('-');
+        let mut words = words.peekable();
+
+        let first_word = words.peek();
+        let is_add = first_word.map(|w| w.0.starts_with('+')).unwrap_or_default();
+        let is_remove = first_word.map(|w| w.0.starts_with('-')).unwrap_or_default();
 
         // Highlight in the same was as `git range-diff` does for diff-lines
-        // that changed. (Contrary to `git range-diff` we don't color unchanged
+        // that changed. In addition we also do word highlighting.
+        //
+        // (Contrary to `git range-diff` we don't color unchanged
         // diff lines though, since then the coloring distracts from what is
         // relevant.)
         if is_add || is_remove {
-            let class = match (hunk_token_status, is_add) {
-                (HunkTokenStatus::Removed, true) => "added-line-before",
-                (HunkTokenStatus::Removed, false) => "removed-line-before",
-                (HunkTokenStatus::Added, true) => "added-line-after",
-                (HunkTokenStatus::Added, false) => "removed-line-after",
+            let prefix_class = match (hunk_token_status, is_add) {
+                (HunkTokenStatus::Removed, true) => "added-before",
+                (HunkTokenStatus::Removed, false) => "removed-before",
+                (HunkTokenStatus::Added, true) => "added-after",
+                (HunkTokenStatus::Added, false) => "removed-after",
             };
+            write!(f, r#"<span class="line-{prefix_class}">"#)?;
 
-            write!(f, r#"<span class="{class}">"#)?;
-            pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
+            for (word, changed) in words {
+                if changed {
+                    write!(f, r#"<span class="word-{prefix_class}">"#)?;
+                    pulldown_cmark_escape::escape_html(FmtWriter(&mut f), word)?;
+                    write!(f, "</span>")?;
+                } else {
+                    pulldown_cmark_escape::escape_html(FmtWriter(&mut f), word)?;
+                }
+            }
+
             write!(f, "</span>")?;
         } else {
-            pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
+            for (word, _status) in words {
+                pulldown_cmark_escape::escape_html(FmtWriter(&mut f), word)?;
+            }
         }
+
         Ok(())
     }
 }
@@ -474,23 +525,82 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
         before: &[Token],
         after: &[Token],
     ) -> fmt::Result {
-        if let Some(&last) = before.last() {
-            for &token in before {
-                let token = self.0[token];
-                self.handle_hunk_token(&mut f, HunkTokenStatus::Removed, token)?;
-            }
-            if !self.0[last].ends_with('\n') {
-                writeln!(f)?;
-            }
-        }
+        // To improve on the line-by-line diff we also want to do a sort of `git --words-diff`
+        // (aka word highlighting). To achieve word highlighting, we only consider hunk that
+        // have the same number of lines removed and added, otherwise it's much more complex
+        // to link the changes together.
 
-        if let Some(&last) = after.last() {
-            for &token in after {
-                let token = self.0[token];
-                self.handle_hunk_token(&mut f, HunkTokenStatus::Added, token)?;
+        if before.len() == after.len() {
+            // Same number of lines before and after, can do word-hightling.
+
+            // Diff the individual lines together.
+            let diffs_and_inputs: Vec<_> = before
+                .into_iter()
+                .zip(after.into_iter())
+                .map(|(b_token, a_token)| {
+                    // Split both lines by words and intern them.
+                    let input: InternedInput<&str> = InternedInput::new(
+                        SplitWordBoundaries(self.0[*b_token]),
+                        SplitWordBoundaries(self.0[*a_token]),
+                    );
+
+                    // Compute the (word) diff
+                    let diff = Diff::compute(Algorithm::Histogram, &input);
+
+                    (diff, input)
+                })
+                .collect();
+
+            // Process all before lines first
+            for (diff, input) in diffs_and_inputs.iter() {
+                self.handle_hunk_line(
+                    &mut f,
+                    HunkTokenStatus::Removed,
+                    input.before.iter().enumerate().map(|(b_pos, b_token)| {
+                        (input.interner[*b_token], diff.is_removed(b_pos as u32))
+                    }),
+                )?;
             }
-            if !self.0[last].ends_with('\n') {
-                writeln!(f)?;
+
+            // Then process all after lines
+            for (diff, input) in diffs_and_inputs.iter() {
+                self.handle_hunk_line(
+                    &mut f,
+                    HunkTokenStatus::Added,
+                    input.after.iter().enumerate().map(|(a_pos, a_token)| {
+                        (input.interner[*a_token], diff.is_added(a_pos as u32))
+                    }),
+                )?;
+            }
+        } else {
+            // Can't do word-highlighting, simply print each line.
+
+            if let Some(&last) = before.last() {
+                for &token in before {
+                    let token = self.0[token];
+                    self.handle_hunk_line(
+                        &mut f,
+                        HunkTokenStatus::Removed,
+                        std::iter::once((token, false)),
+                    )?;
+                }
+                if !self.0[last].ends_with('\n') {
+                    writeln!(f)?;
+                }
+            }
+
+            if let Some(&last) = after.last() {
+                for &token in after {
+                    let token = self.0[token];
+                    self.handle_hunk_line(
+                        &mut f,
+                        HunkTokenStatus::Added,
+                        std::iter::once((token, false)),
+                    )?;
+                }
+                if !self.0[last].ends_with('\n') {
+                    writeln!(f)?;
+                }
             }
         }
         Ok(())
@@ -513,4 +623,21 @@ fn bookmarklet(host: &str) -> String {
     const [, orgName, repoName, basehead] = match; window.location = `{protocol}://{host}/gh-range-diff/${{orgName}}/${{repoName}}/${{basehead}}`;
 }})();"
     )
+}
+
+// Simple abstraction over `unicode_segmentation::split_word_bounds` for `imara_diff::TokenSource`
+struct SplitWordBoundaries<'a>(&'a str);
+
+impl<'a> imara_diff::TokenSource for SplitWordBoundaries<'a> {
+    type Token = &'a str;
+    type Tokenizer = unicode_segmentation::UWordBounds<'a>;
+
+    fn tokenize(&self) -> Self::Tokenizer {
+        self.0.split_word_bounds()
+    }
+
+    fn estimate_tokens(&self) -> u32 {
+        // https://www.wyliecomm.com/2021/11/whats-the-best-length-of-a-word-online/
+        (self.0.len() as f32 / 4.7f32) as u32
+    }
 }
