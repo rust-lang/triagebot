@@ -80,7 +80,7 @@ pub(super) async fn parse_input(
                         // Only mentions byte-for-byte matching content inside the patch.
                         files
                             .iter()
-                            .filter(|f| f.patch.contains(&**entry))
+                            .filter(|f| patch_contains(&f.patch, &**entry))
                             .map(|f| PathBuf::from(&f.filename))
                             .collect()
                     }
@@ -155,4 +155,65 @@ pub(super) async fn handle_input(
         state.save().await?;
     }
     Ok(())
+}
+
+fn patch_contains(patch: &str, needle: &str) -> bool {
+    for line in patch.lines() {
+        if (!line.starts_with("+++") && line.starts_with('+'))
+            || (!line.starts_with("---") && line.starts_with('-'))
+        {
+            if line.contains(needle) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finds_added_line() {
+        let patch = "\
+--- a/file.txt
++++ b/file.txt
++hello world
+ context line
+";
+        assert!(patch_contains(patch, "hello"));
+    }
+
+    #[test]
+    fn finds_removed_line() {
+        let patch = "\
+--- a/file.txt
++++ b/file.txt
+-old value
++new value
+";
+        assert!(patch_contains(patch, "old value"));
+    }
+
+    #[test]
+    fn ignores_diff_headers() {
+        let patch = "\
+--- a/file.txt
++++ b/file.txt
+ context line
+";
+        assert!(!patch_contains(patch, "file.txt")); // should *not* match header
+    }
+
+    #[test]
+    fn needle_not_present() {
+        let patch = "\
+--- a/file.txt
++++ b/file.txt
++added line
+";
+        assert!(!patch_contains(patch, "missing"));
+    }
 }
