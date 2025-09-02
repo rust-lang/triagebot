@@ -225,12 +225,23 @@ pub(crate) struct ConcernConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct MentionsConfig {
     #[serde(flatten)]
-    pub(crate) paths: HashMap<String, MentionsPathConfig>,
+    pub(crate) entries: HashMap<String, MentionsEntryConfig>,
+}
+
+#[derive(PartialEq, Eq, Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum MentionsEntryType {
+    #[default]
+    Filename,
+    Content,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct MentionsPathConfig {
+pub(crate) struct MentionsEntryConfig {
+    #[serde(alias = "type")]
+    #[serde(default)]
+    pub(crate) type_: MentionsEntryType,
     pub(crate) message: Option<String>,
     #[serde(default)]
     pub(crate) cc: Vec<String>,
@@ -661,7 +672,7 @@ mod tests {
 
     #[test]
     fn sample() {
-        let config = r#"
+        let config = r##"
             [relabel]
             allow-unauthenticated = [
                 "C-*"
@@ -692,6 +703,18 @@ mod tests {
             core = "T-core"
             infra = "T-infra"
 
+            [mentions."src/"]
+            cc = ["@someone"]
+            
+            [mentions."target/"]
+            message = "This is a message."
+            cc = ["@someone"]
+            
+            [mentions."#[rustc_attr]"]
+            type = "content"
+            message = "This is a message."
+            cc = ["@someone"]
+
             [shortcut]
 
             [issue-links]
@@ -713,7 +736,7 @@ mod tests {
             [range-diff]
 
             [review-changes-since]
-        "#;
+        "##;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
         ping_teams.insert(
@@ -780,7 +803,34 @@ mod tests {
                 github_releases: None,
                 review_submitted: None,
                 review_requested: None,
-                mentions: None,
+                mentions: Some(MentionsConfig {
+                    entries: HashMap::from([
+                        (
+                            "src/".to_string(),
+                            MentionsEntryConfig {
+                                type_: MentionsEntryType::Filename,
+                                message: None,
+                                cc: vec!["@someone".to_string()]
+                            }
+                        ),
+                        (
+                            "target/".to_string(),
+                            MentionsEntryConfig {
+                                type_: MentionsEntryType::Filename,
+                                message: Some("This is a message.".to_string()),
+                                cc: vec!["@someone".to_string()]
+                            }
+                        ),
+                        (
+                            "#[rustc_attr]".to_string(),
+                            MentionsEntryConfig {
+                                type_: MentionsEntryType::Content,
+                                message: Some("This is a message.".to_string()),
+                                cc: vec!["@someone".to_string()]
+                            }
+                        )
+                    ])
+                }),
                 no_merges: None,
                 pr_tracking: None,
                 transfer: None,
