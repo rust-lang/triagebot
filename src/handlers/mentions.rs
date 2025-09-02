@@ -9,15 +9,16 @@ use crate::{
     handlers::Context,
 };
 use anyhow::Context as _;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::fmt::Write;
 use std::path::Path;
+use std::{fmt::Write, path::PathBuf};
 use tracing as log;
 
 const MENTIONS_KEY: &str = "mentions";
 
 pub(super) struct MentionsInput {
-    to_mention: Vec<String>,
+    to_mention: Vec<(String, Vec<PathBuf>)>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
@@ -64,16 +65,24 @@ pub(super) async fn parse_input(
         let to_mention: Vec<_> = config
             .entries
             .iter()
-            .filter(|(entry, MentionsEntryConfig { cc, type_, .. })| {
-                let relevent = match type_ {
+            .filter_map(|(entry, MentionsEntryConfig { cc, type_, .. })| {
+                let relevant_file_paths: Vec<PathBuf> = match type_ {
                     MentionsEntryType::Filename => {
                         let path = Path::new(entry);
                         // Only mention matching paths.
-                        file_paths.iter().any(|p| p.starts_with(path))
+                        file_paths
+                            .iter()
+                            .filter(|p| p.starts_with(path))
+                            .map(|p| PathBuf::from(p))
+                            .collect()
                     }
                     MentionsEntryType::Content => {
                         // Only mentions byte-for-byte matching content inside the patch.
-                        files.iter().any(|f| f.patch.contains(&**entry))
+                        files
+                            .iter()
+                            .filter(|f| f.patch.contains(&**entry))
+                            .map(|f| PathBuf::from(&f.filename))
+                            .collect()
                     }
                 };
                 // Don't mention if only the author is in the list.
@@ -81,9 +90,12 @@ pub(super) async fn parse_input(
                     [only_cc] => only_cc.trim_start_matches('@') != &event.issue.user.login,
                     _ => true,
                 };
-                relevent && pings_non_author
+                if !relevant_file_paths.is_empty() && pings_non_author {
+                    Some((entry.to_string(), relevant_file_paths))
+                } else {
+                    None
+                }
             })
-            .map(|(key, _mention)| key.to_string())
             .collect();
         if !to_mention.is_empty() {
             return Ok(Some(MentionsInput { to_mention }));
@@ -103,12 +115,12 @@ pub(super) async fn handle_input(
         IssueData::load(&mut client, &event.issue, MENTIONS_KEY).await?;
     // Build the message to post to the issue.
     let mut result = String::new();
-    for to_mention in &input.to_mention {
-        if state.data.entries.iter().any(|p| p == to_mention) {
+    for (entry, relevant_file_paths) in input.to_mention {
+        if state.data.entries.iter().any(|e| e == &entry) {
             // Avoid duplicate mentions.
             continue;
         }
-        let MentionsEntryConfig { message, cc, type_ } = &config.entries[to_mention];
+        let MentionsEntryConfig { message, cc, type_ } = &config.entries[&entry];
         if !result.is_empty() {
             result.push_str("\n\n");
         }
@@ -116,17 +128,23 @@ pub(super) async fn handle_input(
             Some(m) => result.push_str(m),
             None => match type_ {
                 MentionsEntryType::Filename => {
-                    write!(result, "Some changes occurred in {to_mention}").unwrap()
+                    write!(result, "Some changes occurred in {entry}").unwrap()
                 }
-                MentionsEntryType::Content => {
-                    write!(result, "Some changes regarding `{to_mention}` occurred").unwrap()
-                }
+                MentionsEntryType::Content => write!(
+                    result,
+                    "Some changes regarding `{entry}` occurred in {}",
+                    relevant_file_paths
+                        .iter()
+                        .map(|f| f.to_string_lossy())
+                        .join(", ")
+                )
+                .unwrap(),
             },
         }
         if !cc.is_empty() {
             write!(result, "\n\ncc {}", cc.join(", ")).unwrap();
         }
-        state.data.entries.push(to_mention.to_string());
+        state.data.entries.push(entry);
     }
     if !result.is_empty() {
         event
