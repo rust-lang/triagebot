@@ -24,9 +24,16 @@ pub(super) async fn handle_command(
     event: &Event,
     input: RelabelCommand,
 ) -> anyhow::Result<()> {
-    let mut results = vec![];
+    let mut to_rem = vec![];
     let mut to_add = vec![];
-    for delta in &input.0 {
+
+    // If the input matches a valid alias, read the [relabel] config.
+    // if any alias matches, extract the alias config (RelabelRuleConfig) and build a new RelabelCommand.
+    // Discard anything after the alias.
+    let new_input = config.retrieve_command_from_alias(input);
+
+    // Parse input label command, checks permissions, built GitHub commands
+    for delta in &new_input.0 {
         let name = delta.label().as_str();
         let err = match check_filter(name, config, is_member(&event.user(), &ctx.team).await) {
             Ok(CheckFilterResult::Allow) => None,
@@ -53,14 +60,12 @@ pub(super) async fn handle_command(
                 });
             }
             LabelDelta::Remove(label) => {
-                results.push((
-                    label,
-                    event.issue().unwrap().remove_label(&ctx.github, &label),
-                ));
+                to_rem.push(label);
             }
         }
     }
 
+    // Add new labels (if needed)
     if let Err(e) = event
         .issue()
         .unwrap()
@@ -84,8 +89,14 @@ pub(super) async fn handle_command(
         return Err(e);
     }
 
-    for (label, res) in results {
-        if let Err(e) = res.await {
+    // Remove labels (if needed)
+    for label in to_rem {
+        if let Err(e) = event
+            .issue()
+            .unwrap()
+            .remove_label(&ctx.github, &label)
+            .await
+        {
             tracing::error!(
                 "failed to remove {:?} from issue {}: {:?}",
                 label,
@@ -124,6 +135,8 @@ enum CheckFilterResult {
     DenyUnknown,
 }
 
+/// Check if the team member is allowed to apply labels
+/// configured in `allow_unauthenticated`
 fn check_filter(
     label: &str,
     config: &RelabelConfig,
@@ -220,6 +233,7 @@ mod tests {
             ($($member:ident { $($label:expr => $res:ident,)* })*) => {
                 let config = RelabelConfig {
                     allow_unauthenticated: vec!["T-*".into(), "I-*".into(), "!I-*nominated".into()],
+                    configs: None
                 };
                 $($(assert_eq!(
                     check_filter($label, &config, TeamMembership::$member),
