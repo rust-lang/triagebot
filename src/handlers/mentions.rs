@@ -3,26 +3,28 @@
 //! interested people.
 
 use crate::{
-    config::{MentionsConfig, MentionsPathConfig},
+    config::{MentionsConfig, MentionsEntryConfig, MentionsEntryType},
     db::issue_data::IssueData,
     github::{IssuesAction, IssuesEvent},
     handlers::Context,
 };
 use anyhow::Context as _;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::fmt::Write;
 use std::path::Path;
+use std::{fmt::Write, path::PathBuf};
 use tracing as log;
 
 const MENTIONS_KEY: &str = "mentions";
 
 pub(super) struct MentionsInput {
-    paths: Vec<String>,
+    to_mention: Vec<(String, Vec<PathBuf>)>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
 struct MentionState {
-    paths: Vec<String>,
+    #[serde(alias = "paths")]
+    entries: Vec<String>,
 }
 
 pub(super) async fn parse_input(
@@ -61,23 +63,42 @@ pub(super) async fn parse_input(
     {
         let file_paths: Vec<_> = files.iter().map(|fd| Path::new(&fd.filename)).collect();
         let to_mention: Vec<_> = config
-            .paths
+            .entries
             .iter()
-            .filter(|(path, MentionsPathConfig { cc, .. })| {
-                let path = Path::new(path);
-                // Only mention matching paths.
-                let touches_relevant_files = file_paths.iter().any(|p| p.starts_with(path));
+            .filter_map(|(entry, MentionsEntryConfig { cc, type_, .. })| {
+                let relevant_file_paths: Vec<PathBuf> = match type_ {
+                    MentionsEntryType::Filename => {
+                        let path = Path::new(entry);
+                        // Only mention matching paths.
+                        file_paths
+                            .iter()
+                            .filter(|p| p.starts_with(path))
+                            .map(|p| PathBuf::from(p))
+                            .collect()
+                    }
+                    MentionsEntryType::Content => {
+                        // Only mentions byte-for-byte matching content inside the patch.
+                        files
+                            .iter()
+                            .filter(|f| patch_contains(&f.patch, &**entry))
+                            .map(|f| PathBuf::from(&f.filename))
+                            .collect()
+                    }
+                };
                 // Don't mention if only the author is in the list.
                 let pings_non_author = match &cc[..] {
                     [only_cc] => only_cc.trim_start_matches('@') != &event.issue.user.login,
                     _ => true,
                 };
-                touches_relevant_files && pings_non_author
+                if !relevant_file_paths.is_empty() && pings_non_author {
+                    Some((entry.to_string(), relevant_file_paths))
+                } else {
+                    None
+                }
             })
-            .map(|(key, _mention)| key.to_string())
             .collect();
         if !to_mention.is_empty() {
-            return Ok(Some(MentionsInput { paths: to_mention }));
+            return Ok(Some(MentionsInput { to_mention }));
         }
     }
     Ok(None)
@@ -94,23 +115,36 @@ pub(super) async fn handle_input(
         IssueData::load(&mut client, &event.issue, MENTIONS_KEY).await?;
     // Build the message to post to the issue.
     let mut result = String::new();
-    for to_mention in &input.paths {
-        if state.data.paths.iter().any(|p| p == to_mention) {
+    for (entry, relevant_file_paths) in input.to_mention {
+        if state.data.entries.iter().any(|e| e == &entry) {
             // Avoid duplicate mentions.
             continue;
         }
-        let MentionsPathConfig { message, cc } = &config.paths[to_mention];
+        let MentionsEntryConfig { message, cc, type_ } = &config.entries[&entry];
         if !result.is_empty() {
             result.push_str("\n\n");
         }
         match message {
             Some(m) => result.push_str(m),
-            None => write!(result, "Some changes occurred in {to_mention}").unwrap(),
+            None => match type_ {
+                MentionsEntryType::Filename => {
+                    write!(result, "Some changes occurred in {entry}").unwrap()
+                }
+                MentionsEntryType::Content => write!(
+                    result,
+                    "Some changes regarding `{entry}` occurred in {}",
+                    relevant_file_paths
+                        .iter()
+                        .map(|f| f.to_string_lossy())
+                        .join(", ")
+                )
+                .unwrap(),
+            },
         }
         if !cc.is_empty() {
             write!(result, "\n\ncc {}", cc.join(", ")).unwrap();
         }
-        state.data.paths.push(to_mention.to_string());
+        state.data.entries.push(entry);
     }
     if !result.is_empty() {
         event
@@ -121,4 +155,65 @@ pub(super) async fn handle_input(
         state.save().await?;
     }
     Ok(())
+}
+
+fn patch_contains(patch: &str, needle: &str) -> bool {
+    for line in patch.lines() {
+        if (!line.starts_with("+++") && line.starts_with('+'))
+            || (!line.starts_with("---") && line.starts_with('-'))
+        {
+            if line.contains(needle) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finds_added_line() {
+        let patch = "\
+--- a/file.txt
++++ b/file.txt
++hello world
+ context line
+";
+        assert!(patch_contains(patch, "hello"));
+    }
+
+    #[test]
+    fn finds_removed_line() {
+        let patch = "\
+--- a/file.txt
++++ b/file.txt
+-old value
++new value
+";
+        assert!(patch_contains(patch, "old value"));
+    }
+
+    #[test]
+    fn ignores_diff_headers() {
+        let patch = "\
+--- a/file.txt
++++ b/file.txt
+ context line
+";
+        assert!(!patch_contains(patch, "file.txt")); // should *not* match header
+    }
+
+    #[test]
+    fn needle_not_present() {
+        let patch = "\
+--- a/file.txt
++++ b/file.txt
++added line
+";
+        assert!(!patch_contains(patch, "missing"));
+    }
 }
