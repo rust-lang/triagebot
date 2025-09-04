@@ -57,6 +57,8 @@ pub async fn gh_range_diff(
         repository: repo.to_string(),
     };
 
+    let gh_repo = ctx.github.repository(&format!("{owner}/{repo}")).await?;
+
     // Determine the oldbase and get the comparison for the old diff
     let old = async {
         // We need to determine the oldbase (ie. the parent sha of all the commits of old).
@@ -73,7 +75,7 @@ pub async fn gh_range_diff(
         // is always correct no matter the order.
         let oldbase = ctx
             .github
-            .compare(&issue_repo, "master", oldhead)
+            .compare(&issue_repo, &gh_repo.default_branch, oldhead)
             .await
             .context("failed to retrive the comparison between newhead and oldhead")?
             .merge_base_commit
@@ -98,9 +100,9 @@ pub async fn gh_range_diff(
         // See the comment above on old for more details.
         let newbase = ctx
             .github
-            .compare(&issue_repo, "master", newhead)
+            .compare(&issue_repo, &gh_repo.default_branch, newhead)
             .await
-            .context("failed to retrive the comparison between master and newhead")?
+            .context("failed to retrive the comparison between the default branch and newhead")?
             .merge_base_commit
             .sha;
 
