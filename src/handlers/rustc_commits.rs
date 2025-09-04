@@ -68,8 +68,8 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         log::trace!("Not build completion? {:?}", bors);
     }
 
-    if bors.base_ref != "master" {
-        log::trace!("Ignoring bors merge, not on master");
+    if bors.base_ref != event.repository.default_branch {
+        log::trace!("Ignoring bors merge, not on the default branch");
         return Ok(());
     }
 
