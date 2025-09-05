@@ -521,8 +521,62 @@ pub(crate) struct RenderedLinkConfig {
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct IssueLinksConfig {
-    #[serde(default = "default_true")]
-    pub(crate) check_commits: bool,
+    #[serde(default)]
+    pub(crate) check_commits: IssueLinksCheckCommitsConfig,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub(crate) enum IssueLinksCheckCommitsConfig {
+    /// No checking of commits
+    Off,
+    /// Only check for uncanonicalized issue links in commits
+    Uncanonicalized,
+    /// Check for all issue links in commits
+    All,
+}
+
+impl Default for IssueLinksCheckCommitsConfig {
+    fn default() -> Self {
+        IssueLinksCheckCommitsConfig::All
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for IssueLinksCheckCommitsConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct CheckCommitsVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for CheckCommitsVisitor {
+            type Value = IssueLinksCheckCommitsConfig;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a bool or the string \"uncanonicalized\"")
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E> {
+                Ok(if v {
+                    IssueLinksCheckCommitsConfig::All
+                } else {
+                    IssueLinksCheckCommitsConfig::Off
+                })
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if v == "uncanonicalized" {
+                    Ok(IssueLinksCheckCommitsConfig::Uncanonicalized)
+                } else {
+                    Err(E::custom("expected \"uncanonicalized\""))
+                }
+            }
+        }
+
+        deserializer.deserialize_any(CheckCommitsVisitor)
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -543,11 +597,6 @@ pub(crate) struct BehindUpstreamConfig {
     /// The threshold of days for parent commit age to trigger a warning.
     /// Default is 7 days if not specified.
     pub(crate) days_threshold: Option<usize>,
-}
-
-#[inline]
-fn default_true() -> bool {
-    true
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -841,7 +890,7 @@ mod tests {
                     exclude_files: vec![],
                 }),
                 issue_links: Some(IssueLinksConfig {
-                    check_commits: true,
+                    check_commits: IssueLinksCheckCommitsConfig::All,
                 }),
                 no_mentions: Some(NoMentionsConfig {
                     exclude_titles: vec!["subtree update".into()],
@@ -936,7 +985,7 @@ mod tests {
                 bot_pull_requests: None,
                 rendered_link: None,
                 issue_links: Some(IssueLinksConfig {
-                    check_commits: false,
+                    check_commits: IssueLinksCheckCommitsConfig::Off,
                 }),
                 no_mentions: None,
                 behind_upstream: Some(BehindUpstreamConfig {
@@ -975,5 +1024,20 @@ mod tests {
                 auto_assign_no_one: "welcome message!".to_string(),
             })
         );
+    }
+
+    #[test]
+    fn issue_links_uncanonicalized() {
+        let config = r#"
+            [issue-links]
+            check-commits = "uncanonicalized"
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        assert!(matches!(
+            config.issue_links,
+            Some(IssueLinksConfig {
+                check_commits: IssueLinksCheckCommitsConfig::Uncanonicalized
+            })
+        ));
     }
 }
