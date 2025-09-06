@@ -23,7 +23,7 @@ pub enum Command<'a> {
     Nominate(Result<nominate::NominateCommand, Error<'a>>),
     Prioritize(Result<prioritize::PrioritizeCommand, Error<'a>>),
     Second(Result<second::SecondCommand, Error<'a>>),
-    Shortcut(Result<shortcut::ShortcutCommand, Error<'a>>),
+    Review(Result<shortcut::ReviewCommand, Error<'a>>),
     Close(Result<close::CloseCommand, Error<'a>>),
     Note(Result<note::NoteCommand, Error<'a>>),
     Concern(Result<concern::ConcernCommand, Error<'a>>),
@@ -125,8 +125,8 @@ impl<'a> Input<'a> {
             &original_tokenizer,
         ));
         success.extend(parse_single_command(
-            shortcut::ShortcutCommand::parse,
-            Command::Shortcut,
+            shortcut::ReviewCommand::parse,
+            Command::Review,
             &original_tokenizer,
         ));
         success.extend(parse_single_command(
@@ -210,7 +210,7 @@ impl<'a> Command<'a> {
             Command::Nominate(r) => r.is_ok(),
             Command::Prioritize(r) => r.is_ok(),
             Command::Second(r) => r.is_ok(),
-            Command::Shortcut(r) => r.is_ok(),
+            Command::Review(r) => r.is_ok(),
             Command::Close(r) => r.is_ok(),
             Command::Note(r) => r.is_ok(),
             Command::Concern(r) => r.is_ok(),
