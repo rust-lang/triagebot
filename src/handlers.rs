@@ -214,23 +214,39 @@ macro_rules! issue_handlers {
             config: &Arc<Config>,
             errors: &mut Vec<HandlerError>,
         ) {
-            $(
-            match $name::parse_input(ctx, event, config.$name.as_ref()).await {
-                Err(err) => errors.push(HandlerError::Message(err)),
-                Ok(Some(input)) => {
-                    if let Some(config) = &config.$name {
-                        $name::handle_input(ctx, config, event, input).await.unwrap_or_else(|err| errors.push(HandlerError::Other(err)));
-                    } else {
-                        errors.push(HandlerError::Message(format!(
-                            "The feature `{}` is not enabled in this repository.\n\
-                            To enable it add its section in the `triagebot.toml` \
-                            in the root of the repository.",
-                            stringify!($name)
-                        )));
+            // Process the issue handlers concurrently
+            let results = futures::join!(
+                $(
+                    async {
+                        match $name::parse_input(ctx, event, config.$name.as_ref()).await {
+                            Err(err) => Err(HandlerError::Message(err)),
+                            Ok(Some(input)) => {
+                                if let Some(config) = &config.$name {
+                                    $name::handle_input(ctx, config, event, input).await.map_err(HandlerError::Other)
+                                } else {
+                                    Err(HandlerError::Message(format!(
+                                        "The feature `{}` is not enabled in this repository.\n\
+                                        To enable it add its section in the `triagebot.toml` \
+                                        in the root of the repository.",
+                                        stringify!($name)
+                                    )))
+                                }
+                            }
+                            Ok(None) => Ok(())
+                        }
                     }
+                ),*
+            );
+
+            // Destructure the results into named variables
+            let ($($name,)*) = results;
+
+            // Push errors for each handler
+            $(
+                if let Err(e) = $name {
+                    errors.push(e);
                 }
-                Ok(None) => {}
-            })*
+            )*
         }
     }
 }
