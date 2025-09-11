@@ -222,7 +222,14 @@ macro_rules! issue_handlers {
                             Err(err) => Err(HandlerError::Message(err)),
                             Ok(Some(input)) => {
                                 if let Some(config) = &config.$name {
-                                    $name::handle_input(ctx, config, event, input).await.map_err(HandlerError::Other)
+                                    $name::handle_input(ctx, config, event, input)
+                                        .await
+                                        .map_err(|e| {
+                                            HandlerError::Other(e.context(format!(
+                                                "error when processing {} handler",
+                                                stringify!($name)
+                                            )))
+                                        })
                                 } else {
                                     Err(HandlerError::Message(format!(
                                         "The feature `{}` is not enabled in this repository.\n\
@@ -361,7 +368,12 @@ macro_rules! command_handlers {
                         if let Some(config) = &config.$name {
                             $name::handle_command(ctx, config, event, command)
                                 .await
-                                .unwrap_or_else(|err| errors.push(HandlerError::Other(err)));
+                                .unwrap_or_else(|err| {
+                                    errors.push(HandlerError::Other(err.context(format!(
+                                        "error when processing {} command handler",
+                                        stringify!($name)
+                                    ))))
+                                });
                         } else {
                             errors.push(HandlerError::Message(format!(
                                 "The feature `{}` is not enabled in this repository.\n\
