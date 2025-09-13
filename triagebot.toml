@@ -27,3 +27,6 @@ This is just testing some functionality, please ignore this ping.
 label = "help wanted"
 
 [review-changes-since]
+
+[assign.owners]
+"/flake.*" = ["@ada4a"]
