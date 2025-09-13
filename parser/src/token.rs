@@ -232,8 +232,8 @@ impl<'a> Tokenizer<'a> {
 #[cfg(test)]
 fn tokenize<'a>(input: &'a str) -> Result<Vec<Token<'a>>, Error<'a>> {
     let mut tokens = Vec::new();
-    let mut gen = Tokenizer::new(input);
-    while let Some(tok) = gen.next_token()? {
+    let mut input = Tokenizer::new(input);
+    while let Some(tok) = input.next_token()? {
         tokens.push(tok);
     }
     Ok(tokens)
