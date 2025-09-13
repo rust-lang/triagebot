@@ -48,7 +48,7 @@ impl AssignCommand {
         let mut toks = input.clone();
         if let Some(Token::Word("claim")) = toks.peek_token()? {
             toks.next_token()?;
-            if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
+            if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
                 *input = toks;
                 Ok(Some(AssignCommand::Claim))
@@ -70,7 +70,7 @@ impl AssignCommand {
             }
         } else if let Some(Token::Word("release-assignment" | "unclaim")) = toks.peek_token()? {
             toks.next_token()?;
-            if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
+            if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
                 *input = toks;
                 Ok(Some(AssignCommand::ReleaseAssignment))

@@ -374,13 +374,13 @@ async fn determine_assignee(
                     event.issue.global_id()
                 ),
                 Err(
-                    e @ FindReviewerError::NoReviewer { .. }
-                    | e @ FindReviewerError::ReviewerIsPrAuthor { .. }
-                    | e @ FindReviewerError::ReviewerAlreadyAssigned { .. }
-                    | e @ FindReviewerError::ReviewerPreviouslyAssigned { .. }
-                    | e @ FindReviewerError::ReviewerOffRotation { .. }
-                    | e @ FindReviewerError::DatabaseError(_)
-                    | e @ FindReviewerError::ReviewerAtMaxCapacity { .. },
+                    e @ (FindReviewerError::NoReviewer { .. }
+                    | FindReviewerError::ReviewerIsPrAuthor { .. }
+                    | FindReviewerError::ReviewerAlreadyAssigned { .. }
+                    | FindReviewerError::ReviewerPreviouslyAssigned { .. }
+                    | FindReviewerError::ReviewerOffRotation { .. }
+                    | FindReviewerError::DatabaseError(_)
+                    | FindReviewerError::ReviewerAtMaxCapacity { .. }),
                 ) => log::trace!(
                     "no reviewer could be determined for PR {}: {e}",
                     event.issue.global_id()
@@ -508,11 +508,7 @@ pub(super) async fn handle_command(
     event: &Event,
     cmd: AssignCommand,
 ) -> anyhow::Result<()> {
-    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.team).await {
-        false
-    } else {
-        true
-    };
+    let is_team_member = matches!(event.user().is_team_member(&ctx.team).await, Ok(true));
 
     // Don't handle commands in comments from the bot. Some of the comments it
     // posts contain commands to instruct the user, not things that the bot
@@ -897,8 +893,7 @@ fn expand_teams_and_groups(
     // Loop over names to recursively expand them.
     while let Some(candidate) = to_be_expanded.pop() {
         let name_to_expand = match &candidate {
-            Candidate::Direct(name) => name,
-            Candidate::Expanded(name) => name,
+            Candidate::Direct(name) | Candidate::Expanded(name) => name,
         };
 
         // `name_to_expand` could be a team name, an adhoc group name or a username.

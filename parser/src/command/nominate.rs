@@ -55,8 +55,7 @@ impl NominateCommand {
         let style = match toks.peek_token()? {
             Some(Token::Word("beta-nominate")) => Style::Beta,
             Some(Token::Word("nominate")) => Style::Decision,
-            Some(Token::Word("beta-accept")) => Style::BetaApprove,
-            Some(Token::Word("beta-approve")) => Style::BetaApprove,
+            Some(Token::Word("beta-accept" | "beta-approve")) => Style::BetaApprove,
             None | Some(_) => return Ok(None),
         };
         toks.next_token()?;
@@ -67,7 +66,7 @@ impl NominateCommand {
         } else {
             return Err(toks.error(ParseError::NoTeam));
         };
-        if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
+        if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
             toks.next_token()?;
             *input = toks;
             Ok(Some(NominateCommand { team, style }))

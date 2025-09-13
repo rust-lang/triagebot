@@ -1779,24 +1779,21 @@ impl Repository {
                         .first()
                         .map(|parent| parent.oid.0.clone());
 
-                    match &next_first_parent {
-                        Some(first_parent) => {
-                            if first_parent == &node.oid.0 {
-                                // Found the next first parent, include it and
-                                // set next_first_parent to look for this
-                                // commit's first parent.
-                                next_first_parent = this_first_parent;
-                                true
-                            } else {
-                                // Still looking for the next first parent.
-                                false
-                            }
-                        }
-                        None => {
-                            // First commit.
+                    if let Some(first_parent) = &next_first_parent {
+                        if first_parent == &node.oid.0 {
+                            // Found the next first parent, include it and
+                            // set next_first_parent to look for this
+                            // commit's first parent.
                             next_first_parent = this_first_parent;
                             true
+                        } else {
+                            // Still looking for the next first parent.
+                            false
                         }
+                    } else {
+                        // First commit.
+                        next_first_parent = this_first_parent;
+                        true
                     }
                 })
                 // Stop once reached the `oldest` commit
