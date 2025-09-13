@@ -4,4 +4,11 @@ pub fn main() {
         .unwrap()
         .as_default()
         .unwrap();
+    std::process::Command::new("rustfmt")
+        .arg(format!(
+            "{}/cynic-schemas/github.rs",
+            std::env::var("OUT_DIR").unwrap()
+        ))
+        .status()
+        .expect("failed to execute rustfmt");
 }
