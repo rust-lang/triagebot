@@ -64,7 +64,7 @@ impl<'a> Input<'a> {
     pub fn new(input: &'a str, bot: Vec<&'a str>) -> Input<'a> {
         let bots: Vec<_> = bot.iter().map(|bot| format!(r"(?:@{bot}\b)")).collect();
         let bot_re = Regex::new(&format!(
-            r#"(?i)(?P<review>\br\?)|{bots}"#,
+            r"(?i)(?P<review>\br\?)|{bots}",
             bots = bots.join("|")
         ))
         .unwrap();
@@ -140,13 +140,12 @@ impl<'a> Input<'a> {
             &original_tokenizer,
         ));
 
-        if success.len() > 1 {
-            panic!(
-                "succeeded parsing {:?} to multiple commands: {:?}",
-                &self.all[self.parsed..],
-                success
-            );
-        }
+        assert!(
+            success.len() <= 1,
+            "succeeded parsing {:?} to multiple commands: {:?}",
+            &self.all[self.parsed..],
+            success
+        );
 
         let (mut tok, c) = success.pop()?;
         // if we errored out while parsing the command do not move the input forwards
@@ -201,7 +200,7 @@ impl<'a> Iterator for Input<'a> {
     }
 }
 
-impl<'a> Command<'a> {
+impl Command<'_> {
     pub fn is_ok(&self) -> bool {
         match self {
             Command::Relabel(r) => r.is_ok(),

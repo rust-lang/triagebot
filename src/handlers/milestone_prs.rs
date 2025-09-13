@@ -64,18 +64,18 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     e.issue.set_milestone(&ctx.github, &version).await?;
 
     let files = e.issue.diff(&ctx.github).await?;
-    if let Some(files) = files {
-        if let Some(cargo) = files.iter().find(|fd| fd.filename == "src/tools/cargo") {
-            // The webhook timeout of 10 seconds can be too short, so process in
-            // the background.
-            let diff = cargo.patch.clone();
-            tokio::task::spawn(async move {
-                let gh = GithubClient::new_from_env();
-                if let Err(e) = milestone_cargo(&gh, &version, &diff).await {
-                    log::error!("failed to milestone cargo: {e:?}");
-                }
-            });
-        }
+    if let Some(files) = files
+        && let Some(cargo) = files.iter().find(|fd| fd.filename == "src/tools/cargo")
+    {
+        // The webhook timeout of 10 seconds can be too short, so process in
+        // the background.
+        let diff = cargo.patch.clone();
+        tokio::task::spawn(async move {
+            let gh = GithubClient::new_from_env();
+            if let Err(e) = milestone_cargo(&gh, &version, &diff).await {
+                log::error!("failed to milestone cargo: {e:?}");
+            }
+        });
     }
 
     Ok(())
@@ -87,13 +87,12 @@ async fn get_version_standalone(
 ) -> anyhow::Result<Option<String>> {
     let resp = gh
         .raw()
-        .get(&format!(
-            "https://raw.githubusercontent.com/rust-lang/rust/{}/src/version",
-            merge_sha
+        .get(format!(
+            "https://raw.githubusercontent.com/rust-lang/rust/{merge_sha}/src/version"
         ))
         .send()
         .await
-        .with_context(|| format!("retrieving src/version for {}", merge_sha))?;
+        .with_context(|| format!("retrieving src/version for {merge_sha}"))?;
 
     match resp.status() {
         StatusCode::OK => {}
@@ -109,7 +108,7 @@ async fn get_version_standalone(
     Ok(Some(
         resp.text()
             .await
-            .with_context(|| format!("deserializing src/version for {}", merge_sha))?
+            .with_context(|| format!("deserializing src/version for {merge_sha}"))?
             .trim()
             .to_string(),
     ))

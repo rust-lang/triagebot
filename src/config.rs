@@ -73,7 +73,7 @@ impl PingConfig {
             return Some((team, cfg));
         }
 
-        for (name, cfg) in self.teams.iter() {
+        for (name, cfg) in &self.teams {
             if cfg.alias.contains(team) {
                 return Some((name, cfg));
             }
@@ -147,7 +147,7 @@ impl AssignConfig {
     /// Return a "fallback" adhoc group, which is used for assigning reviewers if no other
     /// reviewer was found.
     pub(crate) fn fallback_review_group(&self) -> Option<&[String]> {
-        self.adhoc_groups.get("fallback").map(|v| v.as_slice())
+        self.adhoc_groups.get("fallback").map(Vec::as_slice)
     }
 }
 
@@ -277,7 +277,7 @@ pub(crate) struct AutolabelConfig {
 impl AutolabelConfig {
     pub(crate) fn get_by_trigger(&self, trigger: &str) -> Vec<(&str, &AutolabelLabelConfig)> {
         let mut results = Vec::new();
-        for (label, cfg) in self.labels.iter() {
+        for (label, cfg) in &self.labels {
             if cfg.trigger_labels.iter().any(|l| l == trigger) {
                 results.push((label.as_str(), cfg));
             }
@@ -346,7 +346,7 @@ impl<'de> serde::Deserialize<'de> for NotifyZulipTablesConfig {
         if !direct_fields.is_empty() {
             let direct = NotifyZulipLabelConfig::deserialize(Value::Table(direct_fields))
                 .map_err(Error::custom)?;
-            subtables.insert("".to_string(), direct);
+            subtables.insert(String::new(), direct);
         }
 
         Ok(NotifyZulipTablesConfig { subtables })
@@ -525,20 +525,15 @@ pub(crate) struct IssueLinksConfig {
     pub(crate) check_commits: IssueLinksCheckCommitsConfig,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Default)]
 pub(crate) enum IssueLinksCheckCommitsConfig {
     /// No checking of commits
     Off,
     /// Only check for uncanonicalized issue links in commits
     Uncanonicalized,
     /// Check for all issue links in commits
+    #[default]
     All,
-}
-
-impl Default for IssueLinksCheckCommitsConfig {
-    fn default() -> Self {
-        IssueLinksCheckCommitsConfig::All
-    }
 }
 
 impl<'de> serde::Deserialize<'de> for IssueLinksCheckCommitsConfig {
@@ -548,7 +543,7 @@ impl<'de> serde::Deserialize<'de> for IssueLinksCheckCommitsConfig {
     {
         struct CheckCommitsVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for CheckCommitsVisitor {
+        impl serde::de::Visitor<'_> for CheckCommitsVisitor {
             type Value = IssueLinksCheckCommitsConfig;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -650,7 +645,7 @@ async fn get_fresh_config(
         .await
         .map_err(|e| ConfigurationError::Http(Arc::new(e)))?
         .ok_or(ConfigurationError::Missing)?;
-    let contents = String::from_utf8_lossy(&*contents);
+    let contents = String::from_utf8_lossy(&contents);
     let config = Arc::new(toml::from_str::<Config>(&contents).map_err(ConfigurationError::Toml)?);
     log::debug!("fresh configuration for {}: {:?}", repo.full_name, config);
     Ok(config)

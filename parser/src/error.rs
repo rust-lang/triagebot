@@ -8,25 +8,25 @@ pub struct Error<'a> {
     pub source: Box<dyn error::Error + Send>,
 }
 
-impl<'a> PartialEq for Error<'a> {
+impl PartialEq for Error<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.input == other.input && self.position == other.position
     }
 }
 
-impl<'a> error::Error for Error<'a> {
+impl error::Error for Error<'_> {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         Some(&*self.source)
     }
 }
 
-impl<'a> Error<'a> {
+impl Error<'_> {
     pub fn position(&self) -> usize {
         self.position
     }
 }
 
-impl<'a> fmt::Display for Error<'a> {
+impl fmt::Display for Error<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let space = 10;
         let end = std::cmp::min(self.input.len(), self.position + space);

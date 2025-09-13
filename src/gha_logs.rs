@@ -138,14 +138,13 @@ pub async fn gha_logs(
                 .tree
                 .iter()
                 .zip(&roots_trees)
-                .map(|(root, childs)| {
+                .flat_map(|(root, childs)| {
                     childs
                         .tree
                         .iter()
                         .filter(|t| t.object_type == "tree" || t.object_type == "blob")
                         .map(|t| format!("{}/{}", root.path, t.path))
                 })
-                .flatten()
                 .collect();
 
             // We need to sort the tree roots by descending order, otherwise `library/std` will
@@ -358,8 +357,7 @@ body {{
     );
     headers.insert(
         CONTENT_SECURITY_POLICY,
-        HeaderValue::from_str(&*
-        format!(
+        HeaderValue::from_str(&format!(
             "default-src 'none'; script-src 'nonce-{nonce}' 'self'; style-src 'unsafe-inline'; img-src 'self' www.rust-lang.org"
         )).unwrap(),
     );

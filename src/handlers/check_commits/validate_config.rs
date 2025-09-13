@@ -31,7 +31,7 @@ pub(super) async fn validate_config(
         .context("{CONFIG_FILE_NAME} modified, but failed to get content")?;
 
     let triagebot_content = triagebot_content.unwrap_or_default();
-    let triagebot_content = String::from_utf8_lossy(&*triagebot_content);
+    let triagebot_content = String::from_utf8_lossy(&triagebot_content);
 
     match toml::from_str::<crate::handlers::Config>(&triagebot_content) {
         Err(e) => {

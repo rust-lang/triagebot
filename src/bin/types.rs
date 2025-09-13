@@ -7,7 +7,7 @@ async fn main() -> anyhow::Result<()> {
 
     let args: Vec<String> = std::env::args().collect();
     if args.len() == 2 {
-        match &args[1][..] {
+        match &*args[1] {
             "planning" => {
                 let agenda = agenda::types_planning();
                 print!("{}", agenda.call().await?);

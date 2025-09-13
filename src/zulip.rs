@@ -137,20 +137,14 @@ pub async fn webhook(
 
 pub fn get_token_from_env() -> Result<String, anyhow::Error> {
     // ZULIP_WEBHOOK_SECRET is preferred, ZULIP_TOKEN is kept for retrocompatibility but will be deprecated
-    match std::env::var("ZULIP_WEBHOOK_SECRET") {
-        Ok(v) => return Ok(v),
-        Err(_) => (),
-    }
-
-    match std::env::var("ZULIP_TOKEN") {
-        Ok(v) => return Ok(v),
-        Err(_) => (),
-    }
-
-    log::error!(
-        "Cannot communicate with Zulip: neither ZULIP_WEBHOOK_SECRET or ZULIP_TOKEN are set."
-    );
-    anyhow::bail!("Cannot communicate with Zulip.");
+    std::env::var("ZULIP_WEBHOOK_SECRET")
+        .or_else(|_| std::env::var("ZULIP_TOKEN"))
+        .or_else(|_| {
+            log::error!(
+                "Cannot communicate with Zulip: neither ZULIP_WEBHOOK_SECRET or ZULIP_TOKEN are set."
+            );
+            Err(anyhow::anyhow!("Cannot communicate with Zulip."))
+        })
 }
 
 /// Processes a Zulip webhook.
@@ -210,7 +204,7 @@ async fn handle_command<'a>(
                 }
 
                 // Skip the first two arguments for the rest of CLI parsing
-                words = words[2..].iter().copied().collect();
+                words = words[2..].to_vec();
             } else {
                 return Err(anyhow::anyhow!(
                     "Failed to parse command; expected `as <username> <command...>`."
@@ -226,7 +220,7 @@ async fn handle_command<'a>(
                 acknowledge(&ctx, gh_id, identifier.into()).await
             }
             ChatCommand::Add { url, description } => {
-                add_notification(&ctx, gh_id, &url, &description.join(" ")).await
+                add_notification(&ctx, gh_id, url, &description.join(" ")).await
             }
             ChatCommand::Move { from, to } => move_notification(&ctx, gh_id, *from, *to).await,
             ChatCommand::Meta { index, description } => {
@@ -236,10 +230,10 @@ async fn handle_command<'a>(
             ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
             ChatCommand::Work(cmd) => workqueue_commands(&ctx, gh_id, cmd).await,
             ChatCommand::PingGoals(args) => {
-                ping_goals_cmd(ctx.clone(), gh_id, message_data, &args).await
+                ping_goals_cmd(ctx.clone(), gh_id, message_data, args).await
             }
             ChatCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
-            ChatCommand::TeamStats { name } => team_status_cmd(&ctx, &name).await,
+            ChatCommand::TeamStats { name } => team_status_cmd(&ctx, name).await,
         };
 
         let output = output?;
@@ -285,7 +279,7 @@ async fn handle_command<'a>(
             return Ok(Some("Unknown command".to_string()));
         }
 
-        let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].into_iter().copied())?;
+        let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].iter().copied())?;
         tracing::info!("command parsed to {cmd:?}");
 
         match cmd {
@@ -394,12 +388,11 @@ async fn team_status_cmd(ctx: &Context, team_name: &str) -> anyhow::Result<Optio
         let review_prefs = review_prefs.get(member.github.as_str());
         let max_capacity = review_prefs
             .as_ref()
-            .and_then(|prefs| prefs.max_assigned_prs);
+            .and_then(|prefs| prefs.max_assigned_prs)
+            .map(|c| c.to_string());
+        let max_capacity = max_capacity.as_deref().unwrap_or("unlimited");
         let assigned_prs = workqueue.assigned_pr_count(member.github_id);
 
-        let max_capacity = max_capacity
-            .map(|c| c.to_string())
-            .unwrap_or_else(|| "unlimited".to_string());
         format!(
             "| `{}` | {} | `{assigned_prs}` | `{max_capacity}` |",
             member.github, member.name
@@ -656,7 +649,7 @@ async fn lookup_cmd(ctx: &Context, cmd: &LookupCmd) -> anyhow::Result<Option<Str
 
     // The username could be a mention, which looks like this: `@**<username>**`, so strip the
     // extra sigils.
-    let username = username.trim_matches(&['@', '*']);
+    let username = username.trim_matches(['@', '*']);
 
     match cmd {
         LookupCmd::GitHub { .. } => Ok(Some(lookup_github_username(ctx, username).await?)),
@@ -684,22 +677,21 @@ async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::
 
     // Prefer what is configured on Zulip. If there is nothing, try to lookup the GitHub username
     // from the team database.
-    let github_username = match zulip_user.get_github_username() {
-        Some(name) => name.to_string(),
-        None => {
-            let zulip_id = zulip_user.user_id;
-            let Some(gh_id) = ctx.team.zulip_to_github_id(zulip_id).await? else {
-                return Ok(format!(
-                    "Zulip user {zulip_username} was not found in team Zulip mapping. Maybe they do not have zulip-id configured in team."
-                ));
-            };
-            let Some(username) = ctx.team.username_from_gh_id(gh_id).await? else {
-                return Ok(format!(
-                    "Zulip user {zulip_username} was not found in the team database."
-                ));
-            };
-            username
-        }
+    let github_username = if let Some(name) = zulip_user.get_github_username() {
+        name.to_string()
+    } else {
+        let zulip_id = zulip_user.user_id;
+        let Some(gh_id) = ctx.team.zulip_to_github_id(zulip_id).await? else {
+            return Ok(format!(
+                "Zulip user {zulip_username} was not found in team Zulip mapping. Maybe they do not have zulip-id configured in team."
+            ));
+        };
+        let Some(username) = ctx.team.username_from_gh_id(gh_id).await? else {
+            return Ok(format!(
+                "Zulip user {zulip_username} was not found in the team database."
+            ));
+        };
+        username
     };
 
     Ok(format!(
@@ -727,9 +719,7 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
         Ok(users
             .into_iter()
             .find(|user| {
-                user.get_github_username()
-                    .map(|u| u.to_lowercase())
-                    .as_deref()
+                user.get_github_username().map(str::to_lowercase).as_deref()
                     == Some(username_lowercase.as_str())
             })
             .map(|u| u.user_id))
@@ -781,7 +771,7 @@ pub(crate) struct MessageApiRequest<'a> {
     pub(crate) content: &'a str,
 }
 
-impl<'a> MessageApiRequest<'a> {
+impl MessageApiRequest<'_> {
     pub fn url(&self, zulip: &ZulipClient) -> String {
         self.recipient.url(zulip)
     }
@@ -799,7 +789,7 @@ pub struct UpdateMessageApiRequest<'a> {
     pub content: Option<&'a str>,
 }
 
-impl<'a> UpdateMessageApiRequest<'a> {
+impl UpdateMessageApiRequest<'_> {
     pub async fn send(&self, client: &ZulipClient) -> anyhow::Result<()> {
         client
             .update_message(
@@ -818,7 +808,7 @@ async fn acknowledge<'a>(
     ident: Identifier<'a>,
 ) -> anyhow::Result<Option<String>> {
     let mut db = ctx.db.get().await;
-    let deleted = delete_ping(&mut *db, gh_id, ident)
+    let deleted = delete_ping(&mut db, gh_id, ident)
         .await
         .map_err(|e| format_err!("Failed to acknowledge {ident:?}: {e:?}."))?;
 
@@ -836,7 +826,7 @@ async fn acknowledge<'a>(
                 deleted.origin_url,
                 deleted
                     .metadata
-                    .map_or(String::new(), |m| format!(" ({})", m)),
+                    .map_or(String::new(), |m| format!(" ({m})")),
             ));
         }
         resp
@@ -928,7 +918,7 @@ struct AddReaction<'a> {
     emoji_name: &'a str,
 }
 
-impl<'a> AddReaction<'a> {
+impl AddReaction<'_> {
     pub async fn send(self, client: &ZulipClient) -> anyhow::Result<()> {
         client.add_reaction(self.message_id, self.emoji_name).await
     }

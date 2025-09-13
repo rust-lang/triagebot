@@ -21,7 +21,7 @@ impl Changelog {
     }
 
     pub(crate) fn version(&self, version: &str) -> Option<&str> {
-        self.versions.get(version).map(|s| s.as_str())
+        self.versions.get(version).map(String::as_str)
     }
 }
 
@@ -34,7 +34,7 @@ fn render_for_github_releases<'a>(document: &'a AstNode<'a>) -> anyhow::Result<S
                 // Prevent column width line breaks from appearing in the generated release
                 // notes. GitHub Releases insert <br>s for every line break in the markdown,
                 // mangling the output.
-                width: std::usize::MAX,
+                width: usize::MAX,
 
                 ..ComrakRenderOptions::default()
             },

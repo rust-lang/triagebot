@@ -24,7 +24,7 @@ impl<'a> RustcFormat<'a> {
     }
 
     pub(super) fn parse(mut self, content: &str) -> anyhow::Result<Changelog> {
-        let ast = comrak::parse_document(&self.arena, &content, &ComrakOptions::default());
+        let ast = comrak::parse_document(self.arena, content, &ComrakOptions::default());
 
         let mut section_ast = Vec::new();
         for child in ast.children() {
@@ -69,7 +69,7 @@ impl<'a> RustcFormat<'a> {
         if let Some(version) = h1.split(' ').nth(1) {
             self.result.versions.insert(version.to_string(), content);
         } else {
-            println!("skipped version, invalid header: {}", h1);
+            println!("skipped version, invalid header: {h1}");
         }
 
         Ok(())
