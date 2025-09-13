@@ -681,22 +681,21 @@ async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::
 
     // Prefer what is configured on Zulip. If there is nothing, try to lookup the GitHub username
     // from the team database.
-    let github_username = match zulip_user.get_github_username() {
-        Some(name) => name.to_string(),
-        None => {
-            let zulip_id = zulip_user.user_id;
-            let Some(gh_id) = ctx.team.zulip_to_github_id(zulip_id).await? else {
-                return Ok(format!(
-                    "Zulip user {zulip_username} was not found in team Zulip mapping. Maybe they do not have zulip-id configured in team."
-                ));
-            };
-            let Some(username) = ctx.team.username_from_gh_id(gh_id).await? else {
-                return Ok(format!(
-                    "Zulip user {zulip_username} was not found in the team database."
-                ));
-            };
-            username
-        }
+    let github_username = if let Some(name) = zulip_user.get_github_username() {
+        name.to_string()
+    } else {
+        let zulip_id = zulip_user.user_id;
+        let Some(gh_id) = ctx.team.zulip_to_github_id(zulip_id).await? else {
+            return Ok(format!(
+                "Zulip user {zulip_username} was not found in team Zulip mapping. Maybe they do not have zulip-id configured in team."
+            ));
+        };
+        let Some(username) = ctx.team.username_from_gh_id(gh_id).await? else {
+            return Ok(format!(
+                "Zulip user {zulip_username} was not found in the team database."
+            ));
+        };
+        username
     };
 
     Ok(format!(

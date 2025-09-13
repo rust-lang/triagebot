@@ -44,7 +44,7 @@ impl PingCommand {
             } else {
                 return Err(toks.error(ParseError::NoTeam));
             };
-            if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
+            if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
                 *input = toks;
                 Ok(Some(PingCommand { team }))

@@ -18,11 +18,7 @@ pub(super) async fn handle_command(
     event: &Event,
     team_name: PingCommand,
 ) -> anyhow::Result<()> {
-    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.team).await {
-        false
-    } else {
-        true
-    };
+    let is_team_member = matches!(event.user().is_team_member(&ctx.team).await, Ok(true));
 
     if !is_team_member {
         let cmnt = ErrorComment::new(

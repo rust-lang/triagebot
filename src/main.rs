@@ -119,15 +119,14 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
                     // Log the request id as generated.
                     let request_id = request.headers().get(REQUEST_ID_HEADER);
 
-                    match request_id {
-                        Some(request_id) => info_span!(
+                    if let Some(request_id) = request_id {
+                        info_span!(
                             "request",
                             request_id = ?request_id,
-                        ),
-                        None => {
-                            tracing::error!("could not extract request_id");
-                            info_span!("request")
-                        }
+                        )
+                    } else {
+                        tracing::error!("could not extract request_id");
+                        info_span!("request")
                     }
                 })
                 .on_request(|request: &Request<Body>, _span: &tracing::Span| {

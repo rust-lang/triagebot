@@ -10,15 +10,13 @@ pub fn get_mentions(input: &str) -> Vec<&str> {
 
     let mut mentions = Vec::new();
     for (idx, _) in input.match_indices('@') {
-        if let Some(previous) = input[..idx].chars().next_back() {
-            // A github username must stand apart from other text.
-            //
-            // Oddly enough, english letters do not work, but letters outside
-            // ASCII do work as separators; for now just go with this limited
-            // list.
-            if let 'a'..='z' | 'A'..='Z' | '0'..='9' = previous {
-                continue;
-            }
+        // A github username must stand apart from other text.
+        //
+        // Oddly enough, english letters do not work, but letters outside
+        // ASCII do work as separators; for now just go with this limited
+        // list.
+        if let Some('a'..='z' | 'A'..='Z' | '0'..='9') = input[..idx].chars().next_back() {
+            continue;
         }
         let mut saw_slash = false;
         let username_end = input
