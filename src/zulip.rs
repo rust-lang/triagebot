@@ -723,9 +723,7 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
         Ok(users
             .into_iter()
             .find(|user| {
-                user.get_github_username()
-                    .map(|u| u.to_lowercase())
-                    .as_deref()
+                user.get_github_username().map(str::to_lowercase).as_deref()
                     == Some(username_lowercase.as_str())
             })
             .map(|u| u.user_id))

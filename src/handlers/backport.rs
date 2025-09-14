@@ -76,7 +76,7 @@ pub(super) async fn parse_input(
         .clone()
         .filter(|(_cfg_name, cfg)| {
             let required_pr_labels: Vec<&str> =
-                cfg.required_pr_labels.iter().map(|l| l.as_str()).collect();
+                cfg.required_pr_labels.iter().map(String::as_str).collect();
             if !contains_any(&pr_labels, &required_pr_labels) {
                 log::warn!(
                     "Skipping backport nomination: PR is missing one required label: {:?}",

@@ -147,7 +147,7 @@ impl AssignConfig {
     /// Return a "fallback" adhoc group, which is used for assigning reviewers if no other
     /// reviewer was found.
     pub(crate) fn fallback_review_group(&self) -> Option<&[String]> {
-        self.adhoc_groups.get("fallback").map(|v| v.as_slice())
+        self.adhoc_groups.get("fallback").map(Vec::as_slice)
     }
 }
 
