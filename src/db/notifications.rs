@@ -110,8 +110,8 @@ pub async fn delete_ping(
             let deleted_notification = NotificationData {
                 origin_url,
                 origin_text,
-                time,
                 short_description,
+                time,
                 metadata,
             };
 
@@ -148,8 +148,8 @@ pub async fn delete_ping(
                     NotificationData {
                         origin_url,
                         origin_text,
-                        time,
                         short_description,
+                        time,
                         metadata,
                     }
                 })
