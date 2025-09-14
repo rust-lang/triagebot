@@ -116,7 +116,7 @@ pub async fn delete_ping(
             };
 
             if let Err(e) = t.commit().await {
-                if e.code().map_or(false, |c| {
+                if e.code().is_some_and(|c| {
                     *c == tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE
                 }) {
                     log::trace!("serialization failure, restarting deletion");
@@ -230,9 +230,9 @@ pub async fn move_indices(
         }
 
         if let Err(e) = t.commit().await {
-            if e.code().map_or(false, |c| {
-                *c == tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE
-            }) {
+            if e.code()
+                .is_some_and(|c| *c == tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE)
+            {
                 log::trace!("serialization failure, restarting index movement");
                 continue;
             } else {
@@ -294,9 +294,9 @@ pub async fn add_metadata(
         }
 
         if let Err(e) = t.commit().await {
-            if e.code().map_or(false, |c| {
-                *c == tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE
-            }) {
+            if e.code()
+                .is_some_and(|c| *c == tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE)
+            {
                 log::trace!("serialization failure, restarting index movement");
                 continue;
             } else {

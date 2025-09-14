@@ -460,8 +460,8 @@ impl HtmlDiffPrinter<'_> {
         let mut words = words.peekable();
 
         let first_word = words.peek();
-        let is_add = first_word.map(|w| w.0.starts_with('+')).unwrap_or_default();
-        let is_remove = first_word.map(|w| w.0.starts_with('-')).unwrap_or_default();
+        let is_add = first_word.is_some_and(|w| w.0.starts_with('+'));
+        let is_remove = first_word.is_some_and(|w| w.0.starts_with('-'));
 
         // Highlight in the same was as `git range-diff` does for diff-lines
         // that changed. In addition we also do word highlighting.

@@ -147,8 +147,7 @@ impl GithubClient {
             let rate_limit = if req
                 .url()
                 .path_segments()
-                .map(|mut segments| matches!(segments.next(), Some("search")))
-                .unwrap_or(false)
+                .is_some_and(|mut segments| segments.next() == Some("search"))
             {
                 rate_limit_response.resources.search
             } else {
@@ -308,10 +307,10 @@ impl User {
         let map = permission.teams;
         let is_triager = map
             .get("wg-triage")
-            .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
+            .is_some_and(|w| w.members.iter().any(|g| g.github == self.login));
         let is_async_member = map
             .get("wg-async")
-            .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
+            .is_some_and(|w| w.members.iter().any(|g| g.github == self.login));
         let in_all = map["all"].members.iter().any(|g| g.github == self.login);
         log::trace!(
             "{:?} is all?={:?}, triager?={:?}, async?={:?}",
@@ -601,7 +600,7 @@ impl IssueRepository {
             Ok(_) => Ok(true),
             Err(e) => {
                 if e.downcast_ref::<reqwest::Error>()
-                    .map_or(false, |e| e.status() == Some(StatusCode::NOT_FOUND))
+                    .is_some_and(|e| e.status() == Some(StatusCode::NOT_FOUND))
                 {
                     Ok(false)
                 } else {
@@ -1939,7 +1938,7 @@ impl Repository {
         {
             Ok(_) => return Ok(()),
             Err(e) => {
-                if e.downcast_ref::<reqwest::Error>().map_or(false, |e| {
+                if e.downcast_ref::<reqwest::Error>().is_some_and(|e| {
                     matches!(
                         e.status(),
                         Some(StatusCode::UNPROCESSABLE_ENTITY | StatusCode::CONFLICT)
@@ -2848,9 +2847,9 @@ impl GithubClient {
                 return Ok(milestone);
             }
             Err(e) => {
-                if e.downcast_ref::<reqwest::Error>().map_or(false, |e| {
-                    matches!(e.status(), Some(StatusCode::UNPROCESSABLE_ENTITY))
-                }) {
+                if e.downcast_ref::<reqwest::Error>()
+                    .is_some_and(|e| e.status() == Some(StatusCode::UNPROCESSABLE_ENTITY))
+                {
                     // fall-through, it already exists
                 } else {
                     return Err(e.context(format!(

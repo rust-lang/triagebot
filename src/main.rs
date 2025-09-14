@@ -42,10 +42,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 
     // Loading the workqueue takes ~10-15s, and it's annoying for local rebuilds.
     // Allow users to opt out of it.
-    let skip_loading_workqueue = env::var("SKIP_WORKQUEUE")
-        .ok()
-        .map(|v| v == "1")
-        .unwrap_or(false);
+    let skip_loading_workqueue = env::var("SKIP_WORKQUEUE").is_ok_and(|v| v == "1");
 
     // Load the initial workqueue state from GitHub
     // In case this fails, we do not want to block triagebot, instead
