@@ -64,7 +64,7 @@ impl<'a> Input<'a> {
     pub fn new(input: &'a str, bot: Vec<&'a str>) -> Input<'a> {
         let bots: Vec<_> = bot.iter().map(|bot| format!(r"(?:@{bot}\b)")).collect();
         let bot_re = Regex::new(&format!(
-            r#"(?i)(?P<review>\br\?)|{bots}"#,
+            r"(?i)(?P<review>\br\?)|{bots}",
             bots = bots.join("|")
         ))
         .unwrap();
