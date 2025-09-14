@@ -1522,16 +1522,11 @@ impl Repository {
         let filters = filters
             .iter()
             .map(|(key, val)| format!("{key}={val}"))
-            .chain(std::iter::once(format!(
-                "labels={}",
-                include_labels.join(",")
-            )))
-            .chain(std::iter::once("filter=all".to_owned()))
-            .chain(std::iter::once(format!("sort={}", ordering.sort,)))
-            .chain(std::iter::once(
-                format!("direction={}", ordering.direction,),
-            ))
-            .chain(std::iter::once(format!("per_page={}", ordering.per_page,)))
+            .chain([format!("labels={}", include_labels.join(","))])
+            .chain(["filter=all".to_owned()])
+            .chain([format!("sort={}", ordering.sort)])
+            .chain([format!("direction={}", ordering.direction)])
+            .chain([format!("per_page={}", ordering.per_page)])
             .collect::<Vec<_>>()
             .join("&");
         format!(
@@ -1554,7 +1549,7 @@ impl Repository {
             .map(|(key, val)| format!("{key}:{val}"))
             .chain(include_labels.iter().map(|label| format!("label:{label}")))
             .chain(exclude_labels.iter().map(|label| format!("-label:{label}")))
-            .chain(std::iter::once(format!("repo:{}", self.full_name)))
+            .chain([format!("repo:{}", self.full_name)])
             .collect::<Vec<_>>()
             .join("+");
         format!(
