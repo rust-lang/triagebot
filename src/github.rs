@@ -1415,9 +1415,7 @@ impl Repository {
             .collect();
 
         // `is: pull-request` indicates the query to retrieve PRs only
-        let is_pr = filters
-            .iter()
-            .any(|&(key, value)| key == "is" && value == "pull-request");
+        let is_pr = filters.contains(&("is", "pull-request"));
 
         // There are some cases that can only be handled by the search API:
         // 1. When using negating label filters (exclude_labels)
@@ -1524,7 +1522,7 @@ impl Repository {
     ) -> String {
         let filters = filters
             .iter()
-            .filter(|&&(key, val)| !(key == "state" && val == "all"))
+            .filter(|filter| **filter != ("state", "all"))
             .map(|(key, val)| format!("{key}:{val}"))
             .chain(include_labels.iter().map(|label| format!("label:{label}")))
             .chain(exclude_labels.iter().map(|label| format!("-label:{label}")))
