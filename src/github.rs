@@ -1526,7 +1526,7 @@ impl Repository {
     ) -> String {
         let filters = filters
             .iter()
-            .filter(|&&(key, val)| !(key == "state" && val == "all"))
+            .filter(|filter| **filter != ("state", "all"))
             .map(|(key, val)| format!("{key}:{val}"))
             .chain(include_labels.iter().map(|label| format!("label:{label}")))
             .chain(exclude_labels.iter().map(|label| format!("-label:{label}")))
