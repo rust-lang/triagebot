@@ -56,9 +56,7 @@ pub(super) async fn parse_input(
         .issue
         .diff(&ctx.github)
         .await
-        .map_err(|e| {
-            log::error!("failed to fetch diff: {:?}", e);
-        })
+        .map_err(|e| log::error!("failed to fetch diff: {e:?}"))
         .unwrap_or_default()
     {
         let file_paths: Vec<_> = files.iter().map(|fd| Path::new(&fd.filename)).collect();

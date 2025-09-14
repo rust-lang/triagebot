@@ -62,15 +62,11 @@ pub async fn check_project_goal_acl(team_client: &TeamClient, gh_id: u64) -> any
     let team = match team_client.get_team(GOALS_TEAM).await {
         Ok(Some(team)) => team,
         Ok(None) => {
-            log::info!("team ({}) failed to resolve to a known team", GOALS_TEAM);
+            log::info!("team ({GOALS_TEAM}) failed to resolve to a known team");
             return Ok(false);
         }
         Err(err) => {
-            log::error!(
-                "team ({}) failed to resolve to a known team: {:?}",
-                GOALS_TEAM,
-                err
-            );
+            log::error!("team ({GOALS_TEAM}) failed to resolve to a known team: {err:?}");
             return Ok(false);
         }
     };

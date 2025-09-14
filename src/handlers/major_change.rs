@@ -174,8 +174,7 @@ pub(super) async fn handle_input(
             }
             .url(&ctx.zulip);
             let breadcrumb_comment = format!(
-                "The associated GitHub issue has been renamed. Please see the [renamed Zulip topic]({}).",
-                new_topic_url
+                "The associated GitHub issue has been renamed. Please see the [renamed Zulip topic]({new_topic_url})."
             );
             let zulip_send_breadcrumb_req = crate::zulip::MessageApiRequest {
                 recipient: Recipient::Stream {
@@ -394,9 +393,8 @@ See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/c
 </details>
 {}
 
-[stream]: {}"#,
+[stream]: {topic_url}"#,
             config.open_extra_text.as_deref().unwrap_or_default(),
-            topic_url
         );
         issue
             .post_comment(&ctx.github, &comment)

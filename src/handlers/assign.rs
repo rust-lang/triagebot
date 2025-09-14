@@ -261,10 +261,9 @@ async fn set_assignee(
     }
     if let Err(err) = issue.set_assignee(github, &reviewer.name).await {
         log::warn!(
-            "failed to set assignee of PR {} to {}: {:?}",
+            "failed to set assignee of PR {} to {}: {err:?}",
             issue.global_id(),
             reviewer.name,
-            err
         );
         if let Err(e) = issue
             .post_comment(
@@ -561,7 +560,7 @@ pub(super) async fn handle_command(
                         .await
                     {
                         if let Some(github::UnknownLabels { .. }) = err.downcast_ref() {
-                            log::warn!("Error assigning label: {}", err);
+                            log::warn!("Error assigning label: {err}");
                         } else {
                             return Err(err);
                         }
@@ -647,9 +646,8 @@ pub(super) async fn handle_command(
         // Don't re-assign if aleady assigned, e.g. on comment edit
         if issue.contain_assignee(&to_assign) {
             log::trace!(
-                "ignoring assign issue {} to {}, already assigned",
-                issue.global_id(),
-                to_assign,
+                "ignoring assign issue {issue} to {to_assign}, already assigned",
+                issue = issue.global_id(),
             );
             return Ok(());
         }
@@ -668,8 +666,7 @@ pub(super) async fn handle_command(
                     .await
                     .context("self-assignment failed")?;
                 let cmt_body = format!(
-                    "This issue has been assigned to @{} via [this comment]({}).",
-                    to_assign,
+                    "This issue has been assigned to @{to_assign} via [this comment]({}).",
                     event.html_url().unwrap()
                 );
                 e.apply(&ctx.github, cmt_body).await?;

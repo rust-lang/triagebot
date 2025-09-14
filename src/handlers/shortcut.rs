@@ -31,8 +31,7 @@ pub(super) async fn handle_command(
     // NOTE: if shortcuts available to issues are created, they need to be allowed here
     if !issue.is_pr() {
         return user_error!(format!(
-            "The \"{:?}\" shortcut only works on pull requests.",
-            input
+            "The \"{input:?}\" shortcut only works on pull requests."
         ));
     }
 

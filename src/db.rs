@@ -107,7 +107,7 @@ pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client>
         };
         tokio::task::spawn(async move {
             if let Err(e) = connection.await {
-                eprintln!("database connection error: {}", e);
+                eprintln!("database connection error: {e}");
             }
         });
 
@@ -123,7 +123,7 @@ pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client>
             };
         tokio::spawn(async move {
             if let Err(e) = connection.await {
-                eprintln!("database connection error: {}", e);
+                eprintln!("database connection error: {e}");
             }
         });
 
@@ -186,13 +186,13 @@ pub async fn run_migrations(client: &mut DbClient) -> anyhow::Result<()> {
                 .context("Cannot create migration transactin")?;
             tx.execute(*migration, &[])
                 .await
-                .with_context(|| format!("executing {}th migration", idx))?;
+                .with_context(|| format!("executing {idx}th migration"))?;
             tx.execute(
                 "UPDATE database_versions SET migration_counter = $1",
                 &[&(idx as i32 + 1)],
             )
             .await
-            .with_context(|| format!("updating migration counter to {}", idx))?;
+            .with_context(|| format!("updating migration counter to {idx}"))?;
             tx.commit()
                 .await
                 .context("Cannot commit migration transaction")?;
@@ -236,7 +236,7 @@ pub async fn schedule_job(
 pub async fn run_scheduled_jobs(ctx: &Context) -> anyhow::Result<()> {
     let db = &ctx.db.get().await;
     let jobs = get_jobs_to_execute(db).await?;
-    tracing::trace!("jobs to execute: {:#?}", jobs);
+    tracing::trace!("jobs to execute: {jobs:#?}");
 
     for job in jobs.iter() {
         update_job_executed_at(db, &job.id).await?;
@@ -247,7 +247,7 @@ pub async fn run_scheduled_jobs(ctx: &Context) -> anyhow::Result<()> {
                 delete_job(db, &job.id).await?;
             }
             Err(e) => {
-                tracing::error!("job failed on execution (id={:?}, error={:?})", job.id, e);
+                tracing::error!("job failed on execution (id={:?}, error={e:?})", job.id);
                 update_job_error_message(db, &job.id, &e.to_string()).await?;
             }
         }
@@ -267,11 +267,7 @@ async fn handle_job(
             return job.run(ctx, metadata).await;
         }
     }
-    tracing::trace!(
-        "handle_job fell into default case: (name={:?}, metadata={:?})",
-        name,
-        metadata
-    );
+    tracing::trace!("handle_job fell into default case: (name={name:?}, metadata={metadata:?})");
 
     Ok(())
 }

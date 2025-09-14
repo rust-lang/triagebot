@@ -46,12 +46,12 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let version = if let Some(version) = get_version_standalone(&ctx.github, merge_sha).await? {
         version
     } else {
-        log::error!("could not find the version of {:?}", merge_sha);
+        log::error!("could not find the version of {merge_sha:?}");
         return Ok(());
     };
 
     if !version.starts_with("1.") && version.len() < 8 {
-        log::error!("Weird version {:?} for {:?}", version, merge_sha);
+        log::error!("Weird version {version:?} for {merge_sha:?}");
         return Ok(());
     }
 
@@ -88,28 +88,25 @@ async fn get_version_standalone(
     let resp = gh
         .raw()
         .get(format!(
-            "https://raw.githubusercontent.com/rust-lang/rust/{}/src/version",
-            merge_sha
+            "https://raw.githubusercontent.com/rust-lang/rust/{merge_sha}/src/version"
         ))
         .send()
         .await
-        .with_context(|| format!("retrieving src/version for {}", merge_sha))?;
+        .with_context(|| format!("retrieving src/version for {merge_sha}"))?;
 
     match resp.status() {
         StatusCode::OK => {}
         // Don't treat a 404 as a failure, we'll try another way to retrieve the version.
         StatusCode::NOT_FOUND => return Ok(None),
         status => anyhow::bail!(
-            "unexpected status code {} while retrieving src/version for {}",
-            status,
-            merge_sha
+            "unexpected status code {status} while retrieving src/version for {merge_sha}"
         ),
     }
 
     Ok(Some(
         resp.text()
             .await
-            .with_context(|| format!("deserializing src/version for {}", merge_sha))?
+            .with_context(|| format!("deserializing src/version for {merge_sha}"))?
             .trim()
             .to_string(),
     ))

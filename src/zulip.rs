@@ -836,7 +836,7 @@ async fn acknowledge(
                 deleted.origin_url,
                 deleted
                     .metadata
-                    .map_or(String::new(), |m| format!(" ({})", m)),
+                    .map_or(String::new(), |m| format!(" ({m})")),
             ));
         }
         resp

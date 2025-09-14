@@ -22,7 +22,7 @@ pub(super) async fn handle(
     }
 
     if let Err(e) = add_rendered_link(ctx, e, config).await {
-        tracing::error!("Error adding rendered link: {:?}", e);
+        tracing::error!("Error adding rendered link: {e:?}");
     }
 
     Ok(())

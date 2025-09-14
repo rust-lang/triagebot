@@ -379,7 +379,7 @@ macro_rules! command_handlers {
                 input.collect()
             };
 
-            log::info!("Comment parsed to {:?}", commands);
+            log::info!("Comment parsed to {commands:?}");
 
             if commands.is_empty() {
                 return;
@@ -435,10 +435,9 @@ macro_rules! command_handlers {
                     }
                     Command::$enum(Err(err)) => {
                         errors.push(HandlerError::Message(format!(
-                            "Parsing {} command in [comment]({}) failed: {}",
+                            "Parsing {} command in [comment]({}) failed: {err}",
                             stringify!($name),
                             event.html_url().expect("has html url"),
-                            err
                         )));
                     })*
                 }
@@ -477,7 +476,7 @@ impl std::error::Error for HandlerError {}
 impl fmt::Display for HandlerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            HandlerError::Message(msg) => write!(f, "{}", msg),
+            HandlerError::Message(msg) => write!(f, "{msg}"),
             HandlerError::Other(_) => write!(f, "An internal error occurred."),
         }
     }

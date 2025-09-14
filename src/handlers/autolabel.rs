@@ -47,9 +47,7 @@ pub(super) async fn parse_input(
                 .issue
                 .diff(&ctx.github)
                 .await
-                .map_err(|e| {
-                    log::error!("failed to fetch diff: {:?}", e);
-                })
+                .map_err(|e| log::error!("failed to fetch diff: {e:?}"))
                 .unwrap_or_default()
         } else {
             Default::default()
@@ -65,7 +63,7 @@ pub(super) async fn parse_input(
                 .filter_map(|label| match glob::Pattern::new(label) {
                     Ok(exclude_glob) => Some(exclude_glob),
                     Err(error) => {
-                        log::error!("Invalid glob pattern: {}", error);
+                        log::error!("Invalid glob pattern: {error}");
                         None
                     }
                 })
@@ -170,7 +168,7 @@ pub(super) async fn parse_input(
                 .filter_map(|label| match glob::Pattern::new(label) {
                     Ok(exclude_glob) => Some(exclude_glob),
                     Err(error) => {
-                        log::error!("Invalid glob pattern: {}", error);
+                        log::error!("Invalid glob pattern: {error}");
                         None
                     }
                 })

@@ -74,14 +74,14 @@ impl Recipient<'_> {
                 let mut encoded_topic = String::new();
                 for ch in topic.bytes() {
                     if !(ALWAYS_SAFE.contains(ch as char)) {
-                        write!(encoded_topic, ".{:02X}", ch).unwrap();
+                        write!(encoded_topic, ".{ch:02X}").unwrap();
                     } else {
                         encoded_topic.push(ch as char);
                     }
                 }
-                format!("stream/{}-xxx/topic/{}", id, encoded_topic)
+                format!("stream/{id}-xxx/topic/{encoded_topic}")
             }
-            Recipient::Private { id, .. } => format!("pm-with/{}-xxx", id),
+            Recipient::Private { id, .. } => format!("pm-with/{id}-xxx"),
         }
     }
 
