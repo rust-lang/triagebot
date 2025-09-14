@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fmt::{self, Write};
+use std::iter;
 use std::sync::{Arc, LazyLock};
 
 use anyhow::Context as _;
@@ -170,7 +171,7 @@ pub async fn gh_ranges_diff(
     // Get the comparison between the oldbase..oldhead
     let old = async {
         ctx.github
-            .compare(&issue_repo, &oldbase, oldhead)
+            .compare(&issue_repo, oldbase, oldhead)
             .await
             .with_context(|| {
                 format!("failed to retrive the comparison between {oldbase} and {oldhead}")
@@ -180,7 +181,7 @@ pub async fn gh_ranges_diff(
     // Get the comparison between the newbase..newhead
     let new = async {
         ctx.github
-            .compare(&issue_repo, &newbase, newhead)
+            .compare(&issue_repo, newbase, newhead)
             .await
             .with_context(|| {
                 format!("failed to retrive the comparison between {newbase} and {newhead}")
@@ -193,8 +194,8 @@ pub async fn gh_ranges_diff(
     process_old_new(
         host,
         (&owner, &repo),
-        (&oldbase, oldhead, old),
-        (&newbase, newhead, new),
+        (oldbase, oldhead, old),
+        (newbase, newhead, new),
     )
 }
 
@@ -407,10 +408,10 @@ fn process_old_new(
 
     writeln!(
         html,
-        r#"
+        r"
 </body>
 </html>
-        "#
+        "
     )?;
 
     let mut headers = HeaderMap::new();
@@ -454,13 +455,13 @@ impl HtmlDiffPrinter<'_> {
         match hunk_token_status {
             HunkTokenStatus::Added => write!(f, "{ADDED_BLOCK_SIGN} ")?,
             HunkTokenStatus::Removed => write!(f, "{REMOVED_BLOCK_SIGN} ")?,
-        };
+        }
 
         let mut words = words.peekable();
 
         let first_word = words.peek();
-        let is_add = first_word.map(|w| w.0.starts_with('+')).unwrap_or_default();
-        let is_remove = first_word.map(|w| w.0.starts_with('-')).unwrap_or_default();
+        let is_add = first_word.is_some_and(|w| w.0.starts_with('+'));
+        let is_remove = first_word.is_some_and(|w| w.0.starts_with('-'));
 
         // Highlight in the same was as `git range-diff` does for diff-lines
         // that changed. In addition we also do word highlighting.
@@ -536,9 +537,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
             // Same number of lines before and after, can do word-hightling.
 
             // Diff the individual lines together.
-            let diffs_and_inputs: Vec<_> = before
-                .into_iter()
-                .zip(after.into_iter())
+            let diffs_and_inputs: Vec<_> = iter::zip(before, after)
                 .map(|(b_token, a_token)| {
                     // Split both lines by words and intern them.
                     let input: InternedInput<&str> = InternedInput::new(
@@ -554,7 +553,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
                 .collect();
 
             // Process all before lines first
-            for (diff, input) in diffs_and_inputs.iter() {
+            for (diff, input) in &diffs_and_inputs {
                 self.handle_hunk_line(
                     &mut f,
                     HunkTokenStatus::Removed,
@@ -565,7 +564,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
             }
 
             // Then process all after lines
-            for (diff, input) in diffs_and_inputs.iter() {
+            for (diff, input) in &diffs_and_inputs {
                 self.handle_hunk_line(
                     &mut f,
                     HunkTokenStatus::Added,

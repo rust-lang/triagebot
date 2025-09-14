@@ -23,7 +23,7 @@ pub(super) fn issue_links_in_commits(
     };
 
     let issue_links_commits = commits
-        .into_iter()
+        .iter()
         .filter(|c| {
             !MERGE_IGNORE_LIST
                 .iter()

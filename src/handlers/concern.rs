@@ -48,7 +48,7 @@ pub(super) async fn handle_command(
     match crate::rfcbot::get_all_fcps().await {
         Ok(fcps) => {
             if fcps.iter().any(|(_, fcp)| {
-                fcp.issue.number as u64 == issue.number
+                u64::from(fcp.issue.number) == issue.number
                     && fcp.issue.repository == issue_comment.repository.full_name
             }) {
                 tracing::info!(
@@ -81,7 +81,7 @@ pub(super) async fn handle_command(
             issue.number,
             issue_comment.comment.user,
         );
-        ErrorComment::new(&issue, "Only team members in the [team repo](https://github.com/rust-lang/team) can add or resolve concerns.")
+        ErrorComment::new(issue, "Only team members in the [team repo](https://github.com/rust-lang/team) can add or resolve concerns.")
             .post(&ctx.github)
             .await?;
         return Ok(());
@@ -89,7 +89,7 @@ pub(super) async fn handle_command(
 
     let mut client = ctx.db.get().await;
     let mut edit: EditIssueBody<'_, ConcernData> =
-        EditIssueBody::load(&mut client, &issue, CONCERN_ISSUE_KEY)
+        EditIssueBody::load(&mut client, issue, CONCERN_ISSUE_KEY)
             .await
             .context("unable to fetch the concerns data")?;
     let concern_data = edit.data_mut();
@@ -98,17 +98,17 @@ pub(super) async fn handle_command(
     match cmd {
         ConcernCommand::Concern { title } => {
             // Only add a concern if it wasn't already added, we could be in an edit
-            if !concern_data.concerns.iter().any(|c| c.title == title) {
+            if concern_data.concerns.iter().any(|c| c.title == title) {
+                tracing::info!(
+                    "concern with the same name ({title}) already exists ({:?})",
+                    &concern_data.concerns
+                );
+            } else {
                 concern_data.concerns.push(Concern {
                     title,
                     status: ConcernStatus::Active,
                     comment_url: comment_url.to_string(),
                 });
-            } else {
-                tracing::info!(
-                    "concern with the same name ({title}) already exists ({:?})",
-                    &concern_data.concerns
-                );
             }
         }
         ConcernCommand::Resolve { title } => concern_data
@@ -154,7 +154,7 @@ pub(super) async fn handle_command(
     } else {
         for l in &config.labels {
             issue
-                .remove_label(&ctx.github, &l)
+                .remove_label(&ctx.github, l)
                 .await
                 .context("unable to remove the concern labels")?;
         }
@@ -170,7 +170,7 @@ pub(super) async fn handle_command(
 
 fn markdown_content(concerns: &[Concern], bot: &str) -> String {
     if concerns.is_empty() {
-        return "".to_string();
+        return String::new();
     }
 
     let active_concerns = concerns
@@ -180,7 +180,7 @@ fn markdown_content(concerns: &[Concern], bot: &str) -> String {
 
     let mut md = String::new();
 
-    let _ = writeln!(md, "");
+    let _ = writeln!(md);
 
     if active_concerns > 0 {
         let _ = writeln!(md, "> [!CAUTION]");
@@ -191,10 +191,10 @@ fn markdown_content(concerns: &[Concern], bot: &str) -> String {
     let _ = writeln!(md, "> # Concerns ({active_concerns} active)");
     let _ = writeln!(md, ">");
 
-    for &Concern {
-        ref title,
-        ref status,
-        ref comment_url,
+    for Concern {
+        title,
+        status,
+        comment_url,
     } in concerns
     {
         let _ = match status {

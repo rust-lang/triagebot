@@ -51,12 +51,12 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     if let Some(paired) = state.data.relnotes_issue {
         // Already has a paired release notes issue.
 
-        if let IssuesAction::Milestoned = &e.action {
-            if let Some(milestone) = &e.issue.milestone {
-                ctx.github
-                    .set_milestone(&e.issue.repository().to_string(), &milestone, paired)
-                    .await?;
-            }
+        if let IssuesAction::Milestoned = &e.action
+            && let Some(milestone) = &e.issue.milestone
+        {
+            ctx.github
+                .set_milestone(&e.issue.repository().to_string(), milestone, paired)
+                .await?;
         }
 
         return Ok(());
@@ -115,7 +115,7 @@ If this change is notable enough for inclusion in the blog post then this sectio
             let resp = ctx
                 .github
                 .new_issue(
-                    &e.issue.repository(),
+                    e.issue.repository(),
                     &title,
                     &body,
                     ["relnotes", "relnotes-tracking-issue"]
@@ -134,7 +134,7 @@ If this change is notable enough for inclusion in the blog post then this sectio
                 .await?;
             if let Some(milestone) = &e.issue.milestone {
                 ctx.github
-                    .set_milestone(&e.issue.repository().to_string(), &milestone, resp.number)
+                    .set_milestone(&e.issue.repository().to_string(), milestone, resp.number)
                     .await?;
             }
             state.data.relnotes_issue = Some(resp.number);

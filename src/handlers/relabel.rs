@@ -28,21 +28,19 @@ pub(super) async fn handle_command(
     let mut to_add = vec![];
     for delta in &input.0 {
         let name = delta.label().as_str();
-        let err = match check_filter(name, config, is_member(&event.user(), &ctx.team).await) {
+        let err = match check_filter(name, config, is_member(event.user(), &ctx.team).await) {
             Ok(CheckFilterResult::Allow) => None,
-            Ok(CheckFilterResult::Deny) => Some(format!(
-                "Label {} can only be set by Rust team members",
-                name
-            )),
+            Ok(CheckFilterResult::Deny) => {
+                Some(format!("Label {name} can only be set by Rust team members"))
+            }
             Ok(CheckFilterResult::DenyUnknown) => Some(format!(
-                "Label {} can only be set by Rust team members;\
-                 we were unable to check if you are a team member.",
-                name
+                "Label {name} can only be set by Rust team members;\
+                 we were unable to check if you are a team member."
             )),
             Err(err) => Some(err),
         };
         if let Some(msg) = err {
-            let cmnt = ErrorComment::new(&event.issue().unwrap(), msg);
+            let cmnt = ErrorComment::new(event.issue().unwrap(), msg);
             cmnt.post(&ctx.github).await?;
             return Ok(());
         }
@@ -55,7 +53,7 @@ pub(super) async fn handle_command(
             LabelDelta::Remove(label) => {
                 results.push((
                     label,
-                    event.issue().unwrap().remove_label(&ctx.github, &label),
+                    event.issue().unwrap().remove_label(&ctx.github, label),
                 ));
             }
         }
@@ -111,7 +109,7 @@ async fn is_member(user: &github::User, client: &TeamClient) -> TeamMembership {
         Ok(true) => TeamMembership::Member,
         Ok(false) => TeamMembership::Outsider,
         Err(err) => {
-            eprintln!("failed to check team membership: {:?}", err);
+            eprintln!("failed to check team membership: {err:?}");
             TeamMembership::Unknown
         }
     }
@@ -143,17 +141,17 @@ fn check_filter(
             }
             Ok(MatchPatternResult::NoMatch) => {}
             Err(err) => {
-                eprintln!("failed to match pattern {}: {}", pattern, err);
-                return Err(format!("failed to match pattern {}", pattern));
+                eprintln!("failed to match pattern {pattern}: {err}");
+                return Err(format!("failed to match pattern {pattern}"));
             }
         }
     }
     if matched {
-        return Ok(CheckFilterResult::Allow);
+        Ok(CheckFilterResult::Allow)
     } else if is_member == TeamMembership::Outsider {
-        return Ok(CheckFilterResult::Deny);
+        Ok(CheckFilterResult::Deny)
     } else {
-        return Ok(CheckFilterResult::DenyUnknown);
+        Ok(CheckFilterResult::DenyUnknown)
     }
 }
 

@@ -28,11 +28,11 @@ impl ConcernCommand {
         if let Some(Token::Word(mut action @ ("concern" | "resolve"))) = toks.peek_token()? {
             toks.next_token()?;
 
-            if action == "concern" {
-                if let Some(Token::Word(sub_action @ "resolve")) = toks.peek_token()? {
-                    toks.next_token()?;
-                    action = sub_action;
-                }
+            if action == "concern"
+                && let Some(Token::Word(sub_action @ "resolve")) = toks.peek_token()?
+            {
+                toks.next_token()?;
+                action = sub_action;
             }
 
             let title = toks.take_line()?.trim().to_string();
