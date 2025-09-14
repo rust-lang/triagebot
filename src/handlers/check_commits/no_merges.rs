@@ -41,7 +41,7 @@ pub(super) fn merges_in_commits(
         .unwrap_or(&get_default_message(
             &repository.full_name,
             &repository.default_branch,
-            merge_commits.into_iter(),
+            merge_commits,
         ))
         .to_string();
 
