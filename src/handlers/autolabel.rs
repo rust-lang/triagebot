@@ -139,12 +139,10 @@ pub(super) async fn parse_input(
                         name: label.to_owned(),
                     });
                 }
-            } else {
-                if cfg.new_issue && event.action == IssuesAction::Opened {
-                    autolabels.push(Label {
-                        name: label.to_owned(),
-                    });
-                }
+            } else if cfg.new_issue && event.action == IssuesAction::Opened {
+                autolabels.push(Label {
+                    name: label.to_owned(),
+                });
             }
         }
 

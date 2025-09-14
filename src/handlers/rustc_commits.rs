@@ -103,14 +103,12 @@ pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u
         };
         let parent_sha = gc.parents.remove(0).sha;
 
-        if pr.is_none() {
-            if let Some(tail) = gc.commit.message.strip_prefix("Auto merge of #") {
-                if let Some(end) = tail.find(' ') {
-                    if let Ok(number) = tail[..end].parse::<u32>() {
-                        pr = Some(number);
-                    }
-                }
-            }
+        if pr.is_none()
+            && let Some(tail) = gc.commit.message.strip_prefix("Auto merge of #")
+            && let Some((number, _)) = tail.split_once(' ')
+            && let Ok(number) = number.parse::<u32>()
+        {
+            pr = Some(number);
         }
 
         let Some(pr) = pr.take() else {
