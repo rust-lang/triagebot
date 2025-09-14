@@ -408,10 +408,10 @@ fn process_old_new(
 
     writeln!(
         html,
-        r#"
+        r"
 </body>
 </html>
-        "#
+        "
     )?;
 
     let mut headers = HeaderMap::new();

@@ -274,7 +274,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                     topic: &zulip_topic_name,
                 },
                 content: &format!(
-                    r#"New tracking issue goals#{goalnum}.\n* Goal title: {title}\n* Goal owners: {zulip_owners}"#
+                    r"New tracking issue goals#{goalnum}.\n* Goal title: {title}\n* Goal owners: {zulip_owners}"
                 ),
             };
             zulip_req.send(&ctx.zulip).await?;

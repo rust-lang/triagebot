@@ -369,7 +369,7 @@ async fn handle(
     if new_proposal {
         let topic_url = zulip_req.url(&ctx.zulip);
         let comment = format!(
-            r#"> [!IMPORTANT]
+            r"> [!IMPORTANT]
 > This issue is *not meant to be used for technical discussion*. There is a **Zulip [stream]** for that.
 > Use this issue to leave procedural comments, such as volunteering to review, indicating that you second the proposal (or third, etc), or raising a concern that you would like to be addressed.
 
@@ -391,7 +391,7 @@ See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/c
 </details>
 {}
 
-[stream]: {topic_url}"#,
+[stream]: {topic_url}",
             config.open_extra_text.as_deref().unwrap_or_default(),
         );
         issue
@@ -670,11 +670,11 @@ async fn process_seconded(
             .post_comment(
                 &ctx.github,
                 &format!(
-r#"The final comment period is now complete, this major change is now **accepted**.
+r"The final comment period is now complete, this major change is now **accepted**.
 
 As the automated representative, I would like to thank the author for their work and everyone else who contributed to this major change proposal.
 
-*If you think this major change shouldn't have been accepted, feel free to remove the `{}` label and reopen this issue.*"#,
+*If you think this major change shouldn't have been accepted, feel free to remove the `{}` label and reopen this issue.*",
                     &config.accept_label,
                 ),
             )
