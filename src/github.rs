@@ -2163,7 +2163,7 @@ fn quote_reply(markdown: &str) -> String {
 }
 
 #[async_trait]
-impl<'q> IssuesQuery for Query<'q> {
+impl IssuesQuery for Query<'_> {
     async fn query<'a>(
         &'a self,
         repo: &'a Repository,

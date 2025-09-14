@@ -781,7 +781,7 @@ pub(crate) struct MessageApiRequest<'a> {
     pub(crate) content: &'a str,
 }
 
-impl<'a> MessageApiRequest<'a> {
+impl MessageApiRequest<'_> {
     pub fn url(&self, zulip: &ZulipClient) -> String {
         self.recipient.url(zulip)
     }
@@ -799,7 +799,7 @@ pub struct UpdateMessageApiRequest<'a> {
     pub content: Option<&'a str>,
 }
 
-impl<'a> UpdateMessageApiRequest<'a> {
+impl UpdateMessageApiRequest<'_> {
     pub async fn send(&self, client: &ZulipClient) -> anyhow::Result<()> {
         client
             .update_message(
@@ -812,10 +812,10 @@ impl<'a> UpdateMessageApiRequest<'a> {
     }
 }
 
-async fn acknowledge<'a>(
+async fn acknowledge(
     ctx: &Context,
     gh_id: u64,
-    ident: Identifier<'a>,
+    ident: Identifier<'_>,
 ) -> anyhow::Result<Option<String>> {
     let mut db = ctx.db.get().await;
     let deleted = delete_ping(&mut *db, gh_id, ident)
@@ -928,7 +928,7 @@ struct AddReaction<'a> {
     emoji_name: &'a str,
 }
 
-impl<'a> AddReaction<'a> {
+impl AddReaction<'_> {
     pub async fn send(self, client: &ZulipClient) -> anyhow::Result<()> {
         client.add_reaction(self.message_id, self.emoji_name).await
     }

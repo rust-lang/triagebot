@@ -177,7 +177,7 @@ fn has_all_required_labels(issue: &Issue, config: &NotifyZulipLabelConfig) -> bo
     true
 }
 
-pub(super) async fn handle_input<'a>(
+pub(super) async fn handle_input(
     ctx: &Context,
     config: &NotifyZulipConfig,
     event: &IssuesEvent,

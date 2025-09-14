@@ -95,7 +95,7 @@ pub(super) async fn parse_input(
     }
 }
 
-pub(super) async fn handle_input<'a>(
+pub(super) async fn handle_input(
     ctx: &Context,
     _config: &ReviewPrefsConfig,
     event: &IssuesEvent,
