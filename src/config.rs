@@ -548,7 +548,7 @@ impl<'de> serde::Deserialize<'de> for IssueLinksCheckCommitsConfig {
     {
         struct CheckCommitsVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for CheckCommitsVisitor {
+        impl serde::de::Visitor<'_> for CheckCommitsVisitor {
             type Value = IssueLinksCheckCommitsConfig;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

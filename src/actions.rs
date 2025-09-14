@@ -103,7 +103,7 @@ pub fn to_human(d: DateTime<Utc>) -> String {
 }
 
 #[async_trait]
-impl<'a> Action for Step<'a> {
+impl Action for Step<'_> {
     async fn call(&self) -> anyhow::Result<String> {
         let mut gh = GithubClient::new_from_env();
         gh.set_retry_rate_limit(true);

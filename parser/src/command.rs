@@ -201,7 +201,7 @@ impl<'a> Iterator for Input<'a> {
     }
 }
 
-impl<'a> Command<'a> {
+impl Command<'_> {
     pub fn is_ok(&self) -> bool {
         match self {
             Command::Relabel(r) => r.is_ok(),
