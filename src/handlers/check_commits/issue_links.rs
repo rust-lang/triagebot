@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -30,8 +31,10 @@ pub(super) fn issue_links_in_commits(
                 .any(|i| c.commit.message.starts_with(i))
         })
         .filter(|c| does_match(&c.commit.message))
-        .map(|c| format!("- {}\n", c.sha))
-        .collect::<String>();
+        .fold(String::new(), |mut commits, c| {
+            _ = writeln!(commits, "- {}", c.sha);
+            commits
+        });
 
     if issue_links_commits.is_empty() {
         None

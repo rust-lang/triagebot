@@ -27,19 +27,17 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
         if first_monday.month() == today.month() {
             return Ok(());
         }
-        let meeting_date_string = first_monday.format("%Y-%m-%d").to_string();
-        let message = format!(
-            "\
+        let meeting_date_string = first_monday.format("%Y-%m-%d");
+        let message = "\
             Hello @*T-types/meetings*. Monthly planning meeting in one week.\n\
             This is a reminder to update the current [roadmap tracking issues](https://github.com/rust-lang/types-team/issues?q=is%3Aissue+is%3Aopen+label%3Aroadmap-tracking-issue).\n\
-            Extra reminders will be sent later this week."
-        );
+            Extra reminders will be sent later this week.";
         let zulip_req = crate::zulip::MessageApiRequest {
             recipient: Recipient::Stream {
                 id: TYPES_MEETINGS_STREAM,
                 topic: &format!("{meeting_date_string} planning meeting"),
             },
-            content: &message,
+            content: message,
         };
         zulip_req.send(&ctx.zulip).await?;
 
@@ -51,7 +49,7 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
         let noon = NaiveTime::from_hms_opt(12, 0, 0).unwrap();
         let thursday_at_noon = Utc.from_utc_datetime(&thursday.and_time(noon));
         let metadata = serde_json::value::to_value(PlanningMeetingUpdatesPingMetadata {
-            date_string: meeting_date_string,
+            date_string: meeting_date_string.to_string(),
         })
         .unwrap();
         schedule_job(

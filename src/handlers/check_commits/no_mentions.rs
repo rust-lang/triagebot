@@ -1,6 +1,8 @@
 //! Purpose: When opening a PR, or pushing new changes, check for github mentions
 //! in commits and notify the user of our no-mentions in commits policy.
 
+use std::fmt::Write;
+
 use crate::{config::NoMentionsConfig, github::GithubCommit};
 
 pub(super) fn mentions_in_commits(
@@ -22,8 +24,10 @@ pub(super) fn mentions_in_commits(
             let mentions = parser::get_mentions(&c.commit.message);
             !mentions.is_empty() && mentions.iter().any(|m| *m != "rustbot")
         })
-        .map(|c| format!("- {}\n", c.sha))
-        .collect::<String>();
+        .fold(String::new(), |mut commits, c| {
+            _ = writeln!(commits, "- {}", c.sha);
+            commits
+        });
 
     if mentions_commits.is_empty() {
         None

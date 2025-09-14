@@ -53,7 +53,7 @@ fn get_default_message<'a>(
     default_branch: &str,
     commits: impl IntoIterator<Item = &'a str>,
 ) -> String {
-    let mut message = format!(
+    let mut message = String::from(
         "The following commits have merge commits (commits with multiple parents) in your changes. \
 We have a [no merge policy](https://rustc-dev-guide.rust-lang.org/git.html#no-merge-policy) \
 so these commits will need to be removed for this pull request to be merged.
