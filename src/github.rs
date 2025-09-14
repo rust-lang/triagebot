@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::{FutureExt, future::BoxFuture};
+use itertools::Itertools;
 use octocrab::models::{Author, AuthorAssociation};
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
@@ -1508,8 +1509,7 @@ impl Repository {
             .chain([format!("sort={}", ordering.sort)])
             .chain([format!("direction={}", ordering.direction)])
             .chain([format!("per_page={}", ordering.per_page)])
-            .collect::<Vec<_>>()
-            .join("&");
+            .format("&");
         format!(
             "{}/repos/{}/{}?{}",
             client.api_url, self.full_name, endpoint, filters
@@ -1531,8 +1531,7 @@ impl Repository {
             .chain(include_labels.iter().map(|label| format!("label:{label}")))
             .chain(exclude_labels.iter().map(|label| format!("-label:{label}")))
             .chain([format!("repo:{}", self.full_name)])
-            .collect::<Vec<_>>()
-            .join("+");
+            .format("+");
         format!(
             "{}/search/issues?q={}&sort={}&order={}&per_page={}&page={}",
             client.api_url,
@@ -1633,7 +1632,7 @@ impl Repository {
         client: &GithubClient,
         refname: &str,
     ) -> anyhow::Result<GitReference> {
-        let url = format!("{}/git/ref/{}", self.url(client), refname);
+        let url = format!("{}/git/ref/{refname}", self.url(client));
         client
             .json(client.get(&url))
             .await
