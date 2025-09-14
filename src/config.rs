@@ -9,9 +9,10 @@ use tracing as log;
 pub(crate) static CONFIG_FILE_NAME: &str = "triagebot.toml";
 const REFRESH_EVERY: Duration = Duration::from_secs(2 * 60); // Every two minutes
 
-static CONFIG_CACHE: LazyLock<
-    RwLock<HashMap<String, (Result<Arc<Config>, ConfigurationError>, Instant)>>,
-> = LazyLock::new(|| RwLock::new(HashMap::new()));
+type MaybeConfig = Result<Arc<Config>, ConfigurationError>;
+
+static CONFIG_CACHE: LazyLock<RwLock<HashMap<String, (MaybeConfig, Instant)>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 // This struct maps each possible option of the triagebot.toml.
 // See documentation of options at: https://forge.rust-lang.org/triagebot/pr-assignment.html#configuration
@@ -450,10 +451,7 @@ pub(crate) struct ReviewRequestedConfig {
     pub(crate) add_labels: Vec<String>,
 }
 
-pub(crate) async fn get(
-    gh: &GithubClient,
-    repo: &Repository,
-) -> Result<Arc<Config>, ConfigurationError> {
+pub(crate) async fn get(gh: &GithubClient, repo: &Repository) -> MaybeConfig {
     if let Some(config) = get_cached_config(&repo.full_name) {
         log::trace!("returning config for {} from cache", repo.full_name);
         config
@@ -625,7 +623,7 @@ pub(crate) struct RangeDiffConfig {}
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReviewChangesSinceConfig {}
 
-fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationError>> {
+fn get_cached_config(repo: &str) -> Option<MaybeConfig> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
         if fetch_time.elapsed() < REFRESH_EVERY {
@@ -636,10 +634,7 @@ fn get_cached_config(repo: &str) -> Option<Result<Arc<Config>, ConfigurationErro
     })
 }
 
-async fn get_fresh_config(
-    gh: &GithubClient,
-    repo: &Repository,
-) -> Result<Arc<Config>, ConfigurationError> {
+async fn get_fresh_config(gh: &GithubClient, repo: &Repository) -> MaybeConfig {
     let contents = gh
         .raw_file(&repo.full_name, &repo.default_branch, CONFIG_FILE_NAME)
         .await
