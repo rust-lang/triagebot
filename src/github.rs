@@ -678,9 +678,7 @@ impl Issue {
             self.repository().url(client),
             self.number,
         );
-        Ok(client
-            .json::<Vec<Comment>>(client.get(&comment_url))
-            .await?)
+        client.json::<Vec<Comment>>(client.get(&comment_url)).await
     }
 
     pub async fn edit_body(&self, client: &GithubClient, body: &str) -> anyhow::Result<()> {
@@ -1067,7 +1065,7 @@ impl Issue {
                     "{}/compare/{before}...{after}",
                     self.repository().url(client)
                 ));
-                Ok(client.json(req).await?)
+                client.json(req).await
             })
             .await?;
         Ok(Some(compare))
@@ -1110,7 +1108,7 @@ impl Issue {
             self.repository().url(client),
             self.number
         ));
-        Ok(client.json(req).await?)
+        client.json(req).await
     }
 
     /// Returns the GraphQL ID of this issue.
