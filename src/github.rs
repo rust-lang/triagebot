@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::{FutureExt, future::BoxFuture};
+use itertools::Itertools;
 use octocrab::models::{Author, AuthorAssociation};
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
@@ -1527,8 +1528,7 @@ impl Repository {
             .chain([format!("sort={}", ordering.sort)])
             .chain([format!("direction={}", ordering.direction)])
             .chain([format!("per_page={}", ordering.per_page)])
-            .collect::<Vec<_>>()
-            .join("&");
+            .format("&");
         format!(
             "{}/repos/{}/{}?{}",
             client.api_url, self.full_name, endpoint, filters
@@ -1550,8 +1550,7 @@ impl Repository {
             .chain(include_labels.iter().map(|label| format!("label:{label}")))
             .chain(exclude_labels.iter().map(|label| format!("-label:{label}")))
             .chain([format!("repo:{}", self.full_name)])
-            .collect::<Vec<_>>()
-            .join("+");
+            .format("+");
         format!(
             "{}/search/issues?q={}&sort={}&order={}&per_page={}&page={}",
             client.api_url,
@@ -1652,7 +1651,7 @@ impl Repository {
         client: &GithubClient,
         refname: &str,
     ) -> anyhow::Result<GitReference> {
-        let url = format!("{}/git/ref/{}", self.url(client), refname);
+        let url = format!("{}/git/ref/{refname}", self.url(client));
         client
             .json(client.get(&url))
             .await
@@ -2683,11 +2682,11 @@ impl GithubClient {
     ) -> anyhow::Result<serde_json::Value> {
         let result: serde_json::Value = self.graphql_query_with_errors(query, vars).await?;
         if let Some(errors) = result["errors"].as_array() {
-            let messages: Vec<_> = errors
+            let messages = errors
                 .iter()
                 .map(|err| err["message"].as_str().unwrap_or_default())
-                .collect();
-            anyhow::bail!("error: {}", messages.join("\n"));
+                .format("\n");
+            anyhow::bail!("error: {messages}");
         }
         Ok(result)
     }
@@ -2718,11 +2717,11 @@ impl GithubClient {
             {
                 return Ok(None);
             }
-            let messages: Vec<_> = errors
+            let messages = errors
                 .iter()
                 .map(|err| err["message"].as_str().unwrap_or_default())
-                .collect();
-            anyhow::bail!("failed to query user: {}", messages.join("\n"));
+                .format("\n");
+            anyhow::bail!("failed to query user: {messages}");
         }
         anyhow::bail!("query for user {user} failed, no error message? {user_info:?}");
     }

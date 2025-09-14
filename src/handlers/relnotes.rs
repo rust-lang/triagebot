@@ -12,6 +12,7 @@
 //! the absence of a milestone, T-release is responsible for ascertaining which release is
 //! associated with the issue.
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -108,7 +109,7 @@ If this change is notable enough for inclusion in the blog post then this sectio
 ",
                 pr_number = e.issue.number,
                 people = [&e.issue.user].into_iter().chain(e.issue.assignees.iter())
-                    .map(|v| format!("@{}", v.login)).collect::<Vec<_>>().join(", "),
+                    .format_with(", ", |v, f| f(&format_args!("@{}", v.login))),
                 pr_title = e.issue.title,
                 pr_url = e.issue.html_url,
             );

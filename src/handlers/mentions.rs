@@ -133,7 +133,7 @@ pub(super) async fn handle_input(
                     relevant_file_paths
                         .iter()
                         .map(|f| f.to_string_lossy())
-                        .join(", ")
+                        .format(", ")
                 )
                 .unwrap(),
             },

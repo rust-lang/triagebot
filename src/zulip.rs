@@ -24,6 +24,7 @@ use axum::Json;
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
+use itertools::Itertools;
 use rust_team_data::v1::{TeamKind, TeamMember};
 use std::cmp::Reverse;
 use std::fmt::Write as _;
@@ -521,8 +522,7 @@ async fn workqueue_commands(
                             pr.title
                         )
                     })
-                    .collect::<Vec<String>>()
-                    .join("\n");
+                    .format("\n");
                 format!(
                     "`rust-lang/rust` PRs in your review queue ({} {}):\n{prs}\n\n",
                     assigned_prs.len(),

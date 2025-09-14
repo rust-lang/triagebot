@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use anyhow::Context as _;
 use anyhow::bail;
+use itertools::Itertools;
 
 use super::Context;
 use crate::interactions::ErrorComment;
@@ -281,12 +282,11 @@ async fn handle_new_state(
 
 // Format the warnings for user consumption on Github
 fn warning_from_warnings(warnings: &[String]) -> String {
-    let warnings: Vec<_> = warnings
+    let warnings = warnings
         .iter()
         .map(|warning| warning.trim().replace('\n', "\n    "))
-        .map(|warning| format!("* {warning}"))
-        .collect();
-    format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"))
+        .format_with("\n", |warning, f| f(&format_args!("* {warning}")));
+    format!(":warning: **Warning** :warning:\n\n{warnings}")
 }
 
 // Calculate the label changes
