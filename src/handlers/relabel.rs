@@ -128,11 +128,11 @@ fn check_filter(
         }
     }
     if matched {
-        return Ok(CheckFilterResult::Allow);
+        Ok(CheckFilterResult::Allow)
     } else if is_member == TeamMembership::Outsider {
-        return Ok(CheckFilterResult::Deny);
+        Ok(CheckFilterResult::Deny)
     } else {
-        return Ok(CheckFilterResult::DenyUnknown);
+        Ok(CheckFilterResult::DenyUnknown)
     }
 }
 

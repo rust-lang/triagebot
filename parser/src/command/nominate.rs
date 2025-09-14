@@ -70,9 +70,9 @@ impl NominateCommand {
         if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
             toks.next_token()?;
             *input = toks;
-            return Ok(Some(NominateCommand { team, style }));
+            Ok(Some(NominateCommand { team, style }))
         } else {
-            return Err(toks.error(ParseError::ExpectedEnd));
+            Err(toks.error(ParseError::ExpectedEnd))
         }
     }
 }

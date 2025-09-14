@@ -1076,7 +1076,7 @@ async fn candidate_reviewers_from_names<'a>(
                     });
                 }
 
-                return Ok(candidate);
+                Ok(candidate)
             })
             .collect();
     }

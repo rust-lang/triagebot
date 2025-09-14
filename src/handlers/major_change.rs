@@ -97,7 +97,7 @@ pub(super) async fn parse_input(
     }
 
     // All other issue events are ignored
-    return Ok(None);
+    Ok(None)
 }
 
 pub(super) async fn handle_input(
