@@ -32,7 +32,7 @@ impl<'a> RustcFormat<'a> {
 
             if let NodeValue::Heading(NodeHeading { level: 1, .. }) = child_data.value {
                 if let Some(h1) = self.current_h1.take() {
-                    self.store_version(h1, section_ast)?;
+                    self.store_version(&h1, &section_ast)?;
                 }
 
                 let Some(h1_child_data) = child.first_child().map(|c| c.data.borrow()) else {
@@ -51,16 +51,16 @@ impl<'a> RustcFormat<'a> {
             }
         }
         if let Some(h1) = self.current_h1.take() {
-            self.store_version(h1, section_ast)?;
+            self.store_version(&h1, &section_ast)?;
         }
 
         Ok(self.result)
     }
 
-    fn store_version(&mut self, h1: String, body: Vec<&'a AstNode<'a>>) -> anyhow::Result<()> {
+    fn store_version(&mut self, h1: &str, body: &[&'a AstNode<'a>]) -> anyhow::Result<()> {
         // Create a document with only the contents of this section
         let document = self.arena.alloc(NodeValue::Document.into());
-        for child in &body {
+        for child in body {
             document.append(child);
         }
 
