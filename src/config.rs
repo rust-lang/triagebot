@@ -73,7 +73,7 @@ impl PingConfig {
             return Some((team, cfg));
         }
 
-        for (name, cfg) in self.teams.iter() {
+        for (name, cfg) in &self.teams {
             if cfg.alias.contains(team) {
                 return Some((name, cfg));
             }
@@ -277,7 +277,7 @@ pub(crate) struct AutolabelConfig {
 impl AutolabelConfig {
     pub(crate) fn get_by_trigger(&self, trigger: &str) -> Vec<(&str, &AutolabelLabelConfig)> {
         let mut results = Vec::new();
-        for (label, cfg) in self.labels.iter() {
+        for (label, cfg) in &self.labels {
             if cfg.trigger_labels.iter().any(|l| l == trigger) {
                 results.push((label.as_str(), cfg));
             }
