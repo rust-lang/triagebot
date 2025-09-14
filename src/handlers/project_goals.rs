@@ -185,12 +185,12 @@ pub async fn ping_project_goals_owners(
         log::debug!("zulip_topic_name = {zulip_topic_name:#?}");
         log::debug!("message = {message:#?}");
 
-        if !dry_run {
-            zulip_req.send(&zulip).await?;
-        } else {
+        if dry_run {
             eprintln!();
             eprintln!("-- Dry Run ------------------------------------");
             eprintln!("Would send to {zulip_topic_name}: {}", zulip_req.content);
+        } else {
+            zulip_req.send(zulip).await?;
         }
     }
 

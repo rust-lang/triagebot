@@ -186,15 +186,15 @@ where
 {
     let status = response.status();
 
-    if !status.is_success() {
-        let body = response.text().await.context("Zulip API request failed")?;
-        Err(anyhow::anyhow!(body))
-    } else {
+    if status.is_success() {
         Ok(response.json::<T>().await.with_context(|| {
             anyhow::anyhow!(
                 "Failed to deserialize value of type {}",
                 std::any::type_name::<T>()
             )
         })?)
+    } else {
+        let body = response.text().await.context("Zulip API request failed")?;
+        Err(anyhow::anyhow!(body))
     }
 }
