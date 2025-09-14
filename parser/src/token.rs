@@ -92,7 +92,7 @@ impl<'a> Tokenizer<'a> {
     fn consume_whitespace(&mut self) {
         while self
             .cur()
-            .map_or(false, |c| c.1 != '\n' && c.1.is_whitespace())
+            .is_some_and(|c| c.1 != '\n' && c.1.is_whitespace())
         {
             self.advance();
         }
