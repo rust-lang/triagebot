@@ -56,7 +56,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     // comment, so they don't get notified again
     let mut users_notified = HashSet::new();
     if let Some(from) = event.comment_from() {
-        for login in parser::get_mentions(from).into_iter() {
+        for login in parser::get_mentions(from) {
             if let Some((users, _)) = id_from_user(ctx, login).await? {
                 users_notified.extend(users.into_iter().map(|user| user.id));
             }

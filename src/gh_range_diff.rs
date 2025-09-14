@@ -554,7 +554,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
                 .collect();
 
             // Process all before lines first
-            for (diff, input) in diffs_and_inputs.iter() {
+            for (diff, input) in &diffs_and_inputs {
                 self.handle_hunk_line(
                     &mut f,
                     HunkTokenStatus::Removed,
@@ -565,7 +565,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
             }
 
             // Then process all after lines
-            for (diff, input) in diffs_and_inputs.iter() {
+            for (diff, input) in &diffs_and_inputs {
                 self.handle_hunk_line(
                     &mut f,
                     HunkTokenStatus::Added,

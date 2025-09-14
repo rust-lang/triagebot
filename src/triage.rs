@@ -51,7 +51,7 @@ pub async fn pulls(
     }
 
     let mut pulls: Vec<Value> = Vec::new();
-    for base_pull in base_pulls.into_iter() {
+    for base_pull in base_pulls {
         let assignee = base_pull.assignee.map_or("".to_string(), |v| v.login);
         let updated_at = base_pull
             .updated_at

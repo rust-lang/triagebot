@@ -238,7 +238,7 @@ pub async fn run_scheduled_jobs(ctx: &Context) -> anyhow::Result<()> {
     let jobs = get_jobs_to_execute(db).await?;
     tracing::trace!("jobs to execute: {jobs:#?}");
 
-    for job in jobs.iter() {
+    for job in &jobs {
         update_job_executed_at(db, &job.id).await?;
 
         match handle_job(ctx, &job.name, &job.metadata).await {

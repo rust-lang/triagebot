@@ -56,7 +56,7 @@ pub(super) async fn parse_input(
         let mut autolabels = Vec::new();
         let mut to_remove = Vec::new();
 
-        'outer: for (label, cfg) in config.labels.iter() {
+        'outer: for (label, cfg) in &config.labels {
             let exclude_patterns: Vec<glob::Pattern> = cfg
                 .exclude_labels
                 .iter()
