@@ -80,14 +80,14 @@ pub(super) async fn parse_input(
                         // Only mentions byte-for-byte matching content inside the patch.
                         files
                             .iter()
-                            .filter(|f| patch_adds(&f.patch, &**entry))
+                            .filter(|f| patch_adds(&f.patch, entry))
                             .map(|f| PathBuf::from(&f.filename))
                             .collect()
                     }
                 };
                 // Don't mention if only the author is in the list.
                 let pings_non_author = match &cc[..] {
-                    [only_cc] => only_cc.trim_start_matches('@') != &event.issue.user.login,
+                    [only_cc] => only_cc.trim_start_matches('@') != event.issue.user.login,
                     _ => true,
                 };
                 if !relevant_file_paths.is_empty() && pings_non_author {

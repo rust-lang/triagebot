@@ -87,7 +87,7 @@ async fn get_version_standalone(
 ) -> anyhow::Result<Option<String>> {
     let resp = gh
         .raw()
-        .get(&format!(
+        .get(format!(
             "https://raw.githubusercontent.com/rust-lang/rust/{}/src/version",
             merge_sha
         ))

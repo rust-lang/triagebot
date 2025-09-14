@@ -168,7 +168,7 @@ pub(super) async fn handle_input(
 /// Loads the workqueue (mapping of open PRs assigned to users) from GitHub
 pub async fn load_workqueue(client: &Octocrab) -> anyhow::Result<ReviewerWorkqueue> {
     tracing::debug!("Loading workqueue for rust-lang/rust");
-    let prs = retrieve_pull_request_assignments("rust-lang", "rust", &client).await?;
+    let prs = retrieve_pull_request_assignments("rust-lang", "rust", client).await?;
 
     // Aggregate PRs by user
     let aggregated: HashMap<UserId, HashMap<PullRequestNumber, AssignedPullRequest>> = prs

@@ -254,8 +254,8 @@ pub(super) async fn handle_command(
         .any(|l| l.name == config.enabling_label)
     {
         let cmnt = ErrorComment::new(
-            &issue,
-            &format!(
+            issue,
+            format!(
                 "This issue cannot be seconded; it lacks the `{}` label.",
                 config.enabling_label
             ),
@@ -272,7 +272,7 @@ pub(super) async fn handle_command(
         .unwrap_or(false);
 
     if !is_team_member {
-        let cmnt = ErrorComment::new(&issue, "Only team members can second issues.");
+        let cmnt = ErrorComment::new(issue, "Only team members can second issues.");
         cmnt.post(&ctx.github).await?;
         return Ok(());
     }
@@ -536,7 +536,7 @@ impl Job for MajorChangeAcceptenceJob {
 
         let now = Utc::now();
 
-        match process_seconded(&ctx, &major_change, now).await {
+        match process_seconded(ctx, &major_change, now).await {
             Ok(()) => {
                 tracing::info!(
                     "{}: major change ({:?}) as been accepted",
@@ -686,7 +686,7 @@ async fn process_seconded(
         issue
             .post_comment(
                 &ctx.github,
-                &*format!(
+                &format!(
 r#"The final comment period is now complete, this major change is now **accepted**.
 
 As the automated representative, I would like to thank the author for their work and everyone else who contributed to this major change proposal.

@@ -100,7 +100,7 @@ pub async fn request_updates(
         exclude_labels: vec![],
     };
     let issues = types_repo
-        .get_issues(&gh, &tracking_issues_query)
+        .get_issues(gh, &tracking_issues_query)
         .await
         .with_context(|| "Unable to get issues.")?;
 

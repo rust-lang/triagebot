@@ -169,7 +169,7 @@ impl ZulipClient {
     fn make_request(&self, method: Method, url: &str) -> RequestBuilder {
         let api_token = self.get_api_token();
         self.client
-            .request(method, &format!("{}/api/v1/{url}", self.instance_url))
+            .request(method, format!("{}/api/v1/{url}", self.instance_url))
             .basic_auth(&self.bot_email, Some(api_token))
     }
 

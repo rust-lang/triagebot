@@ -215,7 +215,7 @@ impl<'a> Tokenizer<'a> {
             }
             self.advance();
         }
-        Ok(Some(Token::Word(&self.str_from(start))))
+        Ok(Some(Token::Word(self.str_from(start))))
     }
 
     pub fn eat_token(&mut self, token: Token<'a>) -> Result<bool, Error<'a>> {

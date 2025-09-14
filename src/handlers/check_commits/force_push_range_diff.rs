@@ -43,7 +43,7 @@ pub(super) async fn handle_event(
 
     let compare_before = ctx
         .github
-        .compare(&issue_repo, &base.sha, &before)
+        .compare(&issue_repo, &base.sha, before)
         .await
         .context("failed to get the before compare")?;
 

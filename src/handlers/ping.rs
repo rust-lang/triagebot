@@ -26,7 +26,7 @@ pub(super) async fn handle_command(
 
     if !is_team_member {
         let cmnt = ErrorComment::new(
-            &event.issue().unwrap(),
+            event.issue().unwrap(),
             format!("Only Rust team members can ping teams."),
         );
         cmnt.post(&ctx.github).await?;
@@ -77,7 +77,7 @@ pub(super) async fn handle_command(
             .await
         {
             let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
+                event.issue().unwrap(),
                 format!("Error adding team label (`{}`): {:?}.", label, err),
             );
             cmnt.post(&ctx.github).await?;

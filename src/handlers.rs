@@ -77,7 +77,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
     }
 
     if let Ok(config) = &config {
-        if let Err(e) = check_commits::handle(ctx, host, event, &config).await {
+        if let Err(e) = check_commits::handle(ctx, host, event, config).await {
             log::error!(
                 "failed to process event {:?} with `check_commits` handler: {:?}",
                 event,

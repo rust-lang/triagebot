@@ -130,7 +130,7 @@ pub async fn ping_project_goals_owners(
     days_threshold: i64,
     next_update: &str,
 ) -> anyhow::Result<()> {
-    let goals_repo = gh.repository(&RUST_PROJECT_GOALS_REPO).await?;
+    let goals_repo = gh.repository(RUST_PROJECT_GOALS_REPO).await?;
 
     let tracking_issues_query = github::Query {
         filters: vec![("state", "open"), ("is", "issue")],
@@ -138,7 +138,7 @@ pub async fn ping_project_goals_owners(
         exclude_labels: vec![],
     };
     let issues = goals_repo
-        .get_issues(&gh, &tracking_issues_query)
+        .get_issues(gh, &tracking_issues_query)
         .await
         .with_context(|| "Unable to get issues.")?;
 

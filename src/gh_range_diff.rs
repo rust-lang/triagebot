@@ -170,7 +170,7 @@ pub async fn gh_ranges_diff(
     // Get the comparison between the oldbase..oldhead
     let old = async {
         ctx.github
-            .compare(&issue_repo, &oldbase, oldhead)
+            .compare(&issue_repo, oldbase, oldhead)
             .await
             .with_context(|| {
                 format!("failed to retrive the comparison between {oldbase} and {oldhead}")
@@ -180,7 +180,7 @@ pub async fn gh_ranges_diff(
     // Get the comparison between the newbase..newhead
     let new = async {
         ctx.github
-            .compare(&issue_repo, &newbase, newhead)
+            .compare(&issue_repo, newbase, newhead)
             .await
             .with_context(|| {
                 format!("failed to retrive the comparison between {newbase} and {newhead}")
@@ -193,8 +193,8 @@ pub async fn gh_ranges_diff(
     process_old_new(
         host,
         (&owner, &repo),
-        (&oldbase, oldhead, old),
-        (&newbase, newhead, new),
+        (oldbase, oldhead, old),
+        (newbase, newhead, new),
     )
 }
 
