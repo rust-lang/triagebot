@@ -4,6 +4,8 @@
 //!
 //! Parsing is done in the `parser::command::ping` module.
 
+use std::borrow::Cow;
+
 use crate::{
     config::PingConfig,
     github::{self, Event},
@@ -69,10 +71,10 @@ pub(super) async fn handle_command(
         }
     }
 
-    let ping_msg = if users.is_empty() {
-        format!("no known users to ping?")
+    let ping_msg: Cow<_> = if users.is_empty() {
+        "no known users to ping?".into()
     } else {
-        format!("cc {}", users.join(" "))
+        format!("cc {}", users.join(" ")).into()
     };
     let comment = format!("{}\n\n{}", config.message, ping_msg);
     event

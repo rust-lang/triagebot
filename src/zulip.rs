@@ -814,8 +814,9 @@ async fn acknowledge(
     } else {
         let mut resp = String::from("Acknowledged:\n");
         for deleted in deleted {
-            resp.push_str(&format!(
-                " * [{}]({}){}\n",
+            _ = writeln!(
+                resp,
+                " * [{}]({}){}",
                 deleted
                     .short_description
                     .as_deref()
@@ -824,7 +825,7 @@ async fn acknowledge(
                 deleted
                     .metadata
                     .map_or(String::new(), |m| format!(" ({m})")),
-            ));
+            );
         }
         resp
     };
