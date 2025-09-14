@@ -24,6 +24,7 @@ use axum::Json;
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
+use itertools::Itertools;
 use rust_team_data::v1::{TeamKind, TeamMember};
 use std::cmp::Reverse;
 use std::fmt::Write as _;
@@ -430,7 +431,7 @@ async fn team_status_cmd(ctx: &Context, team_name: &str) -> anyhow::Result<Optio
             "{}",
             table_header(&format!("ON rotation ({})", on_rotation.len()))
         )?;
-        writeln!(msg, "{}\n", on_rotation.join("\n"))?;
+        writeln!(msg, "{}\n", on_rotation.into_iter().format("\n"))?;
     }
     if !off_rotation.is_empty() {
         writeln!(
@@ -438,7 +439,7 @@ async fn team_status_cmd(ctx: &Context, team_name: &str) -> anyhow::Result<Optio
             "{}",
             table_header(&format!("OFF rotation ({})", off_rotation.len()))
         )?;
-        writeln!(msg, "{}\n", off_rotation.join("\n"))?;
+        writeln!(msg, "{}\n", off_rotation.into_iter().format("\n"))?;
     }
 
     Ok(Some(msg))
@@ -521,8 +522,7 @@ async fn workqueue_commands(
                             pr.title
                         )
                     })
-                    .collect::<Vec<String>>()
-                    .join("\n");
+                    .format("\n");
                 format!(
                     "`rust-lang/rust` PRs in your review queue ({} {}):\n{prs}\n\n",
                     assigned_prs.len(),
@@ -618,7 +618,7 @@ async fn whoami_cmd(ctx: &Context, gh_id: u64) -> anyhow::Result<Option<String>>
                 }
             );
             if !member.roles.is_empty() {
-                write!(entry, " (roles: {})", member.roles.join(", ")).unwrap();
+                write!(entry, " (roles: {})", member.roles.iter().format(", ")).unwrap();
             }
             entry
         })

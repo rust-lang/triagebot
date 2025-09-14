@@ -1,6 +1,7 @@
 use std::fmt::Write;
 
 use anyhow::{Context as _, bail};
+use itertools::Itertools;
 
 use crate::{
     config::ConcernConfig,
@@ -142,7 +143,7 @@ pub(super) async fn handle_command(
             .await
         {
             tracing::error!("unable to add concern labels: {err:?}");
-            let labels = config.labels.join(", ");
+            let labels = config.labels.iter().format(", ");
             issue.post_comment(
                 &ctx.github,
                 &format!("*Psst, I was unable to add the labels ({labels}), could someone do it for me.*"),

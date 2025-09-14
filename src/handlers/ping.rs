@@ -12,6 +12,7 @@ use crate::{
     handlers::Context,
     interactions::ErrorComment,
 };
+use itertools::Itertools;
 use parser::command::ping::PingCommand;
 
 pub(super) async fn handle_command(
@@ -94,7 +95,7 @@ pub(super) async fn handle_command(
     let ping_msg: Cow<_> = if users.is_empty() {
         "no known users to ping?".into()
     } else {
-        format!("cc {}", users.join(" ")).into()
+        format!("cc {}", users.into_iter().format(" ")).into()
     };
     let comment = format!("{}\n\n{}", config.message, ping_msg);
     event

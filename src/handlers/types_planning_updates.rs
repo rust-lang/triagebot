@@ -5,6 +5,7 @@ use crate::zulip::api::Recipient;
 use anyhow::Context as _;
 use async_trait::async_trait;
 use chrono::{Datelike, Duration, NaiveTime, TimeZone, Utc};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 const TYPES_REPO: &str = "rust-lang/types-team";
@@ -152,7 +153,7 @@ pub async fn request_updates(
         issues_needs_updates.push(format!("- [Issue #{}]({})", issue.number, issue.html_url));
     }
 
-    let issue_list = issues_needs_updates.join("\n");
+    let issue_list = issues_needs_updates.iter().format("\n");
 
     let message = format!("The following issues still need updates:\n\n{issue_list}");
 

@@ -133,13 +133,13 @@ pub(super) async fn handle_input(
                     relevant_file_paths
                         .iter()
                         .map(|f| f.to_string_lossy())
-                        .join(", ")
+                        .format(", ")
                 )
                 .unwrap(),
             },
         }
         if !cc.is_empty() {
-            write!(result, "\n\ncc {}", cc.join(", ")).unwrap();
+            write!(result, "\n\ncc {}", cc.iter().format(", ")).unwrap();
         }
         state.data.entries.push(entry);
     }

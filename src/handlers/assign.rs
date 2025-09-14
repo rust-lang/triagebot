@@ -31,6 +31,7 @@ use crate::{
     interactions::EditIssueBody,
 };
 use anyhow::{Context as _, bail};
+use itertools::Itertools;
 use octocrab::models::AuthorAssociation;
 use parser::command::assign::AssignCommand;
 use parser::command::{Command, Input};
@@ -736,7 +737,7 @@ impl fmt::Display for FindReviewerError {
                     "No reviewers could be found from initial request `{}`\n\
                      This repo may be misconfigured.\n\
                      Use `r?` to specify someone else to assign.",
-                    initial.join(",")
+                    initial.iter().format(",")
                 )
             }
             FindReviewerError::ReviewerOffRotation { username } => {
@@ -1084,7 +1085,7 @@ async fn candidate_reviewers_from_names<'a>(
 
     log::debug!(
         "Candidate reviewer results for review request `{}` on `{}`: {:?}",
-        names.join(", "),
+        names.iter().format(", "),
         issue.global_id(),
         candidates
     );
