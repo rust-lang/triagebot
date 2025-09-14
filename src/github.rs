@@ -861,10 +861,10 @@ impl Issue {
         let mut unknown_labels = vec![];
         let mut known_labels = vec![];
         for label in labels {
-            if !self.repository().has_label(client, &label).await? {
-                unknown_labels.push(label);
-            } else {
+            if self.repository().has_label(client, &label).await? {
                 known_labels.push(label);
+            } else {
+                unknown_labels.push(label);
             }
         }
 
@@ -2274,15 +2274,15 @@ impl IssuesQuery for Query<'_> {
 
             let mcp_details = if include_mcp_details {
                 let first100_comments = issue.get_first100_comments(gh_client).await?;
-                let (zulip_link, concerns) = if !first100_comments.is_empty() {
+                let (zulip_link, concerns) = if first100_comments.is_empty() {
+                    ("".to_string(), None)
+                } else {
                     let split = re_zulip_link
                         .split(&first100_comments[0].body)
                         .collect::<Vec<&str>>();
                     let zulip_link = split.last().unwrap_or(&"#").to_string();
                     let concerns = find_open_concerns(first100_comments);
                     (zulip_link, concerns)
-                } else {
-                    ("".to_string(), None)
                 };
 
                 Some(crate::actions::MCPDetails {
@@ -2360,10 +2360,10 @@ fn find_open_concerns(comments: Vec<Comment>) -> Option<Vec<(String, String)>> {
     let unresolved_concerns = raised
         .iter()
         .filter_map(|(title, comment_url)| {
-            if !solved.contains_key(title) {
-                Some((title.to_string(), comment_url.to_string()))
-            } else {
+            if solved.contains_key(title) {
                 None
+            } else {
+                Some((title.to_string(), comment_url.to_string()))
             }
         })
         .collect();

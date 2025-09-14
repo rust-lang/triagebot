@@ -146,7 +146,10 @@ pub(super) async fn handle_input(
             return Ok(());
         }
         let welcome = if let Some(custom_messages) = &config.custom_messages {
-            if !from_comment {
+            if from_comment {
+                // No welcome is posted if they used `r?` in the opening body.
+                None
+            } else {
                 let mut welcome = match &assignee {
                     Some(assignee) => custom_messages
                         .auto_assign_someone
@@ -167,9 +170,6 @@ pub(super) async fn handle_input(
                     }
                 }
                 welcome
-            } else {
-                // No welcome is posted if they used `r?` in the opening body.
-                None
             }
         } else if matches!(
             event.issue.author_association,

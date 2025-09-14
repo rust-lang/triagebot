@@ -94,17 +94,17 @@ pub(super) async fn handle_command(
     match cmd {
         ConcernCommand::Concern { title } => {
             // Only add a concern if it wasn't already added, we could be in an edit
-            if !concern_data.concerns.iter().any(|c| c.title == title) {
+            if concern_data.concerns.iter().any(|c| c.title == title) {
+                tracing::info!(
+                    "concern with the same name ({title}) already exists ({:?})",
+                    &concern_data.concerns
+                );
+            } else {
                 concern_data.concerns.push(Concern {
                     title,
                     status: ConcernStatus::Active,
                     comment_url: comment_url.to_string(),
                 });
-            } else {
-                tracing::info!(
-                    "concern with the same name ({title}) already exists ({:?})",
-                    &concern_data.concerns
-                );
             }
         }
         ConcernCommand::Resolve { title } => concern_data

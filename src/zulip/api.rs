@@ -73,10 +73,10 @@ impl Recipient<'_> {
 
                 let mut encoded_topic = String::new();
                 for ch in topic.bytes() {
-                    if !(ALWAYS_SAFE.contains(ch as char)) {
-                        write!(encoded_topic, ".{ch:02X}").unwrap();
-                    } else {
+                    if ALWAYS_SAFE.contains(ch as char) {
                         encoded_topic.push(ch as char);
+                    } else {
+                        write!(encoded_topic, ".{ch:02X}").unwrap();
                     }
                 }
                 format!("stream/{id}-xxx/topic/{encoded_topic}")
