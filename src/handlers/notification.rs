@@ -19,14 +19,14 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         return Ok(());
     };
 
-    if let Event::Issue(e) = event {
-        if !matches!(
+    if let Event::Issue(e) = event
+        && !matches!(
             e.action,
             github::IssuesAction::Opened | github::IssuesAction::Edited
-        ) {
-            // no change in issue's body for these events, so skip
-            return Ok(());
-        }
+        )
+    {
+        // no change in issue's body for these events, so skip
+        return Ok(());
     }
 
     let short_description = match event {
@@ -44,10 +44,10 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     if event.issue().unwrap().repository().organization == "serde-rs" {
         // Only add dtolnay on new issues/PRs, not on comments to old PRs and
         // issues.
-        if let Event::Issue(e) = event {
-            if e.action == github::IssuesAction::Opened {
-                caps.insert("dtolnay");
-            }
+        if let Event::Issue(e) = event
+            && e.action == github::IssuesAction::Opened
+        {
+            caps.insert("dtolnay");
         }
     }
 

@@ -135,10 +135,9 @@ impl<T: DeserializeOwned + Clone> CachedTeamItem<T> {
                 value,
                 last_download,
             } = &*value
+                && *last_download + CACHE_DURATION > now
             {
-                if *last_download + CACHE_DURATION > now {
-                    return Ok(value.clone());
-                }
+                return Ok(value.clone());
             }
         }
         match download::<T>(client, base_url, &self.url_path).await {

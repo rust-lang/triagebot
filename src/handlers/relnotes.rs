@@ -51,12 +51,12 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     if let Some(paired) = state.data.relnotes_issue {
         // Already has a paired release notes issue.
 
-        if let IssuesAction::Milestoned = &e.action {
-            if let Some(milestone) = &e.issue.milestone {
-                ctx.github
-                    .set_milestone(&e.issue.repository().to_string(), &milestone, paired)
-                    .await?;
-            }
+        if let IssuesAction::Milestoned = &e.action
+            && let Some(milestone) = &e.issue.milestone
+        {
+            ctx.github
+                .set_milestone(&e.issue.repository().to_string(), milestone, paired)
+                .await?;
         }
 
         return Ok(());

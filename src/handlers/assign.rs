@@ -160,14 +160,13 @@ pub(super) async fn handle_input(
 
                 if let Some(ref mut welcome) = welcome
                     && let Some(contrib) = &config.contributing_url
-                {
-                    if matches!(
+                    && matches!(
                         event.issue.author_association,
                         AuthorAssociation::FirstTimer | AuthorAssociation::FirstTimeContributor
-                    ) {
-                        welcome.push_str("\n\n");
-                        welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
-                    }
+                    )
+                {
+                    welcome.push_str("\n\n");
+                    welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
                 }
                 welcome
             }
@@ -211,13 +210,13 @@ pub(super) async fn handle_input(
             set_assignee(ctx, &event.issue, &ctx.github, &assignee).await?;
         }
 
-        if let Some(welcome) = welcome {
-            if let Err(e) = event.issue.post_comment(&ctx.github, &welcome).await {
-                log::warn!(
-                    "failed to post welcome comment to {}: {e}",
-                    event.issue.global_id()
-                );
-            }
+        if let Some(welcome) = welcome
+            && let Err(e) = event.issue.post_comment(&ctx.github, &welcome).await
+        {
+            log::warn!(
+                "failed to post welcome comment to {}: {e}",
+                event.issue.global_id()
+            );
         }
     }
 
@@ -297,11 +296,11 @@ They may take a while to respond."
                 )),
                 _ => None,
             };
-            if let Some(warning) = warning {
-                if let Err(err) = issue.post_comment(&ctx.github, &warning).await {
-                    // This is a best-effort warning, do not do anything apart from logging if it fails
-                    log::warn!("failed to post reviewer warning comment: {err}");
-                }
+            if let Some(warning) = warning
+                && let Err(err) = issue.post_comment(&ctx.github, &warning).await
+            {
+                // This is a best-effort warning, do not do anything apart from logging if it fails
+                log::warn!("failed to post reviewer warning comment: {err}");
             }
         }
     }
@@ -800,10 +799,10 @@ async fn find_reviewer_from_names(
     names: &[String],
 ) -> Result<ReviewerSelection, FindReviewerError> {
     // Fast path for self-assign, which is always allowed.
-    if let [name] = names {
-        if is_self_assign(&name, requested_by) {
-            return Ok(ReviewerSelection::from_name(name.clone()));
-        }
+    if let [name] = names
+        && is_self_assign(name, requested_by)
+    {
+        return Ok(ReviewerSelection::from_name(name.clone()));
     }
 
     let candidates =

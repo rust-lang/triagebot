@@ -48,10 +48,10 @@ impl GithubClient {
             .with_context(|| format!("building reqwest {req_dbg}"))?;
 
         let mut resp = self.client.execute(req.try_clone().unwrap()).await?;
-        if self.retry_rate_limit {
-            if let Some(sleep) = Self::needs_retry(&resp).await {
-                resp = self.retry(req, sleep, MAX_ATTEMPTS).await?;
-            }
+        if self.retry_rate_limit
+            && let Some(sleep) = Self::needs_retry(&resp).await
+        {
+            resp = self.retry(req, sleep, MAX_ATTEMPTS).await?;
         }
         let maybe_err = resp.error_for_status_ref().err();
         let body = resp
@@ -164,10 +164,10 @@ impl GithubClient {
             }
 
             let resp = self.client.execute(req.try_clone().unwrap()).await?;
-            if let Some(sleep) = Self::needs_retry(&resp).await {
-                if remaining_attempts > 0 {
-                    return self.retry(req, sleep, remaining_attempts - 1).await;
-                }
+            if let Some(sleep) = Self::needs_retry(&resp).await
+                && remaining_attempts > 0
+            {
+                return self.retry(req, sleep, remaining_attempts - 1).await;
             }
 
             Ok(resp)

@@ -198,10 +198,11 @@ impl<'a> Tokenizer<'a> {
         // Attempt to consume a word from the input.
         // Stop if we encounter whitespace or punctuation.
         let start = self.cur_pos();
-        while self.cur().map_or(false, |(_, ch)| {
-            !(self.cur_punct().is_some() || ch.is_whitespace())
-        }) {
-            if self.cur().unwrap().1 == '"' {
+        while let Some((_, ch)) = self.cur()
+            && self.cur_punct().is_none()
+            && !ch.is_whitespace()
+        {
+            if ch == '"' {
                 let so_far = self.str_from(start);
                 if so_far
                     .strip_prefix('r')
