@@ -137,20 +137,14 @@ pub async fn webhook(
 
 pub fn get_token_from_env() -> Result<String, anyhow::Error> {
     // ZULIP_WEBHOOK_SECRET is preferred, ZULIP_TOKEN is kept for retrocompatibility but will be deprecated
-    match std::env::var("ZULIP_WEBHOOK_SECRET") {
-        Ok(v) => return Ok(v),
-        Err(_) => (),
-    }
-
-    match std::env::var("ZULIP_TOKEN") {
-        Ok(v) => return Ok(v),
-        Err(_) => (),
-    }
-
-    log::error!(
-        "Cannot communicate with Zulip: neither ZULIP_WEBHOOK_SECRET or ZULIP_TOKEN are set."
-    );
-    anyhow::bail!("Cannot communicate with Zulip.");
+    std::env::var("ZULIP_WEBHOOK_SECRET")
+        .or_else(|_| std::env::var("ZULIP_TOKEN"))
+        .or_else(|_| {
+            log::error!(
+                "Cannot communicate with Zulip: neither ZULIP_WEBHOOK_SECRET or ZULIP_TOKEN are set."
+            );
+            Err(anyhow::anyhow!("Cannot communicate with Zulip."))
+        })
 }
 
 /// Processes a Zulip webhook.
