@@ -1,5 +1,5 @@
 use crate::team_data::TeamClient;
-use anyhow::{Context, anyhow};
+use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
@@ -1731,13 +1731,13 @@ impl Repository {
             }
             let target = data
                 .data
-                .ok_or_else(|| anyhow::anyhow!("No data returned."))?
+                .context("No data returned.")?
                 .repository
-                .ok_or_else(|| anyhow::anyhow!("No repository."))?
+                .context("No repository.")?
                 .ref_
-                .ok_or_else(|| anyhow::anyhow!("No ref."))?
+                .context("No ref.")?
                 .target
-                .ok_or_else(|| anyhow::anyhow!("No target."))?;
+                .context("No target.")?;
             let GitObject::Commit(commit) = target else {
                 anyhow::bail!("unexpected target type {target:?}")
             };
@@ -3010,9 +3010,9 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
             }
             let repository = data
                 .data
-                .ok_or_else(|| anyhow::anyhow!("No data returned."))?
+                .context("No data returned.")?
                 .repository
-                .ok_or_else(|| anyhow::anyhow!("No repository."))?;
+                .context("No repository.")?;
             prs.extend(repository.pull_requests.nodes);
             let page_info = repository.pull_requests.page_info;
             if !page_info.has_next_page || page_info.end_cursor.is_none() {
@@ -3147,15 +3147,15 @@ async fn project_items_by_status(
         }
         let items = data
             .data
-            .ok_or_else(|| anyhow!("No data returned."))?
+            .context("No data returned.")?
             .organization
-            .ok_or_else(|| anyhow!("Organization not found."))?
+            .context("Organization not found.")?
             .project_v2
-            .ok_or_else(|| anyhow!("Project not found."))?
+            .context("Project not found.")?
             .items;
         let filtered = items
             .nodes
-            .ok_or_else(|| anyhow!("Malformed response."))?
+            .context("Malformed response.")?
             .into_iter()
             .flatten()
             .filter(|item| status_filter(item.status()));
