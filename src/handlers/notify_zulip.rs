@@ -162,7 +162,7 @@ fn has_all_required_labels(issue: &Issue, config: &NotifyZulipLabelConfig) -> bo
         let pattern = match glob::Pattern::new(req_label) {
             Ok(pattern) => pattern,
             Err(err) => {
-                log::error!("Invalid glob pattern: {}", err);
+                log::error!("Invalid glob pattern: {err}");
                 continue;
             }
         };
@@ -227,7 +227,7 @@ pub(super) async fn handle_input(
                 .await;
 
                 if let Err(err) = req {
-                    log::error!("Failed to send notification to Zulip {}", err);
+                    log::error!("Failed to send notification to Zulip {err}");
                 }
             }
         }
@@ -259,7 +259,7 @@ fn replace_team_to_be_nominated(labels: &[Label], msg: String) -> String {
 #[test]
 fn test_notification() {
     let mut msg = replace_team_to_be_nominated(&[], "Needs `I-{team}-nominated`?".to_string());
-    assert!(msg.contains("Needs `I-{team}-nominated`?"), "{}", msg);
+    assert!(msg.contains("Needs `I-{team}-nominated`?"), "{msg}");
 
     msg = replace_team_to_be_nominated(
         &[Label {
@@ -267,7 +267,7 @@ fn test_notification() {
         }],
         "Needs `I-{team}-nominated`?".to_string(),
     );
-    assert!(msg.contains("I-cooks-nominated"), "{}", msg);
+    assert!(msg.contains("I-cooks-nominated"), "{msg}");
 
     msg = replace_team_to_be_nominated(
         &[
@@ -283,7 +283,7 @@ fn test_notification() {
         ],
         "Needs `I-{team}-nominated`?".to_string(),
     );
-    assert!(msg.contains("I-compiler-nominated"), "{}", msg);
+    assert!(msg.contains("I-compiler-nominated"), "{msg}");
 
     msg = replace_team_to_be_nominated(
         &[
@@ -296,5 +296,5 @@ fn test_notification() {
         ],
         "Needs `I-{team}-nominated`?".to_string(),
     );
-    assert!(msg.contains("Needs `I-{team}-nominated`?"), "{}", msg);
+    assert!(msg.contains("Needs `I-{team}-nominated`?"), "{msg}");
 }

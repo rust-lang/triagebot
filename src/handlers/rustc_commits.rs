@@ -48,7 +48,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let (start, end) = if let (Some(start), Some(end)) = (start, end) {
         (start, end)
     } else {
-        log::warn!("Unable to extract build completion from comment {:?}", body);
+        log::warn!("Unable to extract build completion from comment {body:?}");
         return Ok(());
     };
 
@@ -56,16 +56,15 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         Ok(bors) => bors,
         Err(e) => {
             log::error!(
-                "failed to parse build completion from {:?}: {:?}",
-                &body[start..end],
-                e
+                "failed to parse build completion from {:?}: {e:?}",
+                &body[start..end]
             );
             return Ok(());
         }
     };
 
     if bors.type_ != "BuildCompleted" {
-        log::trace!("Not build completion? {:?}", bors);
+        log::trace!("Not build completion? {bors:?}");
     }
 
     if bors.base_ref != event.repository.default_branch {
@@ -80,7 +79,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
 
 /// Fetch commits that are not present in the database.
 async fn synchronize_commits(ctx: &Context, sha: &str, pr: u32) {
-    log::trace!("synchronize_commits for sha={:?}, pr={}", sha, pr);
+    log::trace!("synchronize_commits for sha={sha:?}, pr={pr}");
     synchronize_commits_inner(ctx, Some((sha.to_owned(), pr))).await;
 }
 
@@ -99,7 +98,7 @@ pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u
             .into_iter()
             .map(|c| (c, None::<u32>)),
     );
-    log::info!("synchronize_commits for {:?}", to_be_resolved);
+    log::info!("synchronize_commits for {to_be_resolved:?}");
 
     let db = ctx.db.get().await;
     while let Some((sha, mut pr)) = to_be_resolved.pop_front() {
@@ -125,7 +124,7 @@ pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u
         let pr = match pr.take() {
             Some(number) => number,
             None => {
-                log::warn!("Failed to find PR number for commit {}", sha);
+                log::warn!("Failed to find PR number for commit {sha}");
                 continue;
             }
         };
@@ -146,7 +145,7 @@ pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u
                     to_be_resolved.push_back((parent_sha, None))
                 }
             }
-            Err(e) => log::error!("Failed to record commit {:?}", e),
+            Err(e) => log::error!("Failed to record commit {e:?}"),
         }
     }
 }

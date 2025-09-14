@@ -42,10 +42,10 @@ impl GithubClient {
     async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<(Bytes, String)> {
         const MAX_ATTEMPTS: u32 = 2;
         log::debug!("send_req with {:?}", req);
-        let req_dbg = format!("{:?}", req);
+        let req_dbg = format!("{req:?}");
         let req = req
             .build()
-            .with_context(|| format!("building reqwest {}", req_dbg))?;
+            .with_context(|| format!("building reqwest {req_dbg}"))?;
 
         let mut resp = self.client.execute(req.try_clone().unwrap()).await?;
         if self.retry_rate_limit {
@@ -562,7 +562,7 @@ impl fmt::Display for AssignmentError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             AssignmentError::InvalidAssignee => write!(f, "invalid assignee"),
-            AssignmentError::Http(e) => write!(f, "cannot assign: {}", e),
+            AssignmentError::Http(e) => write!(f, "cannot assign: {e}"),
         }
     }
 }
@@ -1454,7 +1454,7 @@ impl Repository {
                 let result = client
                     .json::<IssueSearchResult>(result)
                     .await
-                    .with_context(|| format!("failed to list issues from {}", url))?;
+                    .with_context(|| format!("failed to list issues from {url}"))?;
                 issues.extend(result.items);
                 if (issues.len() as u64) < result.total_count {
                     ordering.page += 1;
@@ -1465,7 +1465,7 @@ impl Repository {
                 issues = client
                     .json(result)
                     .await
-                    .with_context(|| format!("failed to list issues from {}", url))?
+                    .with_context(|| format!("failed to list issues from {url}"))?;
             }
 
             break;
@@ -1503,7 +1503,7 @@ impl Repository {
     ) -> String {
         let filters = filters
             .iter()
-            .map(|(key, val)| format!("{}={}", key, val))
+            .map(|(key, val)| format!("{key}={val}"))
             .chain(std::iter::once(format!(
                 "labels={}",
                 include_labels.join(",")
@@ -1533,17 +1533,9 @@ impl Repository {
         let filters = filters
             .iter()
             .filter(|&&(key, val)| !(key == "state" && val == "all"))
-            .map(|(key, val)| format!("{}:{}", key, val))
-            .chain(
-                include_labels
-                    .iter()
-                    .map(|label| format!("label:{}", label)),
-            )
-            .chain(
-                exclude_labels
-                    .iter()
-                    .map(|label| format!("-label:{}", label)),
-            )
+            .map(|(key, val)| format!("{key}:{val}"))
+            .chain(include_labels.iter().map(|label| format!("label:{label}")))
+            .chain(exclude_labels.iter().map(|label| format!("-label:{label}")))
             .chain(std::iter::once(format!("repo:{}", self.full_name)))
             .collect::<Vec<_>>()
             .join("+");
@@ -1661,7 +1653,7 @@ impl Repository {
         refname: &str,
         sha: &str,
     ) -> anyhow::Result<GitReference> {
-        let url = format!("{}/git/refs/{}", self.url(client), refname);
+        let url = format!("{}/git/refs/{refname}", self.url(client));
         client
             .json(client.patch(&url).json(&serde_json::json!({
                 "sha": sha,
@@ -1723,7 +1715,7 @@ impl Repository {
                 })?;
 
             if let Some(errors) = data.errors {
-                anyhow::bail!("There were graphql errors. {:?}", errors);
+                anyhow::bail!("There were graphql errors. {errors:?}");
             }
             let target = data
                 .data
@@ -2581,10 +2573,10 @@ impl GithubClient {
     ) -> anyhow::Result<Option<Bytes>> {
         let url = format!("{}/{repo}/{branch}/{path}", self.raw_url);
         let req = self.get(&url);
-        let req_dbg = format!("{:?}", req);
+        let req_dbg = format!("{req:?}");
         let req = req
             .build()
-            .with_context(|| format!("failed to build request {:?}", req_dbg))?;
+            .with_context(|| format!("failed to build request {req_dbg:?}"))?;
         let resp = self.client.execute(req).await.context(req_dbg.clone())?;
         let status = resp.status();
         let body = resp
@@ -2817,7 +2809,7 @@ impl GithubClient {
         let req = self.get(&format!("{}/repos/{full_name}", self.api_url));
         self.json(req)
             .await
-            .with_context(|| format!("{} failed to get repo", full_name))
+            .with_context(|| format!("{full_name} failed to get repo"))
     }
 
     /// Get or create a [`Milestone`].
@@ -3022,7 +3014,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
             let data: cynic::GraphQlResponse<queries::LeastRecentlyReviewedPullRequests> =
                 client.json(req).await?;
             if let Some(errors) = data.errors {
-                anyhow::bail!("There were graphql errors. {:?}", errors);
+                anyhow::bail!("There were graphql errors. {errors:?}");
             }
             let repository = data
                 .data
@@ -3159,7 +3151,7 @@ async fn project_items_by_status(
 
         let data: cynic::GraphQlResponse<project_items::Query> = client.json(req).await?;
         if let Some(errors) = data.errors {
-            anyhow::bail!("There were graphql errors. {:?}", errors);
+            anyhow::bail!("There were graphql errors. {errors:?}");
         }
         let items = data
             .data

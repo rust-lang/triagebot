@@ -69,7 +69,7 @@ impl<'a> RustcFormat<'a> {
         if let Some(version) = h1.split(' ').nth(1) {
             self.result.versions.insert(version.to_string(), content);
         } else {
-            println!("skipped version, invalid header: {}", h1);
+            println!("skipped version, invalid header: {h1}");
         }
 
         Ok(())

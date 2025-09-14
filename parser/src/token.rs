@@ -30,8 +30,8 @@ impl fmt::Display for Token<'_> {
             Token::ParenRight => write!(f, ")"),
             Token::ParenLeft => write!(f, "("),
             Token::EndOfLine => Ok(()),
-            Token::Quote(body) => write!(f, r#""{}""#, body),
-            Token::Word(word) => write!(f, "{}", word),
+            Token::Quote(body) => write!(f, r#""{body}""#),
+            Token::Word(word) => write!(f, "{word}"),
         }
     }
 }

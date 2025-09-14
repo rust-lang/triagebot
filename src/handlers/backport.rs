@@ -156,7 +156,7 @@ pub(super) async fn handle_input(
     // Add backport nomination label to the pull request
     for issue in issues {
         if let Err(ref err) = issue {
-            log::warn!("Failed to get issue: {:?}", err);
+            log::warn!("Failed to get issue: {err:?}");
             continue;
         }
         let issue = issue.context("failed to get issue")?;

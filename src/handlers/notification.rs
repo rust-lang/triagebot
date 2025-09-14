@@ -74,10 +74,10 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         }
         Ok(None) => {}
         Err(err) => {
-            log::error!("Failed to query ID for {:?}: {:?}", event.user(), err);
+            log::error!("Failed to query ID for {:?}: {err:?}", event.user());
         }
     }
-    log::trace!("Captured usernames in comment: {:?}", caps);
+    log::trace!("Captured usernames in comment: {caps:?}");
     for login in caps {
         let (users, team_name) = match id_from_user(ctx, login).await? {
             Some((users, team_name)) => (users, team_name),
@@ -95,7 +95,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 .await
                 .context("failed to record username")
             {
-                log::error!("record username: {:?}", err);
+                log::error!("record username: {err:?}");
             }
 
             if let Err(err) = notifications::record_ping(
@@ -112,7 +112,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             .await
             .context("failed to record ping")
             {
-                log::error!("record ping: {:?}", err);
+                log::error!("record ping: {err:?}");
             }
         }
     }
@@ -142,18 +142,14 @@ async fn id_from_user(
                 // error, but should be investigated). Otherwise it's probably not going to be in
                 // the team repository so isn't actually an error.
                 if login.starts_with("rust") {
-                    log::error!("team ping ({}) failed to resolve to a known team", login);
+                    log::error!("team ping ({login}) failed to resolve to a known team");
                 } else {
-                    log::info!("team ping ({}) failed to resolve to a known team", login);
+                    log::info!("team ping ({login}) failed to resolve to a known team");
                 }
                 return Ok(None);
             }
             Err(err) => {
-                log::error!(
-                    "team ping ({}) failed to resolve to a known team: {:?}",
-                    login,
-                    err
-                );
+                log::error!("team ping ({login}) failed to resolve to a known team: {err:?}",);
                 return Ok(None);
             }
         };
@@ -173,10 +169,10 @@ async fn id_from_user(
             .team
             .get_gh_id_from_username(login)
             .await
-            .with_context(|| format!("failed to get user {} ID", login))?;
+            .with_context(|| format!("failed to get user {login} ID"))?;
         let Some(id) = id else {
             // If the user was not in the team(s) then just don't record it.
-            log::trace!("Skipping {} because no id found", login);
+            log::trace!("Skipping {login} because no id found");
             return Ok(None);
         };
         Ok(Some((

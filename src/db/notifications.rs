@@ -99,8 +99,7 @@ pub async fn delete_ping(
                 )
                 .await
                 .context(format!(
-                    "Failed to delete notification with id {}",
-                    notification_id
+                    "Failed to delete notification with id {notification_id}"
                 ))?;
 
             let origin_url: String = row.get(0);

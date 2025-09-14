@@ -28,7 +28,7 @@ pub async fn insert_job(
     scheduled_at: &DateTime<Utc>,
     metadata: &serde_json::Value,
 ) -> Result<()> {
-    tracing::trace!("insert_job(name={})", name);
+    tracing::trace!("insert_job(name={name})");
 
     db.execute(
         "INSERT INTO jobs (name, scheduled_at, metadata) VALUES ($1, $2, $3) 
@@ -52,7 +52,7 @@ pub async fn delete_job(db: &DbClient, id: &Uuid) -> Result<()> {
 }
 
 pub async fn update_job_error_message(db: &DbClient, id: &Uuid, message: &String) -> Result<()> {
-    tracing::trace!("update_job_error_message(id={})", id);
+    tracing::trace!("update_job_error_message(id={id})");
 
     db.execute(
         "UPDATE jobs SET error_message = $2 WHERE id = $1",
@@ -65,7 +65,7 @@ pub async fn update_job_error_message(db: &DbClient, id: &Uuid, message: &String
 }
 
 pub async fn update_job_executed_at(db: &DbClient, id: &Uuid) -> Result<()> {
-    tracing::trace!("update_job_executed_at(id={})", id);
+    tracing::trace!("update_job_executed_at(id={id})");
 
     db.execute("UPDATE jobs SET executed_at = now() WHERE id = $1", &[&id])
         .await
@@ -79,11 +79,7 @@ pub async fn get_job_by_name_and_scheduled_at(
     name: &str,
     scheduled_at: &DateTime<Utc>,
 ) -> Result<Job> {
-    tracing::trace!(
-        "get_job_by_name_and_scheduled_at(name={}, scheduled_at={})",
-        name,
-        scheduled_at
-    );
+    tracing::trace!("get_job_by_name_and_scheduled_at(name={name}, scheduled_at={scheduled_at})");
 
     let job = db
         .query_one(

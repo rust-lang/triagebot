@@ -154,7 +154,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
                 .layer(HandleErrorLayer::new(|err: BoxError| async move {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Unhandled error: {}", err),
+                        format!("Unhandled error: {err}"),
                     )
                 }))
                 .layer(BufferLayer::new(5))

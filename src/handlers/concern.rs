@@ -60,10 +60,7 @@ pub(super) async fn handle_command(
             }
         }
         Err(err) => {
-            tracing::warn!(
-                "unable to fetch rfcbot active FCPs: {:?}, skipping check",
-                err
-            );
+            tracing::warn!("unable to fetch rfcbot active FCPs: {err:?}, skipping check");
         }
     }
 
@@ -144,7 +141,7 @@ pub(super) async fn handle_command(
             )
             .await
         {
-            tracing::error!("unable to add concern labels: {:?}", err);
+            tracing::error!("unable to add concern labels: {err:?}");
             let labels = config.labels.join(", ");
             issue.post_comment(
                 &ctx.github,

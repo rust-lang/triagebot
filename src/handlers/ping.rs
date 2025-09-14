@@ -78,7 +78,7 @@ pub(super) async fn handle_command(
         {
             let cmnt = ErrorComment::new(
                 event.issue().unwrap(),
-                format!("Error adding team label (`{}`): {:?}.", label, err),
+                format!("Error adding team label (`{label}`): {err:?}."),
             );
             cmnt.post(&ctx.github).await?;
         }
