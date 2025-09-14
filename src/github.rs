@@ -1712,13 +1712,13 @@ impl Repository {
             }
             let target = data
                 .data
-                .ok_or_else(|| anyhow::anyhow!("No data returned."))?
+                .context("No data returned.")?
                 .repository
-                .ok_or_else(|| anyhow::anyhow!("No repository."))?
+                .context("No repository.")?
                 .ref_
-                .ok_or_else(|| anyhow::anyhow!("No ref."))?
+                .context("No ref.")?
                 .target
-                .ok_or_else(|| anyhow::anyhow!("No target."))?;
+                .context("No target.")?;
             let commit = match target {
                 GitObject::Commit(commit) => commit,
                 _ => anyhow::bail!("unexpected target type {target:?}"),
