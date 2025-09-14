@@ -33,12 +33,13 @@ impl fmt::Display for ParseError {
 
 impl ShortcutCommand {
     pub fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
-        let mut shortcuts = HashMap::new();
-        shortcuts.insert("ready", ShortcutCommand::Ready);
-        shortcuts.insert("review", ShortcutCommand::Ready);
-        shortcuts.insert("reviewer", ShortcutCommand::Ready);
-        shortcuts.insert("author", ShortcutCommand::Author);
-        shortcuts.insert("blocked", ShortcutCommand::Blocked);
+        let shortcuts = HashMap::from([
+            ("ready", ShortcutCommand::Ready),
+            ("review", ShortcutCommand::Ready),
+            ("reviewer", ShortcutCommand::Ready),
+            ("author", ShortcutCommand::Author),
+            ("blocked", ShortcutCommand::Blocked),
+        ]);
 
         let mut toks = input.clone();
         if let Some(Token::Word(word)) = toks.peek_token()? {
