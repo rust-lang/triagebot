@@ -650,7 +650,7 @@ async fn get_fresh_config(
         .await
         .map_err(|e| ConfigurationError::Http(Arc::new(e)))?
         .ok_or(ConfigurationError::Missing)?;
-    let contents = String::from_utf8_lossy(&*contents);
+    let contents = String::from_utf8_lossy(&contents);
     let config = Arc::new(toml::from_str::<Config>(&contents).map_err(ConfigurationError::Toml)?);
     log::debug!("fresh configuration for {}: {:?}", repo.full_name, config);
     Ok(config)

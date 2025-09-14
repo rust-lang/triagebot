@@ -99,7 +99,7 @@ pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client>
         let connector = builder.build().context("built TlsConnector")?;
         let connector = MakeTlsConnector::new(connector);
 
-        let (db_client, connection) = match tokio_postgres::connect(&db_url, connector).await {
+        let (db_client, connection) = match tokio_postgres::connect(db_url, connector).await {
             Ok(v) => v,
             Err(e) => {
                 anyhow::bail!("failed to connect to DB: {}", e);
@@ -115,7 +115,7 @@ pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client>
     } else {
         eprintln!("Warning: Non-TLS connection to non-RDS DB");
         let (db_client, connection) =
-            match tokio_postgres::connect(&db_url, tokio_postgres::NoTls).await {
+            match tokio_postgres::connect(db_url, tokio_postgres::NoTls).await {
                 Ok(v) => v,
                 Err(e) => {
                     anyhow::bail!("failed to connect to DB: {}", e);
@@ -225,9 +225,9 @@ pub async fn schedule_job(
         anyhow::bail!("Job {} does not exist in the current job list.", job_name);
     }
 
-    if let Err(_) = get_job_by_name_and_scheduled_at(&db, job_name, &when).await {
+    if let Err(_) = get_job_by_name_and_scheduled_at(db, job_name, &when).await {
         // mean there's no job already in the db with that name and scheduled_at
-        insert_job(&db, job_name, &when, &job_metadata).await?;
+        insert_job(db, job_name, &when, &job_metadata).await?;
     }
 
     Ok(())
@@ -235,20 +235,20 @@ pub async fn schedule_job(
 
 pub async fn run_scheduled_jobs(ctx: &Context) -> anyhow::Result<()> {
     let db = &ctx.db.get().await;
-    let jobs = get_jobs_to_execute(&db).await?;
+    let jobs = get_jobs_to_execute(db).await?;
     tracing::trace!("jobs to execute: {:#?}", jobs);
 
     for job in jobs.iter() {
-        update_job_executed_at(&db, &job.id).await?;
+        update_job_executed_at(db, &job.id).await?;
 
-        match handle_job(&ctx, &job.name, &job.metadata).await {
+        match handle_job(ctx, &job.name, &job.metadata).await {
             Ok(_) => {
                 tracing::trace!("job successfully executed (id={})", job.id);
-                delete_job(&db, &job.id).await?;
+                delete_job(db, &job.id).await?;
             }
             Err(e) => {
                 tracing::error!("job failed on execution (id={:?}, error={:?})", job.id, e);
-                update_job_error_message(&db, &job.id, &e.to_string()).await?;
+                update_job_error_message(db, &job.id, &e.to_string()).await?;
             }
         }
     }
@@ -263,7 +263,7 @@ async fn handle_job(
     metadata: &serde_json::Value,
 ) -> anyhow::Result<()> {
     for job in jobs() {
-        if &job.name() == &name {
+        if job.name() == name {
             return job.run(ctx, metadata).await;
         }
     }

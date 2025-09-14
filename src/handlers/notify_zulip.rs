@@ -65,7 +65,7 @@ fn parse_label_change_input(
     let mut include_config_names: Vec<String> = vec![];
 
     for (name, label_config) in &config.subtables {
-        if has_all_required_labels(&event.issue, &label_config) {
+        if has_all_required_labels(&event.issue, label_config) {
             match event.action {
                 IssuesAction::Labeled { .. } if !label_config.messages_on_add.is_empty() => {
                     include_config_names.push(name.to_string());
@@ -117,7 +117,7 @@ fn parse_open_close_reopen_input(
             let mut include_config_names: Vec<String> = vec![];
 
             for (name, label_config) in &config.subtables {
-                if has_all_required_labels(&event.issue, &label_config) {
+                if has_all_required_labels(&event.issue, label_config) {
                     match event.action {
                         IssuesAction::Opened if !label_config.messages_on_add.is_empty() => {
                             include_config_names.push(name.to_string());
@@ -225,7 +225,7 @@ pub(super) async fn handle_input(
                 let msg = msg.replace("{number}", &event.issue.number.to_string());
                 let msg = msg.replace("{title}", &event.issue.title);
                 let msg = replace_team_to_be_nominated(&event.issue.labels, msg);
-                let msg = msg.replace("{recipients}", &get_zulip_ids(ctx, &recipients).await);
+                let msg = msg.replace("{recipients}", &get_zulip_ids(ctx, recipients).await);
 
                 let req = crate::zulip::MessageApiRequest {
                     recipient,

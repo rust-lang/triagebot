@@ -42,7 +42,7 @@ pub(super) async fn handle_command(
         return Ok(());
     }
 
-    if let Err(e) = issue.transfer(&ctx.github, "rust-lang", &repo).await {
+    if let Err(e) = issue.transfer(&ctx.github, "rust-lang", repo).await {
         issue
             .post_comment(&ctx.github, &format!("Failed to transfer issue:\n{e:?}"))
             .await?;

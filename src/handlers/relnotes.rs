@@ -115,7 +115,7 @@ If this change is notable enough for inclusion in the blog post then this sectio
             let resp = ctx
                 .github
                 .new_issue(
-                    &e.issue.repository(),
+                    e.issue.repository(),
                     &title,
                     &body,
                     ["relnotes", "relnotes-tracking-issue"]
@@ -134,7 +134,7 @@ If this change is notable enough for inclusion in the blog post then this sectio
                 .await?;
             if let Some(milestone) = &e.issue.milestone {
                 ctx.github
-                    .set_milestone(&e.issue.repository().to_string(), &milestone, resp.number)
+                    .set_milestone(&e.issue.repository().to_string(), milestone, resp.number)
                     .await?;
             }
             state.data.relnotes_issue = Some(resp.number);

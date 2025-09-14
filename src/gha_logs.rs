@@ -358,8 +358,7 @@ body {{
     );
     headers.insert(
         CONTENT_SECURITY_POLICY,
-        HeaderValue::from_str(&*
-        format!(
+        HeaderValue::from_str(&format!(
             "default-src 'none'; script-src 'nonce-{nonce}' 'self'; style-src 'unsafe-inline'; img-src 'self' rust-lang.org"
         )).unwrap(),
     );

@@ -96,7 +96,7 @@ impl fmt::Display for EventName {
 }
 
 pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::Result<T> {
-    let mut deserializer = serde_json::Deserializer::from_str(&v);
+    let mut deserializer = serde_json::Deserializer::from_str(v);
     let res: Result<T, _> = serde_path_to_error::deserialize(&mut deserializer);
     match res {
         Ok(r) => Ok(r),
@@ -148,7 +148,7 @@ pub async fn webhook(
     debug!("signature={signature}");
 
     // Check signature on body
-    if let Err(err) = check_payload_signed(&signature, &body) {
+    if let Err(err) = check_payload_signed(signature, &body) {
         tracing::error!("check_payload_signed: {}", err);
         return (StatusCode::FORBIDDEN, "Wrong signature").into_response();
     }
@@ -198,7 +198,7 @@ async fn process_payload(
             })
         }
         EventName::PullRequestReviewComment => {
-            let mut payload = deserialize_payload::<PullRequestReviewComment>(&payload)
+            let mut payload = deserialize_payload::<PullRequestReviewComment>(payload)
                 .context("failed to deserialize to PullRequestReviewComment")?;
 
             payload.issue.pull_request = Some(PullRequestDetails::new());
@@ -216,7 +216,7 @@ async fn process_payload(
             })
         }
         EventName::IssueComment => {
-            let payload = deserialize_payload::<IssueCommentEvent>(&payload)
+            let payload = deserialize_payload::<IssueCommentEvent>(payload)
                 .context("failed to deserialize IssueCommentEvent")?;
 
             log::info!("handling issue comment {:?}", payload);
@@ -224,7 +224,7 @@ async fn process_payload(
             Event::IssueComment(payload)
         }
         EventName::Issue | EventName::PullRequest => {
-            let mut payload = deserialize_payload::<IssuesEvent>(&payload)
+            let mut payload = deserialize_payload::<IssuesEvent>(payload)
                 .context("failed to deserialize IssuesEvent")?;
 
             if matches!(event, EventName::PullRequest) {
@@ -236,7 +236,7 @@ async fn process_payload(
             Event::Issue(payload)
         }
         EventName::Push => {
-            let payload = deserialize_payload::<PushEvent>(&payload)
+            let payload = deserialize_payload::<PushEvent>(payload)
                 .context("failed to deserialize to PushEvent")?;
 
             log::info!("handling push event {:?}", payload);
@@ -244,7 +244,7 @@ async fn process_payload(
             Event::Push(payload)
         }
         EventName::Create => {
-            let payload = deserialize_payload::<CreateEvent>(&payload)
+            let payload = deserialize_payload::<CreateEvent>(payload)
                 .context("failed to deserialize to CreateEvent")?;
 
             log::info!("handling create event {:?}", payload);
@@ -256,7 +256,7 @@ async fn process_payload(
             return Ok(false);
         }
     };
-    let errors = crate::handlers::handle(&ctx, &host, &event).await;
+    let errors = crate::handlers::handle(ctx, host, &event).await;
     let mut other_error = false;
     let mut message = String::new();
     for err in errors {
@@ -302,7 +302,7 @@ pub fn check_payload_signed(signature: &str, payload: &[u8]) -> Result<(), Signe
     let signature = signature
         .strip_prefix("sha256=")
         .ok_or(SignedPayloadError)?;
-    let signature = match hex::decode(&signature) {
+    let signature = match hex::decode(signature) {
         Ok(e) => e,
         Err(e) => {
             tracing::trace!("hex decode failed for {:?}: {:?}", signature, e);
@@ -316,6 +316,6 @@ pub fn check_payload_signed(signature: &str, payload: &[u8]) -> Result<(), Signe
             .as_bytes(),
     )
     .unwrap();
-    mac.update(&payload);
+    mac.update(payload);
     mac.verify_slice(&signature).map_err(|_| SignedPayloadError)
 }

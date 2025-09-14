@@ -24,7 +24,7 @@ impl<'a> RustcFormat<'a> {
     }
 
     pub(super) fn parse(mut self, content: &str) -> anyhow::Result<Changelog> {
-        let ast = comrak::parse_document(&self.arena, &content, &ComrakOptions::default());
+        let ast = comrak::parse_document(self.arena, content, &ComrakOptions::default());
 
         let mut section_ast = Vec::new();
         for child in ast.children() {

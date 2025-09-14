@@ -31,7 +31,7 @@ pub(super) async fn handle_command(
     if cmd.style == Style::BetaApprove {
         if !issue_labels.iter().any(|l| l.name == "beta-nominated") {
             let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
+                event.issue().unwrap(),
                 format!(
                     "This pull request is not beta-nominated, so it cannot be approved yet.\
                      Perhaps try to beta-nominate it by using `@{} beta-nominate <team>`?",
@@ -50,7 +50,7 @@ pub(super) async fn handle_command(
     } else {
         if !config.teams.contains_key(&cmd.team) {
             let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
+                event.issue().unwrap(),
                 format!(
                     "This team (`{}`) cannot be nominated for via this command;\
                      it may need to be added to `triagebot.toml` on the default branch.",

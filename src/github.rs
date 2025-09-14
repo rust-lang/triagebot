@@ -134,7 +134,7 @@ impl GithubClient {
                 .client
                 .execute(
                     self.client
-                        .get(&format!("{}/rate_limit", self.api_url))
+                        .get(format!("{}/rate_limit", self.api_url))
                         .configure(self)
                         .build()
                         .unwrap(),
@@ -197,7 +197,7 @@ impl GithubClient {
             body: &'a str,
             labels: Vec<String>,
         }
-        let url = format!("{}/issues", repo.url(&self));
+        let url = format!("{}/issues", repo.url(self));
         self.json(self.post(&url).json(&NewIssue {
             title,
             body,
@@ -217,7 +217,7 @@ impl GithubClient {
         struct Update {
             state: PrState,
         }
-        let url = format!("{}/pulls/{number}", repo.url(&self));
+        let url = format!("{}/pulls/{number}", repo.url(self));
         self.send_req(self.patch(&url).json(&Update { state }))
             .await
             .context("failed to update pr state")?;
@@ -229,7 +229,7 @@ impl GithubClient {
         repo: &IssueRepository,
         job_id: u128,
     ) -> anyhow::Result<String> {
-        let url = format!("{}/actions/jobs/{job_id}/logs", repo.url(&self));
+        let url = format!("{}/actions/jobs/{job_id}/logs", repo.url(self));
         let (body, _req_dbg) = self
             .send_req(self.get(&url))
             .await
@@ -242,7 +242,7 @@ impl GithubClient {
         repo: &IssueRepository,
         job_id: u128,
     ) -> anyhow::Result<WorkflowRunJob> {
-        let url = format!("{}/actions/jobs/{job_id}", repo.url(&self));
+        let url = format!("{}/actions/jobs/{job_id}", repo.url(self));
         self.json(self.get(&url))
             .await
             .context("failed to retrive workflow job run details")
@@ -253,7 +253,7 @@ impl GithubClient {
         repo: &IssueRepository,
         sha: &str,
     ) -> anyhow::Result<GitTrees> {
-        let url = format!("{}/git/trees/{sha}", repo.url(&self));
+        let url = format!("{}/git/trees/{sha}", repo.url(self));
         self.json(self.get(&url))
             .await
             .context("failed to retrive git trees")
@@ -265,14 +265,14 @@ impl GithubClient {
         before: &str,
         after: &str,
     ) -> anyhow::Result<GithubCompare> {
-        let url = format!("{}/compare/{before}...{after}", repo.url(&self));
+        let url = format!("{}/compare/{before}...{after}", repo.url(self));
         self.json(self.get(&url))
             .await
             .context("failed to retrive the compare")
     }
 
     pub async fn pull_request(&self, repo: &IssueRepository, pr_num: u64) -> anyhow::Result<Issue> {
-        let url = format!("{}/pulls/{pr_num}", repo.url(&self));
+        let url = format!("{}/pulls/{pr_num}", repo.url(self));
         let mut pr: Issue = self
             .json(self.get(&url))
             .await
@@ -848,7 +848,7 @@ impl Issue {
         // Don't try to add labels already present on this issue.
         let labels = labels
             .into_iter()
-            .filter(|l| !self.labels().contains(&l))
+            .filter(|l| !self.labels().contains(l))
             .map(|l| l.name)
             .collect::<Vec<_>>();
 
@@ -2173,7 +2173,7 @@ impl IssuesQuery for Query<'_> {
         team_client: &'a TeamClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         let issues = repo
-            .get_issues(&gh_client, self)
+            .get_issues(gh_client, self)
             .await
             .with_context(|| "Unable to get issues.")?;
 
@@ -2281,7 +2281,7 @@ impl IssuesQuery for Query<'_> {
             };
 
             let mcp_details = if include_mcp_details {
-                let first100_comments = issue.get_first100_comments(&gh_client).await?;
+                let first100_comments = issue.get_first100_comments(gh_client).await?;
                 let (zulip_link, concerns) = if !first100_comments.is_empty() {
                     let split = re_zulip_link
                         .split(&first100_comments[0].body)
@@ -2367,7 +2367,7 @@ fn find_open_concerns(comments: Vec<Comment>) -> Option<Vec<(String, String)>> {
     // remove solved concerns and return the rest
     let unresolved_concerns = raised
         .iter()
-        .filter_map(|(&ref title, &ref comment_url)| {
+        .filter_map(|(title, comment_url)| {
             if !solved.contains_key(title) {
                 Some((title.to_string(), comment_url.to_string()))
             } else {

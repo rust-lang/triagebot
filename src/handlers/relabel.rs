@@ -33,7 +33,7 @@ pub(super) async fn handle_command(
     // Check label authorization for the current user
     for delta in &input.0 {
         let name = delta.label().as_str();
-        let err = match check_filter(name, config, is_member(&event.user(), &ctx.team).await) {
+        let err = match check_filter(name, config, is_member(event.user(), &ctx.team).await) {
             Ok(CheckFilterResult::Allow) => None,
             Ok(CheckFilterResult::Deny) => Some(format!(
                 "Label {} can only be set by Rust team members",

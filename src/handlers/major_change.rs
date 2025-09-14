@@ -523,7 +523,7 @@ impl Job for MajorChangeAcceptenceJob {
 
         let now = Utc::now();
 
-        match process_seconded(&ctx, &major_change, now).await {
+        match process_seconded(ctx, &major_change, now).await {
             Ok(()) => {
                 tracing::info!(
                     "{}: major change ({:?}) as been accepted",
@@ -673,7 +673,7 @@ async fn process_seconded(
         issue
             .post_comment(
                 &ctx.github,
-                &*format!(
+                &format!(
 r#"The final comment period is now complete, this major change is now **accepted**.
 
 As the automated representative, I would like to thank the author for their work and everyone else who contributed to this major change proposal.

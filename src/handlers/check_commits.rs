@@ -138,8 +138,7 @@ pub(super) async fn handle(
             .days_threshold
             .unwrap_or(behind_upstream::DEFAULT_DAYS_THRESHOLD);
 
-        if let Some(warning) =
-            behind_upstream::behind_upstream(age_threshold, event, &compare).await
+        if let Some(warning) = behind_upstream::behind_upstream(age_threshold, event, compare).await
         {
             warnings.push(warning);
         }
@@ -148,12 +147,12 @@ pub(super) async fn handle(
     // Check if this is a force-push with rebase and if it is emit comment
     // with link to our range-diff viewer.
     if let Some(range_diff) = &config.range_diff {
-        force_push_range_diff::handle_event(ctx, host, range_diff, &event, &compare).await?;
+        force_push_range_diff::handle_event(ctx, host, range_diff, event, compare).await?;
     }
 
     // Check if the `triagebot.toml` config is valid
     errors.extend(
-        validate_config::validate_config(ctx, &event, diff)
+        validate_config::validate_config(ctx, event, diff)
             .await
             .context("validating the the triagebot config")?,
     );

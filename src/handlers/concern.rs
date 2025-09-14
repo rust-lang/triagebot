@@ -88,7 +88,7 @@ pub(super) async fn handle_command(
 
     let mut client = ctx.db.get().await;
     let mut edit: EditIssueBody<'_, ConcernData> =
-        EditIssueBody::load(&mut client, &issue, CONCERN_ISSUE_KEY)
+        EditIssueBody::load(&mut client, issue, CONCERN_ISSUE_KEY)
             .await
             .context("unable to fetch the concerns data")?;
     let concern_data = edit.data_mut();
@@ -197,10 +197,10 @@ fn markdown_content(concerns: &[Concern], bot: &str) -> String {
     let _ = writeln!(md, "> # Concerns ({active_concerns} active)");
     let _ = writeln!(md, ">");
 
-    for &Concern {
-        ref title,
-        ref status,
-        ref comment_url,
+    for Concern {
+        title,
+        status,
+        comment_url,
     } in concerns
     {
         let _ = match status {

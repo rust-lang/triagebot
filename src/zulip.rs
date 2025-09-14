@@ -226,7 +226,7 @@ async fn handle_command<'a>(
                 acknowledge(&ctx, gh_id, identifier.into()).await
             }
             ChatCommand::Add { url, description } => {
-                add_notification(&ctx, gh_id, &url, &description.join(" ")).await
+                add_notification(&ctx, gh_id, url, &description.join(" ")).await
             }
             ChatCommand::Move { from, to } => move_notification(&ctx, gh_id, *from, *to).await,
             ChatCommand::Meta { index, description } => {
@@ -236,10 +236,10 @@ async fn handle_command<'a>(
             ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
             ChatCommand::Work(cmd) => workqueue_commands(&ctx, gh_id, cmd).await,
             ChatCommand::PingGoals(args) => {
-                ping_goals_cmd(ctx.clone(), gh_id, message_data, &args).await
+                ping_goals_cmd(ctx.clone(), gh_id, message_data, args).await
             }
             ChatCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
-            ChatCommand::TeamStats { name } => team_status_cmd(&ctx, &name).await,
+            ChatCommand::TeamStats { name } => team_status_cmd(&ctx, name).await,
         };
 
         let output = output?;
@@ -656,7 +656,7 @@ async fn lookup_cmd(ctx: &Context, cmd: &LookupCmd) -> anyhow::Result<Option<Str
 
     // The username could be a mention, which looks like this: `@**<username>**`, so strip the
     // extra sigils.
-    let username = username.trim_matches(&['@', '*']);
+    let username = username.trim_matches(['@', '*']);
 
     match cmd {
         LookupCmd::GitHub { .. } => Ok(Some(lookup_github_username(ctx, username).await?)),
@@ -818,7 +818,7 @@ async fn acknowledge(
     ident: Identifier<'_>,
 ) -> anyhow::Result<Option<String>> {
     let mut db = ctx.db.get().await;
-    let deleted = delete_ping(&mut *db, gh_id, ident)
+    let deleted = delete_ping(&mut db, gh_id, ident)
         .await
         .map_err(|e| format_err!("Failed to acknowledge {ident:?}: {e:?}."))?;
 

@@ -84,7 +84,7 @@ pub(super) async fn handle_command(
         // Get the state of the author reminder for this PR
         let mut db = ctx.db.get().await;
         let mut state: IssueData<'_, AuthorReminderState> =
-            IssueData::load(&mut db, &issue, AUTHOR_REMINDER_KEY).await?;
+            IssueData::load(&mut db, issue, AUTHOR_REMINDER_KEY).await?;
 
         if state.data.reminder_comment.is_none() {
             let comment_body = format!(

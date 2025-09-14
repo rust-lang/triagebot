@@ -108,16 +108,16 @@ where
                     let end_idx = start_idx + all_new.len();
                     current_body.replace_range(start_idx..end_idx, "");
                 }
-                self.issue.edit_body(&client, &current_body).await?;
+                self.issue.edit_body(client, &current_body).await?;
             } else {
-                let end_idx = current_body.find(&END_BOT).unwrap();
+                let end_idx = current_body.find(END_BOT).unwrap();
                 current_body.insert_str(end_idx, &bot_section);
-                self.issue.edit_body(&client, &current_body).await?;
+                self.issue.edit_body(client, &current_body).await?;
             }
         } else {
             let new_body = format!("{}{}", current_body, all_new);
 
-            self.issue.edit_body(&client, &new_body).await?;
+            self.issue.edit_body(client, &new_body).await?;
         }
 
         // Save the state in the database
