@@ -21,7 +21,7 @@ impl Changelog {
     }
 
     pub(crate) fn version(&self, version: &str) -> Option<&str> {
-        self.versions.get(version).map(|s| s.as_str())
+        self.versions.get(version).map(String::as_str)
     }
 }
 

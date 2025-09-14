@@ -1035,7 +1035,7 @@ async fn candidate_reviewers_from_names<'a>(
             .iter()
             .filter_map(|res| res.as_ref().ok().map(|s| s.name.to_string()))
             .collect();
-        let usernames: Vec<&str> = usernames.iter().map(|s| s.as_str()).collect();
+        let usernames: Vec<&str> = usernames.iter().map(String::as_str).collect();
         let review_prefs = get_review_prefs_batch(db, &usernames)
             .await
             .context("cannot fetch review preferences")

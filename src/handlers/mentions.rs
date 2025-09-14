@@ -70,7 +70,7 @@ pub(super) async fn parse_input(
                         file_paths
                             .iter()
                             .filter(|p| p.starts_with(path))
-                            .map(|p| PathBuf::from(p))
+                            .map(PathBuf::from)
                             .collect()
                     }
                     MentionsEntryType::Content => {

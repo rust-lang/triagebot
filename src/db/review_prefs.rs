@@ -107,7 +107,7 @@ pub async fn get_review_prefs_batch<'a>(
         .iter()
         .map(|name| (name.to_lowercase(), *name))
         .collect();
-    let lowercase_users: Vec<&str> = lowercase_map.keys().map(|s| s.as_str()).collect();
+    let lowercase_users: Vec<&str> = lowercase_map.keys().map(String::as_str).collect();
 
     // The id/user_id/max_assigned_prs/rotation_mode columns have to match the names used in
     // `From<tokio_postgres::row::Row> for ReviewPrefs`.
