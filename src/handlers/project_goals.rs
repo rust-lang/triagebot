@@ -106,7 +106,7 @@ async fn ping_project_goals_owners_automatically(
         zulip,
         team_api,
         false,
-        days_threshold as i64,
+        i64::from(days_threshold),
         &third_monday,
     )
     .await
