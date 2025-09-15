@@ -2277,7 +2277,7 @@ impl IssuesQuery for Query<'_> {
                     let split = re_zulip_link
                         .split(&first100_comments[0].body)
                         .collect::<Vec<&str>>();
-                    let zulip_link = split.last().unwrap_or(&"#").to_string();
+                    let zulip_link = (*split.last().unwrap_or(&"#")).to_string();
                     let concerns = find_open_concerns(first100_comments);
                     (zulip_link, concerns)
                 };
