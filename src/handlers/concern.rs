@@ -183,7 +183,7 @@ fn markdown_content(concerns: &[Concern], bot: &str) -> String {
 
     let mut md = String::new();
 
-    let _ = writeln!(md, "");
+    let _ = writeln!(md);
 
     if active_concerns > 0 {
         let _ = writeln!(md, "> [!CAUTION]");
