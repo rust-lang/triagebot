@@ -117,10 +117,9 @@ pub async fn request_updates(
         /*
         let mut dmed_assignee = false;
         for assignee in issue.assignees {
-            let zulip_id_and_email = zulip_id_and_email(ctx, assignee.id.unwrap()).await?;
-            let (zulip_id, email) = match zulip_id_and_email {
-                Some(id) => id,
-                None => continue,
+            let Some((zulip_id, email)) = zulip_id_and_email(ctx, assignee.id.unwrap()).await?
+            else {
+                continue;
             };
             let message = format!(
                 "Type team tracking issue needs an update. [Issue #{}]({})",

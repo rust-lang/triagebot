@@ -29,35 +29,28 @@ pub(super) async fn handle_command(
         return Ok(());
     }
 
-    let (gh_team, config) = match config.get_by_name(&team_name.team) {
-        Some(v) => v,
-        None => {
-            let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
-                format!(
-                    "This team (`{}`) cannot be pinged via this command; \
-                    it may need to be added to `triagebot.toml` on the default branch.",
-                    team_name.team,
-                ),
-            );
-            cmnt.post(&ctx.github).await?;
-            return Ok(());
-        }
+    let Some((gh_team, config)) = config.get_by_name(&team_name.team) else {
+        let cmnt = ErrorComment::new(
+            event.issue().unwrap(),
+            format!(
+                "This team (`{}`) cannot be pinged via this command; \
+                it may need to be added to `triagebot.toml` on the default branch.",
+                team_name.team,
+            ),
+        );
+        cmnt.post(&ctx.github).await?;
+        return Ok(());
     };
-    let team = ctx.team.get_team(&gh_team).await?;
-    let team = match team {
-        Some(team) => team,
-        None => {
-            let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
-                format!(
-                    "This team (`{}`) does not exist in the team repository.",
-                    team_name.team,
-                ),
-            );
-            cmnt.post(&ctx.github).await?;
-            return Ok(());
-        }
+    let Some(team) = ctx.team.get_team(gh_team).await? else {
+        let cmnt = ErrorComment::new(
+            event.issue().unwrap(),
+            format!(
+                "This team (`{}`) does not exist in the team repository.",
+                team_name.team,
+            ),
+        );
+        cmnt.post(&ctx.github).await?;
+        return Ok(());
     };
 
     if let Some(label) = &config.label {

@@ -12,21 +12,18 @@ use tracing as log;
 const BORS_GH_ID: u64 = 3_372_342;
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
-    let body = match event.comment_body() {
-        Some(v) => v,
+    let Some(body) = event.comment_body() else {
         // Skip events that don't have comment bodies associated
-        None => return Ok(()),
-    };
-
-    let event = if let Event::IssueComment(e) = event {
-        if e.action != github::IssueCommentAction::Created {
-            return Ok(());
-        }
-
-        e
-    } else {
         return Ok(());
     };
+
+    let Event::IssueComment(event) = event else {
+        return Ok(());
+    };
+
+    if event.action != github::IssueCommentAction::Created {
+        return Ok(());
+    }
 
     if !body.contains("Test successful") {
         return Ok(());
@@ -45,9 +42,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let start = "<!-- homu: ";
     let start = body.find(start).map(|s| s + start.len());
     let end = body.find(" -->");
-    let (start, end) = if let (Some(start), Some(end)) = (start, end) {
-        (start, end)
-    } else {
+    let (Some(start), Some(end)) = (start, end) else {
         log::warn!("Unable to extract build completion from comment {body:?}");
         return Ok(());
     };
@@ -102,12 +97,9 @@ pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u
 
     let db = ctx.db.get().await;
     while let Some((sha, mut pr)) = to_be_resolved.pop_front() {
-        let mut gc = match ctx.github.rust_commit(&sha).await {
-            Some(c) => c,
-            None => {
-                log::error!("Could not find bors-reported sha: {:?}", sha);
-                continue;
-            }
+        let Some(mut gc) = ctx.github.rust_commit(&sha).await else {
+            log::error!("Could not find bors-reported sha: {sha:?}");
+            continue;
         };
         let parent_sha = gc.parents.remove(0).sha;
 
@@ -121,12 +113,9 @@ pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u
             }
         }
 
-        let pr = match pr.take() {
-            Some(number) => number,
-            None => {
-                log::warn!("Failed to find PR number for commit {sha}");
-                continue;
-            }
+        let Some(pr) = pr.take() else {
+            log::warn!("Failed to find PR number for commit {sha}");
+            continue;
         };
 
         let res = rustc_commits::record_commit(

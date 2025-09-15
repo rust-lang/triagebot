@@ -14,10 +14,9 @@ use std::collections::HashSet;
 use tracing as log;
 
 pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
-    let body = match event.comment_body() {
-        Some(v) => v,
+    let Some(body) = event.comment_body() else {
         // Skip events that don't have comment bodies associated
-        None => return Ok(()),
+        return Ok(());
     };
 
     if let Event::Issue(e) = event {
@@ -79,9 +78,8 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     }
     log::trace!("Captured usernames in comment: {caps:?}");
     for login in caps {
-        let (users, team_name) = match id_from_user(ctx, login).await? {
-            Some((users, team_name)) => (users, team_name),
-            None => continue,
+        let Some((users, team_name)) = id_from_user(ctx, login).await? else {
+            continue;
         };
 
         let client = ctx.db.get().await;
