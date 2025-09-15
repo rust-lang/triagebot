@@ -28,10 +28,10 @@ impl IgnoreBlocks {
                     ignore_till_end!(TagEnd::CodeBlock);
                 }
                 Event::Start(Tag::Link { .. }) => {
-                    ignore_till_end!(TagEnd::Link { .. });
+                    ignore_till_end!(TagEnd::Link);
                 }
                 Event::Start(Tag::Image { .. }) => {
-                    ignore_till_end!(TagEnd::Image { .. });
+                    ignore_till_end!(TagEnd::Image);
                 }
                 Event::Start(Tag::BlockQuote(_)) => {
                     let start = range.start;
