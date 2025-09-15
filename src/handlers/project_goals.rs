@@ -74,8 +74,7 @@ pub async fn check_project_goal_acl(team_client: &TeamClient, gh_id: u64) -> any
     Ok(team
         .members
         .into_iter()
-        .find(|member| member.github_id == gh_id)
-        .is_some())
+        .any(|member| member.github_id == gh_id))
 }
 
 async fn ping_project_goals_owners_automatically(

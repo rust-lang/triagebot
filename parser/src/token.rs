@@ -125,7 +125,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn cur(&mut self) -> Option<(usize, char)> {
-        self.chars.peek().cloned()
+        self.chars.peek().copied()
     }
 
     fn at_end(&mut self) -> bool {
