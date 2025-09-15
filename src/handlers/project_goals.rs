@@ -262,10 +262,8 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 return Ok(());
             }
             let zulip_topic_name = zulip_topic_name(issue);
-            let zulip_owners = match zulip_owners(&ctx.team, issue).await? {
-                Some(names) => names,
-                None => format!("(no owners assigned)"),
-            };
+            let zulip_owners = zulip_owners(&ctx.team, issue).await?;
+            let zulip_owners = zulip_owners.as_deref().unwrap_or("(no owners assigned)");
             let title = &issue.title;
             let goalnum = issue.number;
             let zulip_req = crate::zulip::MessageApiRequest {
