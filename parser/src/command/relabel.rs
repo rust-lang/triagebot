@@ -68,13 +68,13 @@ impl LabelDelta {
                 return Err(input.error(ParseError::ExpectedLabelDelta));
             }
         };
-        if delta.starts_with('+') {
+        if let Some(label) = delta.strip_prefix('+') {
             Ok(LabelDelta::Add(
-                Label::parse(&delta[1..]).map_err(|e| input.error(e))?,
+                Label::parse(label).map_err(|e| input.error(e))?,
             ))
-        } else if delta.starts_with('-') {
+        } else if let Some(label) = delta.strip_prefix('-') {
             Ok(LabelDelta::Remove(
-                Label::parse(&delta[1..]).map_err(|e| input.error(e))?,
+                Label::parse(label).map_err(|e| input.error(e))?,
             ))
         } else {
             Ok(LabelDelta::Add(

@@ -203,7 +203,10 @@ impl<'a> Tokenizer<'a> {
         }) {
             if self.cur().unwrap().1 == '"' {
                 let so_far = self.str_from(start);
-                if so_far.starts_with('r') && so_far.chars().skip(1).all(|v| v == '#' || v == '"') {
+                if so_far
+                    .strip_prefix('r')
+                    .is_some_and(|s| s.chars().all(|v| v == '#' || v == '"'))
+                {
                     return Err(self.error(ErrorKind::RawString));
                 } else {
                     return Err(self.error(ErrorKind::QuoteInWord));

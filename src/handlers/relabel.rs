@@ -144,8 +144,8 @@ enum MatchPatternResult {
 }
 
 fn match_pattern(pattern: &str, label: &str) -> anyhow::Result<MatchPatternResult> {
-    let (pattern, inverse) = if pattern.starts_with('!') {
-        (&pattern[1..], true)
+    let (pattern, inverse) = if let Some(pat) = pattern.strip_prefix('!') {
+        (pat, true)
     } else {
         (pattern, false)
     };
