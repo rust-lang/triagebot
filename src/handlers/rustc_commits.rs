@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use std::collections::VecDeque;
 use tracing as log;
 
-const BORS_GH_ID: u64 = 3372342;
+const BORS_GH_ID: u64 = 3_372_342;
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let body = match event.comment_body() {
