@@ -7,12 +7,12 @@
 //! job (to be used as an identifier in the database) and the function to run
 //! when the job runs.
 //!
-//! The metadata is a serde_json::Value
-//! Please refer to https://docs.rs/serde_json/latest/serde_json/value/fn.from_value.html
+//! The metadata is a `serde_json::Value`
+//! Please refer to <https://docs.rs/serde_json/latest/serde_json/value/fn.from_value.html>
 //! on how to interpret it as an instance of type T, implementing Serialize/Deserialize.
 //!
-//! The schedule is a cron::Schedule
-//! Please refer to https://docs.rs/cron/latest/cron/struct.Schedule.html for further info
+//! The schedule is a `cron::Schedule`
+//! Please refer to <https://docs.rs/cron/latest/cron/struct.Schedule.html> for further info
 //!
 //! ## Example, sending a zulip message once a week
 //!
@@ -20,26 +20,30 @@
 //! Friday at 11:30am ET into #t-release with a "@T-release meeting!"" content.
 //!
 //! To begin, let's create a generic zulip message Job:
-//!    #[derive(Serialize, Deserialize)]
-//!    struct ZulipMetadata {
-//!      pub message: String
-//!      pub channel: String,
-//!    }
-//!    struct ZulipMessageJob;
-//!    impl Job for ZulipMessageJob { ... }
+//! ```ignore
+//! #[derive(Serialize, Deserialize)]
+//! struct ZulipMetadata {
+//!   pub message: String
+//!   pub channel: String,
+//! }
+//! struct ZulipMessageJob;
+//! impl Job for ZulipMessageJob { ... }
+//! ```
 //!
 //! (Imagine that this job requires a channel and a message in the metadata.)
 //!
 //! If we wanted to have a default scheduled message, we could add the following to
 //! `default_jobs`:
-//!     JobSchedule {
-//!         name: ZulipMessageJob.name(),
-//!         schedule: Schedule::from_str("0 30 11 * * FRI *").unwrap(),
-//!         metadata: serde_json::value::to_value(ZulipMetadata {
-//!             message: "@T-release meeting!".to_string()
-//!             channel: "T-release".to_string(),
-//!         }).unwrap(),
-//!     }
+//! ```ignore
+//! JobSchedule {
+//!     name: ZulipMessageJob.name(),
+//!     schedule: Schedule::from_str("0 30 11 * * FRI *").unwrap(),
+//!     metadata: serde_json::value::to_value(ZulipMetadata {
+//!         message: "@T-release meeting!".to_string()
+//!         channel: "T-release".to_string(),
+//!     }).unwrap(),
+//! }
+//! ```
 
 use std::str::FromStr;
 

@@ -2430,7 +2430,7 @@ impl Event {
         }
     }
 
-    /// This will both extract from IssueComment events but also Issue events
+    /// This will both extract from `IssueComment` events but also `Issue` events
     pub fn comment_body(&self) -> Option<&str> {
         match self {
             Event::Create(_) => None,
@@ -2440,7 +2440,7 @@ impl Event {
         }
     }
 
-    /// This will both extract from IssueComment events but also Issue events
+    /// This will both extract from `IssueComment` events but also `Issue` events
     pub fn comment_from(&self) -> Option<&str> {
         match self {
             Event::Create(_) => None,

@@ -702,7 +702,7 @@ enum FindReviewerError {
     NoReviewer { initial: Vec<String> },
     /// Requested reviewer is off the review rotation (e.g. on a vacation).
     /// Either the username is in [users_on_vacation] in `triagebot.toml` or the user has
-    /// configured [RotationMode::OffRotation] in their reviewer preferences.
+    /// configured [`RotationMode::OffRotation`] in their reviewer preferences.
     ReviewerOffRotation { username: String },
     /// Requested reviewer is PR author
     ReviewerIsPrAuthor { username: String },

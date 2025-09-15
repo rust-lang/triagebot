@@ -64,7 +64,7 @@ pub struct Context {
     pub username: String,
     pub octocrab: Octocrab,
     /// Represents the workqueue (assigned open PRs) of individual reviewers.
-    /// tokio's RwLock is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
+    /// tokio's `RwLock` is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
     pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
     pub gha_logs: Arc<tokio::sync::RwLock<GitHubActionLogsCache>>,
 }
