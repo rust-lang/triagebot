@@ -294,8 +294,8 @@ fn calculate_label_changes(
     previous: &Vec<String>,
     current: &Vec<String>,
 ) -> (Vec<String>, Vec<String>) {
-    let previous_set: HashSet<String> = previous.into_iter().cloned().collect();
-    let current_set: HashSet<String> = current.into_iter().cloned().collect();
+    let previous_set: HashSet<String> = previous.iter().cloned().collect();
+    let current_set: HashSet<String> = current.iter().cloned().collect();
 
     let removals = previous_set.difference(&current_set).cloned().collect();
     let additions = current_set.difference(&previous_set).cloned().collect();
@@ -308,8 +308,8 @@ fn calculate_error_changes(
     previous: &Vec<(String, String)>,
     current: &Vec<String>,
 ) -> (Vec<(String, String)>, Vec<String>) {
-    let previous_set: HashSet<(String, String)> = previous.into_iter().cloned().collect();
-    let current_set: HashSet<String> = current.into_iter().cloned().collect();
+    let previous_set: HashSet<(String, String)> = previous.iter().cloned().collect();
+    let current_set: HashSet<String> = current.iter().cloned().collect();
 
     let removals = previous_set
         .iter()

@@ -2234,19 +2234,15 @@ impl IssuesQuery for Query<'_> {
                         pending_reviewers: fcp
                             .reviews
                             .iter()
-                            .filter_map(|r| {
-                                (!r.approved).then(|| crate::actions::FCPReviewerDetails {
-                                    github_login: r.reviewer.login.clone(),
-                                    zulip_id: zulip_map
-                                        .as_ref()
-                                        .map(|map| {
-                                            map.users
-                                                .iter()
-                                                .find(|&(_, &github)| github == r.reviewer.id)
-                                                .map(|v| *v.0)
-                                        })
-                                        .flatten(),
-                                })
+                            .filter(|r| !r.approved)
+                            .map(|r| crate::actions::FCPReviewerDetails {
+                                github_login: r.reviewer.login.clone(),
+                                zulip_id: zulip_map.as_ref().and_then(|map| {
+                                    map.users
+                                        .iter()
+                                        .find(|&(_, &github)| github == r.reviewer.id)
+                                        .map(|(&zulip, _)| zulip)
+                                }),
                             })
                             .collect(),
                         concerns: fcp
@@ -3237,7 +3233,7 @@ impl IssuesQuery for DesignMeetings {
                 .await?;
         Ok(items
             .into_iter()
-            .flat_map(|item| match item.content {
+            .filter_map(|item| match item.content {
                 Some(ProjectV2ItemContent::Issue(issue)) => Some(crate::actions::IssueDecorator {
                     assignees: String::new(),
                     author: String::new(),

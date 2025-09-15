@@ -492,7 +492,7 @@ fn find_reviewers_from_diff(
         .map(|(path, _)| path);
     let mut potential: Vec<_> = max_paths
         .flat_map(|owner_path| &config.owners[*owner_path])
-        .map(|owner| owner.to_string())
+        .cloned()
         .collect();
     // Dedupe. This isn't strictly necessary, as `find_reviewer_from_names` will deduplicate.
     // However, this helps with testing.

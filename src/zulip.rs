@@ -207,7 +207,7 @@ async fn handle_command<'a>(
                 }
 
                 // Skip the first two arguments for the rest of CLI parsing
-                words = words[2..].iter().copied().collect();
+                words = words[2..].to_vec();
             } else {
                 return Err(anyhow::anyhow!(
                     "Failed to parse command; expected `as <username> <command...>`."
@@ -282,7 +282,7 @@ async fn handle_command<'a>(
             return Ok(Some("Unknown command".to_string()));
         }
 
-        let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].into_iter().copied())?;
+        let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].iter().copied())?;
         tracing::info!("command parsed to {cmd:?}");
 
         match cmd {

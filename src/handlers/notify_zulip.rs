@@ -113,7 +113,7 @@ fn parse_open_close_reopen_input(
                 .get(&label.name)
                 .map(|config| (label, config))
         })
-        .flat_map(|(label, config)| {
+        .filter_map(|(label, config)| {
             let mut include_config_names: Vec<String> = vec![];
 
             for (name, label_config) in &config.subtables {
