@@ -2146,7 +2146,7 @@ fn quote_reply(markdown: &str) -> String {
     if markdown.is_empty() {
         String::from("*No content*")
     } else {
-        format!("\n\t> {}", markdown.replace("\n", "\n\t> "))
+        format!("\n\t> {}", markdown.replace('\n', "\n\t> "))
     }
 }
 

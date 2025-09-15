@@ -678,7 +678,7 @@ fn strip_organization_prefix<'a>(issue: &Issue, name: &'a str) -> &'a str {
     let repo = issue.repository();
     // @ is optional, so it is trimmed separately
     // both @rust-lang/compiler and rust-lang/compiler should work
-    name.trim_start_matches("@")
+    name.trim_start_matches('@')
         .trim_start_matches(&format!("{}/", repo.organization))
 }
 

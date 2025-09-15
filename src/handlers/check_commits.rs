@@ -283,7 +283,7 @@ async fn handle_new_state(
 fn warning_from_warnings(warnings: &[String]) -> String {
     let warnings: Vec<_> = warnings
         .iter()
-        .map(|warning| warning.trim().replace("\n", "\n    "))
+        .map(|warning| warning.trim().replace('\n', "\n    "))
         .map(|warning| format!("* {warning}"))
         .collect();
     format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"))
