@@ -385,12 +385,11 @@ async fn team_status_cmd(ctx: &Context, team_name: &str) -> anyhow::Result<Optio
         let review_prefs = review_prefs.get(member.github.as_str());
         let max_capacity = review_prefs
             .as_ref()
-            .and_then(|prefs| prefs.max_assigned_prs);
+            .and_then(|prefs| prefs.max_assigned_prs)
+            .map(|c| c.to_string());
+        let max_capacity = max_capacity.as_deref().unwrap_or("unlimited");
         let assigned_prs = workqueue.assigned_pr_count(member.github_id);
 
-        let max_capacity = max_capacity
-            .map(|c| c.to_string())
-            .unwrap_or_else(|| "unlimited".to_string());
         format!(
             "| `{}` | {} | `{assigned_prs}` | `{max_capacity}` |",
             member.github, member.name
