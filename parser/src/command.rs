@@ -140,13 +140,12 @@ impl<'a> Input<'a> {
             &original_tokenizer,
         ));
 
-        if success.len() > 1 {
-            panic!(
-                "succeeded parsing {:?} to multiple commands: {:?}",
-                &self.all[self.parsed..],
-                success
-            );
-        }
+        assert!(
+            success.len() <= 1,
+            "succeeded parsing {:?} to multiple commands: {:?}",
+            &self.all[self.parsed..],
+            success
+        );
 
         let (mut tok, c) = success.pop()?;
         // if we errored out while parsing the command do not move the input forwards
