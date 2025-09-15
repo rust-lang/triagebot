@@ -132,7 +132,7 @@ pub(super) async fn handle_command(
     let current = e.data_mut();
 
     let comment_url = String::from(event.html_url().unwrap());
-    let author = event.user().login.to_owned();
+    let author = event.user().login.clone();
 
     match &cmd {
         NoteCommand::Summary { title } => {

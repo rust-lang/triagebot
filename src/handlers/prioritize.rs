@@ -13,7 +13,7 @@ pub(super) async fn handle_command(
 ) -> anyhow::Result<()> {
     let mut labels = vec![];
     labels.push(github::Label {
-        name: config.label.to_owned(),
+        name: config.label.clone(),
     });
     event
         .issue()
