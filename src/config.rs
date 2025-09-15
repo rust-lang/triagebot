@@ -525,20 +525,15 @@ pub(crate) struct IssueLinksConfig {
     pub(crate) check_commits: IssueLinksCheckCommitsConfig,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Default)]
 pub(crate) enum IssueLinksCheckCommitsConfig {
     /// No checking of commits
     Off,
     /// Only check for uncanonicalized issue links in commits
     Uncanonicalized,
     /// Check for all issue links in commits
+    #[default]
     All,
-}
-
-impl Default for IssueLinksCheckCommitsConfig {
-    fn default() -> Self {
-        IssueLinksCheckCommitsConfig::All
-    }
 }
 
 impl<'de> serde::Deserialize<'de> for IssueLinksCheckCommitsConfig {
