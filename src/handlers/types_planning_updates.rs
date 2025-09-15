@@ -7,9 +7,9 @@ use async_trait::async_trait;
 use chrono::{Datelike, Duration, NaiveTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
-const TYPES_REPO: &'static str = "rust-lang/types-team";
+const TYPES_REPO: &str = "rust-lang/types-team";
 // T-types/meetings
-const TYPES_MEETINGS_STREAM: u64 = 326132;
+const TYPES_MEETINGS_STREAM: u64 = 326_132;
 
 pub struct TypesPlanningMeetingThreadOpenJob;
 

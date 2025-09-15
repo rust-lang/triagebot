@@ -13,8 +13,8 @@ use chrono::{Datelike, NaiveDate, Utc};
 use tracing::{self as log};
 
 const MAX_ZULIP_TOPIC: usize = 60;
-const RUST_PROJECT_GOALS_REPO: &'static str = "rust-lang/rust-project-goals";
-const GOALS_STREAM: u64 = 435869; // #project-goals
+const RUST_PROJECT_GOALS_REPO: &str = "rust-lang/rust-project-goals";
+const GOALS_STREAM: u64 = 435_869; // #project-goals
 const C_TRACKING_ISSUE: &str = "C-tracking-issue";
 
 fn message(
