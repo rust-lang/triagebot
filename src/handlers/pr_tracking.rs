@@ -67,7 +67,7 @@ pub(super) async fn parse_input(
     // about this feature not being enabled
     if config.is_none() {
         return Ok(None);
-    };
+    }
 
     // Execute this handler only if this is a PR ...
     if !event.issue.is_pr() {

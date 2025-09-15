@@ -1411,7 +1411,7 @@ impl Repository {
                     "direction" => ordering.direction = val,
                     "per_page" => ordering.per_page = val,
                     _ => return true,
-                };
+                }
                 false
             })
             .collect();
