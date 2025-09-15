@@ -131,7 +131,7 @@ pub async fn synchronize_commits_inner(ctx: &Context, starter: Option<(String, u
         match res {
             Ok(()) => {
                 if !rustc_commits::has_commit(&db, &parent_sha).await {
-                    to_be_resolved.push_back((parent_sha, None))
+                    to_be_resolved.push_back((parent_sha, None));
                 }
             }
             Err(e) => log::error!("Failed to record commit {e:?}"),

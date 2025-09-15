@@ -60,7 +60,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 users_notified.extend(users.into_iter().map(|user| user.id));
             }
         }
-    };
+    }
 
     // We've implicitly notified the user that is submitting the notification:
     // they already know that they left this comment.

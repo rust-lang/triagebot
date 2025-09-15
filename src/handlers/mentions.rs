@@ -125,7 +125,7 @@ pub(super) async fn handle_input(
             Some(m) => result.push_str(m),
             None => match type_ {
                 MentionsEntryType::Filename => {
-                    write!(result, "Some changes occurred in {entry}").unwrap()
+                    write!(result, "Some changes occurred in {entry}").unwrap();
                 }
                 MentionsEntryType::Content => write!(
                     result,

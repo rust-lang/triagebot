@@ -455,7 +455,7 @@ impl HtmlDiffPrinter<'_> {
         match hunk_token_status {
             HunkTokenStatus::Added => write!(f, "{ADDED_BLOCK_SIGN} ")?,
             HunkTokenStatus::Removed => write!(f, "{REMOVED_BLOCK_SIGN} ")?,
-        };
+        }
 
         let mut words = words.peekable();
 
