@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fmt::{self, Write};
+use std::iter;
 use std::sync::{Arc, LazyLock};
 
 use anyhow::Context as _;
@@ -536,9 +537,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
             // Same number of lines before and after, can do word-hightling.
 
             // Diff the individual lines together.
-            let diffs_and_inputs: Vec<_> = before
-                .into_iter()
-                .zip(after.into_iter())
+            let diffs_and_inputs: Vec<_> = iter::zip(before, after)
                 .map(|(b_token, a_token)| {
                     // Split both lines by words and intern them.
                     let input: InternedInput<&str> = InternedInput::new(
