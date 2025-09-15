@@ -54,15 +54,11 @@ impl std::error::Error for ErrorKind {}
 
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                ErrorKind::UnterminatedString => "unterminated string",
-                ErrorKind::QuoteInWord => "quote in word",
-                ErrorKind::RawString => "raw strings are not yet supported",
-            }
-        )
+        match self {
+            ErrorKind::UnterminatedString => write!(f, "unterminated string"),
+            ErrorKind::QuoteInWord => write!(f, "quote in word"),
+            ErrorKind::RawString => write!(f, "raw strings are not yet supported"),
+        }
     }
 }
 
