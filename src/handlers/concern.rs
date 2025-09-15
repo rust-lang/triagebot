@@ -48,7 +48,7 @@ pub(super) async fn handle_command(
     match crate::rfcbot::get_all_fcps().await {
         Ok(fcps) => {
             if fcps.iter().any(|(_, fcp)| {
-                fcp.issue.number as u64 == issue.number
+                u64::from(fcp.issue.number) == issue.number
                     && fcp.issue.repository == issue_comment.repository.full_name
             }) {
                 tracing::info!(
