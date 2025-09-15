@@ -242,7 +242,7 @@ pub async fn run_scheduled_jobs(ctx: &Context) -> anyhow::Result<()> {
         update_job_executed_at(db, &job.id).await?;
 
         match handle_job(ctx, &job.name, &job.metadata).await {
-            Ok(_) => {
+            Ok(()) => {
                 tracing::trace!("job successfully executed (id={})", job.id);
                 delete_job(db, &job.id).await?;
             }
