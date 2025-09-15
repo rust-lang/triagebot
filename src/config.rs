@@ -346,7 +346,7 @@ impl<'de> serde::Deserialize<'de> for NotifyZulipTablesConfig {
         if !direct_fields.is_empty() {
             let direct = NotifyZulipLabelConfig::deserialize(Value::Table(direct_fields))
                 .map_err(Error::custom)?;
-            subtables.insert("".to_string(), direct);
+            subtables.insert(String::new(), direct);
         }
 
         Ok(NotifyZulipTablesConfig { subtables })

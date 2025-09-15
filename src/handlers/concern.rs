@@ -173,7 +173,7 @@ pub(super) async fn handle_command(
 
 fn markdown_content(concerns: &[Concern], bot: &str) -> String {
     if concerns.is_empty() {
-        return "".to_string();
+        return String::new();
     }
 
     let active_concerns = concerns

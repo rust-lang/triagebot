@@ -2267,7 +2267,7 @@ impl IssuesQuery for Query<'_> {
             let mcp_details = if include_mcp_details {
                 let first100_comments = issue.get_first100_comments(gh_client).await?;
                 let (zulip_link, concerns) = if first100_comments.is_empty() {
-                    ("".to_string(), None)
+                    (String::new(), None)
                 } else {
                     let split = re_zulip_link
                         .split(&first100_comments[0].body)
