@@ -29,9 +29,7 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&MajorChangeConfig>,
 ) -> Result<Option<Invocation>, String> {
-    let config = if let Some(config) = config {
-        config
-    } else {
+    let Some(config) = config else {
         return Ok(None);
     };
     let enabling_label = config.enabling_label.as_str();

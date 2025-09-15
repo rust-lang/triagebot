@@ -8,9 +8,7 @@ use reqwest::StatusCode;
 use tracing as log;
 
 pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
-    let e = if let Event::Issue(e) = event {
-        e
-    } else {
+    let Event::Issue(e) = event else {
         return Ok(());
     };
 
@@ -32,9 +30,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let merge_sha = if let Some(s) = &e.issue.merge_commit_sha {
-        s
-    } else {
+    let Some(merge_sha) = &e.issue.merge_commit_sha else {
         log::error!(
             "rust-lang/rust#{}: no merge_commit_sha in event",
             e.issue.number
@@ -43,9 +39,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     };
 
     // Fetch the version from the upstream repository.
-    let version = if let Some(version) = get_version_standalone(&ctx.github, merge_sha).await? {
-        version
-    } else {
+    let Some(version) = get_version_standalone(&ctx.github, merge_sha).await? else {
         log::error!("could not find the version of {merge_sha:?}");
         return Ok(());
     };

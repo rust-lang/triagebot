@@ -16,9 +16,8 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&AutolabelConfig>,
 ) -> Result<Option<AutolabelInput>, String> {
-    let config = match config {
-        Some(config) => config,
-        None => return Ok(None),
+    let Some(config) = config else {
+        return Ok(None);
     };
 
     // On opening a new PR or sync'ing the branch, look at the diff and try to

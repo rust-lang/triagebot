@@ -30,14 +30,11 @@ pub async fn pulls(
         .per_page(100)
         .send()
         .await;
-    let mut page = match res {
-        Ok(page) => page,
-        Err(_) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Html("The repository is not found.".to_string()),
-            );
-        }
+    let Ok(mut page) = res else {
+        return (
+            StatusCode::NOT_FOUND,
+            Html("The repository is not found.".to_string()),
+        );
     };
     let mut base_pulls = page.take_items();
     let mut next_page = page.next;

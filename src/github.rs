@@ -1747,9 +1747,8 @@ impl Repository {
                 .ok_or_else(|| anyhow::anyhow!("No ref."))?
                 .target
                 .ok_or_else(|| anyhow::anyhow!("No target."))?;
-            let commit = match target {
-                GitObject::Commit(commit) => commit,
-                _ => anyhow::bail!("unexpected target type {target:?}"),
+            let GitObject::Commit(commit) = target else {
+                anyhow::bail!("unexpected target type {target:?}")
             };
             let commits = commit
                 .history

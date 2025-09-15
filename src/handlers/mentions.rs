@@ -32,9 +32,8 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&MentionsConfig>,
 ) -> Result<Option<MentionsInput>, String> {
-    let config = match config {
-        Some(config) => config,
-        None => return Ok(None),
+    let Some(config) = config else {
+        return Ok(None);
     };
 
     if !matches!(

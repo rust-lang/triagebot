@@ -34,9 +34,8 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&NotifyZulipConfig>,
 ) -> Result<Option<Vec<NotifyZulipInput>>, String> {
-    let config = match config {
-        Some(config) => config,
-        None => return Ok(None),
+    let Some(config) = config else {
+        return Ok(None);
     };
 
     match &event.action {

@@ -45,9 +45,8 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&BackportConfig>,
 ) -> Result<Option<BackportInput>, String> {
-    let config = match config {
-        Some(config) => config,
-        None => return Ok(None),
+    let Some(config) = config else {
+        return Ok(None);
     };
 
     // Only handle events when the PR is opened or the first comment is edited
