@@ -294,10 +294,7 @@ fn warning_from_warnings(warnings: &[String]) -> String {
 }
 
 // Calculate the label changes
-fn calculate_label_changes(
-    previous: &Vec<String>,
-    current: &Vec<String>,
-) -> (Vec<String>, Vec<String>) {
+fn calculate_label_changes(previous: &[String], current: &[String]) -> (Vec<String>, Vec<String>) {
     let previous_set: HashSet<String> = previous.iter().cloned().collect();
     let current_set: HashSet<String> = current.iter().cloned().collect();
 
@@ -309,8 +306,8 @@ fn calculate_label_changes(
 
 // Calculate the error changes
 fn calculate_error_changes(
-    previous: &Vec<(String, String)>,
-    current: &Vec<String>,
+    previous: &[(String, String)],
+    current: &[String],
 ) -> (Vec<(String, String)>, Vec<String>) {
     let previous_set: HashSet<(String, String)> = previous.iter().cloned().collect();
     let current_set: HashSet<String> = current.iter().cloned().collect();

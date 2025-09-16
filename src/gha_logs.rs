@@ -31,7 +31,7 @@ pub struct CachedLog {
 }
 
 impl GitHubActionLogsCache {
-    pub fn get(&mut self, key: &String) -> Option<Arc<CachedLog>> {
+    pub fn get(&mut self, key: &str) -> Option<Arc<CachedLog>> {
         if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
             // Move previously cached entry to the front
             let entry = self.entries.remove(pos).unwrap();

@@ -3,7 +3,7 @@
 use super::super::*;
 use std::fmt::Write;
 
-fn test_from_diff(diff: &Vec<FileDiff>, config: toml::Table, expected: &[&str]) {
+fn test_from_diff(diff: &[FileDiff], config: toml::Table, expected: &[&str]) {
     let aconfig: AssignConfig = config.try_into().unwrap();
     assert_eq!(
         find_reviewers_from_diff(&aconfig, &*diff).unwrap(),

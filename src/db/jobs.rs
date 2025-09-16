@@ -51,7 +51,7 @@ pub async fn delete_job(db: &DbClient, id: &Uuid) -> Result<()> {
     Ok(())
 }
 
-pub async fn update_job_error_message(db: &DbClient, id: &Uuid, message: &String) -> Result<()> {
+pub async fn update_job_error_message(db: &DbClient, id: &Uuid, message: &str) -> Result<()> {
     tracing::trace!("update_job_error_message(id={id})");
 
     db.execute(
