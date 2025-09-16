@@ -445,6 +445,7 @@ enum HunkTokenStatus {
 struct HtmlDiffPrinter<'a>(pub &'a Interner<&'a str>);
 
 impl HtmlDiffPrinter<'_> {
+    #[expect(clippy::unused_self, reason = "might use it later")]
     fn handle_hunk_line<'a>(
         &self,
         mut f: impl fmt::Write,

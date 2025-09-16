@@ -124,6 +124,10 @@ pub(super) async fn handle(
         warnings.extend(issue_links::issue_links_in_commits(issue_links, &commits));
     }
 
+    #[expect(
+        clippy::collapsible_if,
+        reason = "we always check for `config` in the outer `if`"
+    )]
     if let Some(no_merges) = &config.no_merges {
         if let Some(warn) =
             no_merges::merges_in_commits(&event.issue.title, &event.repository, no_merges, &commits)

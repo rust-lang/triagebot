@@ -3,6 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[allow(clippy::struct_field_names, reason = "the names come from an API")]
+#[expect(
+    clippy::upper_case_acronyms,
+    reason = "https://github.com/rust-lang/triagebot/pull/2181#discussion_r2417056288"
+)]
 pub struct FCP {
     pub id: u32,
     pub fk_issue: u32,
@@ -30,6 +35,7 @@ pub struct Concern {
     pub reviewer: Reviewer,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[expect(clippy::upper_case_acronyms, reason = "see reason on `FCP`")]
 pub struct FCPIssue {
     pub id: u32,
     pub number: u32,
@@ -60,6 +66,7 @@ pub struct StatusComment {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[expect(clippy::upper_case_acronyms, reason = "see reason on `FCP`")]
 pub struct FullFCP {
     pub fcp: FCP,
     pub reviews: Vec<Review>,

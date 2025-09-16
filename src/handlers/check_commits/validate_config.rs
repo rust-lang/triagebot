@@ -74,6 +74,10 @@ pub(super) async fn validate_config(
 }
 
 /// Helper to translate a toml span to a `(line_no, col_no)` (1-based).
+#[expect(
+    clippy::sliced_string_as_bytes,
+    reason = "don't know if the suggestion applies here, because of the char boundaries thing"
+)]
 fn translate_position(input: &str, index: usize) -> (usize, usize) {
     if input.is_empty() {
         return (0, index);

@@ -39,6 +39,10 @@ pub(super) async fn handle_command(
         ));
     };
 
+    #[expect(
+        clippy::collapsible_if,
+        reason = "in the outer `if`, we check for `config`"
+    )]
     if let Some(label) = &config.label {
         if let Err(err) = event
             .issue()
