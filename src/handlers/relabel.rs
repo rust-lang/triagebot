@@ -27,7 +27,7 @@ pub(super) async fn handle_command(
     let mut results = vec![];
     let mut to_add = vec![];
     for delta in &input.0 {
-        let name = delta.label().as_str();
+        let name: &str = delta.label();
         let err = match check_filter(name, config, is_member(event.user(), &ctx.team).await) {
             Ok(CheckFilterResult::Allow) => None,
             Ok(CheckFilterResult::Deny) => {
