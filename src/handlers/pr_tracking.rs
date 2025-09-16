@@ -238,7 +238,7 @@ pub async fn retrieve_pull_request_assignments(
                 assignments.push((
                     User {
                         login: user.login,
-                        id: (*user.id).into(),
+                        id: *user.id,
                     },
                     pr.number,
                     AssignedPullRequest {

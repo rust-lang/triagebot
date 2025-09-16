@@ -70,7 +70,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     // via the Zulip interface.
     match ctx.team.get_gh_id_from_username(&event.user().login).await {
         Ok(Some(id)) => {
-            users_notified.insert(id.try_into().unwrap());
+            users_notified.insert(id);
         }
         Ok(None) => {}
         Err(err) => {
