@@ -446,7 +446,6 @@ struct HtmlDiffPrinter<'a>(pub &'a Interner<&'a str>);
 
 impl HtmlDiffPrinter<'_> {
     fn handle_hunk_line<'a>(
-        &self,
         mut f: impl fmt::Write,
         hunk_token_status: HunkTokenStatus,
         words: impl Iterator<Item = (&'a str, bool)>,
@@ -554,7 +553,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
 
             // Process all before lines first
             for (diff, input) in &diffs_and_inputs {
-                self.handle_hunk_line(
+                Self::handle_hunk_line(
                     &mut f,
                     HunkTokenStatus::Removed,
                     input.before.iter().enumerate().map(|(b_pos, b_token)| {
@@ -565,7 +564,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
 
             // Then process all after lines
             for (diff, input) in &diffs_and_inputs {
-                self.handle_hunk_line(
+                Self::handle_hunk_line(
                     &mut f,
                     HunkTokenStatus::Added,
                     input.after.iter().enumerate().map(|(a_pos, a_token)| {
@@ -579,7 +578,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
             if let Some(&last) = before.last() {
                 for &token in before {
                     let token = self.0[token];
-                    self.handle_hunk_line(
+                    Self::handle_hunk_line(
                         &mut f,
                         HunkTokenStatus::Removed,
                         std::iter::once((token, false)),
@@ -593,7 +592,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
             if let Some(&last) = after.last() {
                 for &token in after {
                     let token = self.0[token];
-                    self.handle_hunk_line(
+                    Self::handle_hunk_line(
                         &mut f,
                         HunkTokenStatus::Added,
                         std::iter::once((token, false)),
