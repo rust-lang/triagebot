@@ -244,11 +244,11 @@ async fn scan_unknowns(
     );
     for unknown in unknowns {
         let pr = repo.get_pr(gh, unknown.number).await?;
-        // Ignore None, we don't want to repeatedly hammer GitHub asking for the answer.
-        if pr.mergeable == Some(false) {
-            maybe_add_comment(gh, &mut db, config, &pr, possibly.as_deref()).await?;
-        } else if pr.mergeable == None {
-            log::info!("unable to determine mergeable after delay for {unknown:?}");
+        match pr.mergeable {
+            Some(true) => {}
+            Some(false) => maybe_add_comment(gh, &mut db, config, &pr, possibly.as_deref()).await?,
+            // Ignore None, we don't want to repeatedly hammer GitHub asking for the answer.
+            None => log::info!("unable to determine mergeable after delay for {unknown:?}"),
         }
     }
     Ok(())
