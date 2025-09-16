@@ -17,6 +17,10 @@ pub(super) async fn handle_command(
     let is_team_member = matches!(event.user().is_team_member(&ctx.team).await, Ok(true));
 
     if !is_team_member {
+        #[expect(
+            clippy::useless_format,
+            reason = "for consistency with the `ErrorComment` constructors below"
+        )]
         let cmnt = ErrorComment::new(
             event.issue().unwrap(),
             format!(

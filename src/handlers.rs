@@ -61,6 +61,10 @@ mod shortcut;
 mod transfer;
 pub mod types_planning_updates;
 
+#[expect(
+    clippy::collapsible_if,
+    reason = "we check the preconditions in the outer if, and handle errors inside"
+)]
 pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo()).await;
     if let Err(e) = &config {

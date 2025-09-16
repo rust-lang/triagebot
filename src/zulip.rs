@@ -137,6 +137,7 @@ pub async fn webhook(
 }
 
 pub fn get_token_from_env() -> Result<String, anyhow::Error> {
+    #[expect(clippy::bind_instead_of_map, reason = "`.map_err` is suggested, but we don't really map the error")]
     // ZULIP_WEBHOOK_SECRET is preferred, ZULIP_TOKEN is kept for retrocompatibility but will be deprecated
     std::env::var("ZULIP_WEBHOOK_SECRET")
         .or_else(|_| std::env::var("ZULIP_TOKEN"))
@@ -186,6 +187,7 @@ async fn handle_command<'a>(
     if message_data.stream_id.is_none() {
         // Handle impersonation
         let mut impersonated = false;
+        #[expect(clippy::get_first, reason = "for symmetry with `get(1)`")]
         if let Some(&"as") = words.get(0) {
             if let Some(username) = words.get(1) {
                 let impersonated_gh_id = ctx

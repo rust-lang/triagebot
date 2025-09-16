@@ -7,6 +7,7 @@ async fn main() -> anyhow::Result<()> {
 
     let args: Vec<String> = std::env::args().collect();
     if args.len() == 2 {
+        #[expect(clippy::single_match, reason = "might add more variants later")]
         match &*args[1] {
             "planning" => {
                 let agenda = agenda::types_planning();
