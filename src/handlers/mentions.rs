@@ -155,15 +155,9 @@ pub(super) async fn handle_input(
 }
 
 fn patch_adds(patch: &str, needle: &str) -> bool {
-    for line in patch.lines() {
-        if !line.starts_with("+++") && line.starts_with('+') {
-            if line.contains(needle) {
-                return true;
-            }
-        }
-    }
-
-    false
+    patch
+        .lines()
+        .any(|line| !line.starts_with("+++") && line.starts_with('+') && line.contains(needle))
 }
 
 #[cfg(test)]
