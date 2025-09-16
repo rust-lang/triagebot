@@ -151,8 +151,10 @@ fn match_pattern(pattern: &str, label: &str) -> anyhow::Result<MatchPatternResul
     };
 
     let glob = glob::Pattern::new(pattern)?;
-    let mut matchopts = glob::MatchOptions::default();
-    matchopts.case_sensitive = false;
+    let matchopts = glob::MatchOptions {
+        case_sensitive: false,
+        ..Default::default()
+    };
 
     Ok(match (glob.matches_with(label, matchopts), inverse) {
         (true, false) => MatchPatternResult::Allow,
