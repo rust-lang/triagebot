@@ -257,11 +257,7 @@ pub async fn run_scheduled_jobs(ctx: &Context) -> anyhow::Result<()> {
 }
 
 // Try to handle a specific job
-async fn handle_job(
-    ctx: &Context,
-    name: &String,
-    metadata: &serde_json::Value,
-) -> anyhow::Result<()> {
+async fn handle_job(ctx: &Context, name: &str, metadata: &serde_json::Value) -> anyhow::Result<()> {
     for job in jobs() {
         if job.name() == name {
             return job.run(ctx, metadata).await;

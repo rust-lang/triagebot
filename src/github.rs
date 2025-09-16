@@ -1472,8 +1472,8 @@ impl Repository {
     fn build_issues_url(
         &self,
         client: &GithubClient,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         self.build_endpoint_url(client, "issues", filters, include_labels, ordering)
@@ -1482,8 +1482,8 @@ impl Repository {
     fn build_pulls_url(
         &self,
         client: &GithubClient,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         self.build_endpoint_url(client, "pulls", filters, include_labels, ordering)
@@ -1493,8 +1493,8 @@ impl Repository {
         &self,
         client: &GithubClient,
         endpoint: &str,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         let filters = filters
@@ -1515,9 +1515,9 @@ impl Repository {
     fn build_search_issues_url(
         &self,
         client: &GithubClient,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
-        exclude_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
+        exclude_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         let filters = filters

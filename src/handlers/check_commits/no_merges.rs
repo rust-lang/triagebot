@@ -12,7 +12,7 @@ pub(super) fn merges_in_commits(
     issue_title: &str,
     repository: &Repository,
     config: &NoMergesConfig,
-    commits: &Vec<GithubCommit>,
+    commits: &[GithubCommit],
 ) -> Option<(String, Vec<String>)> {
     // Don't trigger if the PR has any of the excluded title segments.
     if config
@@ -143,7 +143,7 @@ $ git push --force-with-lease
         let commit = dummy_commit_from_body("67c917fe5937e984f58f5003ccbb5c37e", "+ main.rs");
 
         assert_eq!(
-            merges_in_commits(&title, &repository, &config, &vec![commit]),
+            merges_in_commits(&title, &repository, &config, &[commit]),
             None
         );
     }
@@ -155,7 +155,7 @@ $ git push --force-with-lease
                 "Subtree update of rustc_custom_codegen",
                 &repository,
                 &config,
-                &vec![commit_with_merge()]
+                &[commit_with_merge()]
             ),
             None
         );
