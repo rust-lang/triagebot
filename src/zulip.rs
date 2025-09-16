@@ -199,7 +199,7 @@ async fn handle_command<'a>(
                     .await
                     .context("getting ID of github user")?
                 {
-                    Some(id) => id.try_into()?,
+                    Some(id) => id,
                     None => anyhow::bail!("Can only authorize for other GitHub users."),
                 };
 
