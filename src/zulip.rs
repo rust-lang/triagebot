@@ -193,15 +193,12 @@ async fn handle_command<'a>(
         let mut impersonated = false;
         if let Some(&"as") = words.get(0) {
             if let Some(username) = words.get(1) {
-                let impersonated_gh_id = match ctx
+                let impersonated_gh_id = ctx
                     .team
                     .get_gh_id_from_username(username)
                     .await
                     .context("getting ID of github user")?
-                {
-                    Some(id) => id,
-                    None => anyhow::bail!("Can only authorize for other GitHub users."),
-                };
+                    .context("Can only authorize for other GitHub users.")?;
 
                 // Impersonate => change actual gh_id
                 if impersonated_gh_id != gh_id {
