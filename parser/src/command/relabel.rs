@@ -51,9 +51,9 @@ impl Label {
 }
 
 impl std::ops::Deref for Label {
-    type Target = String;
-    fn deref(&self) -> &String {
-        &self.0
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.0.as_str()
     }
 }
 
