@@ -4,6 +4,7 @@ use std::sync::LazyLock;
 use crate::config::BackportConfig;
 use crate::github::{IssuesAction, IssuesEvent, Label};
 use crate::handlers::Context;
+use crate::utils::contains_any;
 use anyhow::Context as AnyhowContext;
 use futures::future::join_all;
 use regex::Regex;
@@ -202,10 +203,6 @@ pub(super) async fn handle_input(
     }
 
     Ok(())
-}
-
-fn contains_any(haystack: &[&str], needles: &[&str]) -> bool {
-    needles.iter().any(|needle| haystack.contains(needle))
 }
 
 #[cfg(test)]

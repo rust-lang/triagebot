@@ -61,3 +61,7 @@ pub(crate) async fn is_repo_autorized(
 
     Ok(true)
 }
+
+pub fn contains_any(haystack: &[&str], needles: &[&str]) -> bool {
+    needles.iter().any(|needle| haystack.contains(needle))
+}
