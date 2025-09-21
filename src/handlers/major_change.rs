@@ -30,9 +30,7 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&MajorChangeConfig>,
 ) -> Result<Option<Invocation>, String> {
-    let config = if let Some(config) = config {
-        config
-    } else {
+    let Some(config) = config else {
         return Ok(None);
     };
     let enabling_label = config.enabling_label.as_str();
@@ -98,7 +96,7 @@ pub(super) async fn parse_input(
     }
 
     // All other issue events are ignored
-    return Ok(None);
+    Ok(None)
 }
 
 pub(super) async fn handle_input(
@@ -180,8 +178,7 @@ pub(super) async fn handle_input(
             }
             .url(&ctx.zulip);
             let breadcrumb_comment = format!(
-                "The associated GitHub issue has been renamed. Please see the [renamed Zulip topic]({}).",
-                new_topic_url
+                "The associated GitHub issue has been renamed. Please see the [renamed Zulip topic]({new_topic_url})."
             );
             let zulip_send_breadcrumb_req = crate::zulip::MessageApiRequest {
                 recipient: Recipient::Stream {
@@ -254,8 +251,8 @@ pub(super) async fn handle_command(
         .any(|l| l.name == config.enabling_label)
     {
         let cmnt = ErrorComment::new(
-            &issue,
-            &format!(
+            issue,
+            format!(
                 "This issue cannot be seconded; it lacks the `{}` label.",
                 config.enabling_label
             ),
@@ -272,7 +269,7 @@ pub(super) async fn handle_command(
         .unwrap_or(false);
 
     if !is_team_member {
-        let cmnt = ErrorComment::new(&issue, "Only team members can second issues.");
+        let cmnt = ErrorComment::new(issue, "Only team members can second issues.");
         cmnt.post(&ctx.github).await?;
         return Ok(());
     }
@@ -283,21 +280,21 @@ pub(super) async fn handle_command(
         false
     };
 
-    let zulip_msg = if !has_concerns {
-        format!(
-            "@*{}*: Proposal [#{}]({}) has been seconded, and will be approved in {} days if no objections are raised.",
-            config.zulip_ping,
-            issue.number,
-            event.html_url().unwrap(),
-            config.waiting_period,
-        )
-    } else {
+    let zulip_msg = if has_concerns {
         format!(
             "@*{}*: Proposal [#{}]({}) has been seconded, but there are unresolved concerns preventing approval, use `@{} resolve concern-name` in the GitHub thread to resolve them.",
             config.zulip_ping,
             issue.number,
             event.html_url().unwrap(),
             &ctx.username,
+        )
+    } else {
+        format!(
+            "@*{}*: Proposal [#{}]({}) has been seconded, and will be approved in {} days if no objections are raised.",
+            config.zulip_ping,
+            issue.number,
+            event.html_url().unwrap(),
+            config.waiting_period,
         )
     };
 
@@ -385,31 +382,30 @@ async fn handle(
     if new_proposal {
         let topic_url = zulip_req.url(&ctx.zulip);
         let comment = format!(
-            r#"> [!IMPORTANT]
-> This issue is *not meant to be used for technical discussion*. There is a **Zulip [stream]** for that.
-> Use this issue to leave procedural comments, such as volunteering to review, indicating that you second the proposal (or third, etc), or raising a concern that you would like to be addressed.
+            r"> [!IMPORTANT]
+        > This issue is *not meant to be used for technical discussion*. There is a **Zulip [stream]** for that.
+        > Use this issue to leave procedural comments, such as volunteering to review, indicating that you second the proposal (or third, etc), or raising a concern that you would like to be addressed.
 
-<details>
-<summary>Concerns or objections can formally be registered here by adding a comment.</summary>
-<p>
+        <details>
+        <summary>Concerns or objections can formally be registered here by adding a comment.</summary>
+        <p>
 
-```
-@rustbot concern reason-for-concern
-<description of the concern>
-```
-Concerns can be lifted with:
-```
-@rustbot resolve reason-for-concern
-```
-See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/compiler/proposals-and-stabilization.html#what-kinds-of-comments-should-go-on-a-mcp-in-the-compiler-team-repo)
+        ```
+        @rustbot concern reason-for-concern
+        <description of the concern>
+        ```
+        Concerns can be lifted with:
+        ```
+        @rustbot resolve reason-for-concern
+        ```
+        See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/compiler/proposals-and-stabilization.html#what-kinds-of-comments-should-go-on-a-mcp-in-the-compiler-team-repo)
 
-</p>
-</details>
-{}
+        </p>
+        </details>
+        {}
 
-[stream]: {}"#,
+        [stream]: {topic_url}",
             config.open_extra_text.as_deref().unwrap_or_default(),
-            topic_url
         );
         issue
             .post_comment(&ctx.github, &comment)
@@ -536,7 +532,7 @@ impl Job for MajorChangeAcceptenceJob {
 
         let now = Utc::now();
 
-        match process_seconded(&ctx, &major_change, now).await {
+        match process_seconded(ctx, &major_change, now).await {
             Ok(()) => {
                 tracing::info!(
                     "{}: major change ({:?}) as been accepted",
@@ -686,12 +682,12 @@ async fn process_seconded(
         issue
             .post_comment(
                 &ctx.github,
-                &*format!(
-r#"The final comment period is now complete, this major change is now **accepted**.
+                &format!(
+r"The final comment period is now complete, this major change is now **accepted**.
 
 As the automated representative, I would like to thank the author for their work and everyone else who contributed to this major change proposal.
 
-*If you think this major change shouldn't have been accepted, feel free to remove the `{}` label and reopen this issue.*"#,
+*If you think this major change shouldn't have been accepted, feel free to remove the `{}` label and reopen this issue.*",
                     &config.accept_label,
                 ),
             )

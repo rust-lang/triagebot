@@ -169,7 +169,7 @@ impl ZulipClient {
     fn make_request(&self, method: Method, url: &str) -> RequestBuilder {
         let api_token = self.get_api_token();
         self.client
-            .request(method, &format!("{}/api/v1/{url}", self.instance_url))
+            .request(method, format!("{}/api/v1/{url}", self.instance_url))
             .basic_auth(&self.bot_email, Some(api_token))
     }
 
@@ -186,15 +186,15 @@ where
 {
     let status = response.status();
 
-    if !status.is_success() {
-        let body = response.text().await.context("Zulip API request failed")?;
-        Err(anyhow::anyhow!(body))
-    } else {
+    if status.is_success() {
         Ok(response.json::<T>().await.with_context(|| {
             anyhow::anyhow!(
                 "Failed to deserialize value of type {}",
                 std::any::type_name::<T>()
             )
         })?)
+    } else {
+        let body = response.text().await.context("Zulip API request failed")?;
+        Err(anyhow::anyhow!(body))
     }
 }

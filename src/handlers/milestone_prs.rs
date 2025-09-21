@@ -8,9 +8,7 @@ use reqwest::StatusCode;
 use tracing as log;
 
 pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
-    let e = if let Event::Issue(e) = event {
-        e
-    } else {
+    let Event::Issue(e) = event else {
         return Ok(());
     };
 
@@ -32,9 +30,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let merge_sha = if let Some(s) = &e.issue.merge_commit_sha {
-        s
-    } else {
+    let Some(merge_sha) = &e.issue.merge_commit_sha else {
         log::error!(
             "rust-lang/rust#{}: no merge_commit_sha in event",
             e.issue.number
@@ -43,15 +39,13 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     };
 
     // Fetch the version from the upstream repository.
-    let version = if let Some(version) = get_version_standalone(&ctx.github, merge_sha).await? {
-        version
-    } else {
-        log::error!("could not find the version of {:?}", merge_sha);
+    let Some(version) = get_version_standalone(&ctx.github, merge_sha).await? else {
+        log::error!("could not find the version of {merge_sha:?}");
         return Ok(());
     };
 
     if !version.starts_with("1.") && version.len() < 8 {
-        log::error!("Weird version {:?} for {:?}", version, merge_sha);
+        log::error!("Weird version {version:?} for {merge_sha:?}");
         return Ok(());
     }
 
@@ -64,18 +58,18 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     e.issue.set_milestone(&ctx.github, &version).await?;
 
     let files = e.issue.diff(&ctx.github).await?;
-    if let Some(files) = files {
-        if let Some(cargo) = files.iter().find(|fd| fd.filename == "src/tools/cargo") {
-            // The webhook timeout of 10 seconds can be too short, so process in
-            // the background.
-            let diff = cargo.patch.clone();
-            tokio::task::spawn(async move {
-                let gh = GithubClient::new_from_env();
-                if let Err(e) = milestone_cargo(&gh, &version, &diff).await {
-                    log::error!("failed to milestone cargo: {e:?}");
-                }
-            });
-        }
+    if let Some(files) = files
+        && let Some(cargo) = files.iter().find(|fd| fd.filename == "src/tools/cargo")
+    {
+        // The webhook timeout of 10 seconds can be too short, so process in
+        // the background.
+        let diff = cargo.patch.clone();
+        tokio::task::spawn(async move {
+            let gh = GithubClient::new_from_env();
+            if let Err(e) = milestone_cargo(&gh, &version, &diff).await {
+                log::error!("failed to milestone cargo: {e:?}");
+            }
+        });
     }
 
     Ok(())
@@ -87,29 +81,26 @@ async fn get_version_standalone(
 ) -> anyhow::Result<Option<String>> {
     let resp = gh
         .raw()
-        .get(&format!(
-            "https://raw.githubusercontent.com/rust-lang/rust/{}/src/version",
-            merge_sha
+        .get(format!(
+            "https://raw.githubusercontent.com/rust-lang/rust/{merge_sha}/src/version"
         ))
         .send()
         .await
-        .with_context(|| format!("retrieving src/version for {}", merge_sha))?;
+        .with_context(|| format!("retrieving src/version for {merge_sha}"))?;
 
     match resp.status() {
         StatusCode::OK => {}
         // Don't treat a 404 as a failure, we'll try another way to retrieve the version.
         StatusCode::NOT_FOUND => return Ok(None),
         status => anyhow::bail!(
-            "unexpected status code {} while retrieving src/version for {}",
-            status,
-            merge_sha
+            "unexpected status code {status} while retrieving src/version for {merge_sha}"
         ),
     }
 
     Ok(Some(
         resp.text()
             .await
-            .with_context(|| format!("deserializing src/version for {}", merge_sha))?
+            .with_context(|| format!("deserializing src/version for {merge_sha}"))?
             .trim()
             .to_string(),
     ))

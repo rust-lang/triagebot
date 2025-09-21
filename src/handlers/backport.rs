@@ -45,9 +45,8 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&BackportConfig>,
 ) -> Result<Option<BackportInput>, String> {
-    let config = match config {
-        Some(config) => config,
-        None => return Ok(None),
+    let Some(config) = config else {
+        return Ok(None);
     };
 
     // Only handle events when the PR is opened or the first comment is edited
@@ -77,7 +76,7 @@ pub(super) async fn parse_input(
         .clone()
         .filter(|(_cfg_name, cfg)| {
             let required_pr_labels: Vec<&str> =
-                cfg.required_pr_labels.iter().map(|l| l.as_str()).collect();
+                cfg.required_pr_labels.iter().map(String::as_str).collect();
             if !contains_any(&pr_labels, &required_pr_labels) {
                 log::warn!(
                     "Skipping backport nomination: PR is missing one required label: {:?}",
@@ -156,7 +155,7 @@ pub(super) async fn handle_input(
     // Add backport nomination label to the pull request
     for issue in issues {
         if let Err(ref err) = issue {
-            log::warn!("Failed to get issue: {:?}", err);
+            log::warn!("Failed to get issue: {err:?}");
             continue;
         }
         let issue = issue.context("failed to get issue")?;

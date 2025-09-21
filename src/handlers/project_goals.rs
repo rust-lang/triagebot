@@ -13,8 +13,8 @@ use chrono::{Datelike, NaiveDate, Utc};
 use tracing::{self as log};
 
 const MAX_ZULIP_TOPIC: usize = 60;
-const RUST_PROJECT_GOALS_REPO: &'static str = "rust-lang/rust-project-goals";
-const GOALS_STREAM: u64 = 435869; // #project-goals
+const RUST_PROJECT_GOALS_REPO: &str = "rust-lang/rust-project-goals";
+const GOALS_STREAM: u64 = 435_869; // #project-goals
 const C_TRACKING_ISSUE: &str = "C-tracking-issue";
 
 fn message(
@@ -62,15 +62,11 @@ pub async fn check_project_goal_acl(team_client: &TeamClient, gh_id: u64) -> any
     let team = match team_client.get_team(GOALS_TEAM).await {
         Ok(Some(team)) => team,
         Ok(None) => {
-            log::info!("team ({}) failed to resolve to a known team", GOALS_TEAM);
+            log::info!("team ({GOALS_TEAM}) failed to resolve to a known team");
             return Ok(false);
         }
         Err(err) => {
-            log::error!(
-                "team ({}) failed to resolve to a known team: {:?}",
-                GOALS_TEAM,
-                err
-            );
+            log::error!("team ({GOALS_TEAM}) failed to resolve to a known team: {err:?}");
             return Ok(false);
         }
     };
@@ -78,8 +74,7 @@ pub async fn check_project_goal_acl(team_client: &TeamClient, gh_id: u64) -> any
     Ok(team
         .members
         .into_iter()
-        .find(|member| member.github_id == gh_id)
-        .is_some())
+        .any(|member| member.github_id == gh_id))
 }
 
 async fn ping_project_goals_owners_automatically(
@@ -111,7 +106,7 @@ async fn ping_project_goals_owners_automatically(
         zulip,
         team_api,
         false,
-        days_threshold as i64,
+        i64::from(days_threshold),
         &third_monday,
     )
     .await
@@ -130,7 +125,7 @@ pub async fn ping_project_goals_owners(
     days_threshold: i64,
     next_update: &str,
 ) -> anyhow::Result<()> {
-    let goals_repo = gh.repository(&RUST_PROJECT_GOALS_REPO).await?;
+    let goals_repo = gh.repository(RUST_PROJECT_GOALS_REPO).await?;
 
     let tracking_issues_query = github::Query {
         filters: vec![("state", "open"), ("is", "issue")],
@@ -138,7 +133,7 @@ pub async fn ping_project_goals_owners(
         exclude_labels: vec![],
     };
     let issues = goals_repo
-        .get_issues(&gh, &tracking_issues_query)
+        .get_issues(gh, &tracking_issues_query)
         .await
         .with_context(|| "Unable to get issues.")?;
 
@@ -189,12 +184,12 @@ pub async fn ping_project_goals_owners(
         log::debug!("zulip_topic_name = {zulip_topic_name:#?}");
         log::debug!("message = {message:#?}");
 
-        if !dry_run {
-            zulip_req.send(&zulip).await?;
-        } else {
+        if dry_run {
             eprintln!();
             eprintln!("-- Dry Run ------------------------------------");
             eprintln!("Would send to {zulip_topic_name}: {}", zulip_req.content);
+        } else {
+            zulip_req.send(zulip).await?;
         }
     }
 
@@ -267,10 +262,8 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 return Ok(());
             }
             let zulip_topic_name = zulip_topic_name(issue);
-            let zulip_owners = match zulip_owners(&ctx.team, issue).await? {
-                Some(names) => names,
-                None => format!("(no owners assigned)"),
-            };
+            let zulip_owners = zulip_owners(&ctx.team, issue).await?;
+            let zulip_owners = zulip_owners.as_deref().unwrap_or("(no owners assigned)");
             let title = &issue.title;
             let goalnum = issue.number;
             let zulip_req = crate::zulip::MessageApiRequest {
@@ -279,7 +272,7 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                     topic: &zulip_topic_name,
                 },
                 content: &format!(
-                    r#"New tracking issue goals#{goalnum}.\n* Goal title: {title}\n* Goal owners: {zulip_owners}"#
+                    r"New tracking issue goals#{goalnum}.\n* Goal title: {title}\n* Goal owners: {zulip_owners}"
                 ),
             };
             zulip_req.send(&ctx.zulip).await?;

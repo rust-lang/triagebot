@@ -4,12 +4,15 @@
 //!
 //! Parsing is done in the `parser::command::ping` module.
 
+use std::borrow::Cow;
+
 use crate::{
     config::PingConfig,
     github::{self, Event},
     handlers::Context,
     interactions::ErrorComment,
 };
+use itertools::Itertools;
 use parser::command::ping::PingCommand;
 
 pub(super) async fn handle_command(
@@ -18,52 +21,49 @@ pub(super) async fn handle_command(
     event: &Event,
     team_name: PingCommand,
 ) -> anyhow::Result<()> {
-    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.team).await {
-        false
-    } else {
-        true
-    };
+    let is_team_member = matches!(event.user().is_team_member(&ctx.team).await, Ok(true));
 
     if !is_team_member {
+        #[expect(
+            clippy::useless_format,
+            reason = "for consistency with the `ErrorComment` constructors below"
+        )]
         let cmnt = ErrorComment::new(
-            &event.issue().unwrap(),
+            event.issue().unwrap(),
             format!("Only Rust team members can ping teams."),
         );
         cmnt.post(&ctx.github).await?;
         return Ok(());
     }
 
-    let (gh_team, config) = match config.get_by_name(&team_name.team) {
-        Some(v) => v,
-        None => {
-            let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
-                format!(
-                    "This team (`{}`) cannot be pinged via this command; \
-                    it may need to be added to `triagebot.toml` on the default branch.",
-                    team_name.team,
-                ),
-            );
-            cmnt.post(&ctx.github).await?;
-            return Ok(());
-        }
+    let Some((gh_team, config)) = config.get_by_name(&team_name.team) else {
+        let cmnt = ErrorComment::new(
+            event.issue().unwrap(),
+            format!(
+                "This team (`{}`) cannot be pinged via this command; \
+                it may need to be added to `triagebot.toml` on the default branch.",
+                team_name.team,
+            ),
+        );
+        cmnt.post(&ctx.github).await?;
+        return Ok(());
     };
-    let team = ctx.team.get_team(&gh_team).await?;
-    let team = match team {
-        Some(team) => team,
-        None => {
-            let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
-                format!(
-                    "This team (`{}`) does not exist in the team repository.",
-                    team_name.team,
-                ),
-            );
-            cmnt.post(&ctx.github).await?;
-            return Ok(());
-        }
+    let Some(team) = ctx.team.get_team(gh_team).await? else {
+        let cmnt = ErrorComment::new(
+            event.issue().unwrap(),
+            format!(
+                "This team (`{}`) does not exist in the team repository.",
+                team_name.team,
+            ),
+        );
+        cmnt.post(&ctx.github).await?;
+        return Ok(());
     };
 
+    #[expect(
+        clippy::collapsible_if,
+        reason = "in the outer `if`, we check for `config`"
+    )]
     if let Some(label) = &config.label {
         if let Err(err) = event
             .issue()
@@ -77,8 +77,8 @@ pub(super) async fn handle_command(
             .await
         {
             let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
-                format!("Error adding team label (`{}`): {:?}.", label, err),
+                event.issue().unwrap(),
+                format!("Error adding team label (`{label}`): {err:?}."),
             );
             cmnt.post(&ctx.github).await?;
         }
@@ -100,10 +100,10 @@ pub(super) async fn handle_command(
         }
     }
 
-    let ping_msg = if users.is_empty() {
-        format!("no known users to ping?")
+    let ping_msg: Cow<_> = if users.is_empty() {
+        "no known users to ping?".into()
     } else {
-        format!("cc {}", users.join(" "))
+        format!("cc {}", users.into_iter().format(" ")).into()
     };
     let comment = format!("{}\n\n{}", config.message, ping_msg);
     event

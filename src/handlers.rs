@@ -21,7 +21,7 @@ impl std::error::Error for HandlerError {}
 impl fmt::Display for HandlerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            HandlerError::Message(msg) => write!(f, "{}", msg),
+            HandlerError::Message(msg) => write!(f, "{msg}"),
             HandlerError::Other(_) => write!(f, "An internal error occurred."),
         }
     }
@@ -61,6 +61,10 @@ mod shortcut;
 mod transfer;
 pub mod types_planning_updates;
 
+#[expect(
+    clippy::collapsible_if,
+    reason = "we check the preconditions in the outer if, and handle errors inside"
+)]
 pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo()).await;
     if let Err(e) = &config {
@@ -77,73 +81,41 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
     }
 
     if let Ok(config) = &config {
-        if let Err(e) = check_commits::handle(ctx, host, event, &config).await {
-            log::error!(
-                "failed to process event {:?} with `check_commits` handler: {:?}",
-                event,
-                e
-            );
+        if let Err(e) = check_commits::handle(ctx, host, event, config).await {
+            log::error!("failed to process event {event:?} with `check_commits` handler: {e:?}");
         }
     }
 
     if let Err(e) = project_goals::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with `project_goals` handler: {:?}",
-            event,
-            e
-        );
+        log::error!("failed to process event {event:?} with `project_goals` handler: {e:?}");
     }
 
     if let Err(e) = notification::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with notification handler: {:?}",
-            event,
-            e
-        );
+        log::error!("failed to process event {event:?} with notification handler: {e:?}");
     }
 
     if let Err(e) = rustc_commits::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with rustc_commits handler: {:?}",
-            event,
-            e
-        );
+        log::error!("failed to process event {event:?} with rustc_commits handler: {e:?}");
     }
 
     if let Err(e) = milestone_prs::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with milestone_prs handler: {:?}",
-            event,
-            e
-        );
+        log::error!("failed to process event {event:?} with milestone_prs handler: {e:?}");
     }
 
     if let Some(rendered_link_config) = config.as_ref().ok().and_then(|c| c.rendered_link.as_ref())
     {
         if let Err(e) = rendered_link::handle(ctx, event, rendered_link_config).await {
-            log::error!(
-                "failed to process event {:?} with rendered_link handler: {:?}",
-                event,
-                e
-            );
+            log::error!("failed to process event {event:?} with rendered_link handler: {e:?}");
         }
     }
 
     if let Err(e) = relnotes::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with relnotes handler: {:?}",
-            event,
-            e
-        );
+        log::error!("failed to process event {event:?} with relnotes handler: {e:?}",);
     }
 
     if config.as_ref().is_ok_and(|c| c.bot_pull_requests.is_some()) {
         if let Err(e) = bot_pull_requests::handle(ctx, event).await {
-            log::error!(
-                "failed to process event {:?} with bot_pull_requests handler: {:?}",
-                event,
-                e
-            )
+            log::error!("failed to process event {event:?} with bot_pull_requests handler: {e:?}");
         }
     }
 
@@ -153,11 +125,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         .and_then(|c| c.review_submitted.as_ref())
     {
         if let Err(e) = review_submitted::handle(ctx, event, config).await {
-            log::error!(
-                "failed to process event {:?} with review_submitted handler: {:?}",
-                event,
-                e
-            )
+            log::error!("failed to process event {event:?} with review_submitted handler: {e:?}");
         }
     }
 
@@ -168,10 +136,8 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
     {
         if let Err(e) = review_changes_since::handle(ctx, host, event, config).await {
             log::error!(
-                "failed to process event {:?} with review_changes_since handler: {:?}",
-                event,
-                e
-            )
+                "failed to process event {event:?} with review_changes_since handler: {e:?}",
+            );
         }
     }
 
@@ -181,11 +147,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         .and_then(|c| c.github_releases.as_ref())
     {
         if let Err(e) = github_releases::handle(ctx, event, ghr_config).await {
-            log::error!(
-                "failed to process event {:?} with github_releases handler: {:?}",
-                event,
-                e
-            );
+            log::error!("failed to process event {event:?} with github_releases handler: {e:?}");
         }
     }
 
@@ -195,11 +157,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         .and_then(|c| c.merge_conflicts.as_ref())
     {
         if let Err(e) = merge_conflicts::handle(ctx, event, conflict_config).await {
-            log::error!(
-                "failed to process event {:?} with merge_conflicts handler: {:?}",
-                event,
-                e
-            );
+            log::error!("failed to process event {event:?} with merge_conflicts handler: {e:?}");
         }
     }
 
@@ -333,7 +291,7 @@ macro_rules! command_handlers {
                 input.collect()
             };
 
-            log::info!("Comment parsed to {:?}", commands);
+            log::info!("Comment parsed to {commands:?}");
 
             if commands.is_empty() {
                 return;
@@ -424,7 +382,7 @@ pub struct Context {
     pub username: String,
     pub octocrab: Octocrab,
     /// Represents the workqueue (assigned open PRs) of individual reviewers.
-    /// tokio's RwLock is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
+    /// tokio's `RwLock` is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
     pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
     pub gha_logs: Arc<tokio::sync::RwLock<GitHubActionLogsCache>>,
 }

@@ -3,15 +3,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct FCP {
+pub struct Fcp {
     pub id: u32,
     pub fk_issue: u32,
     pub fk_initiator: u32,
     pub fk_initiating_comment: u64,
     pub disposition: Option<String>,
     pub fk_bot_tracking_comment: u64,
-    pub fcp_start: Option<String>,
-    pub fcp_closed: bool,
+    pub start: Option<String>,
+    pub closed: bool,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Reviewer {
@@ -30,7 +30,7 @@ pub struct Concern {
     pub reviewer: Reviewer,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct FCPIssue {
+pub struct FcpIssue {
     pub id: u32,
     pub number: u32,
     pub fk_milestone: Option<u32>,
@@ -60,19 +60,19 @@ pub struct StatusComment {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct FullFCP {
-    pub fcp: FCP,
+pub struct FullFcp {
+    pub fcp: Fcp,
     pub reviews: Vec<Review>,
     pub concerns: Vec<Concern>,
-    pub issue: FCPIssue,
+    pub issue: FcpIssue,
     pub status_comment: StatusComment,
 }
 
-pub async fn get_all_fcps() -> anyhow::Result<HashMap<String, FullFCP>> {
-    let url = Url::parse(&"https://rfcbot.rs/api/all")?;
-    let res = reqwest::get(url).await?.json::<Vec<FullFCP>>().await?;
-    let mut map: HashMap<String, FullFCP> = HashMap::new();
-    for full_fcp in res.into_iter() {
+pub async fn get_all_fcps() -> anyhow::Result<HashMap<String, FullFcp>> {
+    let url = Url::parse("https://rfcbot.rs/api/all")?;
+    let res = reqwest::get(url).await?.json::<Vec<FullFcp>>().await?;
+    let mut map: HashMap<String, FullFcp> = HashMap::new();
+    for full_fcp in res {
         map.insert(
             format!(
                 "{}:{}:{}",

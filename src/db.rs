@@ -99,7 +99,7 @@ pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client>
         let connector = builder.build().context("built TlsConnector")?;
         let connector = MakeTlsConnector::new(connector);
 
-        let (db_client, connection) = match tokio_postgres::connect(&db_url, connector).await {
+        let (db_client, connection) = match tokio_postgres::connect(db_url, connector).await {
             Ok(v) => v,
             Err(e) => {
                 anyhow::bail!("failed to connect to DB: {}", e);
@@ -107,7 +107,7 @@ pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client>
         };
         tokio::task::spawn(async move {
             if let Err(e) = connection.await {
-                eprintln!("database connection error: {}", e);
+                eprintln!("database connection error: {e}");
             }
         });
 
@@ -115,7 +115,7 @@ pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client>
     } else {
         eprintln!("Warning: Non-TLS connection to non-RDS DB");
         let (db_client, connection) =
-            match tokio_postgres::connect(&db_url, tokio_postgres::NoTls).await {
+            match tokio_postgres::connect(db_url, tokio_postgres::NoTls).await {
                 Ok(v) => v,
                 Err(e) => {
                     anyhow::bail!("failed to connect to DB: {}", e);
@@ -123,7 +123,7 @@ pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client>
             };
         tokio::spawn(async move {
             if let Err(e) = connection.await {
-                eprintln!("database connection error: {}", e);
+                eprintln!("database connection error: {e}");
             }
         });
 
@@ -186,13 +186,13 @@ pub async fn run_migrations(client: &mut DbClient) -> anyhow::Result<()> {
                 .context("Cannot create migration transactin")?;
             tx.execute(*migration, &[])
                 .await
-                .with_context(|| format!("executing {}th migration", idx))?;
+                .with_context(|| format!("executing {idx}th migration"))?;
             tx.execute(
                 "UPDATE database_versions SET migration_counter = $1",
                 &[&(idx as i32 + 1)],
             )
             .await
-            .with_context(|| format!("updating migration counter to {}", idx))?;
+            .with_context(|| format!("updating migration counter to {idx}"))?;
             tx.commit()
                 .await
                 .context("Cannot commit migration transaction")?;
@@ -225,9 +225,12 @@ pub async fn schedule_job(
         anyhow::bail!("Job {} does not exist in the current job list.", job_name);
     }
 
-    if let Err(_) = get_job_by_name_and_scheduled_at(&db, job_name, &when).await {
+    if get_job_by_name_and_scheduled_at(db, job_name, &when)
+        .await
+        .is_err()
+    {
         // mean there's no job already in the db with that name and scheduled_at
-        insert_job(&db, job_name, &when, &job_metadata).await?;
+        insert_job(db, job_name, &when, &job_metadata).await?;
     }
 
     Ok(())
@@ -235,20 +238,20 @@ pub async fn schedule_job(
 
 pub async fn run_scheduled_jobs(ctx: &Context) -> anyhow::Result<()> {
     let db = &ctx.db.get().await;
-    let jobs = get_jobs_to_execute(&db).await?;
-    tracing::trace!("jobs to execute: {:#?}", jobs);
+    let jobs = get_jobs_to_execute(db).await?;
+    tracing::trace!("jobs to execute: {jobs:#?}");
 
-    for job in jobs.iter() {
-        update_job_executed_at(&db, &job.id).await?;
+    for job in &jobs {
+        update_job_executed_at(db, &job.id).await?;
 
-        match handle_job(&ctx, &job.name, &job.metadata).await {
-            Ok(_) => {
+        match handle_job(ctx, &job.name, &job.metadata).await {
+            Ok(()) => {
                 tracing::trace!("job successfully executed (id={})", job.id);
-                delete_job(&db, &job.id).await?;
+                delete_job(db, &job.id).await?;
             }
             Err(e) => {
-                tracing::error!("job failed on execution (id={:?}, error={:?})", job.id, e);
-                update_job_error_message(&db, &job.id, &e.to_string()).await?;
+                tracing::error!("job failed on execution (id={:?}, error={e:?})", job.id);
+                update_job_error_message(db, &job.id, &e.to_string()).await?;
             }
         }
     }
@@ -257,21 +260,13 @@ pub async fn run_scheduled_jobs(ctx: &Context) -> anyhow::Result<()> {
 }
 
 // Try to handle a specific job
-async fn handle_job(
-    ctx: &Context,
-    name: &String,
-    metadata: &serde_json::Value,
-) -> anyhow::Result<()> {
+async fn handle_job(ctx: &Context, name: &str, metadata: &serde_json::Value) -> anyhow::Result<()> {
     for job in jobs() {
-        if &job.name() == &name {
+        if job.name() == name {
             return job.run(ctx, metadata).await;
         }
     }
-    tracing::trace!(
-        "handle_job fell into default case: (name={:?}, metadata={:?})",
-        name,
-        metadata
-    );
+    tracing::trace!("handle_job fell into default case: (name={name:?}, metadata={metadata:?})");
 
     Ok(())
 }

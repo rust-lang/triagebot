@@ -12,7 +12,7 @@ pub(super) fn merges_in_commits(
     issue_title: &str,
     repository: &Repository,
     config: &NoMergesConfig,
-    commits: &Vec<GithubCommit>,
+    commits: &[GithubCommit],
 ) -> Option<(String, Vec<String>)> {
     // Don't trigger if the PR has any of the excluded title segments.
     if config
@@ -41,7 +41,7 @@ pub(super) fn merges_in_commits(
         .unwrap_or(&get_default_message(
             &repository.full_name,
             &repository.default_branch,
-            merge_commits.into_iter(),
+            merge_commits,
         ))
         .to_string();
 
@@ -53,7 +53,7 @@ fn get_default_message<'a>(
     default_branch: &str,
     commits: impl IntoIterator<Item = &'a str>,
 ) -> String {
-    let mut message = format!(
+    let mut message = String::from(
         "The following commits have merge commits (commits with multiple parents) in your changes. \
 We have a [no merge policy](https://rustc-dev-guide.rust-lang.org/git.html#no-merge-policy) \
 so these commits will need to be removed for this pull request to be merged.
@@ -143,7 +143,7 @@ $ git push --force-with-lease
         let commit = dummy_commit_from_body("67c917fe5937e984f58f5003ccbb5c37e", "+ main.rs");
 
         assert_eq!(
-            merges_in_commits(&title, &repository, &config, &vec![commit]),
+            merges_in_commits(&title, &repository, &config, &[commit]),
             None
         );
     }
@@ -155,7 +155,7 @@ $ git push --force-with-lease
                 "Subtree update of rustc_custom_codegen",
                 &repository,
                 &config,
-                &vec![commit_with_merge()]
+                &[commit_with_merge()]
             ),
             None
         );

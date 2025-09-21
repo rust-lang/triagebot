@@ -31,7 +31,7 @@ pub(super) async fn validate_config(
         .context("{CONFIG_FILE_NAME} modified, but failed to get content")?;
 
     let triagebot_content = triagebot_content.unwrap_or_default();
-    let triagebot_content = String::from_utf8_lossy(&*triagebot_content);
+    let triagebot_content = String::from_utf8_lossy(&triagebot_content);
 
     match toml::from_str::<crate::handlers::Config>(&triagebot_content) {
         Err(e) => {
@@ -74,6 +74,10 @@ pub(super) async fn validate_config(
 }
 
 /// Helper to translate a toml span to a `(line_no, col_no)` (1-based).
+#[expect(
+    clippy::sliced_string_as_bytes,
+    reason = "don't know if the suggestion applies here, because of the char boundaries thing"
+)]
 fn translate_position(input: &str, index: usize) -> (usize, usize) {
     if input.is_empty() {
         return (0, index);

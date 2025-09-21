@@ -27,22 +27,20 @@ pub(super) async fn handle_command(
     let mut results = vec![];
     let mut to_add = vec![];
     for delta in &input.0 {
-        let name = delta.label().as_str();
-        let err = match check_filter(name, config, is_member(&event.user(), &ctx.team).await) {
+        let name: &str = delta.label();
+        let err = match check_filter(name, config, is_member(event.user(), &ctx.team).await) {
             Ok(CheckFilterResult::Allow) => None,
-            Ok(CheckFilterResult::Deny) => Some(format!(
-                "Label {} can only be set by Rust team members",
-                name
-            )),
+            Ok(CheckFilterResult::Deny) => {
+                Some(format!("Label {name} can only be set by Rust team members"))
+            }
             Ok(CheckFilterResult::DenyUnknown) => Some(format!(
-                "Label {} can only be set by Rust team members;\
-                 we were unable to check if you are a team member.",
-                name
+                "Label {name} can only be set by Rust team members;\
+                 we were unable to check if you are a team member."
             )),
             Err(err) => Some(err),
         };
         if let Some(msg) = err {
-            let cmnt = ErrorComment::new(&event.issue().unwrap(), msg);
+            let cmnt = ErrorComment::new(event.issue().unwrap(), msg);
             cmnt.post(&ctx.github).await?;
             return Ok(());
         }
@@ -55,7 +53,7 @@ pub(super) async fn handle_command(
             LabelDelta::Remove(label) => {
                 results.push((
                     label,
-                    event.issue().unwrap().remove_label(&ctx.github, &label),
+                    event.issue().unwrap().remove_label(&ctx.github, label),
                 ));
             }
         }
@@ -68,10 +66,8 @@ pub(super) async fn handle_command(
         .await
     {
         tracing::error!(
-            "failed to add {:?} from issue {}: {:?}",
-            to_add,
-            event.issue().unwrap().global_id(),
-            e
+            "failed to add {to_add:?} from issue {issue}: {e:?}",
+            issue = event.issue().unwrap().global_id(),
         );
         if let Some(err @ UnknownLabels { .. }) = e.downcast_ref() {
             event
@@ -87,10 +83,8 @@ pub(super) async fn handle_command(
     for (label, res) in results {
         if let Err(e) = res.await {
             tracing::error!(
-                "failed to remove {:?} from issue {}: {:?}",
-                label,
-                event.issue().unwrap().global_id(),
-                e
+                "failed to remove {label:?} from issue {issue}: {e:?}",
+                issue = event.issue().unwrap().global_id(),
             );
             return Err(e);
         }
@@ -111,7 +105,7 @@ async fn is_member(user: &github::User, client: &TeamClient) -> TeamMembership {
         Ok(true) => TeamMembership::Member,
         Ok(false) => TeamMembership::Outsider,
         Err(err) => {
-            eprintln!("failed to check team membership: {:?}", err);
+            eprintln!("failed to check team membership: {err:?}");
             TeamMembership::Unknown
         }
     }
@@ -143,17 +137,17 @@ fn check_filter(
             }
             Ok(MatchPatternResult::NoMatch) => {}
             Err(err) => {
-                eprintln!("failed to match pattern {}: {}", pattern, err);
-                return Err(format!("failed to match pattern {}", pattern));
+                eprintln!("failed to match pattern {pattern}: {err}");
+                return Err(format!("failed to match pattern {pattern}"));
             }
         }
     }
     if matched {
-        return Ok(CheckFilterResult::Allow);
+        Ok(CheckFilterResult::Allow)
     } else if is_member == TeamMembership::Outsider {
-        return Ok(CheckFilterResult::Deny);
+        Ok(CheckFilterResult::Deny)
     } else {
-        return Ok(CheckFilterResult::DenyUnknown);
+        Ok(CheckFilterResult::DenyUnknown)
     }
 }
 
@@ -165,15 +159,17 @@ enum MatchPatternResult {
 }
 
 fn match_pattern(pattern: &str, label: &str) -> anyhow::Result<MatchPatternResult> {
-    let (pattern, inverse) = if pattern.starts_with('!') {
-        (&pattern[1..], true)
+    let (pattern, inverse) = if let Some(pat) = pattern.strip_prefix('!') {
+        (pat, true)
     } else {
         (pattern, false)
     };
 
     let glob = glob::Pattern::new(pattern)?;
-    let mut matchopts = glob::MatchOptions::default();
-    matchopts.case_sensitive = false;
+    let matchopts = glob::MatchOptions {
+        case_sensitive: false,
+        ..Default::default()
+    };
 
     Ok(match (glob.matches_with(label, matchopts), inverse) {
         (true, false) => MatchPatternResult::Allow,

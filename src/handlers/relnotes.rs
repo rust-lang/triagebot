@@ -12,6 +12,7 @@
 //! the absence of a milestone, T-release is responsible for ascertaining which release is
 //! associated with the issue.
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -51,12 +52,12 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     if let Some(paired) = state.data.relnotes_issue {
         // Already has a paired release notes issue.
 
-        if let IssuesAction::Milestoned = &e.action {
-            if let Some(milestone) = &e.issue.milestone {
-                ctx.github
-                    .set_milestone(&e.issue.repository().to_string(), &milestone, paired)
-                    .await?;
-            }
+        if let IssuesAction::Milestoned = &e.action
+            && let Some(milestone) = &e.issue.milestone
+        {
+            ctx.github
+                .set_milestone(&e.issue.repository().to_string(), milestone, paired)
+                .await?;
         }
 
         return Ok(());
@@ -108,14 +109,14 @@ If this change is notable enough for inclusion in the blog post then this sectio
 ",
                 pr_number = e.issue.number,
                 people = [&e.issue.user].into_iter().chain(e.issue.assignees.iter())
-                    .map(|v| format!("@{}", v.login)).collect::<Vec<_>>().join(", "),
+                    .format_with(", ", |v, f| f(&format_args!("@{}", v.login))),
                 pr_title = e.issue.title,
                 pr_url = e.issue.html_url,
             );
             let resp = ctx
                 .github
                 .new_issue(
-                    &e.issue.repository(),
+                    e.issue.repository(),
                     &title,
                     &body,
                     ["relnotes", "relnotes-tracking-issue"]
@@ -134,7 +135,7 @@ If this change is notable enough for inclusion in the blog post then this sectio
                 .await?;
             if let Some(milestone) = &e.issue.milestone {
                 ctx.github
-                    .set_milestone(&e.issue.repository().to_string(), &milestone, resp.number)
+                    .set_milestone(&e.issue.repository().to_string(), milestone, resp.number)
                     .await?;
             }
             state.data.relnotes_issue = Some(resp.number);
