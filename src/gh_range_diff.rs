@@ -227,7 +227,7 @@ fn process_old_new(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" sizes="32x32" type="image/png" href="https://www.rust-lang.org/static/images/favicon-32x32.png">
+    <link rel="icon" sizes="32x32" type="image/png" href="https://rust-lang.org/static/images/favicon-32x32.png">
     <title>range-diff of {oldbase}...{oldhead} {newbase}...{newhead}</title>
     <style>
     body {{
@@ -425,7 +425,7 @@ fn process_old_new(
     headers.insert(
         CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(
-            "default-src 'none'; style-src 'unsafe-inline'; img-src www.rust-lang.org",
+            "default-src 'none'; style-src 'unsafe-inline'; img-src rust-lang.org",
         ),
     );
 
