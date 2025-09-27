@@ -199,7 +199,7 @@ pub async fn gha_logs(
             format!(r#"<link rel="icon" sizes="any" type="image/svg+xml" href="{SUCCESS_URL}">"#)
         }
         _ => {
-            r#"<link rel="icon" sizes="32x32" type="image/png" href="https://www.rust-lang.org/static/images/favicon-32x32.png">"#.to_string()
+            r#"<link rel="icon" sizes="32x32" type="image/png" href="https://rust-lang.org/static/images/favicon-32x32.png">"#.to_string()
         }
     };
 
@@ -360,7 +360,7 @@ body {{
         CONTENT_SECURITY_POLICY,
         HeaderValue::from_str(&*
         format!(
-            "default-src 'none'; script-src 'nonce-{nonce}' 'self'; style-src 'unsafe-inline'; img-src 'self' www.rust-lang.org"
+            "default-src 'none'; script-src 'nonce-{nonce}' 'self'; style-src 'unsafe-inline'; img-src 'self' rust-lang.org"
         )).unwrap(),
     );
 
