@@ -232,7 +232,7 @@ fn simple_markdown_content() {
         Concern {
             title: "This is a resolved concern".to_string(),
             status: ConcernStatus::Resolved {
-                comment_url: "https:://github.com/fake-comment-8888".to_string(),
+                comment_url: "https://github.com/fake-comment-8888".to_string(),
             },
             comment_url: "https://github.com/fake-comment-4561".to_string(),
         },
