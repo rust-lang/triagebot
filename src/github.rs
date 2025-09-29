@@ -1320,9 +1320,6 @@ impl IssuesEvent {
 }
 
 #[derive(Debug, serde::Deserialize)]
-struct PullRequestEventFields {}
-
-#[derive(Debug, serde::Deserialize)]
 pub struct WorkflowRunJob {
     pub name: String,
     pub head_sha: String,
