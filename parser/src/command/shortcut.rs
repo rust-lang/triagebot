@@ -1,4 +1,4 @@
-//! The shortcut command parser.
+//! Parser for commands handling a PR review status
 //!
 //! This can parse predefined shortcut input, single word commands.
 //!
@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub enum ShortcutCommand {
+pub enum ReviewCommand {
     Ready,
     Author,
     Blocked,
@@ -31,14 +31,14 @@ impl fmt::Display for ParseError {
     }
 }
 
-impl ShortcutCommand {
+impl ReviewCommand {
     pub fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
         let mut shortcuts = HashMap::new();
-        shortcuts.insert("ready", ShortcutCommand::Ready);
-        shortcuts.insert("review", ShortcutCommand::Ready);
-        shortcuts.insert("reviewer", ShortcutCommand::Ready);
-        shortcuts.insert("author", ShortcutCommand::Author);
-        shortcuts.insert("blocked", ShortcutCommand::Blocked);
+        shortcuts.insert("ready", ReviewCommand::Ready);
+        shortcuts.insert("review", ReviewCommand::Ready);
+        shortcuts.insert("reviewer", ReviewCommand::Ready);
+        shortcuts.insert("author", ReviewCommand::Author);
+        shortcuts.insert("blocked", ReviewCommand::Blocked);
 
         let mut toks = input.clone();
         if let Some(Token::Word(word)) = toks.peek_token()? {
@@ -55,32 +55,32 @@ impl ShortcutCommand {
 }
 
 #[cfg(test)]
-fn parse(input: &str) -> Result<Option<ShortcutCommand>, Error<'_>> {
+fn parse(input: &str) -> Result<Option<ReviewCommand>, Error<'_>> {
     let mut toks = Tokenizer::new(input);
-    Ok(ShortcutCommand::parse(&mut toks)?)
+    Ok(ReviewCommand::parse(&mut toks)?)
 }
 
 #[test]
 fn test_1() {
-    assert_eq!(parse("ready."), Ok(Some(ShortcutCommand::Ready)));
+    assert_eq!(parse("ready."), Ok(Some(ReviewCommand::Ready)));
 }
 
 #[test]
 fn test_2() {
-    assert_eq!(parse("ready"), Ok(Some(ShortcutCommand::Ready)));
+    assert_eq!(parse("ready"), Ok(Some(ReviewCommand::Ready)));
 }
 
 #[test]
 fn test_3() {
-    assert_eq!(parse("author"), Ok(Some(ShortcutCommand::Author)),);
+    assert_eq!(parse("author"), Ok(Some(ReviewCommand::Author)),);
 }
 
 #[test]
 fn test_4() {
-    assert_eq!(parse("ready word"), Ok(Some(ShortcutCommand::Ready)));
+    assert_eq!(parse("ready word"), Ok(Some(ReviewCommand::Ready)));
 }
 
 #[test]
 fn test_5() {
-    assert_eq!(parse("blocked"), Ok(Some(ShortcutCommand::Blocked)));
+    assert_eq!(parse("blocked"), Ok(Some(ReviewCommand::Blocked)));
 }
