@@ -232,7 +232,7 @@ fn simple_markdown_content() {
         Concern {
             title: "This is a resolved concern".to_string(),
             status: ConcernStatus::Resolved {
-                comment_url: "https:://github.com/fake-comment-8888".to_string(),
+                comment_url: "https://github.com/fake-comment-8888".to_string(),
             },
             comment_url: "https://github.com/fake-comment-4561".to_string(),
         },
@@ -245,7 +245,7 @@ fn simple_markdown_content() {
 > # Concerns (1 active)
 >
 > - [This is my concern about concern](https://github.com/fake-comment-1234)
-> - ~~[This is a resolved concern](https://github.com/fake-comment-4561)~~ resolved in [this comment](https:://github.com/fake-comment-8888)
+> - ~~[This is a resolved concern](https://github.com/fake-comment-4561)~~ resolved in [this comment](https://github.com/fake-comment-8888)
 >
 > *Managed by `@rustbot`—see [help](https://forge.rust-lang.org/triagebot/concern.html) for details.*
 "#
@@ -257,7 +257,7 @@ fn resolved_concerns_markdown_content() {
     let concerns = &[Concern {
         title: "This is a resolved concern".to_string(),
         status: ConcernStatus::Resolved {
-            comment_url: "https:://github.com/fake-comment-8888".to_string(),
+            comment_url: "https://github.com/fake-comment-8888".to_string(),
         },
         comment_url: "https://github.com/fake-comment-4561".to_string(),
     }];
@@ -268,7 +268,7 @@ fn resolved_concerns_markdown_content() {
 > [!NOTE]
 > # Concerns (0 active)
 >
-> - ~~[This is a resolved concern](https://github.com/fake-comment-4561)~~ resolved in [this comment](https:://github.com/fake-comment-8888)
+> - ~~[This is a resolved concern](https://github.com/fake-comment-4561)~~ resolved in [this comment](https://github.com/fake-comment-8888)
 >
 > *Managed by `@rustbot`—see [help](https://forge.rust-lang.org/triagebot/concern.html) for details.*
 "#
