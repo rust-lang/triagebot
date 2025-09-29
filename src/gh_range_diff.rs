@@ -303,7 +303,7 @@ fn process_old_new(
         color: rgba(0, 255, 0, 1);
       }}
       .line-removed-before {{
-        color: rgb(206, 48, 0);
+        color: rgb(255, 159, 131);
       }}
       .line-added-before {{
         color: rgba(11, 142, 0, 1);
