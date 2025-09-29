@@ -1194,10 +1194,16 @@ pub struct ChangeInner {
 }
 
 #[derive(Debug, serde::Deserialize)]
+pub struct BaseChange {
+    pub r#ref: ChangeInner,
+    pub sha: ChangeInner,
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct Changes {
     pub title: Option<ChangeInner>,
     pub body: Option<ChangeInner>,
-    pub base: Option<ChangeInner>,
+    pub base: Option<BaseChange>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
