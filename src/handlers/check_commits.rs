@@ -515,8 +515,13 @@ r#":warning: **Warning** :warning:
         event.changes = Some(crate::github::Changes {
             title: None,
             body: None,
-            base: Some(crate::github::ChangeInner {
-                from: "master".to_string(),
+            base: Some(crate::github::BaseChange {
+                r#ref: crate::github::ChangeInner {
+                    from: "master".to_string(),
+                },
+                sha: crate::github::ChangeInner {
+                    from: "fake-sha".to_string(),
+                },
             }),
         });
         assert!(should_handle_event(&event));
