@@ -324,7 +324,7 @@ impl User {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Ord, PartialOrd, serde::Deserialize)]
 pub struct Label {
     pub name: String,
 }
