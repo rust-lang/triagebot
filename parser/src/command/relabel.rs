@@ -19,7 +19,7 @@ pub enum LabelDelta {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Label(String);
+pub struct Label(pub String);
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum ParseError {

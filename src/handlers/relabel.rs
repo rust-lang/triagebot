@@ -8,6 +8,9 @@
 //! If the command was successful, there will be no feedback beyond the label change to reduce
 //! notification noise.
 
+use std::collections::BTreeSet;
+
+use crate::github::Label;
 use crate::team_data::TeamClient;
 use crate::{
     config::RelabelConfig,
@@ -24,8 +27,6 @@ pub(super) async fn handle_command(
     event: &Event,
     input: RelabelCommand,
 ) -> anyhow::Result<()> {
-    let mut results = vec![];
-    let mut to_add = vec![];
     for delta in &input.0 {
         let name = delta.label().as_str();
         let err = match check_filter(name, config, is_member(&event.user(), &ctx.team).await) {
@@ -46,20 +47,9 @@ pub(super) async fn handle_command(
             cmnt.post(&ctx.github).await?;
             return Ok(());
         }
-        match delta {
-            LabelDelta::Add(label) => {
-                to_add.push(github::Label {
-                    name: label.to_string(),
-                });
-            }
-            LabelDelta::Remove(label) => {
-                results.push((
-                    label,
-                    event.issue().unwrap().remove_label(&ctx.github, &label),
-                ));
-            }
-        }
     }
+
+    let (to_add, to_remove) = compute_label_deltas(&input.0);
 
     if let Err(e) = event
         .issue()
@@ -84,8 +74,13 @@ pub(super) async fn handle_command(
         return Err(e);
     }
 
-    for (label, res) in results {
-        if let Err(e) = res.await {
+    for label in to_remove {
+        if let Err(e) = event
+            .issue()
+            .unwrap()
+            .remove_label(&ctx.github, &label.name)
+            .await
+        {
             tracing::error!(
                 "failed to remove {:?} from issue {}: {:?}",
                 label,
@@ -182,10 +177,41 @@ fn match_pattern(pattern: &str, label: &str) -> anyhow::Result<MatchPatternResul
     })
 }
 
+fn compute_label_deltas(deltas: &[LabelDelta]) -> (Vec<Label>, Vec<Label>) {
+    let mut add = BTreeSet::new();
+    let mut remove = BTreeSet::new();
+
+    for delta in deltas {
+        match delta {
+            LabelDelta::Add(label) => {
+                let label = Label {
+                    name: label.to_string(),
+                };
+                if !remove.remove(&label) {
+                    add.insert(label);
+                }
+            }
+            LabelDelta::Remove(label) => {
+                let label = Label {
+                    name: label.to_string(),
+                };
+                if !add.remove(&label) {
+                    remove.insert(label);
+                }
+            }
+        }
+    }
+
+    (add.into_iter().collect(), remove.into_iter().collect())
+}
+
 #[cfg(test)]
 mod tests {
+    use parser::command::relabel::{Label, LabelDelta};
+
     use super::{
-        CheckFilterResult, MatchPatternResult, TeamMembership, check_filter, match_pattern,
+        CheckFilterResult, MatchPatternResult, TeamMembership, check_filter, compute_label_deltas,
+        match_pattern,
     };
     use crate::config::RelabelConfig;
 
@@ -251,5 +277,56 @@ mod tests {
             }
         }
         Ok(())
+    }
+
+    #[test]
+    fn test_compute_label_deltas() {
+        use crate::github::Label as GitHubLabel;
+
+        let mut deltas = vec![
+            LabelDelta::Add(Label("I-nominated".to_string())),
+            LabelDelta::Add(Label("I-nominated".to_string())),
+            LabelDelta::Add(Label("I-lang-nominated".to_string())),
+            LabelDelta::Add(Label("I-libs-nominated".to_string())),
+            LabelDelta::Remove(Label("I-lang-nominated".to_string())),
+        ];
+
+        assert_eq!(
+            compute_label_deltas(&deltas),
+            (
+                vec![
+                    GitHubLabel {
+                        name: "I-libs-nominated".to_string()
+                    },
+                    GitHubLabel {
+                        name: "I-nominated".to_string()
+                    },
+                ],
+                vec![],
+            ),
+        );
+
+        deltas.push(LabelDelta::Remove(Label("needs-triage".to_string())));
+        deltas.push(LabelDelta::Add(Label("I-lang-nominated".to_string())));
+
+        assert_eq!(
+            compute_label_deltas(&deltas),
+            (
+                vec![
+                    GitHubLabel {
+                        name: "I-lang-nominated".to_string()
+                    },
+                    GitHubLabel {
+                        name: "I-libs-nominated".to_string()
+                    },
+                    GitHubLabel {
+                        name: "I-nominated".to_string()
+                    },
+                ],
+                vec![GitHubLabel {
+                    name: "needs-triage".to_string()
+                }],
+            ),
+        );
     }
 }
