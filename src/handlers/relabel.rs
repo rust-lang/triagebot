@@ -27,6 +27,11 @@ pub(super) async fn handle_command(
     event: &Event,
     input: RelabelCommand,
 ) -> anyhow::Result<()> {
+    let Some(issue) = event.issue() else {
+        anyhow::bail!("event is not an issue");
+    };
+
+    // Check label authorization for the current user
     for delta in &input.0 {
         let name = delta.label().as_str();
         let err = match check_filter(name, config, is_member(&event.user(), &ctx.team).await) {
@@ -43,48 +48,37 @@ pub(super) async fn handle_command(
             Err(err) => Some(err),
         };
         if let Some(msg) = err {
-            let cmnt = ErrorComment::new(&event.issue().unwrap(), msg);
+            let cmnt = ErrorComment::new(issue, msg);
             cmnt.post(&ctx.github).await?;
             return Ok(());
         }
     }
 
+    // Compute the labels to add and remove
     let (to_add, to_remove) = compute_label_deltas(&input.0);
 
-    if let Err(e) = event
-        .issue()
-        .unwrap()
-        .add_labels(&ctx.github, to_add.clone())
-        .await
-    {
+    // Add labels
+    if let Err(e) = issue.add_labels(&ctx.github, to_add.clone()).await {
         tracing::error!(
             "failed to add {:?} from issue {}: {:?}",
             to_add,
-            event.issue().unwrap().global_id(),
+            issue.global_id(),
             e
         );
         if let Some(err @ UnknownLabels { .. }) = e.downcast_ref() {
-            event
-                .issue()
-                .unwrap()
-                .post_comment(&ctx.github, &err.to_string())
-                .await?;
+            issue.post_comment(&ctx.github, &err.to_string()).await?;
         }
 
         return Err(e);
     }
 
+    // Remove labels
     for label in to_remove {
-        if let Err(e) = event
-            .issue()
-            .unwrap()
-            .remove_label(&ctx.github, &label.name)
-            .await
-        {
+        if let Err(e) = issue.remove_label(&ctx.github, &label.name).await {
             tracing::error!(
                 "failed to remove {:?} from issue {}: {:?}",
                 label,
-                event.issue().unwrap().global_id(),
+                issue.global_id(),
                 e
             );
             return Err(e);
