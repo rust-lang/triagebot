@@ -1,9 +1,12 @@
+use crate::github::User;
 use crate::zulip::api::Recipient;
+use crate::zulip::render_zulip_username;
 use crate::{
     config::{NotifyZulipConfig, NotifyZulipLabelConfig, NotifyZulipTablesConfig},
     github::{Issue, IssuesAction, IssuesEvent, Label},
     handlers::Context,
 };
+use futures::future::join_all;
 use tracing as log;
 
 pub(super) struct NotifyZulipInput {
@@ -214,10 +217,15 @@ pub(super) async fn handle_input<'a>(
                 topic: &topic,
             };
 
+            // Issue/PR authors/reviewers will receive a mention if the template has `{recipients}`.
+            let recipients = &mut event.issue.assignees.clone();
+            recipients.push(event.issue.user.clone());
+
             for msg in msgs {
                 let msg = msg.replace("{number}", &event.issue.number.to_string());
                 let msg = msg.replace("{title}", &event.issue.title);
                 let msg = replace_team_to_be_nominated(&event.issue.labels, msg);
+                let msg = msg.replace("{recipients}", &get_zulip_ids(ctx, &recipients).await);
 
                 let req = crate::zulip::MessageApiRequest {
                     recipient,
@@ -236,6 +244,33 @@ pub(super) async fn handle_input<'a>(
     Ok(())
 }
 
+async fn get_zulip_ids(ctx: &Context, recipients: &[User]) -> String {
+    let gh_ids_fut = recipients
+        .iter()
+        .map(|recipient| async move { ctx.team.github_to_zulip_id(recipient.id).await });
+    let zulip_ids = join_all(gh_ids_fut).await;
+
+    let zulip_ids = zulip_ids
+        .iter()
+        .filter_map(|x| {
+            if let Ok(id2) = x.as_ref()
+                && let Some(id) = *id2
+            {
+                Some(render_zulip_username(id))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<String>>();
+
+    if !zulip_ids.is_empty() {
+        zulip_ids.join(", ")
+    } else {
+        "".to_string()
+    }
+}
+
+/// Replace the placeholder "{team}" with the correct team name
 fn replace_team_to_be_nominated(labels: &[Label], msg: String) -> String {
     let teams = labels
         .iter()

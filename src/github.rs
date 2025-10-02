@@ -408,7 +408,8 @@ pub struct Issue {
     // User performing an `action` (or PR/issue author)
     pub user: User,
     pub labels: Vec<Label>,
-    // Users assigned to the issue/pr after `action` has been performed
+    // Users assigned to the issue/pr after `action` has been performed issue
+    // (PR reviewers or issue assignees)
     // These are NOT the same as `IssueEvent.assignee`
     pub assignees: Vec<User>,
     /// Indicator if this is a pull request.
