@@ -288,15 +288,19 @@ async fn maybe_add_comment(
 
     let current_labels: HashSet<_> = issue.labels.iter().map(|l| l.name.clone()).collect();
     if current_labels.is_disjoint(&config.unless) {
-        for label in &config.remove {
-            issue.remove_label(gh, label).await?;
-        }
         let to_add = config
             .add
             .iter()
             .map(|l| Label { name: l.clone() })
             .collect();
+        let to_remove = config
+            .remove
+            .iter()
+            .map(|l| Label { name: l.clone() })
+            .collect();
+
         issue.add_labels(gh, to_add).await?;
+        issue.remove_labels(gh, to_remove).await?;
     }
 
     Ok(())

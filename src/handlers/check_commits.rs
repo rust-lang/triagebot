@@ -243,13 +243,17 @@ async fn handle_new_state(
 
         // Remove the labels no longer required
         if !labels_to_remove.is_empty() {
-            for label in labels_to_remove {
-                event
-                    .issue
-                    .remove_label(&ctx.github, &label)
-                    .await
-                    .context("failed to remove a label in check_commits")?;
-            }
+            event
+                .issue
+                .remove_labels(
+                    &ctx.github,
+                    labels_to_remove
+                        .into_iter()
+                        .map(|name| Label { name })
+                        .collect(),
+                )
+                .await
+                .context("failed to remove a label in check_commits")?;
         }
 
         // Add the labels that are now required

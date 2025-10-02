@@ -73,16 +73,14 @@ pub(super) async fn handle_command(
     }
 
     // Remove labels
-    for label in to_remove {
-        if let Err(e) = issue.remove_label(&ctx.github, &label.name).await {
-            tracing::error!(
-                "failed to remove {:?} from issue {}: {:?}",
-                label,
-                issue.global_id(),
-                e
-            );
-            return Err(e);
-        }
+    if let Err(e) = issue.remove_labels(&ctx.github, to_remove.clone()).await {
+        tracing::error!(
+            "failed to remove {:?} from issue {}: {:?}",
+            to_remove,
+            issue.global_id(),
+            e
+        );
+        return Err(e);
     }
 
     Ok(())
