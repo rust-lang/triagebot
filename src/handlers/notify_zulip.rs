@@ -1,9 +1,12 @@
+use crate::github::User;
 use crate::zulip::api::Recipient;
+use crate::zulip::render_zulip_username;
 use crate::{
     config::{NotifyZulipConfig, NotifyZulipLabelConfig, NotifyZulipTablesConfig},
     github::{Issue, IssuesAction, IssuesEvent, Label},
     handlers::Context,
 };
+use futures::future::join_all;
 use tracing as log;
 
 pub(super) struct NotifyZulipInput {
@@ -218,6 +221,10 @@ pub(super) async fn handle_input<'a>(
                 let msg = msg.replace("{number}", &event.issue.number.to_string());
                 let msg = msg.replace("{title}", &event.issue.title);
                 let msg = replace_team_to_be_nominated(&event.issue.labels, msg);
+                let msg = msg.replace(
+                    "{reviewers}",
+                    &retrieve_zulip_ids(ctx, &event.issue.assignees).await,
+                );
 
                 let req = crate::zulip::MessageApiRequest {
                     recipient,
@@ -236,6 +243,24 @@ pub(super) async fn handle_input<'a>(
     Ok(())
 }
 
+/// Retrieve Zulip IDs for PR assignees
+async fn retrieve_zulip_ids(ctx: &Context, assignees: &[User]) -> String {
+    let gh_ids_fut = assignees
+        .iter()
+        .map(|reviewer| async move { ctx.team.github_to_zulip_id(reviewer.id).await });
+    let zulip_ids = join_all(gh_ids_fut).await;
+
+    zulip_ids
+        .iter()
+        .map(|x| {
+            let id = x.as_ref().unwrap().unwrap();
+            render_zulip_username(id)
+        })
+        .collect::<Vec<String>>()
+        .join(", cc: ")
+}
+
+/// Replace the placeholder "{team}" with the correct team name
 fn replace_team_to_be_nominated(labels: &[Label], msg: String) -> String {
     let teams = labels
         .iter()
