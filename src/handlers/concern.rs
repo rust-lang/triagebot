@@ -152,12 +152,19 @@ pub(super) async fn handle_command(
             ).await.context("unable to post the comment failure it-self")?;
         }
     } else {
-        for l in &config.labels {
-            issue
-                .remove_label(&ctx.github, &l)
-                .await
-                .context("unable to remove the concern labels")?;
-        }
+        issue
+            .remove_labels(
+                &ctx.github,
+                config
+                    .labels
+                    .iter()
+                    .map(|l| Label {
+                        name: l.to_string(),
+                    })
+                    .collect(),
+            )
+            .await
+            .context("unable to remove the concern labels")?;
     }
 
     // Apply the new markdown concerns list to the issue

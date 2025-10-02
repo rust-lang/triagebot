@@ -50,11 +50,17 @@ pub(super) async fn handle_command(
     };
 
     if !issue_labels.iter().any(|l| l.name == add) {
-        for remove in status_labels {
-            if remove != add {
-                issue.remove_label(&ctx.github, remove).await?;
-            }
-        }
+        issue
+            .remove_labels(
+                &ctx.github,
+                status_labels
+                    .iter()
+                    .filter(|l| **l != add)
+                    .map(|l| Label { name: (*l).into() })
+                    .collect(),
+            )
+            .await?;
+
         issue
             .add_labels(
                 &ctx.github,

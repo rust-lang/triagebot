@@ -222,18 +222,11 @@ pub(super) async fn handle_input(
         }
     }
 
-    for label in input.remove {
-        event
-            .issue
-            .remove_label(&ctx.github, &label.name)
-            .await
-            .with_context(|| {
-                format!(
-                    "failed to remove {:?} from {:?}",
-                    label,
-                    event.issue.global_id()
-                )
-            })?;
-    }
+    event
+        .issue
+        .remove_labels(&ctx.github, input.remove)
+        .await
+        .context("failed to remove labels from the issue")?;
+
     Ok(())
 }

@@ -708,7 +708,12 @@ As the automated representative, I would like to thank the author for their work
         .await
         .context("unable to add the accept label")?;
     issue
-        .remove_label(&ctx.github, &config.second_label)
+        .remove_labels(
+            &ctx.github,
+            vec![Label {
+                name: config.second_label.clone(),
+            }],
+        )
         .await
         .context("unable to remove the second label")?;
     issue
