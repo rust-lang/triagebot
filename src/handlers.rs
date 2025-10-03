@@ -10,34 +10,6 @@ use std::fmt;
 use std::sync::Arc;
 use tracing as log;
 
-#[derive(Debug)]
-pub enum HandlerError {
-    Message(String),
-    Other(anyhow::Error),
-}
-
-impl std::error::Error for HandlerError {}
-
-impl fmt::Display for HandlerError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            HandlerError::Message(msg) => write!(f, "{}", msg),
-            HandlerError::Other(_) => write!(f, "An internal error occurred."),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct UserError(String);
-
-impl std::error::Error for UserError {}
-
-impl fmt::Display for UserError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
 macro_rules! inform {
     (msg:literal $(,)?) => {
         anyhow::bail!(crate::handlers::UserError($msg.into()))
@@ -80,6 +52,19 @@ pub mod rustc_commits;
 mod shortcut;
 mod transfer;
 pub mod types_planning_updates;
+
+pub struct Context {
+    pub github: GithubClient,
+    pub zulip: ZulipClient,
+    pub team: TeamClient,
+    pub db: crate::db::ClientPool,
+    pub username: String,
+    pub octocrab: Octocrab,
+    /// Represents the workqueue (assigned open PRs) of individual reviewers.
+    /// tokio's RwLock is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
+    pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
+    pub gha_logs: Arc<tokio::sync::RwLock<GitHubActionLogsCache>>,
+}
 
 pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo()).await;
@@ -440,15 +425,30 @@ command_handlers! {
     transfer: Transfer,
 }
 
-pub struct Context {
-    pub github: GithubClient,
-    pub zulip: ZulipClient,
-    pub team: TeamClient,
-    pub db: crate::db::ClientPool,
-    pub username: String,
-    pub octocrab: Octocrab,
-    /// Represents the workqueue (assigned open PRs) of individual reviewers.
-    /// tokio's RwLock is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
-    pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
-    pub gha_logs: Arc<tokio::sync::RwLock<GitHubActionLogsCache>>,
+#[derive(Debug)]
+pub enum HandlerError {
+    Message(String),
+    Other(anyhow::Error),
+}
+
+impl std::error::Error for HandlerError {}
+
+impl fmt::Display for HandlerError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            HandlerError::Message(msg) => write!(f, "{}", msg),
+            HandlerError::Other(_) => write!(f, "An internal error occurred."),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct UserError(String);
+
+impl std::error::Error for UserError {}
+
+impl fmt::Display for UserError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.0)
+    }
 }
