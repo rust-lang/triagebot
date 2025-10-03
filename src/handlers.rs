@@ -11,9 +11,6 @@ use std::sync::Arc;
 use tracing as log;
 
 macro_rules! inform {
-    (msg:literal $(,)?) => {
-        anyhow::bail!(crate::handlers::UserError($msg.into()))
-    };
     ($err:expr $(,)?) => {
         anyhow::bail!(crate::handlers::UserError($err.into()))
     };
