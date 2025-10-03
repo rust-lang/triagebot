@@ -8,7 +8,6 @@ use crate::{
     config::PingConfig,
     github::{self, Event},
     handlers::Context,
-    interactions::ErrorComment,
 };
 use parser::command::ping::PingCommand;
 
@@ -25,42 +24,27 @@ pub(super) async fn handle_command(
     };
 
     if !is_team_member {
-        let cmnt = ErrorComment::new(
-            &event.issue().unwrap(),
-            format!("Only Rust team members can ping teams."),
-        );
-        cmnt.post(&ctx.github).await?;
-        return Ok(());
+        inform!("Only Rust team members can ping teams.");
     }
 
     let (gh_team, config) = match config.get_by_name(&team_name.team) {
         Some(v) => v,
         None => {
-            let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
-                format!(
-                    "This team (`{}`) cannot be pinged via this command; \
+            inform!(format!(
+                "This team (`{}`) cannot be pinged via this command; \
                     it may need to be added to `triagebot.toml` on the default branch.",
-                    team_name.team,
-                ),
-            );
-            cmnt.post(&ctx.github).await?;
-            return Ok(());
+                team_name.team,
+            ));
         }
     };
     let team = ctx.team.get_team(&gh_team).await?;
     let team = match team {
         Some(team) => team,
         None => {
-            let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
-                format!(
-                    "This team (`{}`) does not exist in the team repository.",
-                    team_name.team,
-                ),
-            );
-            cmnt.post(&ctx.github).await?;
-            return Ok(());
+            inform!(format!(
+                "This team (`{}`) does not exist in the team repository.",
+                team_name.team,
+            ));
         }
     };
 
@@ -76,11 +60,7 @@ pub(super) async fn handle_command(
             )
             .await
         {
-            let cmnt = ErrorComment::new(
-                &event.issue().unwrap(),
-                format!("Error adding team label (`{}`): {:?}.", label, err),
-            );
-            cmnt.post(&ctx.github).await?;
+            inform!(format!("Error adding team label (`{}`): {:?}.", label, err));
         }
     }
 
