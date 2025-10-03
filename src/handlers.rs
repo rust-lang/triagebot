@@ -27,6 +27,26 @@ impl fmt::Display for HandlerError {
     }
 }
 
+#[derive(Debug)]
+pub struct UserError(String);
+
+impl std::error::Error for UserError {}
+
+impl fmt::Display for UserError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+macro_rules! inform {
+    (msg:literal $(,)?) => {
+        anyhow::bail!(crate::handlers::UserError($msg.into()))
+    };
+    ($err:expr $(,)?) => {
+        anyhow::bail!(crate::handlers::UserError($err.into()))
+    };
+}
+
 mod assign;
 mod autolabel;
 mod backport;
@@ -368,11 +388,15 @@ macro_rules! command_handlers {
                         if let Some(config) = &config.$name {
                             $name::handle_command(ctx, config, event, command)
                                 .await
-                                .unwrap_or_else(|err| {
-                                    errors.push(HandlerError::Other(err.context(format!(
-                                        "error when processing {} command handler",
-                                        stringify!($name)
-                                    ))))
+                                .unwrap_or_else(|mut err| {
+                                    if let Some(err) = err.downcast_mut::<UserError>() {
+                                        errors.push(HandlerError::Message(std::mem::take(&mut err.0)));
+                                    } else {
+                                        errors.push(HandlerError::Other(err.context(format!(
+                                            "error when processing {} command handler",
+                                            stringify!($name)
+                                        ))));
+                                    }
                                 });
                         } else {
                             errors.push(HandlerError::Message(format!(

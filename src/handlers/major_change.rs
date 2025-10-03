@@ -6,7 +6,6 @@ use crate::{
     config::MajorChangeConfig,
     github::{Event, Issue, IssuesAction, IssuesEvent, Label, ZulipGitHubReference},
     handlers::Context,
-    interactions::ErrorComment,
 };
 use anyhow::Context as _;
 use async_trait::async_trait;
@@ -113,15 +112,10 @@ pub(super) async fn handle_input(
         .iter()
         .any(|l| l.name == config.enabling_label)
     {
-        let cmnt = ErrorComment::new(
-            &event.issue,
-            format!(
-                "This issue is not ready for proposals; it lacks the `{}` label.",
-                config.enabling_label
-            ),
-        );
-        cmnt.post(&ctx.github).await?;
-        return Ok(());
+        inform!(format!(
+            "This issue is not ready for proposals; it lacks the `{}` label.",
+            config.enabling_label
+        ));
     }
     let (zulip_msg, label_to_add) = match cmd {
         Invocation::NewProposal => (
@@ -253,15 +247,10 @@ pub(super) async fn handle_command(
         .iter()
         .any(|l| l.name == config.enabling_label)
     {
-        let cmnt = ErrorComment::new(
-            &issue,
-            &format!(
-                "This issue cannot be seconded; it lacks the `{}` label.",
-                config.enabling_label
-            ),
-        );
-        cmnt.post(&ctx.github).await?;
-        return Ok(());
+        inform!(format!(
+            "This issue cannot be seconded; it lacks the `{}` label.",
+            config.enabling_label
+        ));
     }
 
     let is_team_member = event
@@ -272,9 +261,7 @@ pub(super) async fn handle_command(
         .unwrap_or(false);
 
     if !is_team_member {
-        let cmnt = ErrorComment::new(&issue, "Only team members can second issues.");
-        cmnt.post(&ctx.github).await?;
-        return Ok(());
+        inform!("Only team members can second issues.");
     }
 
     let has_concerns = if let Some(concerns_label) = &config.concerns_label {

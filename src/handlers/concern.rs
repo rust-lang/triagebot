@@ -6,7 +6,7 @@ use crate::{
     config::ConcernConfig,
     github::{Event, Label},
     handlers::Context,
-    interactions::{EditIssueBody, ErrorComment},
+    interactions::EditIssueBody,
 };
 use parser::command::concern::ConcernCommand;
 
@@ -37,7 +37,7 @@ pub(super) async fn handle_command(
     cmd: ConcernCommand,
 ) -> anyhow::Result<()> {
     let Event::IssueComment(issue_comment) = event else {
-        bail!("concern issued on something other than a issue")
+        inform!("Concerns can only be issued on an issue");
     };
     let Some(comment_url) = event.html_url() else {
         bail!("unable to retrieve the comment url")
@@ -81,10 +81,9 @@ pub(super) async fn handle_command(
             issue.number,
             issue_comment.comment.user,
         );
-        ErrorComment::new(&issue, "Only team members in the [team repo](https://github.com/rust-lang/team) can add or resolve concerns.")
-            .post(&ctx.github)
-            .await?;
-        return Ok(());
+        inform!(
+            "Only team members in the [team repo](https://github.com/rust-lang/team) can add or resolve concerns."
+        );
     }
 
     let mut client = ctx.db.get().await;

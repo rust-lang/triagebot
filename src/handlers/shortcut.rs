@@ -7,7 +7,6 @@ use crate::{
     db::issue_data::IssueData,
     github::{Event, Label},
     handlers::Context,
-    interactions::ErrorComment,
 };
 use octocrab::models::AuthorAssociation;
 use parser::command::shortcut::ShortcutCommand;
@@ -31,10 +30,10 @@ pub(super) async fn handle_command(
     let issue = event.issue().unwrap();
     // NOTE: if shortcuts available to issues are created, they need to be allowed here
     if !issue.is_pr() {
-        let msg = format!("The \"{:?}\" shortcut only works on pull requests.", input);
-        let cmnt = ErrorComment::new(&issue, msg);
-        cmnt.post(&ctx.github).await?;
-        return Ok(());
+        inform!(format!(
+            "The \"{:?}\" shortcut only works on pull requests.",
+            input
+        ));
     }
 
     let issue_labels = issue.labels();
