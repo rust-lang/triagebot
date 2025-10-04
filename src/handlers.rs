@@ -15,6 +15,37 @@ macro_rules! inform {
         anyhow::bail!(crate::handlers::UserError($err.into()))
     };
 }
+macro_rules! custom_handlers {
+    ($errors:ident -> $($name:ident: $hd:expr,)*) => {{
+        // Process the handlers concurrently
+        let results = futures::join!(
+            $(
+                async {
+                    async {
+                        $hd
+                    }
+                    .await
+                    .map_err(|e: anyhow::Error| {
+                        HandlerError::Other(e.context(format!(
+                            "error when processing {} handler",
+                            stringify!($name)
+                        )))
+                    })
+                }
+            ),*
+        );
+
+        // Destructure the results into named variables
+        let ($($name,)*) = results;
+
+        // Push errors for each handler
+        $(
+            if let Err(e) = $name {
+                $errors.push(e);
+            }
+        )*
+    }}
+}
 
 mod assign;
 mod autolabel;
@@ -78,132 +109,57 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         handle_command(ctx, event, &config, body, &mut errors).await;
     }
 
-    if let Ok(config) = &config {
-        if let Err(e) = check_commits::handle(ctx, host, event, &config).await {
-            log::error!(
-                "failed to process event {:?} with `check_commits` handler: {:?}",
-                event,
-                e
-            );
-        }
-    }
-
-    if let Err(e) = project_goals::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with `project_goals` handler: {:?}",
-            event,
-            e
-        );
-    }
-
-    if let Err(e) = notification::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with notification handler: {:?}",
-            event,
-            e
-        );
-    }
-
-    if let Err(e) = rustc_commits::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with rustc_commits handler: {:?}",
-            event,
-            e
-        );
-    }
-
-    if let Err(e) = milestone_prs::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with milestone_prs handler: {:?}",
-            event,
-            e
-        );
-    }
-
-    if let Some(rendered_link_config) = config.as_ref().ok().and_then(|c| c.rendered_link.as_ref())
-    {
-        if let Err(e) = rendered_link::handle(ctx, event, rendered_link_config).await {
-            log::error!(
-                "failed to process event {:?} with rendered_link handler: {:?}",
-                event,
-                e
-            );
-        }
-    }
-
-    if let Err(e) = relnotes::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with relnotes handler: {:?}",
-            event,
-            e
-        );
-    }
-
-    if config.as_ref().is_ok_and(|c| c.bot_pull_requests.is_some()) {
-        if let Err(e) = bot_pull_requests::handle(ctx, event).await {
-            log::error!(
-                "failed to process event {:?} with bot_pull_requests handler: {:?}",
-                event,
-                e
-            )
-        }
-    }
-
-    if let Some(config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.review_submitted.as_ref())
-    {
-        if let Err(e) = review_submitted::handle(ctx, event, config).await {
-            log::error!(
-                "failed to process event {:?} with review_submitted handler: {:?}",
-                event,
-                e
-            )
-        }
-    }
-
-    if let Some(config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.review_changes_since.as_ref())
-    {
-        if let Err(e) = review_changes_since::handle(ctx, host, event, config).await {
-            log::error!(
-                "failed to process event {:?} with review_changes_since handler: {:?}",
-                event,
-                e
-            )
-        }
-    }
-
-    if let Some(ghr_config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.github_releases.as_ref())
-    {
-        if let Err(e) = github_releases::handle(ctx, event, ghr_config).await {
-            log::error!(
-                "failed to process event {:?} with github_releases handler: {:?}",
-                event,
-                e
-            );
-        }
-    }
-
-    if let Some(conflict_config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.merge_conflicts.as_ref())
-    {
-        if let Err(e) = merge_conflicts::handle(ctx, event, conflict_config).await {
-            log::error!(
-                "failed to process event {:?} with merge_conflicts handler: {:?}",
-                event,
-                e
-            );
-        }
-    }
+    // custom handlers (prefer issue_handlers! for issue event handler)
+    custom_handlers! { errors ->
+        project_goals: project_goals::handle(ctx, event).await,
+        notification: notification::handle(ctx, event).await,
+        rustc_commits: rustc_commits::handle(ctx, event).await,
+        milestone_prs: milestone_prs::handle(ctx, event).await,
+        relnotes: relnotes::handle(ctx, event).await,
+        check_commits: {
+            if let Ok(config) = &config {
+                check_commits::handle(ctx, host, event, &config).await?;
+            }
+            Ok(())
+        },
+        rendered_link: {
+            if let Some(rendered_link_config) = config.as_ref().ok().and_then(|c| c.rendered_link.as_ref())
+            {
+                rendered_link::handle(ctx, event, rendered_link_config).await?
+            }
+            Ok(())
+        },
+        bot_pull_requests: {
+            if config.as_ref().is_ok_and(|c| c.bot_pull_requests.is_some()) {
+                bot_pull_requests::handle(ctx, event).await?;
+            }
+            Ok(())
+        },
+        review_submitted: {
+            if let Some(config) = config.as_ref().ok().and_then(|c| c.review_submitted.as_ref()) {
+                review_submitted::handle(ctx, event, config).await?;
+            }
+            Ok(())
+        },
+        review_changes_since: {
+            if let Some(config) = config.as_ref().ok().and_then(|c| c.review_changes_since.as_ref()) {
+                review_changes_since::handle(ctx, host, event, config).await?;
+            }
+            Ok(())
+        },
+        github_releases: {
+            if let Some(ghr_config) = config.as_ref().ok().and_then(|c| c.github_releases.as_ref()) {
+                github_releases::handle(ctx, event, ghr_config).await?;
+            }
+            Ok(())
+        },
+        merge_conflicts: {
+            if let Some(conflict_config) = config.as_ref().ok().and_then(|c| c.merge_conflicts.as_ref()) {
+                merge_conflicts::handle(ctx, event, conflict_config).await?;
+            }
+            Ok(())
+        },
+    };
 
     errors
 }
