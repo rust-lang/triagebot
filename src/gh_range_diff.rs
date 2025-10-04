@@ -210,8 +210,10 @@ fn process_old_new(
     // Create the HTML buffer with a very rough approximation for the capacity
     let mut html: String = String::with_capacity(800 + old.files.len() * 100);
 
-    // Compute the bookmarklet for the current host
-    let bookmarklet = bookmarklet(&host);
+    let a_oldbase = a_github_commit(owner, repo, oldbase);
+    let a_oldhead = a_github_commit(owner, repo, oldhead);
+    let a_newbase = a_github_commit(owner, repo, newbase);
+    let a_newhead = a_github_commit(owner, repo, newhead);
 
     // Write HTML header, style, ...
     writeln!(
@@ -222,7 +224,7 @@ fn process_old_new(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" sizes="32x32" type="image/png" href="https://rust-lang.org/static/images/favicon-32x32.png">
-    <title>range-diff of {oldbase}...{oldhead} {newbase}...{newhead}</title>
+    <title>range-diff of {oldbase}..{oldhead} {newbase}..{newhead}</title>
     <style>
     body {{
       font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
@@ -234,6 +236,10 @@ fn process_old_new(
       font-weight: 800;
       overflow-wrap: break-word;
       white-space: normal;
+    }}
+    .commit {{
+      text-decoration: none;
+      color: unset;
     }}
     .diff-content {{
       overflow-x: auto;
@@ -322,7 +328,7 @@ fn process_old_new(
     </style>
 </head>
 <body>
-<h3>range-diff of {oldbase}<wbr>...{oldhead} {newbase}<wbr>...{newhead}</h3>
+<h3>range-diff of {a_oldbase}..{a_oldhead} {a_newbase}..{a_newhead} in {owner}/{repo}</h3>
 <p>Legend: {REMOVED_BLOCK_SIGN}&nbsp;before | {ADDED_BLOCK_SIGN}&nbsp;after</p>
 "#
     )?;
@@ -618,4 +624,11 @@ impl<'a> imara_diff::TokenSource for SplitWordBoundaries<'a> {
         // https://www.wyliecomm.com/2021/11/whats-the-best-length-of-a-word-online/
         (self.0.len() as f32 / 4.7f32) as u32
     }
+}
+
+fn a_github_commit(owner: &str, repo: &str, ref_: &str) -> String {
+    format!(
+        r#"<a href="https://github.com/{owner}/{repo}/commit/{ref_}" class="commit">{}</a>"#,
+        &ref_[..=6]
+    )
 }
