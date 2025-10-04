@@ -256,7 +256,7 @@ fn process_old_new(
       color: rgb(220, 0, 0)
     }}
     .line-added-after {{
-      color: rgb(0, 73, 0)
+      color: rgb(0, 221, 0)
     }}
     .line-removed-before {{
       color: rgb(192, 78, 76)
