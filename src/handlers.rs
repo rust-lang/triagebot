@@ -10,22 +10,14 @@ use std::fmt;
 use std::sync::Arc;
 use tracing as log;
 
-#[derive(Debug)]
-pub enum HandlerError {
-    Message(String),
-    Other(anyhow::Error),
+macro_rules! inform {
+    ($err:expr $(,)?) => {
+        anyhow::bail!(crate::handlers::UserError($err.into()))
+    };
 }
 
-impl std::error::Error for HandlerError {}
-
-impl fmt::Display for HandlerError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            HandlerError::Message(msg) => write!(f, "{}", msg),
-            HandlerError::Other(_) => write!(f, "An internal error occurred."),
-        }
-    }
-}
+#[macro_use]
+mod macros;
 
 mod assign;
 mod autolabel;
@@ -61,201 +53,17 @@ mod shortcut;
 mod transfer;
 pub mod types_planning_updates;
 
-pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerError> {
-    let config = config::get(&ctx.github, event.repo()).await;
-    if let Err(e) = &config {
-        log::warn!("configuration error {}: {e}", event.repo().full_name);
-    }
-    let mut errors = Vec::new();
-
-    if let (Ok(config), Event::Issue(event)) = (config.as_ref(), event) {
-        handle_issue(ctx, event, config, &mut errors).await;
-    }
-
-    if let Some(body) = event.comment_body() {
-        handle_command(ctx, event, &config, body, &mut errors).await;
-    }
-
-    if let Ok(config) = &config {
-        if let Err(e) = check_commits::handle(ctx, host, event, &config).await {
-            log::error!(
-                "failed to process event {:?} with `check_commits` handler: {:?}",
-                event,
-                e
-            );
-        }
-    }
-
-    if let Err(e) = project_goals::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with `project_goals` handler: {:?}",
-            event,
-            e
-        );
-    }
-
-    if let Err(e) = notification::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with notification handler: {:?}",
-            event,
-            e
-        );
-    }
-
-    if let Err(e) = rustc_commits::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with rustc_commits handler: {:?}",
-            event,
-            e
-        );
-    }
-
-    if let Err(e) = milestone_prs::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with milestone_prs handler: {:?}",
-            event,
-            e
-        );
-    }
-
-    if let Some(rendered_link_config) = config.as_ref().ok().and_then(|c| c.rendered_link.as_ref())
-    {
-        if let Err(e) = rendered_link::handle(ctx, event, rendered_link_config).await {
-            log::error!(
-                "failed to process event {:?} with rendered_link handler: {:?}",
-                event,
-                e
-            );
-        }
-    }
-
-    if let Err(e) = relnotes::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with relnotes handler: {:?}",
-            event,
-            e
-        );
-    }
-
-    if config.as_ref().is_ok_and(|c| c.bot_pull_requests.is_some()) {
-        if let Err(e) = bot_pull_requests::handle(ctx, event).await {
-            log::error!(
-                "failed to process event {:?} with bot_pull_requests handler: {:?}",
-                event,
-                e
-            )
-        }
-    }
-
-    if let Some(config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.review_submitted.as_ref())
-    {
-        if let Err(e) = review_submitted::handle(ctx, event, config).await {
-            log::error!(
-                "failed to process event {:?} with review_submitted handler: {:?}",
-                event,
-                e
-            )
-        }
-    }
-
-    if let Some(config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.review_changes_since.as_ref())
-    {
-        if let Err(e) = review_changes_since::handle(ctx, host, event, config).await {
-            log::error!(
-                "failed to process event {:?} with review_changes_since handler: {:?}",
-                event,
-                e
-            )
-        }
-    }
-
-    if let Some(ghr_config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.github_releases.as_ref())
-    {
-        if let Err(e) = github_releases::handle(ctx, event, ghr_config).await {
-            log::error!(
-                "failed to process event {:?} with github_releases handler: {:?}",
-                event,
-                e
-            );
-        }
-    }
-
-    if let Some(conflict_config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.merge_conflicts.as_ref())
-    {
-        if let Err(e) = merge_conflicts::handle(ctx, event, conflict_config).await {
-            log::error!(
-                "failed to process event {:?} with merge_conflicts handler: {:?}",
-                event,
-                e
-            );
-        }
-    }
-
-    errors
-}
-
-macro_rules! issue_handlers {
-    ($($name:ident,)*) => {
-        async fn handle_issue(
-            ctx: &Context,
-            event: &IssuesEvent,
-            config: &Arc<Config>,
-            errors: &mut Vec<HandlerError>,
-        ) {
-            // Process the issue handlers concurrently
-            let results = futures::join!(
-                $(
-                    async {
-                        match $name::parse_input(ctx, event, config.$name.as_ref()).await {
-                            Err(err) => Err(HandlerError::Message(err)),
-                            Ok(Some(input)) => {
-                                if let Some(config) = &config.$name {
-                                    $name::handle_input(ctx, config, event, input)
-                                        .await
-                                        .map_err(|e| {
-                                            HandlerError::Other(e.context(format!(
-                                                "error when processing {} handler",
-                                                stringify!($name)
-                                            )))
-                                        })
-                                } else {
-                                    Err(HandlerError::Message(format!(
-                                        "The feature `{}` is not enabled in this repository.\n\
-                                        To enable it add its section in the `triagebot.toml` \
-                                        in the root of the repository.",
-                                        stringify!($name)
-                                    )))
-                                }
-                            }
-                            Ok(None) => Ok(())
-                        }
-                    }
-                ),*
-            );
-
-            // Destructure the results into named variables
-            let ($($name,)*) = results;
-
-            // Push errors for each handler
-            $(
-                if let Err(e) = $name {
-                    errors.push(e);
-                }
-            )*
-        }
-    }
+pub struct Context {
+    pub github: GithubClient,
+    pub zulip: ZulipClient,
+    pub team: TeamClient,
+    pub db: crate::db::ClientPool,
+    pub username: String,
+    pub octocrab: Octocrab,
+    /// Represents the workqueue (assigned open PRs) of individual reviewers.
+    /// tokio's RwLock is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
+    pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
+    pub gha_logs: Arc<tokio::sync::RwLock<GitHubActionLogsCache>>,
 }
 
 // Handle events that happened on issues
@@ -272,129 +80,6 @@ issue_handlers! {
     notify_zulip,
     review_requested,
     pr_tracking,
-}
-
-macro_rules! command_handlers {
-    ($($name:ident: $enum:ident,)*) => {
-        async fn handle_command(
-            ctx: &Context,
-            event: &Event,
-            config: &Result<Arc<Config>, ConfigurationError>,
-            body: &str,
-            errors: &mut Vec<HandlerError>,
-        ) {
-            match event {
-                // always handle new PRs / issues
-                Event::Issue(IssuesEvent { action: IssuesAction::Opened, .. }) => {},
-                Event::Issue(IssuesEvent { action: IssuesAction::Edited, .. }) => {
-                    // if the issue was edited, but we don't get a `changes[body]` diff, it means only the title was edited, not the body.
-                    // don't process the same commands twice.
-                    if event.comment_from().is_none() {
-                        log::debug!("skipping title-only edit event");
-                        return;
-                    }
-                },
-                Event::Issue(e) => {
-                    // no change in issue's body for these events, so skip
-                    log::debug!("skipping event, issue was {:?}", e.action);
-                    return;
-                }
-                Event::IssueComment(e) => {
-                    match e.action {
-                        IssueCommentAction::Created => {}
-                        IssueCommentAction::Edited => {
-                            if event.comment_from().is_none() {
-                                // We are not entirely sure why this happens.
-                                // Sometimes when someone posts a PR review,
-                                // GitHub sends an "edited" event with no
-                                // changes just before the "created" event.
-                                log::debug!("skipping issue comment edit without changes");
-                                return;
-                            }
-                        }
-                        IssueCommentAction::Deleted => {
-                            // don't execute commands again when comment is deleted
-                            log::debug!("skipping event, comment was {:?}", e.action);
-                            return;
-                        }
-                    }
-                }
-                Event::Push(_) | Event::Create(_) => {
-                    log::debug!("skipping unsupported event");
-                    return;
-                }
-            }
-
-            let input = Input::new(&body, vec![&ctx.username, "triagebot"]);
-            let commands = if let Some(previous) = event.comment_from() {
-                let prev_commands = Input::new(&previous, vec![&ctx.username, "triagebot"]).collect::<Vec<_>>();
-                input.filter(|cmd| !prev_commands.contains(cmd)).collect::<Vec<_>>()
-            } else {
-                input.collect()
-            };
-
-            log::info!("Comment parsed to {:?}", commands);
-
-            if commands.is_empty() {
-                return;
-            }
-
-            let config = match config {
-                Ok(config) => config,
-                Err(e @ ConfigurationError::Missing) => {
-                    // r? is conventionally used to mean "hey, can you review"
-                    // even if the repo doesn't have a triagebot.toml. In that
-                    // case, just ignore it.
-                    if commands
-                        .iter()
-                        .all(|cmd| matches!(cmd, Command::Assign(Ok(AssignCommand::RequestReview { .. }))))
-                    {
-                        return;
-                    }
-                    return errors.push(HandlerError::Message(e.to_string()));
-                }
-                Err(e @ ConfigurationError::Toml(_)) => {
-                    return errors.push(HandlerError::Message(e.to_string()));
-                }
-                Err(e @ ConfigurationError::Http(_)) => {
-                    return errors.push(HandlerError::Other(e.clone().into()));
-                }
-            };
-
-            for command in commands {
-                match command {
-                    $(
-                    Command::$enum(Ok(command)) => {
-                        if let Some(config) = &config.$name {
-                            $name::handle_command(ctx, config, event, command)
-                                .await
-                                .unwrap_or_else(|err| {
-                                    errors.push(HandlerError::Other(err.context(format!(
-                                        "error when processing {} command handler",
-                                        stringify!($name)
-                                    ))))
-                                });
-                        } else {
-                            errors.push(HandlerError::Message(format!(
-                                "The feature `{}` is not enabled in this repository.\n\
-                                To enable it add its section in the `triagebot.toml` \
-                                in the root of the repository.",
-                                stringify!($name)
-                            )));
-                        }
-                    }
-                    Command::$enum(Err(err)) => {
-                        errors.push(HandlerError::Message(format!(
-                            "Parsing {} command in [comment]({}) failed: {}",
-                            stringify!($name),
-                            event.html_url().expect("has html url"),
-                            err
-                        )));
-                    })*
-                }
-            }
-        }
-    }
 }
 
 // Handle commands in comments/issues body
@@ -416,15 +101,100 @@ command_handlers! {
     transfer: Transfer,
 }
 
-pub struct Context {
-    pub github: GithubClient,
-    pub zulip: ZulipClient,
-    pub team: TeamClient,
-    pub db: crate::db::ClientPool,
-    pub username: String,
-    pub octocrab: Octocrab,
-    /// Represents the workqueue (assigned open PRs) of individual reviewers.
-    /// tokio's RwLock is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
-    pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
-    pub gha_logs: Arc<tokio::sync::RwLock<GitHubActionLogsCache>>,
+pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerError> {
+    let config = config::get(&ctx.github, event.repo()).await;
+    if let Err(e) = &config {
+        log::warn!("configuration error {}: {e}", event.repo().full_name);
+    }
+    let mut errors = Vec::new();
+
+    if let (Ok(config), Event::Issue(event)) = (config.as_ref(), event) {
+        handle_issue(ctx, event, config, &mut errors).await;
+    }
+
+    if let Some(body) = event.comment_body() {
+        handle_command(ctx, event, &config, body, &mut errors).await;
+    }
+
+    // custom handlers (prefer issue_handlers! for issue event handler)
+    custom_handlers! { errors ->
+        project_goals: project_goals::handle(ctx, event).await,
+        notification: notification::handle(ctx, event).await,
+        rustc_commits: rustc_commits::handle(ctx, event).await,
+        milestone_prs: milestone_prs::handle(ctx, event).await,
+        relnotes: relnotes::handle(ctx, event).await,
+        check_commits: {
+            if let Ok(config) = &config {
+                check_commits::handle(ctx, host, event, &config).await?;
+            }
+            Ok(())
+        },
+        rendered_link: {
+            if let Some(rendered_link_config) = config.as_ref().ok().and_then(|c| c.rendered_link.as_ref())
+            {
+                rendered_link::handle(ctx, event, rendered_link_config).await?
+            }
+            Ok(())
+        },
+        bot_pull_requests: {
+            if config.as_ref().is_ok_and(|c| c.bot_pull_requests.is_some()) {
+                bot_pull_requests::handle(ctx, event).await?;
+            }
+            Ok(())
+        },
+        review_submitted: {
+            if let Some(config) = config.as_ref().ok().and_then(|c| c.review_submitted.as_ref()) {
+                review_submitted::handle(ctx, event, config).await?;
+            }
+            Ok(())
+        },
+        review_changes_since: {
+            if let Some(config) = config.as_ref().ok().and_then(|c| c.review_changes_since.as_ref()) {
+                review_changes_since::handle(ctx, host, event, config).await?;
+            }
+            Ok(())
+        },
+        github_releases: {
+            if let Some(ghr_config) = config.as_ref().ok().and_then(|c| c.github_releases.as_ref()) {
+                github_releases::handle(ctx, event, ghr_config).await?;
+            }
+            Ok(())
+        },
+        merge_conflicts: {
+            if let Some(conflict_config) = config.as_ref().ok().and_then(|c| c.merge_conflicts.as_ref()) {
+                merge_conflicts::handle(ctx, event, conflict_config).await?;
+            }
+            Ok(())
+        },
+    };
+
+    errors
+}
+
+#[derive(Debug)]
+pub enum HandlerError {
+    Message(String),
+    Other(anyhow::Error),
+}
+
+impl std::error::Error for HandlerError {}
+
+impl fmt::Display for HandlerError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            HandlerError::Message(msg) => write!(f, "{}", msg),
+            HandlerError::Other(_) => write!(f, "An internal error occurred."),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct UserError(String);
+
+impl std::error::Error for UserError {}
+
+impl fmt::Display for UserError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.0)
+    }
 }
