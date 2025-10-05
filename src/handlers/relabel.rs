@@ -17,7 +17,6 @@ use crate::{
     github::UnknownLabels,
     github::{self, Event},
     handlers::Context,
-    interactions::ErrorComment,
 };
 use parser::command::relabel::{LabelDelta, RelabelCommand};
 
@@ -28,7 +27,7 @@ pub(super) async fn handle_command(
     input: RelabelCommand,
 ) -> anyhow::Result<()> {
     let Some(issue) = event.issue() else {
-        anyhow::bail!("event is not an issue");
+        return user_error!("Can only add and remove labels on an issue");
     };
 
     // Check label authorization for the current user
@@ -47,10 +46,9 @@ pub(super) async fn handle_command(
             )),
             Err(err) => Some(err),
         };
-        if let Some(msg) = err {
-            let cmnt = ErrorComment::new(issue, msg);
-            cmnt.post(&ctx.github).await?;
-            return Ok(());
+        if let Some(err) = err {
+            // bail-out and inform the user why
+            return user_error!(err);
         }
     }
 

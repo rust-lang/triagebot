@@ -10,21 +10,16 @@ use std::fmt;
 use std::sync::Arc;
 use tracing as log;
 
-#[derive(Debug)]
-pub enum HandlerError {
-    Message(String),
-    Other(anyhow::Error),
-}
-
-impl std::error::Error for HandlerError {}
-
-impl fmt::Display for HandlerError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            HandlerError::Message(msg) => write!(f, "{}", msg),
-            HandlerError::Other(_) => write!(f, "An internal error occurred."),
-        }
-    }
+/// Creates a [`UserError`] with message.
+///
+/// Should be used when an handler is in error due to the user action's (not a PR,
+/// not a issue, not authorized, ...).
+///
+/// Should be used like this `return user_error!("My error message.");`.
+macro_rules! user_error {
+    ($err:expr $(,)?) => {
+        anyhow::Result::Err(anyhow::anyhow!(crate::handlers::UserError($err.into())))
+    };
 }
 
 mod assign;
@@ -60,6 +55,19 @@ pub mod rustc_commits;
 mod shortcut;
 mod transfer;
 pub mod types_planning_updates;
+
+pub struct Context {
+    pub github: GithubClient,
+    pub zulip: ZulipClient,
+    pub team: TeamClient,
+    pub db: crate::db::ClientPool,
+    pub username: String,
+    pub octocrab: Octocrab,
+    /// Represents the workqueue (assigned open PRs) of individual reviewers.
+    /// tokio's RwLock is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
+    pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
+    pub gha_logs: Arc<tokio::sync::RwLock<GitHubActionLogsCache>>,
+}
 
 pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo()).await;
@@ -368,11 +376,15 @@ macro_rules! command_handlers {
                         if let Some(config) = &config.$name {
                             $name::handle_command(ctx, config, event, command)
                                 .await
-                                .unwrap_or_else(|err| {
-                                    errors.push(HandlerError::Other(err.context(format!(
-                                        "error when processing {} command handler",
-                                        stringify!($name)
-                                    ))))
+                                .unwrap_or_else(|mut err| {
+                                    if let Some(err) = err.downcast_mut::<UserError>() {
+                                        errors.push(HandlerError::Message(std::mem::take(&mut err.0)));
+                                    } else {
+                                        errors.push(HandlerError::Other(err.context(format!(
+                                            "error when processing {} command handler",
+                                            stringify!($name)
+                                        ))));
+                                    }
                                 });
                         } else {
                             errors.push(HandlerError::Message(format!(
@@ -416,15 +428,33 @@ command_handlers! {
     transfer: Transfer,
 }
 
-pub struct Context {
-    pub github: GithubClient,
-    pub zulip: ZulipClient,
-    pub team: TeamClient,
-    pub db: crate::db::ClientPool,
-    pub username: String,
-    pub octocrab: Octocrab,
-    /// Represents the workqueue (assigned open PRs) of individual reviewers.
-    /// tokio's RwLock is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
-    pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
-    pub gha_logs: Arc<tokio::sync::RwLock<GitHubActionLogsCache>>,
+#[derive(Debug)]
+pub enum HandlerError {
+    Message(String),
+    Other(anyhow::Error),
+}
+
+impl std::error::Error for HandlerError {}
+
+impl fmt::Display for HandlerError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            HandlerError::Message(msg) => write!(f, "{}", msg),
+            HandlerError::Other(_) => write!(f, "An internal error occurred."),
+        }
+    }
+}
+
+/// Represent a user error.
+///
+/// The message will be shown to the user via comment posted by this bot.
+#[derive(Debug)]
+pub struct UserError(String);
+
+impl std::error::Error for UserError {}
+
+impl fmt::Display for UserError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.0)
+    }
 }
