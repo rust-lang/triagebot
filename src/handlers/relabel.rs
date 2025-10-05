@@ -27,7 +27,7 @@ pub(super) async fn handle_command(
     input: RelabelCommand,
 ) -> anyhow::Result<()> {
     let Some(issue) = event.issue() else {
-        inform!("Can only add and remove labels on an issue");
+        return user_error!("Can only add and remove labels on an issue");
     };
 
     // Check label authorization for the current user
@@ -48,7 +48,7 @@ pub(super) async fn handle_command(
         };
         if let Some(err) = err {
             // bail-out and inform the user why
-            inform!(err);
+            return user_error!(err);
         }
     }
 

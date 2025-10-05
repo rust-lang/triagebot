@@ -37,7 +37,7 @@ pub(super) async fn handle_command(
     cmd: ConcernCommand,
 ) -> anyhow::Result<()> {
     let Event::IssueComment(issue_comment) = event else {
-        inform!("Concerns can only be issued on an issue");
+        return user_error!("Concerns can only be issued on an issue");
     };
     let Some(comment_url) = event.html_url() else {
         bail!("unable to retrieve the comment url")
@@ -81,7 +81,7 @@ pub(super) async fn handle_command(
             issue.number,
             issue_comment.comment.user,
         );
-        inform!(
+        return user_error!(
             "Only team members in the [team repo](https://github.com/rust-lang/team) can add or resolve concerns."
         );
     }

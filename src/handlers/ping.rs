@@ -24,13 +24,13 @@ pub(super) async fn handle_command(
     };
 
     if !is_team_member {
-        inform!("Only Rust team members can ping teams.");
+        return user_error!("Only Rust team members can ping teams.");
     }
 
     let (gh_team, config) = match config.get_by_name(&team_name.team) {
         Some(v) => v,
         None => {
-            inform!(format!(
+            return user_error!(format!(
                 "This team (`{}`) cannot be pinged via this command; \
                     it may need to be added to `triagebot.toml` on the default branch.",
                 team_name.team,
@@ -41,7 +41,7 @@ pub(super) async fn handle_command(
     let team = match team {
         Some(team) => team,
         None => {
-            inform!(format!(
+            return user_error!(format!(
                 "This team (`{}`) does not exist in the team repository.",
                 team_name.team,
             ));
@@ -60,7 +60,7 @@ pub(super) async fn handle_command(
             )
             .await
         {
-            inform!(format!("Error adding team label (`{}`): {:?}.", label, err));
+            return user_error!(format!("Error adding team label (`{}`): {:?}.", label, err));
         }
     }
 

@@ -10,9 +10,15 @@ use std::fmt;
 use std::sync::Arc;
 use tracing as log;
 
-macro_rules! inform {
+/// Creates a [`UserError`] with message.
+///
+/// Should be used when an handler is in error due to the user action's (not a PR,
+/// not a issue, not authorized, ...).
+///
+/// Should be used like this `return user_error!("My error message.");`.
+macro_rules! user_error {
     ($err:expr $(,)?) => {
-        anyhow::bail!(crate::handlers::UserError($err.into()))
+        anyhow::Result::Err(anyhow::anyhow!(crate::handlers::UserError($err.into())))
     };
 }
 
@@ -439,6 +445,9 @@ impl fmt::Display for HandlerError {
     }
 }
 
+/// Represent a user error.
+///
+/// The message will be shown to the user via comment posted by this bot.
 #[derive(Debug)]
 pub struct UserError(String);
 

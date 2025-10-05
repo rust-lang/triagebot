@@ -16,7 +16,7 @@ pub(super) async fn handle_command(
         .await
         .unwrap_or(false);
     if !is_team_member {
-        inform!("Only team members can close issues.");
+        return user_error!("Only team members can close issues.");
     }
     issue.close(&ctx.github).await?;
     Ok(())

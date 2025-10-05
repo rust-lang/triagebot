@@ -112,7 +112,7 @@ pub(super) async fn handle_input(
         .iter()
         .any(|l| l.name == config.enabling_label)
     {
-        inform!(format!(
+        return user_error!(format!(
             "This issue is not ready for proposals; it lacks the `{}` label.",
             config.enabling_label
         ));
@@ -247,7 +247,7 @@ pub(super) async fn handle_command(
         .iter()
         .any(|l| l.name == config.enabling_label)
     {
-        inform!(format!(
+        return user_error!(format!(
             "This issue cannot be seconded; it lacks the `{}` label.",
             config.enabling_label
         ));
@@ -261,7 +261,7 @@ pub(super) async fn handle_command(
         .unwrap_or(false);
 
     if !is_team_member {
-        inform!("Only team members can second issues.");
+        return user_error!("Only team members can second issues.");
     }
 
     let has_concerns = if let Some(concerns_label) = &config.concerns_label {

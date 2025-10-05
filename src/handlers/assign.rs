@@ -525,7 +525,7 @@ pub(super) async fn handle_command(
     let issue = event.issue().unwrap();
     if issue.is_pr() {
         if !issue.is_open() {
-            inform!("Assignment is not allowed on a closed PR.");
+            return user_error!("Assignment is not allowed on a closed PR.");
         }
         if matches!(
             event,
@@ -609,7 +609,7 @@ pub(super) async fn handle_command(
             AssignCommand::Claim => event.user().login.clone(),
             AssignCommand::AssignUser { username } => {
                 if !is_team_member && username != event.user().login {
-                    inform!("Only Rust team members can assign other users");
+                    return user_error!("Only Rust team members can assign other users");
                 }
                 username.clone()
             }
@@ -624,7 +624,7 @@ pub(super) async fn handle_command(
                         e.apply(&ctx.github, String::new()).await?;
                         return Ok(());
                     } else {
-                        inform!("Cannot release another user's assignment");
+                        return user_error!("Cannot release another user's assignment");
                     }
                 } else {
                     let current = &event.user().login;
@@ -636,11 +636,13 @@ pub(super) async fn handle_command(
                         e.apply(&ctx.github, String::new()).await?;
                         return Ok(());
                     } else {
-                        inform!("Cannot release unassigned issue");
+                        return user_error!("Cannot release unassigned issue");
                     }
                 };
             }
-            AssignCommand::RequestReview { .. } => inform!("r? is only allowed on PRs."),
+            AssignCommand::RequestReview { .. } => {
+                return user_error!("r? is only allowed on PRs.");
+            }
         };
         // Don't re-assign if aleady assigned, e.g. on comment edit
         if issue.contain_assignee(&to_assign) {
