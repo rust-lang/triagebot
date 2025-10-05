@@ -8,7 +8,6 @@ use axum::{
     http::HeaderValue,
     response::IntoResponse,
 };
-use axum_extra::extract::Host;
 use hyper::header::CACHE_CONTROL;
 use hyper::{
     HeaderMap, StatusCode,
@@ -34,7 +33,6 @@ static MARKER_RE: LazyLock<Regex> =
 pub async fn gh_range_diff(
     Path((owner, repo, basehead)): Path<(String, String, String)>,
     State(ctx): State<Arc<Context>>,
-    host: Host,
 ) -> axum::response::Result<impl IntoResponse, AppError> {
     let Some((oldhead, newhead)) = basehead.split_once("..") else {
         return Ok((
@@ -122,7 +120,6 @@ pub async fn gh_range_diff(
     let ((oldbase, old), (newbase, new)) = futures::try_join!(old, new)?;
 
     process_old_new(
-        host,
         (&owner, &repo),
         (&oldbase, oldhead, old),
         (&newbase, newhead, new),
@@ -136,7 +133,6 @@ pub async fn gh_range_diff(
 pub async fn gh_ranges_diff(
     Path((owner, repo, oldbasehead, newbasehead)): Path<(String, String, String, String)>,
     State(ctx): State<Arc<Context>>,
-    host: Host,
 ) -> axum::response::Result<impl IntoResponse, AppError> {
     let Some((oldbase, oldhead)) = oldbasehead.split_once("..") else {
         return Ok((
@@ -191,7 +187,6 @@ pub async fn gh_ranges_diff(
     let (old, new) = futures::try_join!(old, new)?;
 
     process_old_new(
-        host,
         (&owner, &repo),
         (&oldbase, oldhead, old),
         (&newbase, newhead, new),
@@ -199,7 +194,6 @@ pub async fn gh_ranges_diff(
 }
 
 fn process_old_new(
-    Host(host): Host,
     (owner, repo): (&str, &str),
     (oldbase, oldhead, mut old): (&str, &str, GithubCompare),
     (newbase, newhead, mut new): (&str, &str, GithubCompare),
@@ -216,8 +210,10 @@ fn process_old_new(
     // Create the HTML buffer with a very rough approximation for the capacity
     let mut html: String = String::with_capacity(800 + old.files.len() * 100);
 
-    // Compute the bookmarklet for the current host
-    let bookmarklet = bookmarklet(&host);
+    let a_oldbase = a_github_commit(owner, repo, oldbase);
+    let a_oldhead = a_github_commit(owner, repo, oldhead);
+    let a_newbase = a_github_commit(owner, repo, newbase);
+    let a_newhead = a_github_commit(owner, repo, newhead);
 
     // Write HTML header, style, ...
     writeln!(
@@ -228,7 +224,7 @@ fn process_old_new(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" sizes="32x32" type="image/png" href="https://rust-lang.org/static/images/favicon-32x32.png">
-    <title>range-diff of {oldbase}...{oldhead} {newbase}...{newhead}</title>
+    <title>range-diff of {oldbase}..{oldhead} {newbase}..{newhead}</title>
     <style>
     body {{
       font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
@@ -240,6 +236,10 @@ fn process_old_new(
       font-weight: 800;
       overflow-wrap: break-word;
       white-space: normal;
+    }}
+    .commit {{
+      text-decoration: none;
+      color: unset;
     }}
     .diff-content {{
       overflow-x: auto;
@@ -256,7 +256,7 @@ fn process_old_new(
       color: rgb(220, 0, 0)
     }}
     .line-added-after {{
-      color: rgb(0, 73, 0)
+      color: rgb(0, 221, 0)
     }}
     .line-removed-before {{
       color: rgb(192, 78, 76)
@@ -328,8 +328,8 @@ fn process_old_new(
     </style>
 </head>
 <body>
-<h3>range-diff of {oldbase}<wbr>...{oldhead} {newbase}<wbr>...{newhead}</h3>
-<p>Bookmarklet: <a href="{bookmarklet}" title="Drag-and-drop me on the bookmarks bar, and use me on GitHub compare page.">range-diff</a> <span title="This javascript bookmark can be used to access this page with the right URL. To use it drag-on-drop the range-diff link to your bookmarks bar and click on it when you are on GitHub's compare page to use range-diff compare.">&#128712;</span> | {REMOVED_BLOCK_SIGN}&nbsp;before | {ADDED_BLOCK_SIGN}&nbsp;after</p>
+<h3>range-diff of {a_oldbase}..{a_oldhead} {a_newbase}..{a_newhead} in {owner}/{repo}</h3>
+<p>Legend: {REMOVED_BLOCK_SIGN}&nbsp;before | {ADDED_BLOCK_SIGN}&nbsp;after</p>
 "#
     )?;
 
@@ -609,24 +609,6 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
     }
 }
 
-// Create the javascript bookmarklet based on the host
-fn bookmarklet(host: &str) -> String {
-    let protocol = if host.starts_with("localhost:") {
-        "http"
-    } else {
-        "https"
-    };
-
-    format!(
-        r"javascript:(() => {{
-    const githubUrlPattern = /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/compare\/([^\/]+[.]{{2}}[^\/]+)$/;
-    const match = window.location.href.match(githubUrlPattern);
-    if (!match) {{alert('Invalid GitHub Compare URL format.\nExpected: https://github.com/ORG_NAME/REPO_NAME/compare/BASESHA..HEADSHA'); return;}}
-    const [, orgName, repoName, basehead] = match; window.location = `{protocol}://{host}/gh-range-diff/${{orgName}}/${{repoName}}/${{basehead}}`;
-}})();"
-    )
-}
-
 // Simple abstraction over `unicode_segmentation::split_word_bounds` for `imara_diff::TokenSource`
 struct SplitWordBoundaries<'a>(&'a str);
 
@@ -642,4 +624,11 @@ impl<'a> imara_diff::TokenSource for SplitWordBoundaries<'a> {
         // https://www.wyliecomm.com/2021/11/whats-the-best-length-of-a-word-online/
         (self.0.len() as f32 / 4.7f32) as u32
     }
+}
+
+fn a_github_commit(owner: &str, repo: &str, ref_: &str) -> String {
+    format!(
+        r#"<a href="https://github.com/{owner}/{repo}/commit/{ref_}" class="commit">{}</a>"#,
+        &ref_[..=6]
+    )
 }
