@@ -241,7 +241,7 @@ pub fn prioritization<'a>() -> Box<dyn Action> {
                         kind: QueryKind::List,
                         query: Arc::new(github::Query {
                             filters: vec![("state", "open")],
-                            include_labels: vec!["S-waiting-on-compiler"],
+                            include_labels: vec!["S-waiting-on-t-compiler"],
                             exclude_labels: vec![],
                         }),
                     },
@@ -558,7 +558,7 @@ pub fn lang<'a>() -> Box<dyn Action + Send + Sync> {
                         kind: QueryKind::List,
                         query: Arc::new(github::Query {
                             filters: vec![("state", "open")],
-                            include_labels: vec!["S-waiting-on-lang"],
+                            include_labels: vec!["S-waiting-on-t-lang"],
                             exclude_labels: vec![],
                         }),
                     },

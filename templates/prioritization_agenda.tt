@@ -51,9 +51,9 @@ note_id: xxx
 {{-issues::render(issues=beta_nominated_t_types, backport_branch=":beta:", empty="No beta nominations for `T-types` this time.")}}
 {{-issues::render(issues=stable_nominated_t_types, backport_branch=":stable:", empty="No stable nominations for `T-types` this time.")}}
 
-## PRs S-waiting-on-compiler
+## PRs S-waiting-on-t-compiler
 
-[T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+label%3AS-waiting-on-compiler)
+[T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+label%3AS-waiting-on-t-compiler)
 {{-issues::render(issues=prs_waiting_on_team_t_compiler, empty="No PRs waiting on `T-compiler` this time.")}}
 - [Issues in progress or waiting on other teams](https://hackmd.io/XYr1BrOWSiqCrl8RCWXRaQ)
 
