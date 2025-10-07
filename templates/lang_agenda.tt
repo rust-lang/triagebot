@@ -46,7 +46,7 @@ Edit the schedule here: https://github.com/orgs/rust-lang/projects/31/views/7.
 
 {{-issues_heading::render(issues=rfcs_waiting_to_be_merged)}}
 
-## `S-waiting-on-team`
+## `S-waiting-on-t-lang`
 
 {{-issues_heading::render(issues=waiting_on_lang_team)}}
 
