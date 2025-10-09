@@ -84,130 +84,168 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         handle_command(ctx, event, &config, body, &mut errors).await;
     }
 
-    if let Ok(config) = &config {
-        if let Err(e) = check_commits::handle(ctx, host, event, &config).await {
-            log::error!(
-                "failed to process event {:?} with `check_commits` handler: {:?}",
-                event,
-                e
-            );
+    let check_commits = async {
+        if let Ok(check_commits_config) = &config {
+            check_commits::handle(ctx, host, event, check_commits_config)
+                .await
+                .map_err(|e| HandlerError::Other(e.context("check_commits handler failed")))
+        } else {
+            Ok(())
         }
-    }
+    };
 
-    if let Err(e) = project_goals::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with `project_goals` handler: {:?}",
-            event,
-            e
-        );
-    }
+    let project_goals = async {
+        project_goals::handle(ctx, event)
+            .await
+            .map_err(|e| HandlerError::Other(e.context("project_goals handler failed")))
+    };
 
-    if let Err(e) = notification::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with notification handler: {:?}",
-            event,
-            e
-        );
-    }
+    let notification = async {
+        notification::handle(ctx, event)
+            .await
+            .map_err(|e| HandlerError::Other(e.context("notification handler failed")))
+    };
 
-    if let Err(e) = rustc_commits::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with rustc_commits handler: {:?}",
-            event,
-            e
-        );
-    }
+    let rustc_commits = async {
+        rustc_commits::handle(ctx, event)
+            .await
+            .map_err(|e| HandlerError::Other(e.context("rustc_commits handler failed")))
+    };
 
-    if let Err(e) = milestone_prs::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with milestone_prs handler: {:?}",
-            event,
-            e
-        );
-    }
+    let milestone_prs = async {
+        milestone_prs::handle(ctx, event)
+            .await
+            .map_err(|e| HandlerError::Other(e.context("milestone_prs handler failed")))
+    };
 
-    if let Some(rendered_link_config) = config.as_ref().ok().and_then(|c| c.rendered_link.as_ref())
-    {
-        if let Err(e) = rendered_link::handle(ctx, event, rendered_link_config).await {
-            log::error!(
-                "failed to process event {:?} with rendered_link handler: {:?}",
-                event,
-                e
-            );
+    let rendered_link = async {
+        if let Some(rendered_link_config) =
+            config.as_ref().ok().and_then(|c| c.rendered_link.as_ref())
+        {
+            rendered_link::handle(ctx, event, rendered_link_config)
+                .await
+                .map_err(|e| HandlerError::Other(e.context("rendered_link handler failed")))
+        } else {
+            Ok(())
         }
-    }
+    };
 
-    if let Err(e) = relnotes::handle(ctx, event).await {
-        log::error!(
-            "failed to process event {:?} with relnotes handler: {:?}",
-            event,
-            e
-        );
-    }
+    let relnotes = async {
+        relnotes::handle(ctx, event)
+            .await
+            .map_err(|e| HandlerError::Other(e.context("relnotes handler failed")))
+    };
 
-    if config.as_ref().is_ok_and(|c| c.bot_pull_requests.is_some()) {
-        if let Err(e) = bot_pull_requests::handle(ctx, event).await {
-            log::error!(
-                "failed to process event {:?} with bot_pull_requests handler: {:?}",
-                event,
-                e
-            )
+    let bot_pull_requests = async {
+        if config.as_ref().is_ok_and(|c| c.bot_pull_requests.is_some()) {
+            bot_pull_requests::handle(ctx, event)
+                .await
+                .map_err(|e| HandlerError::Other(e.context("bot_pull_requests handler failed")))
+        } else {
+            Ok(())
         }
-    }
+    };
 
-    if let Some(config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.review_submitted.as_ref())
-    {
-        if let Err(e) = review_submitted::handle(ctx, event, config).await {
-            log::error!(
-                "failed to process event {:?} with review_submitted handler: {:?}",
-                event,
-                e
-            )
+    let review_submitted = async {
+        if let Some(review_submitted_config) = config
+            .as_ref()
+            .ok()
+            .and_then(|c| c.review_submitted.as_ref())
+        {
+            review_submitted::handle(ctx, event, review_submitted_config)
+                .await
+                .map_err(|e| HandlerError::Other(e.context("review_submitted handler failed")))
+        } else {
+            Ok(())
         }
-    }
+    };
 
-    if let Some(config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.review_changes_since.as_ref())
-    {
-        if let Err(e) = review_changes_since::handle(ctx, host, event, config).await {
-            log::error!(
-                "failed to process event {:?} with review_changes_since handler: {:?}",
-                event,
-                e
-            )
+    let review_changes_since = async {
+        if let Some(review_changes_since_config) = config
+            .as_ref()
+            .ok()
+            .and_then(|c| c.review_changes_since.as_ref())
+        {
+            review_changes_since::handle(ctx, host, event, review_changes_since_config)
+                .await
+                .map_err(|e| HandlerError::Other(e.context("review_changes_since handler failed")))
+        } else {
+            Ok(())
         }
-    }
+    };
 
-    if let Some(ghr_config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.github_releases.as_ref())
-    {
-        if let Err(e) = github_releases::handle(ctx, event, ghr_config).await {
-            log::error!(
-                "failed to process event {:?} with github_releases handler: {:?}",
-                event,
-                e
-            );
+    let github_releases = async {
+        if let Some(github_releases_config) = config
+            .as_ref()
+            .ok()
+            .and_then(|c| c.github_releases.as_ref())
+        {
+            github_releases::handle(ctx, event, github_releases_config)
+                .await
+                .map_err(|e| HandlerError::Other(e.context("github_releases handler failed")))
+        } else {
+            Ok(())
         }
-    }
+    };
 
-    if let Some(conflict_config) = config
-        .as_ref()
-        .ok()
-        .and_then(|c| c.merge_conflicts.as_ref())
-    {
-        if let Err(e) = merge_conflicts::handle(ctx, event, conflict_config).await {
-            log::error!(
-                "failed to process event {:?} with merge_conflicts handler: {:?}",
-                event,
-                e
-            );
+    let merge_conflicts = async {
+        if let Some(merge_conflicts_config) = config
+            .as_ref()
+            .ok()
+            .and_then(|c| c.merge_conflicts.as_ref())
+        {
+            merge_conflicts::handle(ctx, event, merge_conflicts_config)
+                .await
+                .map_err(|e| HandlerError::Other(e.context("merge_conflicts handler failed")))
+        } else {
+            Ok(())
+        }
+    };
+
+    let (
+        check_commits,
+        project_goals,
+        notification,
+        rustc_commits,
+        milestone_prs,
+        rendered_link,
+        relnotes,
+        bot_pull_requests,
+        review_submitted,
+        review_changes_since,
+        github_releases,
+        merge_conflicts,
+    ) = futures::join!(
+        check_commits,
+        project_goals,
+        notification,
+        rustc_commits,
+        milestone_prs,
+        rendered_link,
+        relnotes,
+        bot_pull_requests,
+        review_submitted,
+        review_changes_since,
+        github_releases,
+        merge_conflicts,
+    );
+
+    for result in [
+        check_commits,
+        project_goals,
+        notification,
+        rustc_commits,
+        milestone_prs,
+        rendered_link,
+        relnotes,
+        bot_pull_requests,
+        review_submitted,
+        review_changes_since,
+        github_releases,
+        merge_conflicts,
+    ] {
+        if let Err(e) = result {
+            errors.push(e);
         }
     }
 
