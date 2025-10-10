@@ -338,6 +338,15 @@ body {{
             }});
         }}
 
+        // 8. Add a copy handler that force plain/text copy and removes the timestamps
+        //  from the copied selection.
+        const dateRegexWithSpace = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z )/gm;
+        document.addEventListener("copy", function(e) {{
+            var text = window.getSelection().toString().replace(dateRegexWithSpace, '');
+            e.clipboardData.setData('text/plain', text);
+            e.preventDefault();
+        }});
+
         }} catch (e) {{
            console.error(e);
            document.body.innerText = `Something went wrong: ${{e}}\n\n{REPORT_TO}`;
