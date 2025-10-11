@@ -96,7 +96,7 @@ impl fmt::Display for EventName {
 }
 
 pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::Result<T> {
-    let mut deserializer = serde_json::Deserializer::from_str(&v);
+    let mut deserializer = serde_json::Deserializer::from_str(v);
     let res: Result<T, _> = serde_path_to_error::deserialize(&mut deserializer);
     match res {
         Ok(r) => Ok(r),
@@ -148,8 +148,8 @@ pub async fn webhook(
     debug!("signature={signature}");
 
     // Check signature on body
-    if let Err(err) = check_payload_signed(&signature, &body) {
-        tracing::error!("check_payload_signed: {}", err);
+    if let Err(err) = check_payload_signed(signature, &body) {
+        tracing::error!("check_payload_signed: {err}");
         return (StatusCode::FORBIDDEN, "Wrong signature").into_response();
     }
 
@@ -163,7 +163,7 @@ pub async fn webhook(
         Ok(false) => ("ignored request",).into_response(),
         Err(err) => {
             tracing::error!("{err:?}");
-            let body = format!("request failed: {:?}", err);
+            let body = format!("request failed: {err:?}");
             (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
         }
     }
@@ -180,7 +180,7 @@ async fn process_payload(
             let mut payload = deserialize_payload::<PullRequestReviewEvent>(payload)
                 .context("failed to deserialize to PullRequestReviewEvent")?;
 
-            log::info!("handling pull request review comment {:?}", payload);
+            log::info!("handling pull request review comment {payload:?}");
             payload.pull_request.pull_request = Some(PullRequestDetails::new());
 
             // Treat pull request review comments exactly like pull request
@@ -198,12 +198,12 @@ async fn process_payload(
             })
         }
         EventName::PullRequestReviewComment => {
-            let mut payload = deserialize_payload::<PullRequestReviewComment>(&payload)
+            let mut payload = deserialize_payload::<PullRequestReviewComment>(payload)
                 .context("failed to deserialize to PullRequestReviewComment")?;
 
             payload.issue.pull_request = Some(PullRequestDetails::new());
 
-            log::info!("handling pull request review comment {:?}", payload);
+            log::info!("handling pull request review comment {payload:?}");
 
             // Treat pull request review comments exactly like pull request
             // review comments.
@@ -216,38 +216,38 @@ async fn process_payload(
             })
         }
         EventName::IssueComment => {
-            let payload = deserialize_payload::<IssueCommentEvent>(&payload)
+            let payload = deserialize_payload::<IssueCommentEvent>(payload)
                 .context("failed to deserialize IssueCommentEvent")?;
 
-            log::info!("handling issue comment {:?}", payload);
+            log::info!("handling issue comment {payload:?}");
 
             Event::IssueComment(payload)
         }
         EventName::Issue | EventName::PullRequest => {
-            let mut payload = deserialize_payload::<IssuesEvent>(&payload)
+            let mut payload = deserialize_payload::<IssuesEvent>(payload)
                 .context("failed to deserialize IssuesEvent")?;
 
             if matches!(event, EventName::PullRequest) {
                 payload.issue.pull_request = Some(PullRequestDetails::new());
             }
 
-            log::info!("handling issue event {:?}", payload);
+            log::info!("handling issue event {payload:?}");
 
             Event::Issue(payload)
         }
         EventName::Push => {
-            let payload = deserialize_payload::<PushEvent>(&payload)
+            let payload = deserialize_payload::<PushEvent>(payload)
                 .context("failed to deserialize to PushEvent")?;
 
-            log::info!("handling push event {:?}", payload);
+            log::info!("handling push event {payload:?}");
 
             Event::Push(payload)
         }
         EventName::Create => {
-            let payload = deserialize_payload::<CreateEvent>(&payload)
+            let payload = deserialize_payload::<CreateEvent>(payload)
                 .context("failed to deserialize to CreateEvent")?;
 
-            log::info!("handling create event {:?}", payload);
+            log::info!("handling create event {payload:?}");
 
             Event::Create(payload)
         }
@@ -256,7 +256,7 @@ async fn process_payload(
             return Ok(false);
         }
     };
-    let errors = crate::handlers::handle(&ctx, &host, &event).await;
+    let errors = crate::handlers::handle(ctx, host, &event).await;
     let mut other_error = false;
     let mut message = String::new();
     for err in errors {
@@ -268,7 +268,7 @@ async fn process_payload(
                 message.push_str(&msg);
             }
             HandlerError::Other(err) => {
-                log::error!("handling event failed: {:?}", err);
+                log::error!("handling event failed: {err:?}");
                 other_error = true;
             }
         }
@@ -302,10 +302,10 @@ pub fn check_payload_signed(signature: &str, payload: &[u8]) -> Result<(), Signe
     let signature = signature
         .strip_prefix("sha256=")
         .ok_or(SignedPayloadError)?;
-    let signature = match hex::decode(&signature) {
+    let signature = match hex::decode(signature) {
         Ok(e) => e,
         Err(e) => {
-            tracing::trace!("hex decode failed for {:?}: {:?}", signature, e);
+            tracing::trace!("hex decode failed for {signature:?}: {e:?}");
             return Err(SignedPayloadError);
         }
     };
@@ -316,6 +316,6 @@ pub fn check_payload_signed(signature: &str, payload: &[u8]) -> Result<(), Signe
             .as_bytes(),
     )
     .unwrap();
-    mac.update(&payload);
+    mac.update(payload);
     mac.verify_slice(&signature).map_err(|_| SignedPayloadError)
 }

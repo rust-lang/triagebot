@@ -16,9 +16,8 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&AutolabelConfig>,
 ) -> Result<Option<AutolabelInput>, String> {
-    let config = match config {
-        Some(config) => config,
-        None => return Ok(None),
+    let Some(config) = config else {
+        return Ok(None);
     };
 
     // On opening a new PR or sync'ing the branch, look at the diff and try to
@@ -47,9 +46,7 @@ pub(super) async fn parse_input(
                 .issue
                 .diff(&ctx.github)
                 .await
-                .map_err(|e| {
-                    log::error!("failed to fetch diff: {:?}", e);
-                })
+                .map_err(|e| log::error!("failed to fetch diff: {e:?}"))
                 .unwrap_or_default()
         } else {
             Default::default()
@@ -58,14 +55,14 @@ pub(super) async fn parse_input(
         let mut autolabels = Vec::new();
         let mut to_remove = Vec::new();
 
-        'outer: for (label, cfg) in config.labels.iter() {
+        'outer: for (label, cfg) in &config.labels {
             let exclude_patterns: Vec<glob::Pattern> = cfg
                 .exclude_labels
                 .iter()
                 .filter_map(|label| match glob::Pattern::new(label) {
                     Ok(exclude_glob) => Some(exclude_glob),
                     Err(error) => {
-                        log::error!("Invalid glob pattern: {}", error);
+                        log::error!("Invalid glob pattern: {error}");
                         None
                     }
                 })
@@ -111,6 +108,7 @@ pub(super) async fn parse_input(
                 let is_opened_as_draft = is_opened && event.issue.draft;
                 let is_converted_to_draft = event.action == IssuesAction::ConvertedToDraft;
 
+                #[expect(clippy::if_same_then_else, reason = "suggested code looks ugly")]
                 if cfg.new_pr && (is_opened_non_draft || is_ready_for_review) {
                     autolabels.push(Label {
                         name: label.to_owned(),
@@ -123,6 +121,7 @@ pub(super) async fn parse_input(
 
                 // If a PR is converted to draft or closed, remove all the "new PR" labels.
                 // Same for "new draft" labels when the PR is ready for review or closed.
+                #[expect(clippy::if_same_then_else, reason = "suggested code looks ugly")]
                 if cfg.new_pr
                     && matches!(
                         event.action,
@@ -142,12 +141,10 @@ pub(super) async fn parse_input(
                         name: label.to_owned(),
                     });
                 }
-            } else {
-                if cfg.new_issue && event.action == IssuesAction::Opened {
-                    autolabels.push(Label {
-                        name: label.to_owned(),
-                    });
-                }
+            } else if cfg.new_issue && event.action == IssuesAction::Opened {
+                autolabels.push(Label {
+                    name: label.to_owned(),
+                });
             }
         }
 
@@ -170,7 +167,7 @@ pub(super) async fn parse_input(
                 .filter_map(|label| match glob::Pattern::new(label) {
                     Ok(exclude_glob) => Some(exclude_glob),
                     Err(error) => {
-                        log::error!("Invalid glob pattern: {}", error);
+                        log::error!("Invalid glob pattern: {error}");
                         None
                     }
                 })

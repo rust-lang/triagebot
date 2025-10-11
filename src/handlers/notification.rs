@@ -14,20 +14,19 @@ use std::collections::HashSet;
 use tracing as log;
 
 pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
-    let body = match event.comment_body() {
-        Some(v) => v,
+    let Some(body) = event.comment_body() else {
         // Skip events that don't have comment bodies associated
-        None => return Ok(()),
+        return Ok(());
     };
 
-    if let Event::Issue(e) = event {
-        if !matches!(
+    if let Event::Issue(e) = event
+        && !matches!(
             e.action,
             github::IssuesAction::Opened | github::IssuesAction::Edited
-        ) {
-            // no change in issue's body for these events, so skip
-            return Ok(());
-        }
+        )
+    {
+        // no change in issue's body for these events, so skip
+        return Ok(());
     }
 
     let short_description = match event {
@@ -45,10 +44,10 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     if event.issue().unwrap().repository().organization == "serde-rs" {
         // Only add dtolnay on new issues/PRs, not on comments to old PRs and
         // issues.
-        if let Event::Issue(e) = event {
-            if e.action == github::IssuesAction::Opened {
-                caps.insert("dtolnay");
-            }
+        if let Event::Issue(e) = event
+            && e.action == github::IssuesAction::Opened
+        {
+            caps.insert("dtolnay");
         }
     }
 
@@ -56,12 +55,12 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     // comment, so they don't get notified again
     let mut users_notified = HashSet::new();
     if let Some(from) = event.comment_from() {
-        for login in parser::get_mentions(from).into_iter() {
+        for login in parser::get_mentions(from) {
             if let Some((users, _)) = id_from_user(ctx, login).await? {
                 users_notified.extend(users.into_iter().map(|user| user.id));
             }
         }
-    };
+    }
 
     // We've implicitly notified the user that is submitting the notification:
     // they already know that they left this comment.
@@ -70,18 +69,17 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     // via the Zulip interface.
     match ctx.team.get_gh_id_from_username(&event.user().login).await {
         Ok(Some(id)) => {
-            users_notified.insert(id.try_into().unwrap());
+            users_notified.insert(id);
         }
         Ok(None) => {}
         Err(err) => {
-            log::error!("Failed to query ID for {:?}: {:?}", event.user(), err);
+            log::error!("Failed to query ID for {:?}: {err:?}", event.user());
         }
     }
-    log::trace!("Captured usernames in comment: {:?}", caps);
+    log::trace!("Captured usernames in comment: {caps:?}");
     for login in caps {
-        let (users, team_name) = match id_from_user(ctx, login).await? {
-            Some((users, team_name)) => (users, team_name),
-            None => continue,
+        let Some((users, team_name)) = id_from_user(ctx, login).await? else {
+            continue;
         };
 
         let client = ctx.db.get().await;
@@ -95,7 +93,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                 .await
                 .context("failed to record username")
             {
-                log::error!("record username: {:?}", err);
+                log::error!("record username: {err:?}");
             }
 
             if let Err(err) = notifications::record_ping(
@@ -112,7 +110,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
             .await
             .context("failed to record ping")
             {
-                log::error!("record ping: {:?}", err);
+                log::error!("record ping: {err:?}");
             }
         }
     }
@@ -142,18 +140,14 @@ async fn id_from_user(
                 // error, but should be investigated). Otherwise it's probably not going to be in
                 // the team repository so isn't actually an error.
                 if login.starts_with("rust") {
-                    log::error!("team ping ({}) failed to resolve to a known team", login);
+                    log::error!("team ping ({login}) failed to resolve to a known team");
                 } else {
-                    log::info!("team ping ({}) failed to resolve to a known team", login);
+                    log::info!("team ping ({login}) failed to resolve to a known team");
                 }
                 return Ok(None);
             }
             Err(err) => {
-                log::error!(
-                    "team ping ({}) failed to resolve to a known team: {:?}",
-                    login,
-                    err
-                );
+                log::error!("team ping ({login}) failed to resolve to a known team: {err:?}",);
                 return Ok(None);
             }
         };
@@ -173,10 +167,10 @@ async fn id_from_user(
             .team
             .get_gh_id_from_username(login)
             .await
-            .with_context(|| format!("failed to get user {} ID", login))?;
+            .with_context(|| format!("failed to get user {login} ID"))?;
         let Some(id) = id else {
             // If the user was not in the team(s) then just don't record it.
-            log::trace!("Skipping {} because no id found", login);
+            log::trace!("Skipping {login} because no id found");
             return Ok(None);
         };
         Ok(Some((

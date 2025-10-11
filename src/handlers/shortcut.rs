@@ -31,8 +31,7 @@ pub(super) async fn handle_command(
     // NOTE: if shortcuts available to issues are created, they need to be allowed here
     if !issue.is_pr() {
         return user_error!(format!(
-            "The \"{:?}\" shortcut only works on pull requests.",
-            input
+            "The \"{input:?}\" shortcut only works on pull requests."
         ));
     }
 
@@ -84,7 +83,7 @@ pub(super) async fn handle_command(
         // Get the state of the author reminder for this PR
         let mut db = ctx.db.get().await;
         let mut state: IssueData<'_, AuthorReminderState> =
-            IssueData::load(&mut db, &issue, AUTHOR_REMINDER_KEY).await?;
+            IssueData::load(&mut db, issue, AUTHOR_REMINDER_KEY).await?;
 
         if state.data.reminder_comment.is_none() {
             let comment_body = format!(

@@ -12,7 +12,7 @@ pub fn pluralize(text: &str, count: usize) -> Cow<'_, str> {
     if count == 1 {
         text.into()
     } else {
-        format!("{}s", text).into()
+        format!("{text}s").into()
     }
 }
 

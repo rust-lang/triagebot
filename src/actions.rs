@@ -87,7 +87,7 @@ pub struct MCPDetails {
 pub static TEMPLATES: LazyLock<Tera> = LazyLock::new(|| match Tera::new("templates/*") {
     Ok(t) => t,
     Err(e) => {
-        println!("Parsing error(s): {}", e);
+        println!("Parsing error(s): {e}");
         ::std::process::exit(1);
     }
 });
@@ -98,12 +98,12 @@ pub fn to_human(d: DateTime<Utc>) -> String {
     if days > 60 {
         format!("{} months ago", days / 30)
     } else {
-        format!("about {} days ago", days)
+        format!("about {days} days ago")
     }
 }
 
 #[async_trait]
-impl<'a> Action for Step<'a> {
+impl Action for Step<'_> {
     async fn call(&self) -> anyhow::Result<String> {
         let mut gh = GithubClient::new_from_env();
         gh.set_retry_rate_limit(true);

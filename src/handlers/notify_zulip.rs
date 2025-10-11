@@ -34,9 +34,8 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&NotifyZulipConfig>,
 ) -> Result<Option<Vec<NotifyZulipInput>>, String> {
-    let config = match config {
-        Some(config) => config,
-        None => return Ok(None),
+    let Some(config) = config else {
+        return Ok(None);
     };
 
     match &event.action {
@@ -65,7 +64,7 @@ fn parse_label_change_input(
     let mut include_config_names: Vec<String> = vec![];
 
     for (name, label_config) in &config.subtables {
-        if has_all_required_labels(&event.issue, &label_config) {
+        if has_all_required_labels(&event.issue, label_config) {
             match event.action {
                 IssuesAction::Labeled { .. } if !label_config.messages_on_add.is_empty() => {
                     include_config_names.push(name.to_string());
@@ -113,11 +112,11 @@ fn parse_open_close_reopen_input(
                 .get(&label.name)
                 .map(|config| (label, config))
         })
-        .flat_map(|(label, config)| {
+        .filter_map(|(label, config)| {
             let mut include_config_names: Vec<String> = vec![];
 
             for (name, label_config) in &config.subtables {
-                if has_all_required_labels(&event.issue, &label_config) {
+                if has_all_required_labels(&event.issue, label_config) {
                     match event.action {
                         IssuesAction::Opened if !label_config.messages_on_add.is_empty() => {
                             include_config_names.push(name.to_string());
@@ -165,7 +164,7 @@ fn has_all_required_labels(issue: &Issue, config: &NotifyZulipLabelConfig) -> bo
         let pattern = match glob::Pattern::new(req_label) {
             Ok(pattern) => pattern,
             Err(err) => {
-                log::error!("Invalid glob pattern: {}", err);
+                log::error!("Invalid glob pattern: {err}");
                 continue;
             }
         };
@@ -177,7 +176,7 @@ fn has_all_required_labels(issue: &Issue, config: &NotifyZulipLabelConfig) -> bo
     true
 }
 
-pub(super) async fn handle_input<'a>(
+pub(super) async fn handle_input(
     ctx: &Context,
     config: &NotifyZulipConfig,
     event: &IssuesEvent,
@@ -225,7 +224,7 @@ pub(super) async fn handle_input<'a>(
                 let msg = msg.replace("{number}", &event.issue.number.to_string());
                 let msg = msg.replace("{title}", &event.issue.title);
                 let msg = replace_team_to_be_nominated(&event.issue.labels, msg);
-                let msg = msg.replace("{recipients}", &get_zulip_ids(ctx, &recipients).await);
+                let msg = msg.replace("{recipients}", &get_zulip_ids(ctx, recipients).await);
 
                 let req = crate::zulip::MessageApiRequest {
                     recipient,
@@ -235,7 +234,7 @@ pub(super) async fn handle_input<'a>(
                 .await;
 
                 if let Err(err) = req {
-                    log::error!("Failed to send notification to Zulip {}", err);
+                    log::error!("Failed to send notification to Zulip {err}");
                 }
             }
         }
@@ -294,7 +293,7 @@ fn replace_team_to_be_nominated(labels: &[Label], msg: String) -> String {
 #[test]
 fn test_notification() {
     let mut msg = replace_team_to_be_nominated(&[], "Needs `I-{team}-nominated`?".to_string());
-    assert!(msg.contains("Needs `I-{team}-nominated`?"), "{}", msg);
+    assert!(msg.contains("Needs `I-{team}-nominated`?"), "{msg}");
 
     msg = replace_team_to_be_nominated(
         &[Label {
@@ -302,7 +301,7 @@ fn test_notification() {
         }],
         "Needs `I-{team}-nominated`?".to_string(),
     );
-    assert!(msg.contains("I-cooks-nominated"), "{}", msg);
+    assert!(msg.contains("I-cooks-nominated"), "{msg}");
 
     msg = replace_team_to_be_nominated(
         &[
@@ -318,7 +317,7 @@ fn test_notification() {
         ],
         "Needs `I-{team}-nominated`?".to_string(),
     );
-    assert!(msg.contains("I-compiler-nominated"), "{}", msg);
+    assert!(msg.contains("I-compiler-nominated"), "{msg}");
 
     msg = replace_team_to_be_nominated(
         &[
@@ -331,5 +330,5 @@ fn test_notification() {
         ],
         "Needs `I-{team}-nominated`?".to_string(),
     );
-    assert!(msg.contains("Needs `I-{team}-nominated`?"), "{}", msg);
+    assert!(msg.contains("Needs `I-{team}-nominated`?"), "{msg}");
 }

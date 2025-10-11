@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::sync::Arc;
 
 use anyhow::Context as _;
@@ -39,7 +40,7 @@ pub async fn notifications(
     out.push_str("</head>");
     out.push_str("<body>");
 
-    out.push_str(&format!("<h3>Pending notifications for {}</h3>", user));
+    _ = write!(out, "<h3>Pending notifications for {user}</h3>");
 
     if notifications.is_empty() {
         out.push_str("<p><em>You have no pending notifications! :)</em></p>");
@@ -47,7 +48,8 @@ pub async fn notifications(
         out.push_str("<ol>");
         for notification in notifications {
             out.push_str("<li>");
-            out.push_str(&format!(
+            _ = write!(
+                out,
                 "<a href='{}'>{}</a>",
                 notification.origin_url,
                 notification
@@ -59,9 +61,10 @@ pub async fn notifications(
                     .replace('>', "&gt;")
                     .replace('"', "&quot;")
                     .replace('\'', "&#39;"),
-            ));
+            );
             if let Some(metadata) = &notification.metadata {
-                out.push_str(&format!(
+                _ = write!(
+                    out,
                     "<ul><li>{}</li></ul>",
                     metadata
                         .replace('&', "&amp;")
@@ -69,7 +72,7 @@ pub async fn notifications(
                         .replace('>', "&gt;")
                         .replace('"', "&quot;")
                         .replace('\'', "&#39;"),
-                ));
+                );
             }
             out.push_str("</li>");
         }

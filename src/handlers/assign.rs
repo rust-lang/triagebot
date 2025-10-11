@@ -137,7 +137,7 @@ pub(super) async fn handle_input(
     // Don't auto-assign or welcome if the user manually set the assignee when opening.
     if event.issue.assignees.is_empty() {
         let (assignee, from_comment) =
-            determine_assignee(ctx, assign_command, event, config, &diff).await?;
+            determine_assignee(ctx, assign_command, event, config, diff).await?;
         if assignee.as_ref().map(|r| r.name.as_str()) == Some(GHOST_ACCOUNT) {
             // "ghost" is GitHub's placeholder account for deleted accounts.
             // It is used here as a convenient way to prevent assignment. This
@@ -146,7 +146,10 @@ pub(super) async fn handle_input(
             return Ok(());
         }
         let welcome = if let Some(custom_messages) = &config.custom_messages {
-            if !from_comment {
+            if from_comment {
+                // No welcome is posted if they used `r?` in the opening body.
+                None
+            } else {
                 let mut welcome = match &assignee {
                     Some(assignee) => custom_messages
                         .auto_assign_someone
@@ -157,19 +160,15 @@ pub(super) async fn handle_input(
 
                 if let Some(ref mut welcome) = welcome
                     && let Some(contrib) = &config.contributing_url
-                {
-                    if matches!(
+                    && matches!(
                         event.issue.author_association,
                         AuthorAssociation::FirstTimer | AuthorAssociation::FirstTimeContributor
-                    ) {
-                        welcome.push_str("\n\n");
-                        welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
-                    }
+                    )
+                {
+                    welcome.push_str("\n\n");
+                    welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
                 }
                 welcome
-            } else {
-                // No welcome is posted if they used `r?` in the opening body.
-                None
             }
         } else if matches!(
             event.issue.author_association,
@@ -208,16 +207,16 @@ pub(super) async fn handle_input(
             None
         };
         if let Some(assignee) = assignee {
-            set_assignee(&ctx, &event.issue, &ctx.github, &assignee).await?;
+            set_assignee(ctx, &event.issue, &ctx.github, &assignee).await?;
         }
 
-        if let Some(welcome) = welcome {
-            if let Err(e) = event.issue.post_comment(&ctx.github, &welcome).await {
-                log::warn!(
-                    "failed to post welcome comment to {}: {e}",
-                    event.issue.global_id()
-                );
-            }
+        if let Some(welcome) = welcome
+            && let Err(e) = event.issue.post_comment(&ctx.github, &welcome).await
+        {
+            log::warn!(
+                "failed to post welcome comment to {}: {e}",
+                event.issue.global_id()
+            );
         }
     }
 
@@ -248,7 +247,7 @@ async fn set_assignee(
 ) -> anyhow::Result<()> {
     let mut db = ctx.db.get().await;
     let mut state: IssueData<'_, Reviewers> =
-        IssueData::load(&mut db, &issue, PREVIOUS_REVIEWERS_KEY).await?;
+        IssueData::load(&mut db, issue, PREVIOUS_REVIEWERS_KEY).await?;
 
     // Don't re-assign if already assigned, e.g. on comment edit
     if issue.contain_assignee(&reviewer.name) {
@@ -261,10 +260,9 @@ async fn set_assignee(
     }
     if let Err(err) = issue.set_assignee(github, &reviewer.name).await {
         log::warn!(
-            "failed to set assignee of PR {} to {}: {:?}",
+            "failed to set assignee of PR {} to {}: {err:?}",
             issue.global_id(),
             reviewer.name,
-            err
         );
         if let Err(e) = issue
             .post_comment(
@@ -298,11 +296,11 @@ They may take a while to respond."
                 )),
                 _ => None,
             };
-            if let Some(warning) = warning {
-                if let Err(err) = issue.post_comment(&ctx.github, &warning).await {
-                    // This is a best-effort warning, do not do anything apart from logging if it fails
-                    log::warn!("failed to post reviewer warning comment: {err}");
-                }
+            if let Some(warning) = warning
+                && let Err(err) = issue.post_comment(&ctx.github, &warning).await
+            {
+                // This is a best-effort warning, do not do anything apart from logging if it fails
+                log::warn!("failed to post reviewer warning comment: {err}");
             }
         }
     }
@@ -336,7 +334,7 @@ async fn determine_assignee(
         match find_reviewer_from_names(
             &mut db_client,
             ctx.workqueue.clone(),
-            &teams,
+            teams,
             config,
             &event.issue,
             &event.issue.user.login,
@@ -360,7 +358,7 @@ async fn determine_assignee(
             match find_reviewer_from_names(
                 &mut db_client,
                 ctx.workqueue.clone(),
-                &teams,
+                teams,
                 config,
                 &event.issue,
                 &event.issue.user.login,
@@ -375,13 +373,13 @@ async fn determine_assignee(
                     event.issue.global_id()
                 ),
                 Err(
-                    e @ FindReviewerError::NoReviewer { .. }
-                    | e @ FindReviewerError::ReviewerIsPrAuthor { .. }
-                    | e @ FindReviewerError::ReviewerAlreadyAssigned { .. }
-                    | e @ FindReviewerError::ReviewerPreviouslyAssigned { .. }
-                    | e @ FindReviewerError::ReviewerOffRotation { .. }
-                    | e @ FindReviewerError::DatabaseError(_)
-                    | e @ FindReviewerError::ReviewerAtMaxCapacity { .. },
+                    e @ (FindReviewerError::NoReviewer { .. }
+                    | FindReviewerError::ReviewerIsPrAuthor { .. }
+                    | FindReviewerError::ReviewerAlreadyAssigned { .. }
+                    | FindReviewerError::ReviewerPreviouslyAssigned { .. }
+                    | FindReviewerError::ReviewerOffRotation { .. }
+                    | FindReviewerError::DatabaseError(_)
+                    | FindReviewerError::ReviewerAtMaxCapacity { .. }),
                 ) => log::trace!(
                     "no reviewer could be determined for PR {}: {e}",
                     event.issue.global_id()
@@ -402,7 +400,7 @@ async fn determine_assignee(
         match find_reviewer_from_names(
             &mut db_client,
             ctx.workqueue.clone(),
-            &teams,
+            teams,
             config,
             &event.issue,
             &event.issue.user.login,
@@ -493,7 +491,7 @@ fn find_reviewers_from_diff(
         .map(|(path, _)| path);
     let mut potential: Vec<_> = max_paths
         .flat_map(|owner_path| &config.owners[*owner_path])
-        .map(|owner| owner.to_string())
+        .cloned()
         .collect();
     // Dedupe. This isn't strictly necessary, as `find_reviewer_from_names` will deduplicate.
     // However, this helps with testing.
@@ -509,11 +507,7 @@ pub(super) async fn handle_command(
     event: &Event,
     cmd: AssignCommand,
 ) -> anyhow::Result<()> {
-    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.team).await {
-        false
-    } else {
-        true
-    };
+    let is_team_member = matches!(event.user().is_team_member(&ctx.team).await, Ok(true));
 
     // Don't handle commands in comments from the bot. Some of the comments it
     // posts contain commands to instruct the user, not things that the bot
@@ -554,14 +548,14 @@ pub(super) async fn handle_command(
             }
             AssignCommand::RequestReview { name } => {
                 // Determine if assignee is a team. If yes, add the corresponding GH label.
-                if let Some(team_name) = get_team_name(&teams, &issue, &name) {
+                if let Some(team_name) = get_team_name(&teams, issue, &name) {
                     let t_label = format!("T-{team_name}");
                     if let Err(err) = issue
                         .add_labels(&ctx.github, vec![github::Label { name: t_label }])
                         .await
                     {
                         if let Some(github::UnknownLabels { .. }) = err.downcast_ref() {
-                            log::warn!("Error assigning label: {}", err);
+                            log::warn!("Error assigning label: {err}");
                         } else {
                             return Err(err);
                         }
@@ -602,7 +596,7 @@ pub(super) async fn handle_command(
     } else {
         let mut client = ctx.db.get().await;
         let mut e: EditIssueBody<'_, AssignData> =
-            EditIssueBody::load(&mut client, &issue, "ASSIGN").await?;
+            EditIssueBody::load(&mut client, issue, "ASSIGN").await?;
         let d = e.data_mut();
 
         let to_assign = match cmd {
@@ -630,7 +624,7 @@ pub(super) async fn handle_command(
                     let current = &event.user().login;
                     if issue.contain_assignee(current) {
                         issue
-                            .remove_assignees(&ctx.github, Selection::One(&current))
+                            .remove_assignees(&ctx.github, Selection::One(current))
                             .await?;
                         *d = AssignData { user: None };
                         e.apply(&ctx.github, String::new()).await?;
@@ -647,9 +641,8 @@ pub(super) async fn handle_command(
         // Don't re-assign if aleady assigned, e.g. on comment edit
         if issue.contain_assignee(&to_assign) {
             log::trace!(
-                "ignoring assign issue {} to {}, already assigned",
-                issue.global_id(),
-                to_assign,
+                "ignoring assign issue {issue} to {to_assign}, already assigned",
+                issue = issue.global_id(),
             );
             return Ok(());
         }
@@ -668,8 +661,7 @@ pub(super) async fn handle_command(
                     .await
                     .context("self-assignment failed")?;
                 let cmt_body = format!(
-                    "This issue has been assigned to @{} via [this comment]({}).",
-                    to_assign,
+                    "This issue has been assigned to @{to_assign} via [this comment]({}).",
                     event.html_url().unwrap()
                 );
                 e.apply(&ctx.github, cmt_body).await?;
@@ -685,7 +677,7 @@ fn strip_organization_prefix<'a>(issue: &Issue, name: &'a str) -> &'a str {
     let repo = issue.repository();
     // @ is optional, so it is trimmed separately
     // both @rust-lang/compiler and rust-lang/compiler should work
-    name.trim_start_matches("@")
+    name.trim_start_matches('@')
         .trim_start_matches(&format!("{}/", repo.organization))
 }
 
@@ -709,7 +701,7 @@ enum FindReviewerError {
     NoReviewer { initial: Vec<String> },
     /// Requested reviewer is off the review rotation (e.g. on a vacation).
     /// Either the username is in [users_on_vacation] in `triagebot.toml` or the user has
-    /// configured [RotationMode::OffRotation] in their reviewer preferences.
+    /// configured [`RotationMode::OffRotation`] in their reviewer preferences.
     ReviewerOffRotation { username: String },
     /// Requested reviewer is PR author
     ReviewerIsPrAuthor { username: String },
@@ -807,10 +799,10 @@ async fn find_reviewer_from_names(
     names: &[String],
 ) -> Result<ReviewerSelection, FindReviewerError> {
     // Fast path for self-assign, which is always allowed.
-    if let [name] = names {
-        if is_self_assign(&name, requested_by) {
-            return Ok(ReviewerSelection::from_name(name.clone()));
-        }
+    if let [name] = names
+        && is_self_assign(name, requested_by)
+    {
+        return Ok(ReviewerSelection::from_name(name.clone()));
     }
 
     let candidates =
@@ -900,8 +892,7 @@ fn expand_teams_and_groups(
     // Loop over names to recursively expand them.
     while let Some(candidate) = to_be_expanded.pop() {
         let name_to_expand = match &candidate {
-            Candidate::Direct(name) => name,
-            Candidate::Expanded(name) => name,
+            Candidate::Direct(name) | Candidate::Expanded(name) => name,
         };
 
         // `name_to_expand` could be a team name, an adhoc group name or a username.
@@ -994,7 +985,7 @@ async fn candidate_reviewers_from_names<'a>(
         let candidate = &reviewer_candidate.name;
         let name_lower = candidate.to_lowercase();
         let is_pr_author = name_lower == issue.user.login.to_lowercase();
-        let is_on_vacation = config.is_on_vacation(&candidate);
+        let is_on_vacation = config.is_on_vacation(candidate);
         let is_already_assigned = issue
             .assignees
             .iter()
@@ -1043,7 +1034,7 @@ async fn candidate_reviewers_from_names<'a>(
             .iter()
             .filter_map(|res| res.as_ref().ok().map(|s| s.name.to_string()))
             .collect();
-        let usernames: Vec<&str> = usernames.iter().map(|s| s.as_str()).collect();
+        let usernames: Vec<&str> = usernames.iter().map(String::as_str).collect();
         let review_prefs = get_review_prefs_batch(db, &usernames)
             .await
             .context("cannot fetch review preferences")
@@ -1079,7 +1070,7 @@ async fn candidate_reviewers_from_names<'a>(
                     });
                 }
 
-                return Ok(candidate);
+                Ok(candidate)
             })
             .collect();
     }
@@ -1138,7 +1129,7 @@ async fn candidate_reviewers_from_names<'a>(
 
 async fn get_previous_reviewer_names(db: &mut DbClient, issue: &Issue) -> HashSet<String> {
     let state: IssueData<'_, Reviewers> =
-        match IssueData::load(db, &issue, PREVIOUS_REVIEWERS_KEY).await {
+        match IssueData::load(db, issue, PREVIOUS_REVIEWERS_KEY).await {
             Ok(state) => state,
             Err(_) => return HashSet::new(),
         };

@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use anyhow::Context as _;
 use anyhow::bail;
+use itertools::Itertools;
 
 use super::Context;
 use crate::interactions::ErrorComment;
@@ -123,6 +124,10 @@ pub(super) async fn handle(
         warnings.extend(issue_links::issue_links_in_commits(issue_links, &commits));
     }
 
+    #[expect(
+        clippy::collapsible_if,
+        reason = "we always check for `config` in the outer `if`"
+    )]
     if let Some(no_merges) = &config.no_merges {
         if let Some(warn) =
             no_merges::merges_in_commits(&event.issue.title, &event.repository, no_merges, &commits)
@@ -138,8 +143,7 @@ pub(super) async fn handle(
             .days_threshold
             .unwrap_or(behind_upstream::DEFAULT_DAYS_THRESHOLD);
 
-        if let Some(warning) =
-            behind_upstream::behind_upstream(age_threshold, event, &compare).await
+        if let Some(warning) = behind_upstream::behind_upstream(age_threshold, event, compare).await
         {
             warnings.push(warning);
         }
@@ -148,12 +152,12 @@ pub(super) async fn handle(
     // Check if this is a force-push with rebase and if it is emit comment
     // with link to our range-diff viewer.
     if let Some(range_diff) = &config.range_diff {
-        force_push_range_diff::handle_event(ctx, host, range_diff, &event, &compare).await?;
+        force_push_range_diff::handle_event(ctx, host, range_diff, event, compare).await?;
     }
 
     // Check if the `triagebot.toml` config is valid
     errors.extend(
-        validate_config::validate_config(ctx, &event, diff)
+        validate_config::validate_config(ctx, event, diff)
             .await
             .context("validating the the triagebot config")?,
     );
@@ -282,21 +286,17 @@ async fn handle_new_state(
 
 // Format the warnings for user consumption on Github
 fn warning_from_warnings(warnings: &[String]) -> String {
-    let warnings: Vec<_> = warnings
+    let warnings = warnings
         .iter()
-        .map(|warning| warning.trim().replace("\n", "\n    "))
-        .map(|warning| format!("* {warning}"))
-        .collect();
-    format!(":warning: **Warning** :warning:\n\n{}", warnings.join("\n"))
+        .map(|warning| warning.trim().replace('\n', "\n    "))
+        .format_with("\n", |warning, f| f(&format_args!("* {warning}")));
+    format!(":warning: **Warning** :warning:\n\n{warnings}")
 }
 
 // Calculate the label changes
-fn calculate_label_changes(
-    previous: &Vec<String>,
-    current: &Vec<String>,
-) -> (Vec<String>, Vec<String>) {
-    let previous_set: HashSet<String> = previous.into_iter().cloned().collect();
-    let current_set: HashSet<String> = current.into_iter().cloned().collect();
+fn calculate_label_changes(previous: &[String], current: &[String]) -> (Vec<String>, Vec<String>) {
+    let previous_set: HashSet<String> = previous.iter().cloned().collect();
+    let current_set: HashSet<String> = current.iter().cloned().collect();
 
     let removals = previous_set.difference(&current_set).cloned().collect();
     let additions = current_set.difference(&previous_set).cloned().collect();
@@ -306,11 +306,11 @@ fn calculate_label_changes(
 
 // Calculate the error changes
 fn calculate_error_changes(
-    previous: &Vec<(String, String)>,
-    current: &Vec<String>,
+    previous: &[(String, String)],
+    current: &[String],
 ) -> (Vec<(String, String)>, Vec<String>) {
-    let previous_set: HashSet<(String, String)> = previous.into_iter().cloned().collect();
-    let current_set: HashSet<String> = current.into_iter().cloned().collect();
+    let previous_set: HashSet<(String, String)> = previous.iter().cloned().collect();
+    let current_set: HashSet<String> = current.iter().cloned().collect();
 
     let removals = previous_set
         .iter()

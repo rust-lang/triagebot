@@ -30,14 +30,11 @@ pub async fn pulls(
         .per_page(100)
         .send()
         .await;
-    let mut page = match res {
-        Ok(page) => page,
-        Err(_) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Html("The repository is not found.".to_string()),
-            );
-        }
+    let Ok(mut page) = res else {
+        return (
+            StatusCode::NOT_FOUND,
+            Html("The repository is not found.".to_string()),
+        );
     };
     let mut base_pulls = page.take_items();
     let mut next_page = page.next;
@@ -51,11 +48,11 @@ pub async fn pulls(
     }
 
     let mut pulls: Vec<Value> = Vec::new();
-    for base_pull in base_pulls.into_iter() {
-        let assignee = base_pull.assignee.map_or("".to_string(), |v| v.login);
+    for base_pull in base_pulls {
+        let assignee = base_pull.assignee.map_or(String::new(), |v| v.login);
         let updated_at = base_pull
             .updated_at
-            .map_or("".to_string(), |v| v.format("%Y-%m-%d").to_string());
+            .map_or(String::new(), |v| v.format("%Y-%m-%d").to_string());
 
         let yellow_line = Utc::now() - Duration::days(YELLOW_DAYS);
         let red_line = Utc::now() - Duration::days(RED_DAYS);
@@ -70,7 +67,7 @@ pub async fn pulls(
             (Utc::now() - base_pull.created_at.unwrap()).num_days()
         };
 
-        let labels = base_pull.labels.map_or("".to_string(), |labels| {
+        let labels = base_pull.labels.map_or(String::new(), |labels| {
             labels
                 .iter()
                 .map(|label| label.name.clone())

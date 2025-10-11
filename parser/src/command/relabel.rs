@@ -51,9 +51,9 @@ impl Label {
 }
 
 impl std::ops::Deref for Label {
-    type Target = String;
-    fn deref(&self) -> &String {
-        &self.0
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.0.as_str()
     }
 }
 
@@ -68,13 +68,13 @@ impl LabelDelta {
                 return Err(input.error(ParseError::ExpectedLabelDelta));
             }
         };
-        if delta.starts_with('+') {
+        if let Some(label) = delta.strip_prefix('+') {
             Ok(LabelDelta::Add(
-                Label::parse(&delta[1..]).map_err(|e| input.error(e))?,
+                Label::parse(label).map_err(|e| input.error(e))?,
             ))
-        } else if delta.starts_with('-') {
+        } else if let Some(label) = delta.strip_prefix('-') {
             Ok(LabelDelta::Remove(
-                Label::parse(&delta[1..]).map_err(|e| input.error(e))?,
+                Label::parse(label).map_err(|e| input.error(e))?,
             ))
         } else {
             Ok(LabelDelta::Add(
@@ -85,8 +85,7 @@ impl LabelDelta {
 
     pub fn label(&self) -> &Label {
         match self {
-            LabelDelta::Add(l) => l,
-            LabelDelta::Remove(l) => l,
+            LabelDelta::Add(l) | LabelDelta::Remove(l) => l,
         }
     }
 }
@@ -129,9 +128,7 @@ impl RelabelCommand {
             toks.eat_token(Token::Comma)?;
             toks.eat_token(Token::Word("and"))?;
 
-            if let Some(Token::Semi) | Some(Token::Dot) | Some(Token::EndOfLine) =
-                toks.peek_token()?
-            {
+            if let Some(Token::Semi | Token::Dot | Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
                 *input = toks;
                 return Ok(Some(RelabelCommand(deltas)));

@@ -7,9 +7,9 @@ use async_trait::async_trait;
 use chrono::{Datelike, Duration, NaiveTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
-const TYPES_REPO: &'static str = "rust-lang/types-team";
+const TYPES_REPO: &str = "rust-lang/types-team";
 // T-types/meetings
-const TYPES_MEETINGS_STREAM: u64 = 326132;
+const TYPES_MEETINGS_STREAM: u64 = 326_132;
 
 pub struct TypesPlanningMeetingThreadOpenJob;
 
@@ -27,19 +27,17 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
         if first_monday.month() == today.month() {
             return Ok(());
         }
-        let meeting_date_string = first_monday.format("%Y-%m-%d").to_string();
-        let message = format!(
-            "\
+        let meeting_date_string = first_monday.format("%Y-%m-%d");
+        let message = "\
             Hello @*T-types/meetings*. Monthly planning meeting in one week.\n\
             This is a reminder to update the current [roadmap tracking issues](https://github.com/rust-lang/types-team/issues?q=is%3Aissue+is%3Aopen+label%3Aroadmap-tracking-issue).\n\
-            Extra reminders will be sent later this week."
-        );
+            Extra reminders will be sent later this week.";
         let zulip_req = crate::zulip::MessageApiRequest {
             recipient: Recipient::Stream {
                 id: TYPES_MEETINGS_STREAM,
                 topic: &format!("{meeting_date_string} planning meeting"),
             },
-            content: &message,
+            content: message,
         };
         zulip_req.send(&ctx.zulip).await?;
 
@@ -51,7 +49,7 @@ impl Job for TypesPlanningMeetingThreadOpenJob {
         let noon = NaiveTime::from_hms_opt(12, 0, 0).unwrap();
         let thursday_at_noon = Utc.from_utc_datetime(&thursday.and_time(noon));
         let metadata = serde_json::value::to_value(PlanningMeetingUpdatesPingMetadata {
-            date_string: meeting_date_string,
+            date_string: meeting_date_string.to_string(),
         })
         .unwrap();
         schedule_job(
@@ -100,7 +98,7 @@ pub async fn request_updates(
         exclude_labels: vec![],
     };
     let issues = types_repo
-        .get_issues(&gh, &tracking_issues_query)
+        .get_issues(gh, &tracking_issues_query)
         .await
         .with_context(|| "Unable to get issues.")?;
 
@@ -117,10 +115,9 @@ pub async fn request_updates(
         /*
         let mut dmed_assignee = false;
         for assignee in issue.assignees {
-            let zulip_id_and_email = zulip_id_and_email(ctx, assignee.id.unwrap()).await?;
-            let (zulip_id, email) = match zulip_id_and_email {
-                Some(id) => id,
-                None => continue,
+            let Some((zulip_id, email)) = zulip_id_and_email(ctx, assignee.id.unwrap()).await?
+            else {
+                continue;
             };
             let message = format!(
                 "Type team tracking issue needs an update. [Issue #{}]({})",

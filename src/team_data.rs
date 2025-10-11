@@ -135,10 +135,9 @@ impl<T: DeserializeOwned + Clone> CachedTeamItem<T> {
                 value,
                 last_download,
             } = &*value
+                && *last_download + CACHE_DURATION > now
             {
-                if *last_download + CACHE_DURATION > now {
-                    return Ok(value.clone());
-                }
+                return Ok(value.clone());
             }
         }
         match download::<T>(client, base_url, &self.url_path).await {
@@ -169,16 +168,9 @@ async fn download<T: DeserializeOwned>(
     for _ in 0i32..3 {
         let response = client.get(&url).send().await;
         match response {
-            Ok(v) => {
-                return Ok(v.json().await?);
-            }
-            Err(e) => {
-                if e.is_timeout() {
-                    continue;
-                } else {
-                    return Err(e.into());
-                }
-            }
+            Ok(v) => return Ok(v.json().await?),
+            Err(e) if e.is_timeout() => continue,
+            Err(e) => return Err(e.into()),
         }
     }
 
