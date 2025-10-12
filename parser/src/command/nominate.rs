@@ -55,26 +55,23 @@ impl NominateCommand {
         let style = match toks.peek_token()? {
             Some(Token::Word("beta-nominate")) => Style::Beta,
             Some(Token::Word("nominate")) => Style::Decision,
-            Some(Token::Word("beta-accept")) => Style::BetaApprove,
-            Some(Token::Word("beta-approve")) => Style::BetaApprove,
+            Some(Token::Word("beta-accept" | "beta-approve")) => Style::BetaApprove,
             None | Some(_) => return Ok(None),
         };
         toks.next_token()?;
-        let team = if style != Style::BetaApprove {
-            if let Some(Token::Word(team)) = toks.next_token()? {
-                team.to_owned()
-            } else {
-                return Err(toks.error(ParseError::NoTeam));
-            }
-        } else {
+        let team = if style == Style::BetaApprove {
             String::new()
+        } else if let Some(Token::Word(team)) = toks.next_token()? {
+            team.to_owned()
+        } else {
+            return Err(toks.error(ParseError::NoTeam));
         };
-        if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
+        if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
             toks.next_token()?;
             *input = toks;
-            return Ok(Some(NominateCommand { team, style }));
+            Ok(Some(NominateCommand { team, style }))
         } else {
-            return Err(toks.error(ParseError::ExpectedEnd));
+            Err(toks.error(ParseError::ExpectedEnd))
         }
     }
 }

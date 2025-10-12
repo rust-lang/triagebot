@@ -64,11 +64,15 @@ pub struct Context {
     pub username: String,
     pub octocrab: Octocrab,
     /// Represents the workqueue (assigned open PRs) of individual reviewers.
-    /// tokio's RwLock is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
+    /// tokio's `RwLock` is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
     pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
     pub gha_logs: Arc<tokio::sync::RwLock<GitHubActionLogsCache>>,
 }
 
+#[expect(
+    clippy::collapsible_if,
+    reason = "we check the preconditions in the outer if, and handle errors inside"
+)]
 pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo()).await;
     if let Err(e) = &config {
@@ -379,7 +383,7 @@ macro_rules! command_handlers {
                 input.collect()
             };
 
-            log::info!("Comment parsed to {:?}", commands);
+            log::info!("Comment parsed to {commands:?}");
 
             if commands.is_empty() {
                 return;
@@ -435,10 +439,9 @@ macro_rules! command_handlers {
                     }
                     Command::$enum(Err(err)) => {
                         errors.push(HandlerError::Message(format!(
-                            "Parsing {} command in [comment]({}) failed: {}",
+                            "Parsing {} command in [comment]({}) failed: {err}",
                             stringify!($name),
                             event.html_url().expect("has html url"),
-                            err
                         )));
                     })*
                 }
@@ -477,7 +480,7 @@ impl std::error::Error for HandlerError {}
 impl fmt::Display for HandlerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            HandlerError::Message(msg) => write!(f, "{}", msg),
+            HandlerError::Message(msg) => write!(f, "{msg}"),
             HandlerError::Other(_) => write!(f, "An internal error occurred."),
         }
     }

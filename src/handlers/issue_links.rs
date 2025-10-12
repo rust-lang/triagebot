@@ -40,7 +40,7 @@ pub(super) async fn parse_input(
     // configuration block to enable the handler.
     if config.is_none() {
         return Ok(None);
-    };
+    }
 
     Ok(Some(IssueLinksInput {}))
 }

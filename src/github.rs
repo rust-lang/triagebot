@@ -1,9 +1,10 @@
 use crate::team_data::TeamClient;
-use anyhow::{Context, anyhow};
+use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::{FutureExt, future::BoxFuture};
+use itertools::Itertools;
 use octocrab::models::{Author, AuthorAssociation};
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
@@ -42,16 +43,16 @@ impl GithubClient {
     async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<(Bytes, String)> {
         const MAX_ATTEMPTS: u32 = 2;
         log::debug!("send_req with {:?}", req);
-        let req_dbg = format!("{:?}", req);
+        let req_dbg = format!("{req:?}");
         let req = req
             .build()
-            .with_context(|| format!("building reqwest {}", req_dbg))?;
+            .with_context(|| format!("building reqwest {req_dbg}"))?;
 
         let mut resp = self.client.execute(req.try_clone().unwrap()).await?;
-        if self.retry_rate_limit {
-            if let Some(sleep) = Self::needs_retry(&resp).await {
-                resp = self.retry(req, sleep, MAX_ATTEMPTS).await?;
-            }
+        if self.retry_rate_limit
+            && let Some(sleep) = Self::needs_retry(&resp).await
+        {
+            resp = self.retry(req, sleep, MAX_ATTEMPTS).await?;
         }
         let maybe_err = resp.error_for_status_ref().err();
         let body = resp
@@ -134,7 +135,7 @@ impl GithubClient {
                 .client
                 .execute(
                     self.client
-                        .get(&format!("{}/rate_limit", self.api_url))
+                        .get(format!("{}/rate_limit", self.api_url))
                         .configure(self)
                         .build()
                         .unwrap(),
@@ -147,8 +148,7 @@ impl GithubClient {
             let rate_limit = if req
                 .url()
                 .path_segments()
-                .map(|mut segments| matches!(segments.next(), Some("search")))
-                .unwrap_or(false)
+                .is_some_and(|mut segments| segments.next() == Some("search"))
             {
                 rate_limit_response.resources.search
             } else {
@@ -165,10 +165,10 @@ impl GithubClient {
             }
 
             let resp = self.client.execute(req.try_clone().unwrap()).await?;
-            if let Some(sleep) = Self::needs_retry(&resp).await {
-                if remaining_attempts > 0 {
-                    return self.retry(req, sleep, remaining_attempts - 1).await;
-                }
+            if let Some(sleep) = Self::needs_retry(&resp).await
+                && remaining_attempts > 0
+            {
+                return self.retry(req, sleep, remaining_attempts - 1).await;
             }
 
             Ok(resp)
@@ -197,7 +197,7 @@ impl GithubClient {
             body: &'a str,
             labels: Vec<String>,
         }
-        let url = format!("{}/issues", repo.url(&self));
+        let url = format!("{}/issues", repo.url(self));
         self.json(self.post(&url).json(&NewIssue {
             title,
             body,
@@ -217,7 +217,7 @@ impl GithubClient {
         struct Update {
             state: PrState,
         }
-        let url = format!("{}/pulls/{number}", repo.url(&self));
+        let url = format!("{}/pulls/{number}", repo.url(self));
         self.send_req(self.patch(&url).json(&Update { state }))
             .await
             .context("failed to update pr state")?;
@@ -229,7 +229,7 @@ impl GithubClient {
         repo: &IssueRepository,
         job_id: u128,
     ) -> anyhow::Result<String> {
-        let url = format!("{}/actions/jobs/{job_id}/logs", repo.url(&self));
+        let url = format!("{}/actions/jobs/{job_id}/logs", repo.url(self));
         let (body, _req_dbg) = self
             .send_req(self.get(&url))
             .await
@@ -242,7 +242,7 @@ impl GithubClient {
         repo: &IssueRepository,
         job_id: u128,
     ) -> anyhow::Result<WorkflowRunJob> {
-        let url = format!("{}/actions/jobs/{job_id}", repo.url(&self));
+        let url = format!("{}/actions/jobs/{job_id}", repo.url(self));
         self.json(self.get(&url))
             .await
             .context("failed to retrive workflow job run details")
@@ -253,7 +253,7 @@ impl GithubClient {
         repo: &IssueRepository,
         sha: &str,
     ) -> anyhow::Result<GitTrees> {
-        let url = format!("{}/git/trees/{sha}", repo.url(&self));
+        let url = format!("{}/git/trees/{sha}", repo.url(self));
         self.json(self.get(&url))
             .await
             .context("failed to retrive git trees")
@@ -265,14 +265,14 @@ impl GithubClient {
         before: &str,
         after: &str,
     ) -> anyhow::Result<GithubCompare> {
-        let url = format!("{}/compare/{before}...{after}", repo.url(&self));
+        let url = format!("{}/compare/{before}...{after}", repo.url(self));
         self.json(self.get(&url))
             .await
             .context("failed to retrive the compare")
     }
 
     pub async fn pull_request(&self, repo: &IssueRepository, pr_num: u64) -> anyhow::Result<Issue> {
-        let url = format!("{}/pulls/{pr_num}", repo.url(&self));
+        let url = format!("{}/pulls/{pr_num}", repo.url(self));
         let mut pr: Issue = self
             .json(self.get(&url))
             .await
@@ -308,10 +308,10 @@ impl User {
         let map = permission.teams;
         let is_triager = map
             .get("wg-triage")
-            .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
+            .is_some_and(|w| w.members.iter().any(|g| g.github == self.login));
         let is_async_member = map
             .get("wg-async")
-            .map_or(false, |w| w.members.iter().any(|g| g.github == self.login));
+            .is_some_and(|w| w.members.iter().any(|g| g.github == self.login));
         let in_all = map["all"].members.iter().any(|g| g.github == self.login);
         log::trace!(
             "{:?} is all?={:?}, triager?={:?}, async?={:?}",
@@ -563,7 +563,7 @@ impl fmt::Display for AssignmentError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             AssignmentError::InvalidAssignee => write!(f, "invalid assignee"),
-            AssignmentError::Http(e) => write!(f, "cannot assign: {}", e),
+            AssignmentError::Http(e) => write!(f, "cannot assign: {e}"),
         }
     }
 }
@@ -601,7 +601,7 @@ impl IssueRepository {
             Ok(_) => Ok(true),
             Err(e) => {
                 if e.downcast_ref::<reqwest::Error>()
-                    .map_or(false, |e| e.status() == Some(StatusCode::NOT_FOUND))
+                    .is_some_and(|e| e.status() == Some(StatusCode::NOT_FOUND))
                 {
                     Ok(false)
                 } else {
@@ -680,9 +680,7 @@ impl Issue {
             self.repository().url(client),
             self.number,
         );
-        Ok(client
-            .json::<Vec<Comment>>(client.get(&comment_url))
-            .await?)
+        client.json::<Vec<Comment>>(client.get(&comment_url)).await
     }
 
     pub async fn edit_body(&self, client: &GithubClient, body: &str) -> anyhow::Result<()> {
@@ -848,7 +846,7 @@ impl Issue {
         // Don't try to add labels already present on this issue.
         let labels = labels
             .into_iter()
-            .filter(|l| !self.labels().contains(&l))
+            .filter(|l| !self.labels().contains(l))
             .map(|l| l.name)
             .collect::<Vec<_>>();
 
@@ -861,10 +859,10 @@ impl Issue {
         let mut unknown_labels = vec![];
         let mut known_labels = vec![];
         for label in labels {
-            if !self.repository().has_label(client, &label).await? {
-                unknown_labels.push(label);
-            } else {
+            if self.repository().has_label(client, &label).await? {
                 known_labels.push(label);
+            } else {
+                unknown_labels.push(label);
             }
         }
 
@@ -1083,7 +1081,7 @@ impl Issue {
                     "{}/compare/{before}...{after}",
                     self.repository().url(client)
                 ));
-                Ok(client.json(req).await?)
+                client.json(req).await
             })
             .await?;
         Ok(Some(compare))
@@ -1126,7 +1124,7 @@ impl Issue {
             self.repository().url(client),
             self.number
         ));
-        Ok(client.json(req).await?)
+        client.json(req).await
     }
 
     /// Returns the GraphQL ID of this issue.
@@ -1432,15 +1430,13 @@ impl Repository {
                     "direction" => ordering.direction = val,
                     "per_page" => ordering.per_page = val,
                     _ => return true,
-                };
+                }
                 false
             })
             .collect();
 
         // `is: pull-request` indicates the query to retrieve PRs only
-        let is_pr = filters
-            .iter()
-            .any(|&(key, value)| key == "is" && value == "pull-request");
+        let is_pr = filters.contains(&("is", "pull-request"));
 
         // There are some cases that can only be handled by the search API:
         // 1. When using negating label filters (exclude_labels)
@@ -1475,7 +1471,7 @@ impl Repository {
                 let result = client
                     .json::<IssueSearchResult>(result)
                     .await
-                    .with_context(|| format!("failed to list issues from {}", url))?;
+                    .with_context(|| format!("failed to list issues from {url}"))?;
                 issues.extend(result.items);
                 if (issues.len() as u64) < result.total_count {
                     ordering.page += 1;
@@ -1486,7 +1482,7 @@ impl Repository {
                 issues = client
                     .json(result)
                     .await
-                    .with_context(|| format!("failed to list issues from {}", url))?
+                    .with_context(|| format!("failed to list issues from {url}"))?;
             }
 
             break;
@@ -1497,8 +1493,8 @@ impl Repository {
     fn build_issues_url(
         &self,
         client: &GithubClient,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         self.build_endpoint_url(client, "issues", filters, include_labels, ordering)
@@ -1507,8 +1503,8 @@ impl Repository {
     fn build_pulls_url(
         &self,
         client: &GithubClient,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         self.build_endpoint_url(client, "pulls", filters, include_labels, ordering)
@@ -1518,25 +1514,19 @@ impl Repository {
         &self,
         client: &GithubClient,
         endpoint: &str,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         let filters = filters
             .iter()
-            .map(|(key, val)| format!("{}={}", key, val))
-            .chain(std::iter::once(format!(
-                "labels={}",
-                include_labels.join(",")
-            )))
-            .chain(std::iter::once("filter=all".to_owned()))
-            .chain(std::iter::once(format!("sort={}", ordering.sort,)))
-            .chain(std::iter::once(
-                format!("direction={}", ordering.direction,),
-            ))
-            .chain(std::iter::once(format!("per_page={}", ordering.per_page,)))
-            .collect::<Vec<_>>()
-            .join("&");
+            .map(|(key, val)| format!("{key}={val}"))
+            .chain([format!("labels={}", include_labels.join(","))])
+            .chain(["filter=all".to_owned()])
+            .chain([format!("sort={}", ordering.sort)])
+            .chain([format!("direction={}", ordering.direction)])
+            .chain([format!("per_page={}", ordering.per_page)])
+            .format("&");
         format!(
             "{}/repos/{}/{}?{}",
             client.api_url, self.full_name, endpoint, filters
@@ -1546,28 +1536,19 @@ impl Repository {
     fn build_search_issues_url(
         &self,
         client: &GithubClient,
-        filters: &Vec<(&str, &str)>,
-        include_labels: &Vec<&str>,
-        exclude_labels: &Vec<&str>,
+        filters: &[(&str, &str)],
+        include_labels: &[&str],
+        exclude_labels: &[&str],
         ordering: Ordering<'_>,
     ) -> String {
         let filters = filters
             .iter()
-            .filter(|&&(key, val)| !(key == "state" && val == "all"))
-            .map(|(key, val)| format!("{}:{}", key, val))
-            .chain(
-                include_labels
-                    .iter()
-                    .map(|label| format!("label:{}", label)),
-            )
-            .chain(
-                exclude_labels
-                    .iter()
-                    .map(|label| format!("-label:{}", label)),
-            )
-            .chain(std::iter::once(format!("repo:{}", self.full_name)))
-            .collect::<Vec<_>>()
-            .join("+");
+            .filter(|filter| **filter != ("state", "all"))
+            .map(|(key, val)| format!("{key}:{val}"))
+            .chain(include_labels.iter().map(|label| format!("label:{label}")))
+            .chain(exclude_labels.iter().map(|label| format!("-label:{label}")))
+            .chain([format!("repo:{}", self.full_name)])
+            .format("+");
         format!(
             "{}/search/issues?q={}&sort={}&order={}&per_page={}&page={}",
             client.api_url,
@@ -1668,7 +1649,7 @@ impl Repository {
         client: &GithubClient,
         refname: &str,
     ) -> anyhow::Result<GitReference> {
-        let url = format!("{}/git/ref/{}", self.url(client), refname);
+        let url = format!("{}/git/ref/{refname}", self.url(client));
         client
             .json(client.get(&url))
             .await
@@ -1682,7 +1663,7 @@ impl Repository {
         refname: &str,
         sha: &str,
     ) -> anyhow::Result<GitReference> {
-        let url = format!("{}/git/refs/{}", self.url(client), refname);
+        let url = format!("{}/git/refs/{refname}", self.url(client));
         client
             .json(client.patch(&url).json(&serde_json::json!({
                 "sha": sha,
@@ -1744,20 +1725,19 @@ impl Repository {
                 })?;
 
             if let Some(errors) = data.errors {
-                anyhow::bail!("There were graphql errors. {:?}", errors);
+                anyhow::bail!("There were graphql errors. {errors:?}");
             }
             let target = data
                 .data
-                .ok_or_else(|| anyhow::anyhow!("No data returned."))?
+                .context("No data returned.")?
                 .repository
-                .ok_or_else(|| anyhow::anyhow!("No repository."))?
+                .context("No repository.")?
                 .ref_
-                .ok_or_else(|| anyhow::anyhow!("No ref."))?
+                .context("No ref.")?
                 .target
-                .ok_or_else(|| anyhow::anyhow!("No target."))?;
-            let commit = match target {
-                GitObject::Commit(commit) => commit,
-                _ => anyhow::bail!("unexpected target type {target:?}"),
+                .context("No target.")?;
+            let GitObject::Commit(commit) = target else {
+                anyhow::bail!("unexpected target type {target:?}")
             };
             let commits = commit
                 .history
@@ -1787,24 +1767,21 @@ impl Repository {
                         .first()
                         .map(|parent| parent.oid.0.clone());
 
-                    match &next_first_parent {
-                        Some(first_parent) => {
-                            if first_parent == &node.oid.0 {
-                                // Found the next first parent, include it and
-                                // set next_first_parent to look for this
-                                // commit's first parent.
-                                next_first_parent = this_first_parent;
-                                true
-                            } else {
-                                // Still looking for the next first parent.
-                                false
-                            }
-                        }
-                        None => {
-                            // First commit.
+                    if let Some(first_parent) = &next_first_parent {
+                        if first_parent == &node.oid.0 {
+                            // Found the next first parent, include it and
+                            // set next_first_parent to look for this
+                            // commit's first parent.
                             next_first_parent = this_first_parent;
                             true
+                        } else {
+                            // Still looking for the next first parent.
+                            false
                         }
+                    } else {
+                        // First commit.
+                        next_first_parent = this_first_parent;
+                        true
                     }
                 })
                 // Stop once reached the `oldest` commit
@@ -1951,7 +1928,7 @@ impl Repository {
         {
             Ok(_) => return Ok(()),
             Err(e) => {
-                if e.downcast_ref::<reqwest::Error>().map_or(false, |e| {
+                if e.downcast_ref::<reqwest::Error>().is_some_and(|e| {
                     matches!(
                         e.status(),
                         Some(StatusCode::UNPROCESSABLE_ENTITY | StatusCode::CONFLICT)
@@ -2158,12 +2135,12 @@ fn quote_reply(markdown: &str) -> String {
     if markdown.is_empty() {
         String::from("*No content*")
     } else {
-        format!("\n\t> {}", markdown.replace("\n", "\n\t> "))
+        format!("\n\t> {}", markdown.replace('\n', "\n\t> "))
     }
 }
 
 #[async_trait]
-impl<'q> IssuesQuery for Query<'q> {
+impl IssuesQuery for Query<'_> {
     async fn query<'a>(
         &'a self,
         repo: &'a Repository,
@@ -2173,7 +2150,7 @@ impl<'q> IssuesQuery for Query<'q> {
         team_client: &'a TeamClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
         let issues = repo
-            .get_issues(&gh_client, self)
+            .get_issues(gh_client, self)
             .await
             .with_context(|| "Unable to get issues.")?;
 
@@ -2245,19 +2222,15 @@ impl<'q> IssuesQuery for Query<'q> {
                         pending_reviewers: fcp
                             .reviews
                             .iter()
-                            .filter_map(|r| {
-                                (!r.approved).then(|| crate::actions::FCPReviewerDetails {
-                                    github_login: r.reviewer.login.clone(),
-                                    zulip_id: zulip_map
-                                        .as_ref()
-                                        .map(|map| {
-                                            map.users
-                                                .iter()
-                                                .find(|&(_, &github)| github == r.reviewer.id)
-                                                .map(|v| *v.0)
-                                        })
-                                        .flatten(),
-                                })
+                            .filter(|r| !r.approved)
+                            .map(|r| crate::actions::FCPReviewerDetails {
+                                github_login: r.reviewer.login.clone(),
+                                zulip_id: zulip_map.as_ref().and_then(|map| {
+                                    map.users
+                                        .iter()
+                                        .find(|&(_, &github)| github == r.reviewer.id)
+                                        .map(|(&zulip, _)| zulip)
+                                }),
                             })
                             .collect(),
                         concerns: fcp
@@ -2281,16 +2254,16 @@ impl<'q> IssuesQuery for Query<'q> {
             };
 
             let mcp_details = if include_mcp_details {
-                let first100_comments = issue.get_first100_comments(&gh_client).await?;
-                let (zulip_link, concerns) = if !first100_comments.is_empty() {
+                let first100_comments = issue.get_first100_comments(gh_client).await?;
+                let (zulip_link, concerns) = if first100_comments.is_empty() {
+                    (String::new(), None)
+                } else {
                     let split = re_zulip_link
                         .split(&first100_comments[0].body)
                         .collect::<Vec<&str>>();
-                    let zulip_link = split.last().unwrap_or(&"#").to_string();
+                    let zulip_link = (*split.last().unwrap_or(&"#")).to_string();
                     let concerns = find_open_concerns(first100_comments);
                     (zulip_link, concerns)
-                } else {
-                    ("".to_string(), None)
                 };
 
                 Some(crate::actions::MCPDetails {
@@ -2367,11 +2340,11 @@ fn find_open_concerns(comments: Vec<Comment>) -> Option<Vec<(String, String)>> {
     // remove solved concerns and return the rest
     let unresolved_concerns = raised
         .iter()
-        .filter_map(|(&ref title, &ref comment_url)| {
-            if !solved.contains_key(title) {
-                Some((title.to_string(), comment_url.to_string()))
-            } else {
+        .filter_map(|(title, comment_url)| {
+            if solved.contains_key(title) {
                 None
+            } else {
+                Some((title.to_string(), comment_url.to_string()))
             }
         })
         .collect();
@@ -2446,7 +2419,7 @@ impl Event {
         }
     }
 
-    /// This will both extract from IssueComment events but also Issue events
+    /// This will both extract from `IssueComment` events but also `Issue` events
     pub fn comment_body(&self) -> Option<&str> {
         match self {
             Event::Create(_) => None,
@@ -2456,7 +2429,7 @@ impl Event {
         }
     }
 
-    /// This will both extract from IssueComment events but also Issue events
+    /// This will both extract from `IssueComment` events but also `Issue` events
     pub fn comment_from(&self) -> Option<&str> {
         match self {
             Event::Create(_) => None,
@@ -2515,23 +2488,11 @@ impl RequestSend for RequestBuilder {
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
 pub fn default_token_from_env() -> String {
-    match std::env::var("GITHUB_TOKEN") {
-        Ok(v) => return v,
-        Err(_) => (),
-    }
-
-    // kept for retrocompatibility but usage is discouraged and will be deprecated
-    match std::env::var("GITHUB_API_TOKEN") {
-        Ok(v) => return v,
-        Err(_) => (),
-    }
-
-    match get_token_from_git_config() {
-        Ok(v) => return v,
-        Err(_) => (),
-    }
-
-    panic!("could not find token in GITHUB_TOKEN, GITHUB_API_TOKEN or .gitconfig/github.oath-token")
+    std::env::var("GITHUB_TOKEN")
+        // kept for retrocompatibility but usage is discouraged and will be deprecated
+        .or_else(|_| std::env::var("GITHUB_API_TOKEN"))
+        .or_else(|_| get_token_from_git_config())
+        .expect("could not find token in GITHUB_TOKEN, GITHUB_API_TOKEN or .gitconfig/github.oath-token")
 }
 
 fn get_token_from_git_config() -> anyhow::Result<String> {
@@ -2602,10 +2563,10 @@ impl GithubClient {
     ) -> anyhow::Result<Option<Bytes>> {
         let url = format!("{}/{repo}/{branch}/{path}", self.raw_url);
         let req = self.get(&url);
-        let req_dbg = format!("{:?}", req);
+        let req_dbg = format!("{req:?}");
         let req = req
             .build()
-            .with_context(|| format!("failed to build request {:?}", req_dbg))?;
+            .with_context(|| format!("failed to build request {req_dbg:?}"))?;
         let resp = self.client.execute(req).await.context(req_dbg.clone())?;
         let status = resp.status();
         let body = resp
@@ -2719,11 +2680,11 @@ impl GithubClient {
     ) -> anyhow::Result<serde_json::Value> {
         let result: serde_json::Value = self.graphql_query_with_errors(query, vars).await?;
         if let Some(errors) = result["errors"].as_array() {
-            let messages: Vec<_> = errors
+            let messages = errors
                 .iter()
                 .map(|err| err["message"].as_str().unwrap_or_default())
-                .collect();
-            anyhow::bail!("error: {}", messages.join("\n"));
+                .format("\n");
+            anyhow::bail!("error: {messages}");
         }
         Ok(result)
     }
@@ -2754,11 +2715,11 @@ impl GithubClient {
             {
                 return Ok(None);
             }
-            let messages: Vec<_> = errors
+            let messages = errors
                 .iter()
                 .map(|err| err["message"].as_str().unwrap_or_default())
-                .collect();
-            anyhow::bail!("failed to query user: {}", messages.join("\n"));
+                .format("\n");
+            anyhow::bail!("failed to query user: {messages}");
         }
         anyhow::bail!("query for user {user} failed, no error message? {user_info:?}");
     }
@@ -2838,7 +2799,7 @@ impl GithubClient {
         let req = self.get(&format!("{}/repos/{full_name}", self.api_url));
         self.json(req)
             .await
-            .with_context(|| format!("{} failed to get repo", full_name))
+            .with_context(|| format!("{full_name} failed to get repo"))
     }
 
     /// Get or create a [`Milestone`].
@@ -2864,9 +2825,9 @@ impl GithubClient {
                 return Ok(milestone);
             }
             Err(e) => {
-                if e.downcast_ref::<reqwest::Error>().map_or(false, |e| {
-                    matches!(e.status(), Some(StatusCode::UNPROCESSABLE_ENTITY))
-                }) {
+                if e.downcast_ref::<reqwest::Error>()
+                    .is_some_and(|e| e.status() == Some(StatusCode::UNPROCESSABLE_ENTITY))
+                {
                     // fall-through, it already exists
                 } else {
                     return Err(e.context(format!(
@@ -3043,13 +3004,13 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
             let data: cynic::GraphQlResponse<queries::LeastRecentlyReviewedPullRequests> =
                 client.json(req).await?;
             if let Some(errors) = data.errors {
-                anyhow::bail!("There were graphql errors. {:?}", errors);
+                anyhow::bail!("There were graphql errors. {errors:?}");
             }
             let repository = data
                 .data
-                .ok_or_else(|| anyhow::anyhow!("No data returned."))?
+                .context("No data returned.")?
                 .repository
-                .ok_or_else(|| anyhow::anyhow!("No repository."))?;
+                .context("No repository.")?;
             prs.extend(repository.pull_requests.nodes);
             let page_info = repository.pull_requests.page_info;
             if !page_info.has_next_page || page_info.end_cursor.is_none() {
@@ -3180,19 +3141,19 @@ async fn project_items_by_status(
 
         let data: cynic::GraphQlResponse<project_items::Query> = client.json(req).await?;
         if let Some(errors) = data.errors {
-            anyhow::bail!("There were graphql errors. {:?}", errors);
+            anyhow::bail!("There were graphql errors. {errors:?}");
         }
         let items = data
             .data
-            .ok_or_else(|| anyhow!("No data returned."))?
+            .context("No data returned.")?
             .organization
-            .ok_or_else(|| anyhow!("Organization not found."))?
+            .context("Organization not found.")?
             .project_v2
-            .ok_or_else(|| anyhow!("Project not found."))?
+            .context("Project not found.")?
             .items;
         let filtered = items
             .nodes
-            .ok_or_else(|| anyhow!("Malformed response."))?
+            .context("Malformed response.")?
             .into_iter()
             .flatten()
             .filter(|item| status_filter(item.status()));
@@ -3248,7 +3209,7 @@ impl IssuesQuery for DesignMeetings {
                 .await?;
         Ok(items
             .into_iter()
-            .flat_map(|item| match item.content {
+            .filter_map(|item| match item.content {
                 Some(ProjectV2ItemContent::Issue(issue)) => Some(crate::actions::IssueDecorator {
                     assignees: String::new(),
                     author: String::new(),

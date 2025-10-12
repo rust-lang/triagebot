@@ -32,9 +32,8 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&MentionsConfig>,
 ) -> Result<Option<MentionsInput>, String> {
-    let config = match config {
-        Some(config) => config,
-        None => return Ok(None),
+    let Some(config) = config else {
+        return Ok(None);
     };
 
     if !matches!(
@@ -56,9 +55,7 @@ pub(super) async fn parse_input(
         .issue
         .diff(&ctx.github)
         .await
-        .map_err(|e| {
-            log::error!("failed to fetch diff: {:?}", e);
-        })
+        .map_err(|e| log::error!("failed to fetch diff: {e:?}"))
         .unwrap_or_default()
     {
         let file_paths: Vec<_> = files.iter().map(|fd| Path::new(&fd.filename)).collect();
@@ -73,21 +70,21 @@ pub(super) async fn parse_input(
                         file_paths
                             .iter()
                             .filter(|p| p.starts_with(path))
-                            .map(|p| PathBuf::from(p))
+                            .map(PathBuf::from)
                             .collect()
                     }
                     MentionsEntryType::Content => {
                         // Only mentions byte-for-byte matching content inside the patch.
                         files
                             .iter()
-                            .filter(|f| patch_adds(&f.patch, &**entry))
+                            .filter(|f| patch_adds(&f.patch, entry))
                             .map(|f| PathBuf::from(&f.filename))
                             .collect()
                     }
                 };
                 // Don't mention if only the author is in the list.
                 let pings_non_author = match &cc[..] {
-                    [only_cc] => only_cc.trim_start_matches('@') != &event.issue.user.login,
+                    [only_cc] => only_cc.trim_start_matches('@') != event.issue.user.login,
                     _ => true,
                 };
                 if !relevant_file_paths.is_empty() && pings_non_author {
@@ -128,7 +125,7 @@ pub(super) async fn handle_input(
             Some(m) => result.push_str(m),
             None => match type_ {
                 MentionsEntryType::Filename => {
-                    write!(result, "Some changes occurred in {entry}").unwrap()
+                    write!(result, "Some changes occurred in {entry}").unwrap();
                 }
                 MentionsEntryType::Content => write!(
                     result,
@@ -136,7 +133,7 @@ pub(super) async fn handle_input(
                     relevant_file_paths
                         .iter()
                         .map(|f| f.to_string_lossy())
-                        .join(", ")
+                        .format(", ")
                 )
                 .unwrap(),
             },
@@ -158,15 +155,9 @@ pub(super) async fn handle_input(
 }
 
 fn patch_adds(patch: &str, needle: &str) -> bool {
-    for line in patch.lines() {
-        if !line.starts_with("+++") && line.starts_with('+') {
-            if line.contains(needle) {
-                return true;
-            }
-        }
-    }
-
-    false
+    patch
+        .lines()
+        .any(|line| !line.starts_with("+++") && line.starts_with('+') && line.contains(needle))
 }
 
 #[cfg(test)]

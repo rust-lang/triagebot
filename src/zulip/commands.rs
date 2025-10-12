@@ -125,7 +125,7 @@ pub enum IdentifierCli {
 impl<'a> From<&'a IdentifierCli> for Identifier<'a> {
     fn from(value: &'a IdentifierCli) -> Self {
         match value {
-            IdentifierCli::Url(url) => Self::Url(&url),
+            IdentifierCli::Url(url) => Self::Url(url),
             IdentifierCli::Index(index) => Self::Index(*index),
             IdentifierCli::All => Self::All,
         }

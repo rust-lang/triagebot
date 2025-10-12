@@ -21,8 +21,8 @@ pub(super) async fn handle(
         return Ok(());
     }
 
-    if let Err(e) = add_rendered_link(&ctx, &e, config).await {
-        tracing::error!("Error adding rendered link: {:?}", e);
+    if let Err(e) = add_rendered_link(ctx, e, config).await {
+        tracing::error!("Error adding rendered link: {e:?}");
     }
 
     Ok(())
@@ -55,7 +55,7 @@ async fn add_rendered_link(
             // Sort the relavant files by the total number of lines changed, as to
             // improve our guess for the relevant file to show the link to.
             .max_by_key(|f| f.additions + f.deletions + f.changes)
-            .map(|file| {
+            .and_then(|file| {
                 let head = e.issue.head.as_ref()?;
                 let base = e.issue.base.as_ref()?;
 
@@ -91,8 +91,7 @@ async fn add_rendered_link(
                     },
                     file.filename
                 ))
-            })
-            .flatten();
+            });
 
         let new_body: Cow<'_, str> = if !e.issue.body.contains("[Rendered]") {
             if let Some(rendered_link) = rendered_link {

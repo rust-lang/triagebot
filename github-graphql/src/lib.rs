@@ -323,17 +323,11 @@ pub mod project_items {
 
     impl ProjectV2Item {
         pub fn status(&self) -> Option<&str> {
-            let Some(ref status) = self.status else {
-                return None;
-            };
-            status.as_str()
+            self.status.as_ref()?.as_str()
         }
 
         pub fn date(&self) -> Option<Date> {
-            let Some(ref date) = self.date else {
-                return None;
-            };
-            date.as_date()
+            self.date.as_ref()?.as_date()
         }
     }
 

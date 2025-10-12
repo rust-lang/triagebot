@@ -48,12 +48,12 @@ impl AssignCommand {
         let mut toks = input.clone();
         if let Some(Token::Word("claim")) = toks.peek_token()? {
             toks.next_token()?;
-            if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
+            if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
                 *input = toks;
-                return Ok(Some(AssignCommand::Claim));
+                Ok(Some(AssignCommand::Claim))
             } else {
-                return Err(toks.error(ParseError::ExpectedEnd));
+                Err(toks.error(ParseError::ExpectedEnd))
             }
         } else if let Some(Token::Word("assign")) = toks.peek_token()? {
             toks.next_token()?;
@@ -63,22 +63,22 @@ impl AssignCommand {
                         username: user[1..].to_owned(),
                     }))
                 } else {
-                    return Err(toks.error(ParseError::MentionUser));
+                    Err(toks.error(ParseError::MentionUser))
                 }
             } else {
-                return Err(toks.error(ParseError::NoUser));
+                Err(toks.error(ParseError::NoUser))
             }
         } else if let Some(Token::Word("release-assignment" | "unclaim")) = toks.peek_token()? {
             toks.next_token()?;
-            if let Some(Token::Dot) | Some(Token::EndOfLine) = toks.peek_token()? {
+            if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
                 *input = toks;
-                return Ok(Some(AssignCommand::ReleaseAssignment));
+                Ok(Some(AssignCommand::ReleaseAssignment))
             } else {
-                return Err(toks.error(ParseError::ExpectedEnd));
+                Err(toks.error(ParseError::ExpectedEnd))
             }
         } else {
-            return Ok(None);
+            Ok(None)
         }
     }
 

@@ -43,7 +43,7 @@ pub(super) async fn handle_event(
 
     let compare_before = ctx
         .github
-        .compare(&issue_repo, &base.sha, &before)
+        .compare(&issue_repo, &base.sha, before)
         .await
         .context("failed to get the before compare")?;
 
@@ -88,9 +88,9 @@ fn changed_base_commit(
     let newbase = &compare_after.merge_base_commit.sha;
 
     let message = format!(
-        r#"This PR was rebased onto a different {branch} commit. Here's a [range-diff]({protocol}://{host}/gh-range-diff/{issue_repo}/{oldbase}..{oldhead}/{newbase}..{newhead}) highlighting what actually changed.
+        r"This PR was rebased onto a different {branch} commit. Here's a [range-diff]({protocol}://{host}/gh-range-diff/{issue_repo}/{oldbase}..{oldhead}/{newbase}..{newhead}) highlighting what actually changed.
 
-*Rebasing is a normal part of keeping PRs up to date, so no action is needed—this note is just to help reviewers.*"#
+*Rebasing is a normal part of keeping PRs up to date, so no action is needed—this note is just to help reviewers.*"
     );
 
     Some(message)

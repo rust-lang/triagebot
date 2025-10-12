@@ -67,7 +67,7 @@ pub(super) async fn parse_input(
     // about this feature not being enabled
     if config.is_none() {
         return Ok(None);
-    };
+    }
 
     // Execute this handler only if this is a PR ...
     if !event.issue.is_pr() {
@@ -95,7 +95,7 @@ pub(super) async fn parse_input(
     }
 }
 
-pub(super) async fn handle_input<'a>(
+pub(super) async fn handle_input(
     ctx: &Context,
     _config: &ReviewPrefsConfig,
     event: &IssuesEvent,
@@ -168,7 +168,7 @@ pub(super) async fn handle_input<'a>(
 /// Loads the workqueue (mapping of open PRs assigned to users) from GitHub
 pub async fn load_workqueue(client: &Octocrab) -> anyhow::Result<ReviewerWorkqueue> {
     tracing::debug!("Loading workqueue for rust-lang/rust");
-    let prs = retrieve_pull_request_assignments("rust-lang", "rust", &client).await?;
+    let prs = retrieve_pull_request_assignments("rust-lang", "rust", client).await?;
 
     // Aggregate PRs by user
     let aggregated: HashMap<UserId, HashMap<PullRequestNumber, AssignedPullRequest>> = prs
@@ -238,7 +238,7 @@ pub async fn retrieve_pull_request_assignments(
                 assignments.push((
                     User {
                         login: user.login,
-                        id: (*user.id).into(),
+                        id: *user.id,
                     },
                     pr.number,
                     AssignedPullRequest {

@@ -93,9 +93,9 @@ where
         let start_section = self.start_section();
         let end_section = self.end_section();
 
-        let bot_section = format!("{}{}{}", start_section, text, end_section);
-        let empty_bot_section = format!("{}{}", start_section, end_section);
-        let all_new = format!("\n\n{}{}{}", START_BOT, bot_section, END_BOT);
+        let bot_section = format!("{start_section}{text}{end_section}");
+        let empty_bot_section = format!("{start_section}{end_section}");
+        let all_new = format!("\n\n{START_BOT}{bot_section}{END_BOT}");
 
         // Edit or add the new text the current triagebot section
         if current_body.contains(START_BOT) {
@@ -108,16 +108,16 @@ where
                     let end_idx = start_idx + all_new.len();
                     current_body.replace_range(start_idx..end_idx, "");
                 }
-                self.issue.edit_body(&client, &current_body).await?;
+                self.issue.edit_body(client, &current_body).await?;
             } else {
-                let end_idx = current_body.find(&END_BOT).unwrap();
+                let end_idx = current_body.find(END_BOT).unwrap();
                 current_body.insert_str(end_idx, &bot_section);
-                self.issue.edit_body(&client, &current_body).await?;
+                self.issue.edit_body(client, &current_body).await?;
             }
         } else {
-            let new_body = format!("{}{}", current_body, all_new);
+            let new_body = format!("{current_body}{all_new}");
 
-            self.issue.edit_body(&client, &new_body).await?;
+            self.issue.edit_body(client, &new_body).await?;
         }
 
         // Save the state in the database
@@ -144,7 +144,7 @@ where
         let end_idx = all.find(&end)?;
         let text = &all[(start_idx + start.len())..end_idx];
         Some(serde_json::from_str(text).unwrap_or_else(|e| {
-            panic!("deserializing data {:?} failed: {:?}", text, e);
+            panic!("deserializing data {text:?} failed: {e:?}");
         }))
     }
 

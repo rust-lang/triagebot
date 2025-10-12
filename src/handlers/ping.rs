@@ -4,6 +4,8 @@
 //!
 //! Parsing is done in the `parser::command::ping` module.
 
+use std::borrow::Cow;
+
 use crate::{
     config::PingConfig,
     github::{self, Event},
@@ -17,37 +19,30 @@ pub(super) async fn handle_command(
     event: &Event,
     team_name: PingCommand,
 ) -> anyhow::Result<()> {
-    let is_team_member = if let Err(_) | Ok(false) = event.user().is_team_member(&ctx.team).await {
-        false
-    } else {
-        true
-    };
+    let is_team_member = matches!(event.user().is_team_member(&ctx.team).await, Ok(true));
 
     if !is_team_member {
         return user_error!("Only Rust team members can ping teams.");
     }
 
-    let (gh_team, config) = match config.get_by_name(&team_name.team) {
-        Some(v) => v,
-        None => {
-            return user_error!(format!(
-                "This team (`{}`) cannot be pinged via this command; \
+    let Some((gh_team, config)) = config.get_by_name(&team_name.team) else {
+        return user_error!(format!(
+            "This team (`{}`) cannot be pinged via this command; \
                     it may need to be added to `triagebot.toml` on the default branch.",
-                team_name.team,
-            ));
-        }
+            team_name.team,
+        ));
     };
-    let team = ctx.team.get_team(&gh_team).await?;
-    let team = match team {
-        Some(team) => team,
-        None => {
-            return user_error!(format!(
-                "This team (`{}`) does not exist in the team repository.",
-                team_name.team,
-            ));
-        }
+    let Some(team) = ctx.team.get_team(gh_team).await? else {
+        return user_error!(format!(
+            "This team (`{}`) does not exist in the team repository.",
+            team_name.team,
+        ));
     };
 
+    #[expect(
+        clippy::collapsible_if,
+        reason = "in the outer `if`, we check for `config`"
+    )]
     if let Some(label) = &config.label {
         if let Err(err) = event
             .issue()
@@ -80,10 +75,10 @@ pub(super) async fn handle_command(
         }
     }
 
-    let ping_msg = if users.is_empty() {
-        format!("no known users to ping?")
+    let ping_msg: Cow<_> = if users.is_empty() {
+        "no known users to ping?".into()
     } else {
-        format!("cc {}", users.join(" "))
+        format!("cc {}", users.join(" ")).into()
     };
     let comment = format!("{}\n\n{}", config.message, ping_msg);
     event

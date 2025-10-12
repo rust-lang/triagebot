@@ -15,7 +15,7 @@ impl IgnoreBlocks {
             macro_rules! ignore_till_end {
                 ($p:pat) => {
                     let start = range.start;
-                    while let Some((event, range)) = parser.next() {
+                    for (event, range) in parser.by_ref() {
                         if let Event::End($p) = event {
                             ignore.push(start..range.end);
                             break;
@@ -28,15 +28,15 @@ impl IgnoreBlocks {
                     ignore_till_end!(TagEnd::CodeBlock);
                 }
                 Event::Start(Tag::Link { .. }) => {
-                    ignore_till_end!(TagEnd::Link { .. });
+                    ignore_till_end!(TagEnd::Link);
                 }
                 Event::Start(Tag::Image { .. }) => {
-                    ignore_till_end!(TagEnd::Image { .. });
+                    ignore_till_end!(TagEnd::Image);
                 }
                 Event::Start(Tag::BlockQuote(_)) => {
                     let start = range.start;
                     let mut count = 1;
-                    while let Some((event, range)) = parser.next() {
+                    for (event, range) in parser.by_ref() {
                         if let Event::Start(Tag::BlockQuote(_)) = event {
                             count += 1;
                         } else if let Event::End(TagEnd::BlockQuote(_)) = event {

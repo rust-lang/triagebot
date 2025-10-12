@@ -17,7 +17,7 @@ pub(super) fn mentions_in_commits(
     }
 
     let mentions_commits = commits
-        .into_iter()
+        .iter()
         .filter(|c| {
             let mentions = parser::get_mentions(&c.commit.message);
             !mentions.is_empty() && mentions.iter().any(|m| *m != "rustbot")

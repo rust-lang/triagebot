@@ -189,7 +189,7 @@ async fn create_commit(
 async fn create_pr(gh: &GithubClient, dest_repo: &Repository, updates: &[Update]) -> Result<Issue> {
     let mut body = String::new();
     for update in updates {
-        write!(body, "{}\n", update.pr_body).unwrap();
+        writeln!(body, "{}", update.pr_body).unwrap();
     }
 
     let username = WORK_REPO.split('/').next().unwrap();

@@ -30,8 +30,8 @@ impl fmt::Display for Token<'_> {
             Token::ParenRight => write!(f, ")"),
             Token::ParenLeft => write!(f, "("),
             Token::EndOfLine => Ok(()),
-            Token::Quote(body) => write!(f, r#""{}""#, body),
-            Token::Word(word) => write!(f, "{}", word),
+            Token::Quote(body) => write!(f, r#""{body}""#),
+            Token::Word(word) => write!(f, "{word}"),
         }
     }
 }
@@ -54,15 +54,11 @@ impl std::error::Error for ErrorKind {}
 
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                ErrorKind::UnterminatedString => "unterminated string",
-                ErrorKind::QuoteInWord => "quote in word",
-                ErrorKind::RawString => "raw strings are not yet supported",
-            }
-        )
+        match self {
+            ErrorKind::UnterminatedString => write!(f, "unterminated string"),
+            ErrorKind::QuoteInWord => write!(f, "quote in word"),
+            ErrorKind::RawString => write!(f, "raw strings are not yet supported"),
+        }
     }
 }
 
@@ -96,7 +92,7 @@ impl<'a> Tokenizer<'a> {
     fn consume_whitespace(&mut self) {
         while self
             .cur()
-            .map_or(false, |c| c.1 != '\n' && c.1.is_whitespace())
+            .is_some_and(|c| c.1 != '\n' && c.1.is_whitespace())
         {
             self.advance();
         }
@@ -125,7 +121,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn cur(&mut self) -> Option<(usize, char)> {
-        self.chars.peek().cloned()
+        self.chars.peek().copied()
     }
 
     fn at_end(&mut self) -> bool {
@@ -202,12 +198,16 @@ impl<'a> Tokenizer<'a> {
         // Attempt to consume a word from the input.
         // Stop if we encounter whitespace or punctuation.
         let start = self.cur_pos();
-        while self.cur().map_or(false, |(_, ch)| {
-            !(self.cur_punct().is_some() || ch.is_whitespace())
-        }) {
-            if self.cur().unwrap().1 == '"' {
+        while let Some((_, ch)) = self.cur()
+            && self.cur_punct().is_none()
+            && !ch.is_whitespace()
+        {
+            if ch == '"' {
                 let so_far = self.str_from(start);
-                if so_far.starts_with('r') && so_far.chars().skip(1).all(|v| v == '#' || v == '"') {
+                if so_far
+                    .strip_prefix('r')
+                    .is_some_and(|s| s.chars().all(|v| v == '#' || v == '"'))
+                {
                     return Err(self.error(ErrorKind::RawString));
                 } else {
                     return Err(self.error(ErrorKind::QuoteInWord));
@@ -215,7 +215,7 @@ impl<'a> Tokenizer<'a> {
             }
             self.advance();
         }
-        Ok(Some(Token::Word(&self.str_from(start))))
+        Ok(Some(Token::Word(self.str_from(start))))
     }
 
     pub fn eat_token(&mut self, token: Token<'a>) -> Result<bool, Error<'a>> {
@@ -232,8 +232,8 @@ impl<'a> Tokenizer<'a> {
 #[cfg(test)]
 fn tokenize<'a>(input: &'a str) -> Result<Vec<Token<'a>>, Error<'a>> {
     let mut tokens = Vec::new();
-    let mut gen = Tokenizer::new(input);
-    while let Some(tok) = gen.next_token()? {
+    let mut input = Tokenizer::new(input);
+    while let Some(tok) = input.next_token()? {
         tokens.push(tok);
     }
     Ok(tokens)

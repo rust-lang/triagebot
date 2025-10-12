@@ -99,8 +99,7 @@ pub async fn delete_ping(
                 )
                 .await
                 .context(format!(
-                    "Failed to delete notification with id {}",
-                    notification_id
+                    "Failed to delete notification with id {notification_id}"
                 ))?;
 
             let origin_url: String = row.get(0);
@@ -111,13 +110,13 @@ pub async fn delete_ping(
             let deleted_notification = NotificationData {
                 origin_url,
                 origin_text,
-                time,
                 short_description,
+                time,
                 metadata,
             };
 
             if let Err(e) = t.commit().await {
-                if e.code().map_or(false, |c| {
+                if e.code().is_some_and(|c| {
                     *c == tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE
                 }) {
                     log::trace!("serialization failure, restarting deletion");
@@ -149,8 +148,8 @@ pub async fn delete_ping(
                     NotificationData {
                         origin_url,
                         origin_text,
-                        time,
                         short_description,
+                        time,
                         metadata,
                     }
                 })
@@ -231,9 +230,9 @@ pub async fn move_indices(
         }
 
         if let Err(e) = t.commit().await {
-            if e.code().map_or(false, |c| {
-                *c == tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE
-            }) {
+            if e.code()
+                .is_some_and(|c| *c == tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE)
+            {
                 log::trace!("serialization failure, restarting index movement");
                 continue;
             } else {
@@ -295,9 +294,9 @@ pub async fn add_metadata(
         }
 
         if let Err(e) = t.commit().await {
-            if e.code().map_or(false, |c| {
-                *c == tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE
-            }) {
+            if e.code()
+                .is_some_and(|c| *c == tokio_postgres::error::SqlState::T_R_SERIALIZATION_FAILURE)
+            {
                 log::trace!("serialization failure, restarting index movement");
                 continue;
             } else {

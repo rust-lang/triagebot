@@ -11,10 +11,9 @@ pub(super) async fn handle_command(
     event: &Event,
     _: PrioritizeCommand,
 ) -> anyhow::Result<()> {
-    let mut labels = vec![];
-    labels.push(github::Label {
-        name: config.label.to_owned(),
-    });
+    let labels = vec![github::Label {
+        name: config.label.clone(),
+    }];
     event
         .issue()
         .unwrap()

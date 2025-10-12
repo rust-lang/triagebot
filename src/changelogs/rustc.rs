@@ -24,7 +24,7 @@ impl<'a> RustcFormat<'a> {
     }
 
     pub(super) fn parse(mut self, content: &str) -> anyhow::Result<Changelog> {
-        let ast = comrak::parse_document(&self.arena, &content, &ComrakOptions::default());
+        let ast = comrak::parse_document(self.arena, content, &ComrakOptions::default());
 
         let mut section_ast = Vec::new();
         for child in ast.children() {
@@ -32,7 +32,7 @@ impl<'a> RustcFormat<'a> {
 
             if let NodeValue::Heading(NodeHeading { level: 1, .. }) = child_data.value {
                 if let Some(h1) = self.current_h1.take() {
-                    self.store_version(h1, section_ast)?;
+                    self.store_version(&h1, &section_ast)?;
                 }
 
                 let Some(h1_child_data) = child.first_child().map(|c| c.data.borrow()) else {
@@ -51,16 +51,16 @@ impl<'a> RustcFormat<'a> {
             }
         }
         if let Some(h1) = self.current_h1.take() {
-            self.store_version(h1, section_ast)?;
+            self.store_version(&h1, &section_ast)?;
         }
 
         Ok(self.result)
     }
 
-    fn store_version(&mut self, h1: String, body: Vec<&'a AstNode<'a>>) -> anyhow::Result<()> {
+    fn store_version(&mut self, h1: &str, body: &[&'a AstNode<'a>]) -> anyhow::Result<()> {
         // Create a document with only the contents of this section
         let document = self.arena.alloc(NodeValue::Document.into());
-        for child in &body {
+        for child in body {
             document.append(child);
         }
 
@@ -69,7 +69,7 @@ impl<'a> RustcFormat<'a> {
         if let Some(version) = h1.split(' ').nth(1) {
             self.result.versions.insert(version.to_string(), content);
         } else {
-            println!("skipped version, invalid header: {}", h1);
+            println!("skipped version, invalid header: {h1}");
         }
 
         Ok(())

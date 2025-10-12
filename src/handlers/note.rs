@@ -128,11 +128,11 @@ pub(super) async fn handle_command(
 
     let mut client = ctx.db.get().await;
     let mut e: EditIssueBody<'_, NoteData> =
-        EditIssueBody::load(&mut client, &issue, "SUMMARY").await?;
+        EditIssueBody::load(&mut client, issue, "SUMMARY").await?;
     let current = e.data_mut();
 
     let comment_url = String::from(event.html_url().unwrap());
-    let author = event.user().login.to_owned();
+    let author = event.user().login.clone();
 
     match &cmd {
         NoteCommand::Summary { title } => {
