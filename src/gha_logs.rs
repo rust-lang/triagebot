@@ -211,18 +211,29 @@ pub async fn gha_logs(
     <title>{job_name} - {owner}/{repo}@{short_sha}</title>
     {icon_status}
     <style>
+:root {{
+    --timestamp-length: 28ch;
+}}
 body {{
   font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
   background: #0C0C0C;
   color: #CCC;
   white-space: pre;
+  padding-left: calc(var(--timestamp-length) + 1ch);
+  margin: 0;
 }}
 .timestamp {{
   color: #848484;
   text-decoration: none;
+  position: absolute;
+  left: 0;
+  width: var(--timestamp-length);
 }}
 .timestamp:hover {{
   text-decoration: underline;
+}}
+.timestamp::before {{
+  content: attr(data-timestamp);
 }}
 .error-marker {{
   scroll-margin-bottom: 15vh;
@@ -275,9 +286,9 @@ body {{
         }}
 
         // 3. Add a self-referencial anchor to all timestamps at the start of the lines
-        const dateRegex = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z)/gm;
-        html = html.replace(dateRegex, (ts) => 
-            `<a id="${{ts}}" href="#${{ts}}" class="timestamp">${{ts}}</a>`
+        const dateRegex = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z) /gm;
+        html = html.replace(dateRegex, (match, ts) => 
+            `<a id="${{ts}}" href="#${{ts}}" class="timestamp" data-timestamp="${{ts}}"></a>`
         );
 
         // 4. Add a anchor around every "##[error]" string
@@ -337,11 +348,9 @@ body {{
             }});
         }}
 
-        // 8. Add a copy handler that force plain/text copy and removes the timestamps
-        //  from the copied selection.
-        const dateRegexWithSpace = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z )/gm;
+        // 8. Add a copy handler that force plain/text copy
         document.addEventListener("copy", function(e) {{
-            var text = window.getSelection().toString().replace(dateRegexWithSpace, '');
+            var text = window.getSelection().toString();
             e.clipboardData.setData('text/plain', text);
             e.preventDefault();
         }});
