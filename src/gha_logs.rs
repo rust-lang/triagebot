@@ -219,6 +219,7 @@ body {{
 }}
 .timestamp {{
   color: #848484;
+  user-select: none;
   text-decoration: none;
 }}
 .timestamp:hover {{
@@ -270,14 +271,19 @@ body {{
         var html = ansi_up.ansi_to_html(logs);
 
         // 2. Remove UTF-8 useless BOM
-        if (html.charCodeAt(0) === 0xFEFF) {{
-            html = html.substr(1);
-        }}
-
-        // 3. Add a self-referencial anchor to all timestamps at the start of the lines
-        const dateRegex = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z)/gm;
-        html = html.replace(dateRegex, (ts) => 
-            `<a id="${{ts}}" href="#${{ts}}" class="timestamp">${{ts}}</a>`
+        html = html.replace(/^\uFEFF/gm, "");
+        
+        // 3. Transform each log lines that doesn't start with a timestamp into a row where everything is in the second column
+        const untsRegex = /^(?!\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z)(.*)$/gm;
+        html = html.replace(untsRegex, (match, log) => 
+            `<tr><td></td><td>${{log}}</td></tr>`
+        );
+        
+        // 3.b Transform each log lines that start with a timestamp in a row with two columns and make the timestamp be a
+        //  self-referencial anchor.
+        const tsRegex = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z) (.*)$/gm;
+        html = html.replace(tsRegex, (match, ts, log) => 
+            `<tr><td><a id="${{ts}}" href="#${{ts}}" class="timestamp">${{ts}}</a></td><td>${{log}}</td></tr>`
         );
 
         // 4. Add a anchor around every "##[error]" string
@@ -324,8 +330,8 @@ body {{
             return `${{boundary_start}}<a href="https://github.com/{owner}/{repo}/blob/{sha}/${{path}}${{pos}}" class="path-marker">${{inner}}</a>${{boundary_end}}`;
         }});
 
-        // 6. Add the html to the DOM
-        document.body.innerHTML = html;
+        // 6. Add the html to the table
+        document.getElementById("logs").innerHTML = html;
 
         // 7. If no anchor is given, scroll to the last error
         if (location.hash === "" && errorCounter >= 0) {{
@@ -337,11 +343,9 @@ body {{
             }});
         }}
 
-        // 8. Add a copy handler that force plain/text copy and removes the timestamps
-        //  from the copied selection.
-        const dateRegexWithSpace = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z )/gm;
+        // 8. Add a copy handler that force plain/text copy
         document.addEventListener("copy", function(e) {{
-            var text = window.getSelection().toString().replace(dateRegexWithSpace, '');
+            var text = window.getSelection().toString();
             e.clipboardData.setData('text/plain', text);
             e.preventDefault();
         }});
@@ -353,6 +357,14 @@ body {{
     </script>
 </head>
 <body>
+<table style="table-layout: fixed; width: 100%">
+    <colgroup>
+        <col style="width: 29ch">
+        <col style="width: 100%">
+    </colgroup>
+    <tbody id="logs">
+    </tbody>
+</table>
 </body>
 </html>"###,
     );
