@@ -211,29 +211,19 @@ pub async fn gha_logs(
     <title>{job_name} - {owner}/{repo}@{short_sha}</title>
     {icon_status}
     <style>
-:root {{
-    --timestamp-length: 28ch;
-}}
 body {{
   font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
   background: #0C0C0C;
   color: #CCC;
   white-space: pre;
-  padding-left: calc(var(--timestamp-length) + 1ch);
-  margin: 0;
 }}
 .timestamp {{
   color: #848484;
+  user-select: none;
   text-decoration: none;
-  position: absolute;
-  left: 0;
-  width: var(--timestamp-length);
 }}
 .timestamp:hover {{
   text-decoration: underline;
-}}
-.timestamp::before {{
-  content: attr(data-timestamp);
 }}
 .error-marker {{
   scroll-margin-bottom: 15vh;
@@ -281,14 +271,19 @@ body {{
         var html = ansi_up.ansi_to_html(logs);
 
         // 2. Remove UTF-8 useless BOM
-        if (html.charCodeAt(0) === 0xFEFF) {{
-            html = html.substr(1);
-        }}
-
-        // 3. Add a self-referencial anchor to all timestamps at the start of the lines
-        const dateRegex = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z) /gm;
-        html = html.replace(dateRegex, (match, ts) => 
-            `<a id="${{ts}}" href="#${{ts}}" class="timestamp" data-timestamp="${{ts}}"></a>`
+        html = html.replace(/^\uFEFF/gm, "");
+        
+        // 3. Transform each log lines that doesn't start with a timestamp into a row where everything is in the second column
+        const untsRegex = /^(?!\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z)(.*)$/gm;
+        html = html.replace(untsRegex, (match, log) => 
+            `<tr><td></td><td>${{log}}</td></tr>`
+        );
+        
+        // 3.b Transform each log lines that start with a timestamp in a row with two columns and make the timestamp be a
+        //  self-referencial anchor.
+        const tsRegex = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z) (.*)$/gm;
+        html = html.replace(tsRegex, (match, ts, log) => 
+            `<tr><td><a id="${{ts}}" href="#${{ts}}" class="timestamp">${{ts}}</a></td><td>${{log}}</td></tr>`
         );
 
         // 4. Add a anchor around every "##[error]" string
@@ -335,8 +330,8 @@ body {{
             return `${{boundary_start}}<a href="https://github.com/{owner}/{repo}/blob/{sha}/${{path}}${{pos}}" class="path-marker">${{inner}}</a>${{boundary_end}}`;
         }});
 
-        // 6. Add the html to the DOM
-        document.body.innerHTML = html;
+        // 6. Add the html to the table
+        document.getElementById("logs").innerHTML = html;
 
         // 7. If no anchor is given, scroll to the last error
         if (location.hash === "" && errorCounter >= 0) {{
@@ -362,6 +357,14 @@ body {{
     </script>
 </head>
 <body>
+<table style="table-layout: fixed; width: 100%">
+    <colgroup>
+        <col style="width: 29ch">
+        <col style="width: 100%">
+    </colgroup>
+    <tbody id="logs">
+    </tbody>
+</table>
 </body>
 </html>"###,
     );
