@@ -1,5 +1,6 @@
 use crate::changelogs::ChangelogFormat;
 use crate::github::{GithubClient, Repository};
+use parser::command::relabel::{Label, LabelDelta, RelabelCommand};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::{Arc, LazyLock, RwLock};
@@ -250,10 +251,62 @@ pub(crate) struct MentionsEntryConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[serde(deny_unknown_fields)]
 pub(crate) struct RelabelConfig {
     #[serde(default)]
     pub(crate) allow_unauthenticated: Vec<String>,
+    // alias identifier -> labels
+    #[serde(flatten)]
+    pub(crate) configs: Option<HashMap<String, RelabelRuleConfig>>,
+}
+
+impl RelabelConfig {
+    pub(crate) fn retrieve_command_from_alias(&self, input: RelabelCommand) -> RelabelCommand {
+        match &self.configs {
+            Some(configs) => {
+                dbg!(&configs);
+                // get only the first token from the command
+                // extract the "alias" from the RelabelCommand
+                if input.0.len() > 0 {
+                    let name = input.0.get(0).unwrap();
+                    let name = name.label().as_str();
+                    // check if this alias matches any RelabelRuleConfig key in our config
+                    // extract the labels and build a new command
+                    if configs.contains_key(name) {
+                        let (_alias, cfg) = configs.get_key_value(name).unwrap();
+                        return cfg.to_command();
+                    }
+                }
+            }
+            None => {
+                return input;
+            }
+        };
+        input
+    }
+}
+
+#[derive(Default, PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RelabelRuleConfig {
+    /// Labels to be added
+    pub(crate) add_labels: Vec<String>,
+    /// Labels to be removed
+    pub(crate) rem_labels: Vec<String>,
+}
+
+impl RelabelRuleConfig {
+    /// Translate a RelabelRuleConfig into a RelabelCommand for GitHub consumption
+    pub fn to_command(&self) -> RelabelCommand {
+        let mut deltas = Vec::new();
+        for l in self.add_labels.iter() {
+            deltas.push(LabelDelta::Add(Label(l.into())));
+        }
+        for l in self.rem_labels.iter() {
+            deltas.push(LabelDelta::Remove(Label(l.into())));
+        }
+        RelabelCommand(deltas)
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -818,6 +871,7 @@ mod tests {
             Config {
                 relabel: Some(RelabelConfig {
                     allow_unauthenticated: vec!["C-*".into()],
+                    configs: Some(HashMap::new())
                 }),
                 assign: Some(AssignConfig {
                     warn_non_default_branch: WarnNonDefaultBranchConfig::Simple(false),

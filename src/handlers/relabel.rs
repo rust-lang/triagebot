@@ -103,6 +103,8 @@ enum CheckFilterResult {
     DenyUnknown,
 }
 
+/// Check if the team member is allowed to apply labels
+/// configured in `allow_unauthenticated`
 fn check_filter(
     label: &str,
     config: &RelabelConfig,
@@ -232,6 +234,7 @@ mod tests {
             ($($member:ident { $($label:expr => $res:ident,)* })*) => {
                 let config = RelabelConfig {
                     allow_unauthenticated: vec!["T-*".into(), "I-*".into(), "!I-*nominated".into()],
+                    configs: None
                 };
                 $($(assert_eq!(
                     check_filter($label, &config, TeamMembership::$member),
