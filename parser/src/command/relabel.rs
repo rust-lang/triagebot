@@ -12,7 +12,7 @@ use std::fmt;
 #[derive(Debug, PartialEq, Eq)]
 pub struct RelabelCommand(pub Vec<LabelDelta>);
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LabelDelta {
     Add(Label),
     Remove(Label),

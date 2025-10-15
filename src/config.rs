@@ -260,27 +260,33 @@ pub(crate) struct RelabelConfig {
 
 impl RelabelConfig {
     pub(crate) fn retrieve_command_from_alias(&self, input: RelabelCommand) -> RelabelCommand {
+        let mut deltas = vec![];
         match &self.configs {
             Some(configs) => {
-                dbg!(&configs);
-                // get only the first token from the command
-                // extract the "alias" from the RelabelCommand
+                // parse all tokens: if one matches an alias, extract the labels
+                // else, it will assumed to be a valid label
                 if input.0.len() > 0 {
-                    let name = input.0.get(0).unwrap();
-                    let name = name.label().as_str();
-                    // check if this alias matches any RelabelRuleConfig key in our config
-                    // extract the labels and build a new command
-                    if configs.contains_key(name) {
-                        let (_alias, cfg) = configs.get_key_value(name).unwrap();
-                        return cfg.to_command();
+                    for tk in input.0.iter() {
+                        let name = tk.label().as_str();
+                        if configs.contains_key(name) {
+                            if let Some((_, cfg)) = configs.get_key_value(name) {
+                                let cmd = cfg.to_command();
+                                for d in cmd.0 {
+                                    deltas.push(d);
+                                }
+                            }
+                        } else {
+                            deltas.push(tk.clone());
+                        }
                     }
                 }
             }
             None => {
+                // nothing to do, return the original command
                 return input;
             }
         };
-        input
+        RelabelCommand(deltas)
     }
 }
 
@@ -807,11 +813,11 @@ mod tests {
 
             [mentions."src/"]
             cc = ["@someone"]
-            
+
             [mentions."target/"]
             message = "This is a message."
             cc = ["@someone"]
-            
+
             [mentions."#[rustc_attr]"]
             type = "content"
             message = "This is a message."
@@ -1078,6 +1084,35 @@ mod tests {
                 auto_assign_no_one: "welcome message!".to_string(),
             })
         );
+    }
+
+    #[test]
+    fn relabel_alias_config() {
+        let config = r#"
+            [relabel.to-stable]
+            add-labels = ["regression-from-stable-to-stable"]
+            rem-labels = ["regression-from-stable-to-beta", "regression-from-stable-to-nightly"]
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+
+        let mut relabel_configs = HashMap::new();
+        relabel_configs.insert(
+            "to-stable".into(),
+            RelabelRuleConfig {
+                add_labels: vec!["regression-from-stable-to-stable".to_string()],
+                rem_labels: vec![
+                    "regression-from-stable-to-beta".to_string(),
+                    "regression-from-stable-to-nightly".to_string(),
+                ],
+            },
+        );
+
+        let expected_cfg = RelabelConfig {
+            allow_unauthenticated: vec![],
+            configs: Some(relabel_configs),
+        };
+
+        assert_eq!(config.relabel, Some(expected_cfg));
     }
 
     #[test]

@@ -1,7 +1,7 @@
-//! Purpose: Allow any user to modify issue labels on GitHub via comments.
+//! Purpose: Allow any user to modify labels on GitHub issues and pull requests via comments.
 //!
-//! Labels are checked against the labels in the project; the bot does not support creating new
-//! labels.
+//! Labels are checked against the existing set in the git repository; the bot does not support
+//! creating new labels.
 //!
 //! Parsing is done in the `parser::command::relabel` module.
 //!
@@ -27,11 +27,15 @@ pub(super) async fn handle_command(
     input: RelabelCommand,
 ) -> anyhow::Result<()> {
     let Some(issue) = event.issue() else {
-        return user_error!("Can only add and remove labels on an issue");
+        return user_error!("Can only add and remove labels on issues and pull requests");
     };
 
+    // If the input matches a valid alias, read the [relabel] config.
+    // if any alias matches, extract the alias config (RelabelRuleConfig) and build a new RelabelCommand.
+    let new_input = config.retrieve_command_from_alias(input);
+
     // Check label authorization for the current user
-    for delta in &input.0 {
+    for delta in &new_input.0 {
         let name = delta.label().as_str();
         let err = match check_filter(name, config, is_member(&event.user(), &ctx.team).await) {
             Ok(CheckFilterResult::Allow) => None,
@@ -53,7 +57,7 @@ pub(super) async fn handle_command(
     }
 
     // Compute the labels to add and remove
-    let (to_add, to_remove) = compute_label_deltas(&input.0);
+    let (to_add, to_remove) = compute_label_deltas(&new_input.0);
 
     // Add labels
     if let Err(e) = issue.add_labels(&ctx.github, to_add.clone()).await {
