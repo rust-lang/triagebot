@@ -708,7 +708,7 @@ async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::
     ))
 }
 
-fn render_zulip_username(zulip_id: u64) -> String {
+pub fn render_zulip_username(zulip_id: u64) -> String {
     // Rendering the username directly was running into some encoding issues, so we use
     // the special `|<user-id>` syntax instead.
     // @**|<zulip-id>** is Zulip syntax that will render as the username (and a link) of the user

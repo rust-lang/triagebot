@@ -274,11 +274,10 @@ async fn process_payload(
         }
     }
     if !message.is_empty() {
+        log::info!("user error: {}", message);
         if let Some(issue) = event.issue() {
             let cmnt = ErrorComment::new(issue, message);
             cmnt.post(&ctx.github).await?;
-        } else {
-            log::error!("handling event failed: {:?}", message);
         }
     }
     if other_error {

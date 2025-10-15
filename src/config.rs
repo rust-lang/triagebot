@@ -226,12 +226,23 @@ pub(crate) struct ConcernConfig {
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 pub(crate) struct MentionsConfig {
     #[serde(flatten)]
-    pub(crate) paths: HashMap<String, MentionsPathConfig>,
+    pub(crate) entries: HashMap<String, MentionsEntryConfig>,
+}
+
+#[derive(PartialEq, Eq, Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum MentionsEntryType {
+    #[default]
+    Filename,
+    Content,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct MentionsPathConfig {
+pub(crate) struct MentionsEntryConfig {
+    #[serde(alias = "type")]
+    #[serde(default)]
+    pub(crate) type_: MentionsEntryType,
     pub(crate) message: Option<String>,
     #[serde(default)]
     pub(crate) cc: Vec<String>,
@@ -563,8 +574,62 @@ pub(crate) struct RenderedLinkConfig {
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct IssueLinksConfig {
-    #[serde(default = "default_true")]
-    pub(crate) check_commits: bool,
+    #[serde(default)]
+    pub(crate) check_commits: IssueLinksCheckCommitsConfig,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub(crate) enum IssueLinksCheckCommitsConfig {
+    /// No checking of commits
+    Off,
+    /// Only check for uncanonicalized issue links in commits
+    Uncanonicalized,
+    /// Check for all issue links in commits
+    All,
+}
+
+impl Default for IssueLinksCheckCommitsConfig {
+    fn default() -> Self {
+        IssueLinksCheckCommitsConfig::All
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for IssueLinksCheckCommitsConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct CheckCommitsVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for CheckCommitsVisitor {
+            type Value = IssueLinksCheckCommitsConfig;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a bool or the string \"uncanonicalized\"")
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E> {
+                Ok(if v {
+                    IssueLinksCheckCommitsConfig::All
+                } else {
+                    IssueLinksCheckCommitsConfig::Off
+                })
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if v == "uncanonicalized" {
+                    Ok(IssueLinksCheckCommitsConfig::Uncanonicalized)
+                } else {
+                    Err(E::custom("expected \"uncanonicalized\""))
+                }
+            }
+        }
+
+        deserializer.deserialize_any(CheckCommitsVisitor)
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -585,11 +650,6 @@ pub(crate) struct BehindUpstreamConfig {
     /// The threshold of days for parent commit age to trigger a warning.
     /// Default is 7 days if not specified.
     pub(crate) days_threshold: Option<usize>,
-}
-
-#[inline]
-fn default_true() -> bool {
-    true
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -714,7 +774,7 @@ mod tests {
 
     #[test]
     fn sample() {
-        let config = r#"
+        let config = r##"
             [relabel]
             allow-unauthenticated = [
                 "C-*"
@@ -745,6 +805,18 @@ mod tests {
             core = "T-core"
             infra = "T-infra"
 
+            [mentions."src/"]
+            cc = ["@someone"]
+            
+            [mentions."target/"]
+            message = "This is a message."
+            cc = ["@someone"]
+            
+            [mentions."#[rustc_attr]"]
+            type = "content"
+            message = "This is a message."
+            cc = ["@someone"]
+
             [shortcut]
 
             [issue-links]
@@ -766,7 +838,7 @@ mod tests {
             [range-diff]
 
             [review-changes-since]
-        "#;
+        "##;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
         ping_teams.insert(
@@ -834,7 +906,34 @@ mod tests {
                 github_releases: None,
                 review_submitted: None,
                 review_requested: None,
-                mentions: None,
+                mentions: Some(MentionsConfig {
+                    entries: HashMap::from([
+                        (
+                            "src/".to_string(),
+                            MentionsEntryConfig {
+                                type_: MentionsEntryType::Filename,
+                                message: None,
+                                cc: vec!["@someone".to_string()]
+                            }
+                        ),
+                        (
+                            "target/".to_string(),
+                            MentionsEntryConfig {
+                                type_: MentionsEntryType::Filename,
+                                message: Some("This is a message.".to_string()),
+                                cc: vec!["@someone".to_string()]
+                            }
+                        ),
+                        (
+                            "#[rustc_attr]".to_string(),
+                            MentionsEntryConfig {
+                                type_: MentionsEntryType::Content,
+                                message: Some("This is a message.".to_string()),
+                                cc: vec!["@someone".to_string()]
+                            }
+                        )
+                    ])
+                }),
                 no_merges: None,
                 pr_tracking: None,
                 transfer: None,
@@ -845,7 +944,7 @@ mod tests {
                     exclude_files: vec![],
                 }),
                 issue_links: Some(IssueLinksConfig {
-                    check_commits: true,
+                    check_commits: IssueLinksCheckCommitsConfig::All,
                 }),
                 no_mentions: Some(NoMentionsConfig {
                     exclude_titles: vec!["subtree update".into()],
@@ -940,7 +1039,7 @@ mod tests {
                 bot_pull_requests: None,
                 rendered_link: None,
                 issue_links: Some(IssueLinksConfig {
-                    check_commits: false,
+                    check_commits: IssueLinksCheckCommitsConfig::Off,
                 }),
                 no_mentions: None,
                 behind_upstream: Some(BehindUpstreamConfig {
@@ -982,34 +1081,17 @@ mod tests {
     }
 
     #[test]
-    fn relabel_new_config() {
+    fn issue_links_uncanonicalized() {
         let config = r#"
-            [relabel]
-            allow-unauthenticated = ["ABCD-*"]
-
-            [relabel.to-stable]
-            add-labels = ["regression-from-stable-to-stable"]
-            rem-labels = ["regression-from-stable-to-beta", "regression-from-stable-to-nightly"]
+            [issue-links]
+            check-commits = "uncanonicalized"
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
-
-        let mut relabel_configs = HashMap::new();
-        relabel_configs.insert(
-            "to-stable".into(),
-            RelabelRuleConfig {
-                add_labels: vec!["regression-from-stable-to-stable".to_string()],
-                rem_labels: vec![
-                    "regression-from-stable-to-beta".to_string(),
-                    "regression-from-stable-to-nightly".to_string(),
-                ],
-            },
-        );
-
-        let expected_cfg = RelabelConfig {
-            allow_unauthenticated: vec!["ABCD-*".to_string()],
-            configs: Some(relabel_configs),
-        };
-
-        assert_eq!(config.relabel, Some(expected_cfg));
+        assert!(matches!(
+            config.issue_links,
+            Some(IssueLinksConfig {
+                check_commits: IssueLinksCheckCommitsConfig::Uncanonicalized
+            })
+        ));
     }
 }

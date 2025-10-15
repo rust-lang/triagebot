@@ -324,7 +324,7 @@ impl User {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Ord, PartialOrd, serde::Deserialize)]
 pub struct Label {
     pub name: String,
 }
@@ -408,7 +408,8 @@ pub struct Issue {
     // User performing an `action` (or PR/issue author)
     pub user: User,
     pub labels: Vec<Label>,
-    // Users assigned to the issue/pr after `action` has been performed
+    // Users assigned to the issue/pr after `action` has been performed issue
+    // (PR reviewers or issue assignees)
     // These are NOT the same as `IssueEvent.assignee`
     pub assignees: Vec<User>,
     /// Indicator if this is a pull request.
@@ -785,33 +786,47 @@ impl Issue {
         Ok(())
     }
 
-    pub async fn remove_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<()> {
-        log::info!("remove_label from {}: {:?}", self.global_id(), label);
-        // DELETE /repos/:owner/:repo/issues/:number/labels/{name}
-        let url = format!(
-            "{repo_url}/issues/{number}/labels/{name}",
-            repo_url = self.repository().url(client),
-            number = self.number,
-            name = label,
+    pub async fn remove_labels(
+        &self,
+        client: &GithubClient,
+        labels: Vec<Label>,
+    ) -> anyhow::Result<()> {
+        log::info!("remove_labels from {}: {:?}", self.global_id(), labels);
+
+        // Don't try to remove labels not already present on this issue.
+        let labels = labels
+            .into_iter()
+            .filter(|l| self.labels().contains(l))
+            .collect::<Vec<_>>();
+
+        log::info!(
+            "remove_labels: {} filtered to {:?}",
+            self.global_id(),
+            labels
         );
 
-        if !self
-            .labels()
-            .iter()
-            .any(|l| l.name.to_lowercase() == label.to_lowercase())
-        {
-            log::info!(
-                "remove_label from {}: {:?} already not present, skipping",
-                self.global_id(),
-                label
-            );
+        if labels.is_empty() {
             return Ok(());
         }
 
-        client
-            .send_req(client.delete(&url))
-            .await
-            .context("failed to delete label")?;
+        // There is no API to remove all labels at once, so we issue as many
+        // API requests are required in parallel.
+        let requests = labels.into_iter().map(|label| async move {
+            // DELETE /repos/:owner/:repo/issues/:number/labels/{name}
+            let url = format!(
+                "{repo_url}/issues/{number}/labels/{name}",
+                repo_url = self.repository().url(client),
+                number = self.number,
+                name = label.name,
+            );
+
+            client
+                .send_req(client.delete(&url))
+                .await
+                .with_context(|| format!("failed to remove {label:?}"))
+        });
+
+        futures::future::try_join_all(requests).await?;
 
         Ok(())
     }
@@ -1194,10 +1209,16 @@ pub struct ChangeInner {
 }
 
 #[derive(Debug, serde::Deserialize)]
+pub struct BaseChange {
+    pub r#ref: ChangeInner,
+    pub sha: ChangeInner,
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct Changes {
     pub title: Option<ChangeInner>,
     pub body: Option<ChangeInner>,
-    pub base: Option<ChangeInner>,
+    pub base: Option<BaseChange>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]

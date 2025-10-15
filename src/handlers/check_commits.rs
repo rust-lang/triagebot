@@ -243,13 +243,17 @@ async fn handle_new_state(
 
         // Remove the labels no longer required
         if !labels_to_remove.is_empty() {
-            for label in labels_to_remove {
-                event
-                    .issue
-                    .remove_label(&ctx.github, &label)
-                    .await
-                    .context("failed to remove a label in check_commits")?;
-            }
+            event
+                .issue
+                .remove_labels(
+                    &ctx.github,
+                    labels_to_remove
+                        .into_iter()
+                        .map(|name| Label { name })
+                        .collect(),
+                )
+                .await
+                .context("failed to remove a label in check_commits")?;
         }
 
         // Add the labels that are now required
@@ -515,8 +519,13 @@ r#":warning: **Warning** :warning:
         event.changes = Some(crate::github::Changes {
             title: None,
             body: None,
-            base: Some(crate::github::ChangeInner {
-                from: "master".to_string(),
+            base: Some(crate::github::BaseChange {
+                r#ref: crate::github::ChangeInner {
+                    from: "master".to_string(),
+                },
+                sha: crate::github::ChangeInner {
+                    from: "fake-sha".to_string(),
+                },
             }),
         });
         assert!(should_handle_event(&event));

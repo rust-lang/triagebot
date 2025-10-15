@@ -52,9 +52,18 @@ pub(crate) async fn handle_input(
         )
         .await?;
 
-    for label in &config.remove_labels {
-        event.issue.remove_label(&ctx.github, label).await?;
-    }
+    event
+        .issue
+        .remove_labels(
+            &ctx.github,
+            config
+                .remove_labels
+                .iter()
+                .cloned()
+                .map(|name| Label { name })
+                .collect(),
+        )
+        .await?;
 
     Ok(())
 }

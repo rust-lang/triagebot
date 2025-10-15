@@ -21,15 +21,9 @@ pub(super) async fn handle_command(
     };
 
     if !is_team_member {
-        let cmnt = ErrorComment::new(
-            &event.issue().unwrap(),
-            format!(
-                "Nominating and approving issues and pull requests is restricted to members of\
-                 the Rust teams."
-            ),
+        return user_error!(
+            "Nominating and approving issues and pull requests is restricted to members of the Rust teams."
         );
-        cmnt.post(&ctx.github).await?;
-        return Ok(());
     }
 
     let issue_labels = event.issue().unwrap().labels();

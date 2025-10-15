@@ -6,7 +6,7 @@ use crate::{
     config::ConcernConfig,
     github::{Event, Label},
     handlers::Context,
-    interactions::{EditIssueBody, ErrorComment},
+    interactions::EditIssueBody,
 };
 use parser::command::concern::ConcernCommand;
 
@@ -37,7 +37,7 @@ pub(super) async fn handle_command(
     cmd: ConcernCommand,
 ) -> anyhow::Result<()> {
     let Event::IssueComment(issue_comment) = event else {
-        bail!("concern issued on something other than a issue")
+        return user_error!("Concerns can only be issued on an issue");
     };
     let Some(comment_url) = event.html_url() else {
         bail!("unable to retrieve the comment url")
@@ -81,10 +81,9 @@ pub(super) async fn handle_command(
             issue.number,
             issue_comment.comment.user,
         );
-        ErrorComment::new(&issue, "Only team members in the [team repo](https://github.com/rust-lang/team) can add or resolve concerns.")
-            .post(&ctx.github)
-            .await?;
-        return Ok(());
+        return user_error!(
+            "Only team members in the [team repo](https://github.com/rust-lang/team) can add or resolve concerns."
+        );
     }
 
     let mut client = ctx.db.get().await;
@@ -152,12 +151,19 @@ pub(super) async fn handle_command(
             ).await.context("unable to post the comment failure it-self")?;
         }
     } else {
-        for l in &config.labels {
-            issue
-                .remove_label(&ctx.github, &l)
-                .await
-                .context("unable to remove the concern labels")?;
-        }
+        issue
+            .remove_labels(
+                &ctx.github,
+                config
+                    .labels
+                    .iter()
+                    .map(|l| Label {
+                        name: l.to_string(),
+                    })
+                    .collect(),
+            )
+            .await
+            .context("unable to remove the concern labels")?;
     }
 
     // Apply the new markdown concerns list to the issue
@@ -232,7 +238,7 @@ fn simple_markdown_content() {
         Concern {
             title: "This is a resolved concern".to_string(),
             status: ConcernStatus::Resolved {
-                comment_url: "https:://github.com/fake-comment-8888".to_string(),
+                comment_url: "https://github.com/fake-comment-8888".to_string(),
             },
             comment_url: "https://github.com/fake-comment-4561".to_string(),
         },
@@ -245,7 +251,7 @@ fn simple_markdown_content() {
 > # Concerns (1 active)
 >
 > - [This is my concern about concern](https://github.com/fake-comment-1234)
-> - ~~[This is a resolved concern](https://github.com/fake-comment-4561)~~ resolved in [this comment](https:://github.com/fake-comment-8888)
+> - ~~[This is a resolved concern](https://github.com/fake-comment-4561)~~ resolved in [this comment](https://github.com/fake-comment-8888)
 >
 > *Managed by `@rustbot`—see [help](https://forge.rust-lang.org/triagebot/concern.html) for details.*
 "#
@@ -257,7 +263,7 @@ fn resolved_concerns_markdown_content() {
     let concerns = &[Concern {
         title: "This is a resolved concern".to_string(),
         status: ConcernStatus::Resolved {
-            comment_url: "https:://github.com/fake-comment-8888".to_string(),
+            comment_url: "https://github.com/fake-comment-8888".to_string(),
         },
         comment_url: "https://github.com/fake-comment-4561".to_string(),
     }];
@@ -268,7 +274,7 @@ fn resolved_concerns_markdown_content() {
 > [!NOTE]
 > # Concerns (0 active)
 >
-> - ~~[This is a resolved concern](https://github.com/fake-comment-4561)~~ resolved in [this comment](https:://github.com/fake-comment-8888)
+> - ~~[This is a resolved concern](https://github.com/fake-comment-4561)~~ resolved in [this comment](https://github.com/fake-comment-8888)
 >
 > *Managed by `@rustbot`—see [help](https://forge.rust-lang.org/triagebot/concern.html) for details.*
 "#
