@@ -419,6 +419,9 @@ pub(crate) struct MajorChangeConfig {
     pub(crate) zulip_stream: u64,
     /// Extra text in the opening major change.
     pub(crate) open_extra_text: Option<String>,
+    /// Template for a tracking issue to be created when the major change is accepted
+    #[serde(rename = "tracking-issue-template")]
+    pub(crate) tracking_issue_template: Option<MajorChangeTrackingIssueTemplateConfig>,
 }
 
 impl MajorChangeConfig {
@@ -431,6 +434,20 @@ impl MajorChangeConfig {
     fn waiting_period_default() -> u16 {
         10
     }
+}
+
+#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MajorChangeTrackingIssueTemplateConfig {
+    /// Template for the title
+    pub(crate) title: String,
+    /// Repository where to create the tracking issue (otherwise the current repository)
+    pub(crate) repository: Option<String>,
+    /// List of labels to add to the issue
+    pub(crate) labels: Vec<String>,
+    /// Template of the body
+    pub(crate) body: String,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -1029,5 +1046,51 @@ mod tests {
                 check_commits: IssueLinksCheckCommitsConfig::Uncanonicalized
             })
         ));
+    }
+
+    #[test]
+    fn major_change() {
+        let config = r#"
+            [major-change]
+            enabling_label = "major-change"
+            meeting_label = "to-announce"
+            second_label = "final-comment-period"
+            concerns_label = "has-concerns"
+            accept_label = "major-change-accepted"
+            waiting_period = 1
+            auto_closing = true
+            zulip_stream = 224082
+            zulip_ping = "Urgau"
+
+            [major-change.tracking-issue-template]
+            repository = "triagebot"
+            title = "Tracking issue for MCP#${mcp_number}"
+            body = """
+Multi text body with ${mcp_issue} and ${mcp_title}
+"""
+            labels = ["C-tracking-issue", "T-compiler"]
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        assert_eq!(
+            config.major_change,
+            Some(MajorChangeConfig {
+                zulip_ping: "Urgau".to_string(),
+                enabling_label: "major-change".to_string(),
+                second_label: "final-comment-period".to_string(),
+                accept_label: "major-change-accepted".to_string(),
+                meeting_label: "to-announce".to_string(),
+                concerns_label: Some("has-concerns".to_string()),
+                waiting_period: 1,
+                auto_closing: true,
+                zulip_stream: 224082,
+                open_extra_text: None,
+                tracking_issue_template: Some(MajorChangeTrackingIssueTemplateConfig {
+                    title: "Tracking issue for MCP#${mcp_number}".to_string(),
+                    repository: Some("triagebot".to_string()),
+                    body: "Multi text body with ${mcp_issue} and ${mcp_title}\n".to_string(),
+                    labels: vec!["C-tracking-issue".to_string(), "T-compiler".to_string()],
+                })
+            })
+        );
     }
 }

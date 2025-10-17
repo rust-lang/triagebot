@@ -581,6 +581,11 @@ async fn process_seconded(
         .await
         .context("unable to get the associated issue")?;
 
+    let (org, repo) = major_change
+        .repo
+        .split_once('/')
+        .context("unable to split org/repo")?;
+
     {
         // Static checks against the timeline to block the acceptance if the state changed between
         // the second and now (like concerns added, issue closed, ...).
@@ -588,10 +593,6 @@ async fn process_seconded(
         // Note that checking the timeline is important as a concern could have been added and
         // resolved by the time we run, missing that this job should not run.
 
-        let (org, repo) = major_change
-            .repo
-            .split_once('/')
-            .context("unable to split org/repo")?;
         let timeline = ctx
             .octocrab
             .issues(org, repo)
@@ -665,13 +666,58 @@ async fn process_seconded(
     }
 
     if !issue.labels.iter().any(|l| l.name == config.accept_label) {
-        // Only post the comment if the accept_label isn't set yet, we may be in a retry
+        // Only create the tracking issue and post the comment if the accept_label isn't set yet, we may be in a retry.
+
+        let tracking_issue_text =
+            if let Some(tracking_issue_template) = &config.tracking_issue_template {
+                let issue_repo = crate::github::IssueRepository {
+                    organization: org.to_string(),
+                    repository: tracking_issue_template
+                        .repository
+                        .as_deref()
+                        .unwrap_or(repo)
+                        .to_string(),
+                };
+
+                let fill_out = |input: &str| {
+                    input
+                        .replace("${mcp_number}", &issue.number.to_string())
+                        .replace("${mcp_title}", &issue.title)
+                        .replace("${mcp_author}", &issue.user.login)
+                };
+
+                let title = fill_out(&tracking_issue_template.title);
+                let body = fill_out(&tracking_issue_template.body);
+
+                let tracking_issue = ctx
+                    .github
+                    .new_issue(
+                        &issue_repo,
+                        &title,
+                        &body,
+                        tracking_issue_template.labels.clone(),
+                    )
+                    .await
+                    .context("unable to create MCP tracking issue")
+                    .with_context(|| format!("title: {title}"))
+                    .with_context(|| format!("body: {body}"))?;
+
+                format!(
+                    r"
+Progress of this major change will be tracked in the tracking issue at {}#{}.
+",
+                    &issue_repo, tracking_issue.number
+                )
+            } else {
+                String::new()
+            };
+
         issue
             .post_comment(
                 &ctx.github,
                 &format!(
 r"The final comment period is now complete, this major change is now **accepted**.
-
+{tracking_issue_text}
 As the automated representative, I would like to thank the author for their work and everyone else who contributed to this major change proposal.
 
 *If you think this major change shouldn't have been accepted, feel free to remove the `{}` label and reopen this issue.*",
