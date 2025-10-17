@@ -519,7 +519,7 @@ impl Job for MajorChangeAcceptenceJob {
 
         let now = Utc::now();
 
-        match process_seconded(ctx, &major_change, now).await {
+        match try_accept_mcp(ctx, &major_change, now).await {
             Ok(()) => {
                 tracing::info!(
                     "{}: major change ({:?}) as been accepted",
@@ -549,7 +549,7 @@ impl Job for MajorChangeAcceptenceJob {
     }
 }
 
-async fn process_seconded(
+async fn try_accept_mcp(
     ctx: &super::Context,
     major_change: &MajorChangeSeconded,
     now: DateTime<Utc>,
