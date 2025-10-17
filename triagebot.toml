@@ -20,6 +20,16 @@ auto_closing = true
 zulip_stream = 224082
 zulip_ping = "Urgau"
 
+[major-change.tracking-issue-template]
+repository = "triagebot"
+title = "Test tracking issue for MCP#${mcp_number}"
+body = """
+Multi line body for ${mcp_issue}: ${mcp_title}
+
+Created by ${mcp_author}
+"""
+labels = ["A-mcp"]
+
 [ping.wg-meta]
 message = """\
 This is just testing some functionality, please ignore this ping.
