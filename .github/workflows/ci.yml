@@ -29,6 +29,11 @@ jobs:
         run: cargo test --workspace --all-targets
       - name: Check formatting
         run: cargo fmt --all --check
+      - name: Lint
+        run: |
+          # Install Clippy (not included in the `minimal` profile)
+          rustup component add clippy
+          cargo clippy --all --all-targets
 
   deploy:
     name: Deploy
