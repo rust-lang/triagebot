@@ -1,5 +1,6 @@
 use crate::db::notifications::Identifier;
 use crate::db::review_prefs::RotationMode;
+use crate::github::PullRequestNumber;
 use clap::{ColorChoice, Parser};
 use std::num::NonZeroU32;
 use std::str::FromStr;
@@ -161,8 +162,10 @@ pub enum StreamCommand {
     Read,
     /// Ping project goal owners.
     PingGoals(PingGoalsArgs),
-    /// Update docs
+    /// Update docs.
     DocsUpdate,
+    /// Accept or decline a backport.
+    Backport(BackportArgs),
 }
 
 #[derive(clap::Parser, Debug, PartialEq, Clone)]
@@ -171,6 +174,55 @@ pub struct PingGoalsArgs {
     pub threshold: u64,
     /// Date of next update
     pub next_update: String,
+}
+
+/// Backport release channels
+#[derive(Clone, clap::ValueEnum, Debug, PartialEq)]
+pub enum BackportChannelArgs {
+    Beta,
+    Stable,
+}
+
+impl std::fmt::Display for BackportChannelArgs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match &self {
+            BackportChannelArgs::Beta => write!(f, "beta"),
+            BackportChannelArgs::Stable => write!(f, "stable"),
+        }
+    }
+}
+
+/// Backport verbs
+#[derive(Clone, clap::ValueEnum, Debug, PartialEq)]
+pub enum BackportVerbArgs {
+    Accept,
+    Accepted,
+    Approve,
+    Approved,
+    Decline,
+    Declined,
+}
+
+impl std::fmt::Display for BackportVerbArgs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match &self {
+            BackportVerbArgs::Accept
+            | BackportVerbArgs::Accepted
+            | BackportVerbArgs::Approve
+            | BackportVerbArgs::Approved => write!(f, "approved"),
+            BackportVerbArgs::Decline | BackportVerbArgs::Declined => write!(f, "declined"),
+        }
+    }
+}
+
+#[derive(clap::Parser, Debug, PartialEq, Clone)]
+pub struct BackportArgs {
+    /// Release channel this backport is pointing to. Allowed: "beta" or "stable".
+    pub channel: BackportChannelArgs,
+    /// Accept or decline this backport? Allowed: "accept", "accepted", "approve", "approved", "decline", "declined".
+    pub verb: BackportVerbArgs,
+    /// PR to be backported
+    pub pr_num: PullRequestNumber,
 }
 
 /// Helper function to parse CLI arguments without any colored help or error output.
@@ -290,6 +342,26 @@ mod tests {
     fn end_meeting_command() {
         assert_eq!(parse_stream(&["end-meeting"]), StreamCommand::EndMeeting);
         assert_eq!(parse_stream(&["await"]), StreamCommand::EndTopic);
+    }
+
+    #[test]
+    fn backports_command() {
+        assert_eq!(
+            parse_stream(&["backport", "beta", "accept", "123456"]),
+            StreamCommand::Backport(BackportArgs {
+                channel: BackportChannelArgs::Beta,
+                verb: BackportVerbArgs::Accept,
+                pr_num: 123456
+            })
+        );
+        assert_eq!(
+            parse_stream(&["backport", "stable", "decline", "123456"]),
+            StreamCommand::Backport(BackportArgs {
+                channel: BackportChannelArgs::Stable,
+                verb: BackportVerbArgs::Decline,
+                pr_num: 123456
+            })
+        );
     }
 
     fn parse_chat(input: &[&str]) -> ChatCommand {
