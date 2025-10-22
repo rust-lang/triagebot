@@ -102,7 +102,6 @@ fn delta_empty() {
 }
 
 impl RelabelCommand {
-    /// Parse and validate command tokens
     pub fn parse<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
         let mut toks = input.clone();
 
