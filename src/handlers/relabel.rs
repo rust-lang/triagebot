@@ -1,7 +1,7 @@
-//! Purpose: Allow any user to modify labels on GitHub issues and pull requests via comments.
+//! Purpose: Allow any user to modify issue labels on GitHub via comments.
 //!
-//! Labels are checked against the existing set in the git repository; the bot does not support
-//! creating new labels.
+//! Labels are checked against the labels in the project; the bot does not support creating new
+//! labels.
 //!
 //! Parsing is done in the `parser::command::relabel` module.
 //!
@@ -27,17 +27,13 @@ pub(super) async fn handle_command(
     input: RelabelCommand,
 ) -> anyhow::Result<()> {
     let Some(issue) = event.issue() else {
-        return user_error!("Can only add and remove labels on issues and pull requests");
+        return user_error!("Can only add and remove labels on an issue");
     };
 
-    // If the input matches a valid alias, read the [relabel] config.
-    // if any alias matches, extract the alias config (RelabelAliasConfig) and build a new RelabelCommand.
-    let new_input = config.retrieve_command_from_alias(input);
-
     // Check label authorization for the current user
-    for delta in &new_input.0 {
+    for delta in &input.0 {
         let name = delta.label() as &str;
-        let err = match check_filter(name, config, is_member(&event.user(), &ctx.team).await) {
+        let err = match check_filter(name, config, is_member(event.user(), &ctx.team).await) {
             Ok(CheckFilterResult::Allow) => None,
             Ok(CheckFilterResult::Deny) => {
                 Some(format!("Label {name} can only be set by Rust team members"))
@@ -48,7 +44,6 @@ pub(super) async fn handle_command(
             )),
             Err(err) => Some(err),
         };
-
         if let Some(err) = err {
             // bail-out and inform the user why
             return user_error!(err);
@@ -56,7 +51,7 @@ pub(super) async fn handle_command(
     }
 
     // Compute the labels to add and remove
-    let (to_add, to_remove) = compute_label_deltas(&new_input.0);
+    let (to_add, to_remove) = compute_label_deltas(&input.0);
 
     // Add labels
     if let Err(e) = issue.add_labels(&ctx.github, to_add.clone()).await {
@@ -108,8 +103,6 @@ enum CheckFilterResult {
     DenyUnknown,
 }
 
-/// Check if the team member is allowed to apply labels
-/// configured in `allow_unauthenticated`
 fn check_filter(
     label: &str,
     config: &RelabelConfig,
@@ -201,7 +194,6 @@ fn compute_label_deltas(deltas: &[LabelDelta]) -> (Vec<Label>, Vec<Label>) {
 #[cfg(test)]
 mod tests {
     use parser::command::relabel::{Label, LabelDelta};
-    use std::collections::HashMap;
 
     use super::{
         CheckFilterResult, MatchPatternResult, TeamMembership, check_filter, compute_label_deltas,
@@ -240,7 +232,6 @@ mod tests {
             ($($member:ident { $($label:expr => $res:ident,)* })*) => {
                 let config = RelabelConfig {
                     allow_unauthenticated: vec!["T-*".into(), "I-*".into(), "!I-*nominated".into()],
-                    aliases: HashMap::new()
                 };
                 $($(assert_eq!(
                     check_filter($label, &config, TeamMembership::$member),
