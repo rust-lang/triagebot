@@ -177,14 +177,15 @@ async fn process_zulip_request(ctx: Arc<Context>, req: Request) -> anyhow::Resul
 async fn handle_command<'a>(
     ctx: Arc<Context>,
     mut gh_id: u64,
-    command: &'a str,
+    message: &'a str,
     message_data: &'a Message,
 ) -> anyhow::Result<Option<String>> {
-    log::trace!("handling zulip command {:?}", command);
-    let mut words: Vec<&str> = command.split_whitespace().collect();
+    log::trace!("handling zulip message {:?}", message);
 
     // Missing stream means that this is a direct message
     if message_data.stream_id.is_none() {
+        let mut words: Vec<&str> = message.split_whitespace().collect();
+
         // Handle impersonation
         let mut impersonated = false;
         #[expect(clippy::get_first, reason = "for symmetry with `get(1)`")]
@@ -252,7 +253,7 @@ async fn handle_command<'a>(
 
             let sender = &message_data.sender_full_name;
             let message = format!(
-                "{sender} ran `{command}` on your behalf. Output:\n{}",
+                "{sender} ran `{message}` on your behalf. Output:\n{}",
                 output.as_deref().unwrap_or("<empty>")
             );
 
@@ -270,33 +271,47 @@ async fn handle_command<'a>(
         Ok(output)
     } else {
         // We are in a stream, where someone wrote `@**triagebot** <command(s)>`
-        let cmd_index = words
-            .iter()
-            .position(|w| *w == "@**triagebot**")
-            .unwrap_or(words.len());
-        let cmd_index = cmd_index + 1;
-        if cmd_index >= words.len() {
-            return Ok(Some("Unknown command".to_string()));
+        //
+        // Yet we need to process each lines separately as the command can only be
+        // one line.
+        for line in message.lines() {
+            let words: Vec<&str> = line.split_whitespace().collect();
+
+            // Try to find the ping, continue to the next line if we don't find it here.
+            let Some(cmd_index) = words.iter().position(|w| *w == "@**triagebot**") else {
+                continue;
+            };
+
+            let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].iter().copied())?;
+            tracing::info!("command parsed to {cmd:?}");
+
+            // Process the command and early return (we don't expect multi-commands in the
+            // same message)
+            return match cmd {
+                StreamCommand::EndTopic => {
+                    post_waiter(&ctx, message_data, WaitingMessage::end_topic())
+                        .await
+                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                }
+                StreamCommand::EndMeeting => {
+                    post_waiter(&ctx, message_data, WaitingMessage::end_meeting())
+                        .await
+                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                }
+                StreamCommand::Read => {
+                    post_waiter(&ctx, message_data, WaitingMessage::start_reading())
+                        .await
+                        .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
+                }
+                StreamCommand::PingGoals(args) => {
+                    ping_goals_cmd(ctx, gh_id, message_data, &args).await
+                }
+                StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
+            };
         }
 
-        let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].iter().copied())?;
-        tracing::info!("command parsed to {cmd:?}");
-
-        match cmd {
-            StreamCommand::EndTopic => post_waiter(&ctx, message_data, WaitingMessage::end_topic())
-                .await
-                .map_err(|e| format_err!("Failed to await at this time: {e:?}")),
-            StreamCommand::EndMeeting => {
-                post_waiter(&ctx, message_data, WaitingMessage::end_meeting())
-                    .await
-                    .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
-            }
-            StreamCommand::Read => post_waiter(&ctx, message_data, WaitingMessage::start_reading())
-                .await
-                .map_err(|e| format_err!("Failed to await at this time: {e:?}")),
-            StreamCommand::PingGoals(args) => ping_goals_cmd(ctx, gh_id, message_data, &args).await,
-            StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
-        }
+        tracing::warn!("no command found, yet we were pinged, weird");
+        Ok(Some("Unknown command".to_string()))
     }
 }
 
