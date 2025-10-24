@@ -282,6 +282,16 @@ async fn handle_command<'a>(
                 continue;
             };
 
+            // Skip @**triagebot**
+            let cmd_index = cmd_index + 1;
+
+            // Error on unexpected end-of-line
+            if cmd_index >= words.len() {
+                return Ok(Some(
+                    "Error parsing command: unexpected end-of-line".to_string(),
+                ));
+            }
+
             let cmd = parse_cli::<StreamCommand, _>(words[cmd_index..].iter().copied())?;
             tracing::info!("command parsed to {cmd:?}");
 
