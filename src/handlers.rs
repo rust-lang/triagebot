@@ -422,6 +422,11 @@ macro_rules! command_handlers {
                                     if let Some(err) = err.downcast_mut::<UserError>() {
                                         errors.push(HandlerError::Message(std::mem::take(&mut err.0)));
                                     } else {
+                                        errors.push(HandlerError::Message(format!(
+                                            "`{}` handler unexpectedly failed in [this comment]({}): {err}",
+                                            stringify!($name),
+                                            event.html_url().expect("has html url"),
+                                        )));
                                         errors.push(HandlerError::Other(err.context(format!(
                                             "error when processing {} command handler",
                                             stringify!($name)
