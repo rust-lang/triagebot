@@ -408,7 +408,7 @@ macro_rules! command_handlers {
                                 .await
                                 .unwrap_or_else(|mut err| {
                                     if let Some(err) = err.downcast_mut::<crate::errors::UserError>() {
-                                        errors.push(HandlerError::Message(std::mem::take(&mut err.0)));
+                                        errors.push(HandlerError::Message(err.to_string()));
                                     } else {
                                         errors.push(HandlerError::Message(format!(
                                             "`{}` handler unexpectedly failed in [this comment]({}): {err}",

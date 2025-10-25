@@ -13,13 +13,17 @@ use axum::{
 ///
 /// The message will be shown to the user via comment posted by this bot.
 #[derive(Debug)]
-pub struct UserError(pub String);
+pub enum UserError {
+    Message(String),
+}
 
 impl std::error::Error for UserError {}
 
 impl fmt::Display for UserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.0)
+        match self {
+            UserError::Message(msg) => f.write_str(msg),
+        }
     }
 }
 
@@ -31,7 +35,9 @@ impl fmt::Display for UserError {
 /// Should be used like this `return user_error!("My error message.");`.
 macro_rules! user_error {
     ($err:expr $(,)?) => {
-        anyhow::Result::Err(anyhow::anyhow!(crate::errors::UserError($err.into())))
+        anyhow::Result::Err(anyhow::anyhow!(crate::errors::UserError::Message(
+            $err.into()
+        )))
     };
 }
 
