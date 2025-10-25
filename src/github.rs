@@ -1,3 +1,4 @@
+use crate::errors::UserError;
 use crate::team_data::TeamClient;
 use anyhow::Context;
 use async_trait::async_trait;
@@ -612,20 +613,6 @@ impl IssueRepository {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct UnknownLabels {
-    labels: Vec<String>,
-}
-
-// NOTE: This is used to post the Github comment; make sure it's valid markdown.
-impl fmt::Display for UnknownLabels {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Unknown labels: {}", &self.labels.join(", "))
-    }
-}
-
-impl std::error::Error for UnknownLabels {}
-
 impl Issue {
     pub fn to_zulip_github_reference(&self) -> ZulipGitHubReference {
         ZulipGitHubReference {
@@ -867,7 +854,7 @@ impl Issue {
         }
 
         if !unknown_labels.is_empty() {
-            return Err(UnknownLabels {
+            return Err(UserError::UnknownLabels {
                 labels: unknown_labels,
             }
             .into());
@@ -3270,18 +3257,5 @@ impl Submodule {
                 anyhow::anyhow!("expected .git suffix, got {}", self.submodule_git_url)
             })?;
         client.repository(fullname).await
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn display_labels() {
-        let x = UnknownLabels {
-            labels: vec!["A-bootstrap".into(), "xxx".into()],
-        };
-        assert_eq!(x.to_string(), "Unknown labels: A-bootstrap, xxx");
     }
 }

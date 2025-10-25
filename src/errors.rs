@@ -14,15 +14,22 @@ use axum::{
 /// The message will be shown to the user via comment posted by this bot.
 #[derive(Debug)]
 pub enum UserError {
+    /// Simple message
     Message(String),
+    /// Unknown labels
+    UnknownLabels { labels: Vec<String> },
 }
 
 impl std::error::Error for UserError {}
 
+// NOTE: This is used to post the Github comment; make sure it's valid markdown.
 impl fmt::Display for UserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             UserError::Message(msg) => f.write_str(msg),
+            UserError::UnknownLabels { labels } => {
+                write!(f, "Unknown labels: {}", labels.join(", "))
+            }
         }
     }
 }
@@ -66,5 +73,18 @@ where
 {
     fn from(err: E) -> Self {
         AppError(err.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_labels() {
+        let x = UserError::UnknownLabels {
+            labels: vec!["A-bootstrap".into(), "xxx".into()],
+        };
+        assert_eq!(x.to_string(), "Unknown labels: A-bootstrap, xxx");
     }
 }
