@@ -18,6 +18,8 @@ pub enum UserError {
     Message(String),
     /// Unknown labels
     UnknownLabels { labels: Vec<String> },
+    /// Invalid assignee
+    InvalidAssignee,
 }
 
 impl std::error::Error for UserError {}
@@ -30,6 +32,7 @@ impl fmt::Display for UserError {
             UserError::UnknownLabels { labels } => {
                 write!(f, "Unknown labels: {}", labels.join(", "))
             }
+            UserError::InvalidAssignee => write!(f, "invalid assignee"),
         }
     }
 }
@@ -73,6 +76,32 @@ where
 {
     fn from(err: E) -> Self {
         AppError(err.into())
+    }
+}
+
+/// Represent an error when trying to assign someone
+#[derive(Debug)]
+pub enum AssignmentError {
+    InvalidAssignee,
+    Other(anyhow::Error),
+}
+
+// NOTE: This is used to post the Github comment; make sure it's valid markdown.
+impl fmt::Display for AssignmentError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AssignmentError::InvalidAssignee => write!(f, "invalid assignee"),
+            AssignmentError::Other(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl From<AssignmentError> for anyhow::Error {
+    fn from(a: AssignmentError) -> Self {
+        match a {
+            AssignmentError::InvalidAssignee => UserError::InvalidAssignee.into(),
+            AssignmentError::Other(err) => err.context("assignment error"),
+        }
     }
 }
 

@@ -22,7 +22,7 @@
 
 use crate::db::issue_data::IssueData;
 use crate::db::review_prefs::{RotationMode, get_review_prefs_batch};
-use crate::errors::{self, user_error};
+use crate::errors::{self, AssignmentError, user_error};
 use crate::github::UserId;
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::{
@@ -656,11 +656,8 @@ pub(super) async fn handle_command(
                 e.apply(&ctx.github, String::new()).await?;
                 return Ok(());
             } // we are done
-            Err(github::AssignmentError::InvalidAssignee) => {
-                issue
-                    .set_assignee(&ctx.github, &ctx.username)
-                    .await
-                    .context("self-assignment failed")?;
+            Err(AssignmentError::InvalidAssignee) => {
+                issue.set_assignee(&ctx.github, &ctx.username).await?;
                 let cmt_body = format!(
                     "This issue has been assigned to @{to_assign} via [this comment]({}).",
                     event.html_url().unwrap()

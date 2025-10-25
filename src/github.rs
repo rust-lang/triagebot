@@ -1,4 +1,4 @@
-use crate::errors::UserError;
+use crate::errors::{AssignmentError, UserError};
 use crate::team_data::TeamClient;
 use anyhow::Context;
 use async_trait::async_trait;
@@ -548,28 +548,11 @@ where
 }
 
 #[derive(Debug)]
-pub enum AssignmentError {
-    InvalidAssignee,
-    Http(anyhow::Error),
-}
-
-#[derive(Debug)]
 pub enum Selection<'a, T: ?Sized> {
     All,
     One(&'a T),
     Except(&'a T),
 }
-
-impl fmt::Display for AssignmentError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AssignmentError::InvalidAssignee => write!(f, "invalid assignee"),
-            AssignmentError::Http(e) => write!(f, "cannot assign: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for AssignmentError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssueRepository {
@@ -916,12 +899,14 @@ impl Issue {
         struct AssigneeReq<'a> {
             assignees: &'a [&'a str],
         }
+
         client
             .send_req(client.delete(&url).json(&AssigneeReq {
                 assignees: &assignees[..],
             }))
             .await
-            .map_err(AssignmentError::Http)?;
+            .map_err(AssignmentError::Other)?;
+
         Ok(())
     }
 
@@ -945,7 +930,8 @@ impl Issue {
         let result: Issue = client
             .json(client.post(&url).json(&AssigneeReq { assignees: &[user] }))
             .await
-            .map_err(AssignmentError::Http)?;
+            .map_err(AssignmentError::Other)?;
+
         // Invalid assignees are silently ignored. We can just check if the user is now
         // contained in the assignees list.
         let success = result
