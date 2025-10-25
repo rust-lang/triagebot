@@ -262,11 +262,15 @@ macro_rules! issue_handlers {
                                 if let Some(config) = &config.$name {
                                     $name::handle_input(ctx, config, event, input)
                                         .await
-                                        .map_err(|e| {
-                                            HandlerError::Other(e.context(format!(
-                                                "error when processing {} handler",
-                                                stringify!($name)
-                                            )))
+                                        .map_err(|mut e| {
+                                            if let Some(err) = e.downcast_mut::<crate::errors::UserError>() {
+                                                HandlerError::Message(err.to_string())
+                                            } else {
+                                                HandlerError::Other(e.context(format!(
+                                                    "error when processing {} handler",
+                                                    stringify!($name)
+                                                )))
+                                            }
                                         })
                                 } else {
                                     Err(HandlerError::Message(format!(
