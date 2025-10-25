@@ -7,11 +7,7 @@ use axum::{
 };
 use hyper::StatusCode;
 
-use crate::{
-    github,
-    handlers::Context,
-    utils::{AppError, is_repo_autorized},
-};
+use crate::{errors::AppError, github, handlers::Context, utils::is_repo_autorized};
 
 /// Redirects to either `/gh-range-diff` (when the base changed) or to GitHub's compare
 /// page (when the base is the same).

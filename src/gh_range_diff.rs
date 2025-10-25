@@ -23,7 +23,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::github::GithubCompare;
 use crate::utils::is_repo_autorized;
-use crate::{github, handlers::Context, utils::AppError};
+use crate::{errors::AppError, github, handlers::Context};
 
 static MARKER_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"@@ -[\d]+,[\d]+ [+][\d]+,[\d]+ @@").unwrap());

@@ -1,3 +1,4 @@
+use crate::errors::{AssignmentError, UserError};
 use crate::team_data::TeamClient;
 use anyhow::Context;
 use async_trait::async_trait;
@@ -547,28 +548,11 @@ where
 }
 
 #[derive(Debug)]
-pub enum AssignmentError {
-    InvalidAssignee,
-    Http(anyhow::Error),
-}
-
-#[derive(Debug)]
 pub enum Selection<'a, T: ?Sized> {
     All,
     One(&'a T),
     Except(&'a T),
 }
-
-impl fmt::Display for AssignmentError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AssignmentError::InvalidAssignee => write!(f, "invalid assignee"),
-            AssignmentError::Http(e) => write!(f, "cannot assign: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for AssignmentError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssueRepository {
@@ -611,20 +595,6 @@ impl IssueRepository {
         }
     }
 }
-
-#[derive(Debug)]
-pub(crate) struct UnknownLabels {
-    labels: Vec<String>,
-}
-
-// NOTE: This is used to post the Github comment; make sure it's valid markdown.
-impl fmt::Display for UnknownLabels {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Unknown labels: {}", &self.labels.join(", "))
-    }
-}
-
-impl std::error::Error for UnknownLabels {}
 
 impl Issue {
     pub fn to_zulip_github_reference(&self) -> ZulipGitHubReference {
@@ -867,7 +837,7 @@ impl Issue {
         }
 
         if !unknown_labels.is_empty() {
-            return Err(UnknownLabels {
+            return Err(UserError::UnknownLabels {
                 labels: unknown_labels,
             }
             .into());
@@ -929,12 +899,14 @@ impl Issue {
         struct AssigneeReq<'a> {
             assignees: &'a [&'a str],
         }
+
         client
             .send_req(client.delete(&url).json(&AssigneeReq {
                 assignees: &assignees[..],
             }))
             .await
-            .map_err(AssignmentError::Http)?;
+            .map_err(AssignmentError::Other)?;
+
         Ok(())
     }
 
@@ -958,7 +930,8 @@ impl Issue {
         let result: Issue = client
             .json(client.post(&url).json(&AssigneeReq { assignees: &[user] }))
             .await
-            .map_err(AssignmentError::Http)?;
+            .map_err(AssignmentError::Other)?;
+
         // Invalid assignees are silently ignored. We can just check if the user is now
         // contained in the assignees list.
         let success = result
@@ -3270,18 +3243,5 @@ impl Submodule {
                 anyhow::anyhow!("expected .git suffix, got {}", self.submodule_git_url)
             })?;
         client.repository(fullname).await
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn display_labels() {
-        let x = UnknownLabels {
-            labels: vec!["A-bootstrap".into(), "xxx".into()],
-        };
-        assert_eq!(x.to_string(), "Unknown labels: A-bootstrap, xxx");
     }
 }

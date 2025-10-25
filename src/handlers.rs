@@ -10,18 +10,6 @@ use std::fmt;
 use std::sync::Arc;
 use tracing as log;
 
-/// Creates a [`UserError`] with message.
-///
-/// Should be used when an handler is in error due to the user action's (not a PR,
-/// not a issue, not authorized, ...).
-///
-/// Should be used like this `return user_error!("My error message.");`.
-macro_rules! user_error {
-    ($err:expr $(,)?) => {
-        anyhow::Result::Err(anyhow::anyhow!(crate::handlers::UserError($err.into())))
-    };
-}
-
 mod assign;
 mod autolabel;
 mod backport;
@@ -274,11 +262,15 @@ macro_rules! issue_handlers {
                                 if let Some(config) = &config.$name {
                                     $name::handle_input(ctx, config, event, input)
                                         .await
-                                        .map_err(|e| {
-                                            HandlerError::Other(e.context(format!(
-                                                "error when processing {} handler",
-                                                stringify!($name)
-                                            )))
+                                        .map_err(|mut e| {
+                                            if let Some(err) = e.downcast_mut::<crate::errors::UserError>() {
+                                                HandlerError::Message(err.to_string())
+                                            } else {
+                                                HandlerError::Other(e.context(format!(
+                                                    "error when processing {} handler",
+                                                    stringify!($name)
+                                                )))
+                                            }
                                         })
                                 } else {
                                     Err(HandlerError::Message(format!(
@@ -419,8 +411,8 @@ macro_rules! command_handlers {
                             $name::handle_command(ctx, config, event, command)
                                 .await
                                 .unwrap_or_else(|mut err| {
-                                    if let Some(err) = err.downcast_mut::<UserError>() {
-                                        errors.push(HandlerError::Message(std::mem::take(&mut err.0)));
+                                    if let Some(err) = err.downcast_mut::<crate::errors::UserError>() {
+                                        errors.push(HandlerError::Message(err.to_string()));
                                     } else {
                                         errors.push(HandlerError::Message(format!(
                                             "`{}` handler unexpectedly failed in [this comment]({}): {err}",
@@ -488,19 +480,5 @@ impl fmt::Display for HandlerError {
             HandlerError::Message(msg) => write!(f, "{msg}"),
             HandlerError::Other(_) => write!(f, "An internal error occurred."),
         }
-    }
-}
-
-/// Represent a user error.
-///
-/// The message will be shown to the user via comment posted by this bot.
-#[derive(Debug)]
-pub struct UserError(String);
-
-impl std::error::Error for UserError {}
-
-impl fmt::Display for UserError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.0)
     }
 }

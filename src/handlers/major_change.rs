@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use crate::errors::user_error;
 use crate::jobs::Job;
 use crate::zulip::api::Recipient;
 use crate::{

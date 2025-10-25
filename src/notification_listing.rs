@@ -9,7 +9,7 @@ use axum::{
 use hyper::StatusCode;
 use serde::Deserialize;
 
-use crate::{db::notifications::get_notifications, handlers::Context, utils::AppError};
+use crate::{db::notifications::get_notifications, errors::AppError, handlers::Context};
 
 #[derive(Deserialize)]
 pub struct NotificationsQuery {

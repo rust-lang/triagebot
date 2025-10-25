@@ -1,8 +1,8 @@
 use axum::response::Html;
 
 use crate::actions::{Action, Query, QueryKind, QueryMap, Step};
+use crate::errors::AppError;
 use crate::github;
-use crate::utils::AppError;
 use std::sync::Arc;
 
 pub async fn lang_http() -> axum::response::Result<Html<String>, AppError> {

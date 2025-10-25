@@ -10,14 +10,15 @@
 
 use std::collections::BTreeSet;
 
+use crate::errors::user_error;
 use crate::github::Label;
 use crate::team_data::TeamClient;
 use crate::{
     config::RelabelConfig,
-    github::UnknownLabels,
     github::{self, Event},
     handlers::Context,
 };
+use anyhow::Context as _;
 use parser::command::relabel::{LabelDelta, RelabelCommand};
 
 pub(super) async fn handle_command(
@@ -54,26 +55,16 @@ pub(super) async fn handle_command(
     let (to_add, to_remove) = compute_label_deltas(&input.0);
 
     // Add labels
-    if let Err(e) = issue.add_labels(&ctx.github, to_add.clone()).await {
-        tracing::error!(
-            "failed to add {to_add:?} from issue {issue}: {e:?}",
-            issue = issue.global_id(),
-        );
-        if let Some(err @ UnknownLabels { .. }) = e.downcast_ref() {
-            issue.post_comment(&ctx.github, &err.to_string()).await?;
-        }
-
-        return Err(e);
-    }
+    issue
+        .add_labels(&ctx.github, to_add.clone())
+        .await
+        .context("failed to add labels to the issue")?;
 
     // Remove labels
-    if let Err(e) = issue.remove_labels(&ctx.github, to_remove.clone()).await {
-        tracing::error!(
-            "failed to remove {to_remove:?} from issue {issue}: {e:?}",
-            issue = issue.global_id(),
-        );
-        return Err(e);
-    }
+    issue
+        .remove_labels(&ctx.github, to_remove.clone())
+        .await
+        .context("failed to remove labels from the issue")?;
 
     Ok(())
 }
