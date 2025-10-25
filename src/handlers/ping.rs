@@ -8,6 +8,7 @@ use std::borrow::Cow;
 
 use crate::{
     config::PingConfig,
+    errors::user_error,
     github::{self, Event},
     handlers::Context,
 };

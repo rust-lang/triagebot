@@ -2,6 +2,7 @@
 
 use crate::{
     config::NominateConfig,
+    errors::user_error,
     github::{self, Event},
     handlers::Context,
     interactions::ErrorComment,

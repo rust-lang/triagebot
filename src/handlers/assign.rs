@@ -22,6 +22,7 @@
 
 use crate::db::issue_data::IssueData;
 use crate::db::review_prefs::{RotationMode, get_review_prefs_batch};
+use crate::errors::user_error;
 use crate::github::UserId;
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::{

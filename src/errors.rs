@@ -23,6 +23,21 @@ impl fmt::Display for UserError {
     }
 }
 
+/// Creates a [`UserError`] with message.
+///
+/// Should be used when an handler is in error due to the user action's (not a PR,
+/// not a issue, not authorized, ...).
+///
+/// Should be used like this `return user_error!("My error message.");`.
+macro_rules! user_error {
+    ($err:expr $(,)?) => {
+        anyhow::Result::Err(anyhow::anyhow!(crate::errors::UserError($err.into())))
+    };
+}
+
+// export the macro
+pub(crate) use user_error;
+
 /// Represent a application error.
 ///
 /// Useful for returning a error via the API

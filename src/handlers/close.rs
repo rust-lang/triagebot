@@ -1,6 +1,6 @@
 //! Allows to close an issue or a PR
 
-use crate::{config::CloseConfig, github::Event, handlers::Context};
+use crate::{config::CloseConfig, errors::user_error, github::Event, handlers::Context};
 use parser::command::close::CloseCommand;
 
 pub(super) async fn handle_command(

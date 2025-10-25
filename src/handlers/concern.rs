@@ -4,6 +4,7 @@ use anyhow::{Context as _, bail};
 
 use crate::{
     config::ConcernConfig,
+    errors::user_error,
     github::{Event, Label},
     handlers::Context,
     interactions::EditIssueBody,
