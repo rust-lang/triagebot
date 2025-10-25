@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{Json, extract::State};
 
-use crate::{db, handlers::Context, utils::AppError};
+use crate::{db, errors::AppError, handlers::Context};
 
 pub async fn bors_commit_list(
     State(ctx): State<Arc<Context>>,

@@ -1,7 +1,8 @@
+use crate::errors::AppError;
 use crate::github::{self, WorkflowRunJob};
 use crate::handlers::Context;
 use crate::interactions::REPORT_TO;
-use crate::utils::{AppError, is_repo_autorized};
+use crate::utils::is_repo_autorized;
 use anyhow::Context as _;
 use axum::extract::{Path, State};
 use axum::http::HeaderValue;
