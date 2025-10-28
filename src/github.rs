@@ -554,6 +554,11 @@ pub enum Selection<'a, T: ?Sized> {
     Except(&'a T),
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct CollaboratorPermission {
+    pub permission: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssueRepository {
     pub organization: String,
@@ -593,6 +598,16 @@ impl IssueRepository {
                 }
             }
         }
+    }
+
+    pub(crate) async fn collaborator_permission(
+        &self,
+        client: &GithubClient,
+        username: &str,
+    ) -> anyhow::Result<CollaboratorPermission> {
+        let url = format!("{}/collaborators/{username}/permission", self.url(client));
+        let permission = client.json(client.get(&url)).await?;
+        Ok(permission)
     }
 }
 
