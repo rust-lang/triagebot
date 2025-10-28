@@ -17,20 +17,47 @@ use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
 use crate::zulip::commands::{
-    ChatCommand, LookupCmd, PingGoalsArgs, StreamCommand, WorkqueueCmd, WorkqueueLimit, parse_cli,
+    BackportChannelArgs, BackportVerbArgs, ChatCommand, LookupCmd, PingGoalsArgs, StreamCommand,
+    WorkqueueCmd, WorkqueueLimit, parse_cli,
 };
 use anyhow::{Context as _, format_err};
 use axum::Json;
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
+use commands::BackportArgs;
 use itertools::Itertools;
+use octocrab::Octocrab;
 use rust_team_data::v1::{TeamKind, TeamMember};
 use std::cmp::Reverse;
 use std::fmt::Write as _;
 use std::sync::Arc;
 use subtle::ConstantTimeEq;
-use tracing as log;
+use tracing::log;
+
+fn get_text_backport_approved(
+    channel: &BackportChannelArgs,
+    verb: &BackportVerbArgs,
+    zulip_link: &str,
+) -> String {
+    format!("
+{channel} backport {verb} as per compiler team [on Zulip]({zulip_link}). A backport PR will be authored by the release team at the end of the current development cycle. Backport labels are handled by them.
+
+@rustbot label +{channel}-accepted")
+}
+
+fn get_text_backport_declined(
+    channel: &BackportChannelArgs,
+    verb: &BackportVerbArgs,
+    zulip_link: &str,
+) -> String {
+    format!(
+        "
+{channel} backport {verb} as per compiler team [on Zulip]({zulip_link}).
+
+@rustbot label -{channel}-nominated -{channel}-accepted"
+    )
+}
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Request {
@@ -317,12 +344,66 @@ async fn handle_command<'a>(
                     ping_goals_cmd(ctx, gh_id, message_data, &args).await
                 }
                 StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
+                StreamCommand::Backport(args) => {
+                    accept_decline_backport(message_data, &ctx.octocrab, &ctx.zulip, &args).await
+                }
             };
         }
 
         tracing::warn!("no command found, yet we were pinged, weird");
         Ok(Some("Unknown command".to_string()))
     }
+}
+
+// TODO: shorter variant of this command (f.e. `backport accept` or even `accept`) that infers everything from the Message payload
+async fn accept_decline_backport(
+    message_data: &Message,
+    octo_client: &Octocrab,
+    zulip_client: &ZulipClient,
+    args_data: &BackportArgs,
+) -> anyhow::Result<Option<String>> {
+    let message = message_data.clone();
+    let args = args_data.clone();
+    let stream_id = message.stream_id.unwrap();
+    let subject = message.subject.unwrap();
+
+    // Repository owner and name are hardcoded
+    // This command is only used in this repository
+    let repo_owner = "rust-lang";
+    let repo_name = "rust";
+
+    // TODO: factor out the Zulip "URL encoder" to make it practical to use
+    let zulip_send_req = crate::zulip::MessageApiRequest {
+        recipient: Recipient::Stream {
+            id: stream_id,
+            topic: &subject,
+        },
+        content: "",
+    };
+
+    // NOTE: the Zulip Message API cannot yet pin exactly a single message so the link in the GitHub comment will be to the whole topic
+    // See: https://rust-lang.zulipchat.com/#narrow/channel/122653-zulip/topic/.22near.22.20parameter.20in.20payload.20of.20send.20message.20API
+    let zulip_link = zulip_send_req.url(zulip_client);
+
+    let message_body = match args.verb {
+        BackportVerbArgs::Accept
+        | BackportVerbArgs::Accepted
+        | BackportVerbArgs::Approve
+        | BackportVerbArgs::Approved => {
+            get_text_backport_approved(&args.channel, &args.verb, &zulip_link)
+        }
+        BackportVerbArgs::Decline | BackportVerbArgs::Declined => {
+            get_text_backport_declined(&args.channel, &args.verb, &zulip_link)
+        }
+    };
+
+    let _ = octo_client
+        .issues(repo_owner, repo_name)
+        .create_comment(args.pr_num, &message_body)
+        .await
+        .with_context(|| anyhow::anyhow!("unable to post comment on #{}", args.pr_num))?;
+
+    Ok(None)
 }
 
 async fn ping_goals_cmd(
