@@ -705,7 +705,8 @@ async fn try_accept_mcp(
 
                 format!(
                     r"
-Progress of this major change will be tracked in the tracking issue at {}#{}.
+> [!NOTE]
+> Further progress is now tracked over at {}#{}.
 ",
                     &issue_repo, tracking_issue.number
                 )
@@ -717,11 +718,12 @@ Progress of this major change will be tracked in the tracking issue at {}#{}.
             .post_comment(
                 &ctx.github,
                 &format!(
-r"The final comment period is now complete, this major change is now **accepted**.
-{tracking_issue_text}
-As the automated representative, I would like to thank the author for their work and everyone else who contributed to this major change proposal.
+r"The final comment period is now complete, this major change is now **accepted**. :tada:
 
-*If you think this major change shouldn't have been accepted, feel free to remove the `{}` label and reopen this issue.*",
+As the automated representative, I want to express gratitude to the author for their work and everyone else who contributed to this major change proposal.
+
+*If you think this major change shouldn't have been accepted, feel free to remove the `{}` label and reopen this issue.*
+{tracking_issue_text}",
                     &config.accept_label,
                 ),
             )
