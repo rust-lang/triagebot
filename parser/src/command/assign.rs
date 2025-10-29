@@ -22,6 +22,8 @@ pub enum AssignCommand {
     AssignUser { username: String },
     /// Corresponds to `r? [@]user`.
     RequestReview { name: String },
+    /// Corresponds to `@bot reroll`.
+    Reroll,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -74,6 +76,15 @@ impl AssignCommand {
                 toks.next_token()?;
                 *input = toks;
                 Ok(Some(AssignCommand::ReleaseAssignment))
+            } else {
+                Err(toks.error(ParseError::ExpectedEnd))
+            }
+        } else if let Some(Token::Word("reroll")) = toks.peek_token()? {
+            toks.next_token()?;
+            if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
+                toks.next_token()?;
+                *input = toks;
+                Ok(Some(AssignCommand::Reroll))
             } else {
                 Err(toks.error(ParseError::ExpectedEnd))
             }
