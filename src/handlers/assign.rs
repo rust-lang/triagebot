@@ -6,6 +6,8 @@
 //! * `@rustbot claim`: Assigns to the comment author.
 //! * `@rustbot release-assignment`: Removes the commenter's assignment.
 //! * `r? @user`: Assigns to the given user (PRs only).
+//! * `@rustbot reroll`: Re-run the automatic assignment logic based on PR diff and owner map that
+//!   is normally triggered when a PR is opened.
 //!
 //! Note: this module does not handle review assignments issued from the
 //! GitHub "Assignees" dropdown menu
@@ -137,8 +139,15 @@ pub(super) async fn handle_input(
 
     // Don't auto-assign or welcome if the user manually set the assignee when opening.
     if event.issue.assignees.is_empty() {
-        let (assignee, from_comment) =
-            determine_assignee(ctx, assign_command, event, config, diff).await?;
+        let (assignee, from_comment) = determine_assignee(
+            ctx,
+            assign_command,
+            &event.issue,
+            &event.issue.user.login,
+            config,
+            diff,
+        )
+        .await?;
         if assignee.as_ref().map(|r| r.name.as_str()) == Some(GHOST_ACCOUNT) {
             // "ghost" is GitHub's placeholder account for deleted accounts.
             // It is used here as a convenient way to prevent assignment. This
@@ -324,7 +333,8 @@ They may take a while to respond."
 async fn determine_assignee(
     ctx: &Context,
     assign_command: Option<String>,
-    event: &IssuesEvent,
+    issue: &Issue,
+    requested_by: &str,
     config: &AssignConfig,
     diff: &[FileDiff],
 ) -> anyhow::Result<(Option<ReviewerSelection>, bool)> {
@@ -337,18 +347,15 @@ async fn determine_assignee(
             ctx.workqueue.clone(),
             teams,
             config,
-            &event.issue,
-            &event.issue.user.login,
+            issue,
+            requested_by,
             &[name],
         )
         .await
         {
             Ok(assignee) => return Ok((Some(assignee), true)),
             Err(e) => {
-                event
-                    .issue
-                    .post_comment(&ctx.github, &e.to_string())
-                    .await?;
+                issue.post_comment(&ctx.github, &e.to_string()).await?;
                 // Fall through below for normal diff detection.
             }
         }
@@ -361,8 +368,8 @@ async fn determine_assignee(
                 ctx.workqueue.clone(),
                 teams,
                 config,
-                &event.issue,
-                &event.issue.user.login,
+                issue,
+                requested_by,
                 &candidates,
             )
             .await
@@ -371,7 +378,7 @@ async fn determine_assignee(
                 Err(FindReviewerError::TeamNotFound(team)) => log::warn!(
                     "team {team} not found via diff from PR {}, \
                     is there maybe a misconfigured group?",
-                    event.issue.global_id()
+                    issue.global_id()
                 ),
                 Err(
                     e @ (FindReviewerError::NoReviewer { .. }
@@ -383,7 +390,7 @@ async fn determine_assignee(
                     | FindReviewerError::ReviewerAtMaxCapacity { .. }),
                 ) => log::trace!(
                     "no reviewer could be determined for PR {}: {e}",
-                    event.issue.global_id()
+                    issue.global_id()
                 ),
             }
         }
@@ -403,8 +410,8 @@ async fn determine_assignee(
             ctx.workqueue.clone(),
             teams,
             config,
-            &event.issue,
-            &event.issue.user.login,
+            issue,
+            requested_by,
             fallback,
         )
         .await
@@ -413,7 +420,7 @@ async fn determine_assignee(
             Err(e) => {
                 log::trace!(
                     "failed to select from fallback group for PR {}: {e}",
-                    event.issue.global_id()
+                    issue.global_id()
                 );
             }
         }
@@ -564,6 +571,38 @@ pub(super) async fn handle_command(
                 }
                 name
             }
+            AssignCommand::Reroll => {
+                // We need to compute the PR diff here, but the IssuesEvent created from a
+                // comment webhook doesn't contain the required `base` and `head` fields.
+                // So we have to load the information about the pull request from the GitHub API
+                // explicitly.
+                let pr = ctx
+                    .github
+                    .pull_request(issue.repository(), issue.number)
+                    .await
+                    .context("Cannot load pull request from GitHub")?;
+                let Some(diff) = pr.diff(&ctx.github).await.context("Cannot load PR diff")? else {
+                    bail!(
+                        "expected issue {} to be a PR, but the diff could not be determined",
+                        issue.number
+                    );
+                };
+
+                let (assignee, _) =
+                    determine_assignee(ctx, None, issue, &event.user().login, config, diff)
+                        .await
+                        .context("Cannot determine assignee when rerolling")?;
+                if let Some(assignee) = assignee {
+                    set_assignee(ctx, issue, &ctx.github, &assignee)
+                        .await
+                        .context("Cannot set assignee when rerolling")?;
+                } else {
+                    return user_error!(
+                        "Cannot determine a new reviewer. Use `r? <username or team>` to request a specific reviewer or a team."
+                    );
+                }
+                return Ok(());
+            }
         };
 
         // In the PR body, `r? ghost` means "do not assign anybody".
@@ -638,8 +677,11 @@ pub(super) async fn handle_command(
             AssignCommand::RequestReview { .. } => {
                 return user_error!("r? is only allowed on PRs.");
             }
+            AssignCommand::Reroll { .. } => {
+                return user_error!("reroll is only allowed on PRs.");
+            }
         };
-        // Don't re-assign if aleady assigned, e.g. on comment edit
+        // Don't re-assign if already assigned, e.g. on comment edit
         if issue.contain_assignee(&to_assign) {
             log::trace!(
                 "ignoring assign issue {issue} to {to_assign}, already assigned",
