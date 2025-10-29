@@ -268,20 +268,37 @@ pub(super) async fn handle_command(
         false
     };
 
+    let already_seconded = issue
+        .labels()
+        .iter()
+        .any(|l| &l.name == &config.second_label);
+
     let zulip_ping = &config.zulip_ping;
     let issue_number = issue.number;
     let issue_url = &issue.html_url;
     let bot_username = &ctx.username;
     let waiting_period = config.waiting_period;
 
-    let zulip_msg = if has_concerns {
-        format!(
-            "@*{zulip_ping}*: Proposal [#{issue_number}]({issue_url}) has been seconded, but there are unresolved concerns preventing approval, use `@{bot_username} resolve concern-name` in the GitHub thread to resolve them.",
-        )
+    let zulip_msg = if already_seconded {
+        if has_concerns {
+            format!(
+                "@*{zulip_ping}*: Proposal [#{issue_number}]({issue_url}) has been seconded again, but there are unresolved concerns preventing approval, use `@{bot_username} resolve concern-name` in the GitHub thread to resolve them.",
+            )
+        } else {
+            format!(
+                "@*{zulip_ping}*: Proposal [#{issue_number}]({issue_url}) has been seconded again, and will be approved in maximum {waiting_period} days if no objections are raised.",
+            )
+        }
     } else {
-        format!(
-            "@*{zulip_ping}*: Proposal [#{issue_number}]({issue_url}) has been seconded, and will be approved in {waiting_period} days if no objections are raised.",
-        )
+        if has_concerns {
+            format!(
+                "@*{zulip_ping}*: Proposal [#{issue_number}]({issue_url}) has been seconded, but there are unresolved concerns preventing approval, use `@{bot_username} resolve concern-name` in the GitHub thread to resolve them.",
+            )
+        } else {
+            format!(
+                "@*{zulip_ping}*: Proposal [#{issue_number}]({issue_url}) has been seconded, and will be approved in {waiting_period} days if no objections are raised.",
+            )
+        }
     };
 
     handle(
