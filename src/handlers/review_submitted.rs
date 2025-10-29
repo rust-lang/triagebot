@@ -1,3 +1,5 @@
+use anyhow::Context as _;
+
 use crate::github::{Issue, IssueCommentAction, IssueCommentEvent, Label, PullRequestReviewState};
 use crate::{config::ReviewSubmittedConfig, github::Event, handlers::Context};
 
@@ -21,7 +23,19 @@ pub(crate) async fn handle(
             return Ok(());
         }
 
-        if event.issue.assignees.contains(&event.comment.user) {
+        // Let's switch the review labels if the user who issued the changes requested:
+        //  - is one of the assignees
+        //  - or has write/admin permission on the repository
+        if event.issue.assignees.contains(&event.comment.user) || {
+            let perm = event
+                .issue
+                .repository()
+                .collaborator_permission(&ctx.github, &event.comment.user.login)
+                .await
+                .context("failed to get the user repository permission")?;
+
+            perm.permission == "write" || perm.permission == "admin"
+        } {
             // Remove review labels
             event
                 .issue
