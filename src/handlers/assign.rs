@@ -579,8 +579,9 @@ pub(super) async fn handle_command(
                 let pr = ctx
                     .github
                     .pull_request(issue.repository(), issue.number)
-                    .await?;
-                let Some(diff) = pr.diff(&ctx.github).await? else {
+                    .await
+                    .context("Cannot load pull request from GitHub")?;
+                let Some(diff) = pr.diff(&ctx.github).await.context("Cannot load PR diff")? else {
                     bail!(
                         "expected issue {} to be a PR, but the diff could not be determined",
                         issue.number
@@ -588,13 +589,17 @@ pub(super) async fn handle_command(
                 };
 
                 let (assignee, _) =
-                    determine_assignee(ctx, None, issue, &event.user().login, config, diff).await?;
+                    determine_assignee(ctx, None, issue, &event.user().login, config, diff)
+                        .await
+                        .context("Cannot determine assignee when rerolling")?;
                 if let Some(assignee) = assignee {
-                    set_assignee(ctx, issue, &ctx.github, &assignee).await?;
+                    set_assignee(ctx, issue, &ctx.github, &assignee)
+                        .await
+                        .context("Cannot set assignee when rerolling")?;
                 } else {
-                    issue
-                        .post_comment(&ctx.github, "Cannot determine a new reviewer. Use `r? <username or team>` to request a specific reviewer or a team.")
-                        .await?;
+                    return user_error!(
+                        "Cannot determine a new reviewer. Use `r? <username or team>` to request a specific reviewer or a team."
+                    );
                 }
                 return Ok(());
             }
