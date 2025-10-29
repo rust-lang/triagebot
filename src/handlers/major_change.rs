@@ -268,21 +268,19 @@ pub(super) async fn handle_command(
         false
     };
 
+    let zulip_ping = &config.zulip_ping;
+    let issue_number = issue.number;
+    let issue_url = &issue.html_url;
+    let bot_username = &ctx.username;
+    let waiting_period = config.waiting_period;
+
     let zulip_msg = if has_concerns {
         format!(
-            "@*{}*: Proposal [#{}]({}) has been seconded, but there are unresolved concerns preventing approval, use `@{} resolve concern-name` in the GitHub thread to resolve them.",
-            config.zulip_ping,
-            issue.number,
-            event.html_url().unwrap(),
-            &ctx.username,
+            "@*{zulip_ping}*: Proposal [#{issue_number}]({issue_url}) has been seconded, but there are unresolved concerns preventing approval, use `@{bot_username} resolve concern-name` in the GitHub thread to resolve them.",
         )
     } else {
         format!(
-            "@*{}*: Proposal [#{}]({}) has been seconded, and will be approved in {} days if no objections are raised.",
-            config.zulip_ping,
-            issue.number,
-            event.html_url().unwrap(),
-            config.waiting_period,
+            "@*{zulip_ping}*: Proposal [#{issue_number}]({issue_url}) has been seconded, and will be approved in {waiting_period} days if no objections are raised.",
         )
     };
 
