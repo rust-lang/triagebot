@@ -803,6 +803,13 @@ async fn find_reviewer_from_names(
         return Ok(ReviewerSelection::from_name(name.clone()));
     }
 
+    // Allow `me` as an alias for self-assign, which is always allowed.
+    if let [name] = names
+        && name == "me"
+    {
+        return Ok(ReviewerSelection::from_name(requested_by.to_string()));
+    }
+
     let candidates =
         candidate_reviewers_from_names(db, workqueue, teams, config, issue, names).await?;
     assert!(!candidates.is_empty());
