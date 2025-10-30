@@ -2,6 +2,11 @@
 {%- if backport_branch != "" %}
   - Authored by {{ issue.author }}
   - Voting [Zulip topic](#)
+<!--
+Triagebot commands for handling backports on GitHub
+If approved: @triagebot backport {{ backport_branch }} accept {{ issue.number }}
+If declined: @triagebot backport {{ backport_branch }} decline {{ issue.number }}
+-->
 {%- endif -%}
 {% if issue.mcp_details.concerns %}{%- for concern in issue.mcp_details.concerns %}
     - concern: [{{- concern.0 -}}]({{- concern.1 -}})

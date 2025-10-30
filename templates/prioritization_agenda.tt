@@ -87,7 +87,7 @@ note_id: xxx
 
 ## Performance logs
 
-> [triage logs](https://github.com/rust-lang/rustc-perf/tree/master/triage#triage-logs)
+> [triage logs](https://github.com/rust-lang/rustc-perf/tree/master/triage/{{ now() | date(format="%Y") }})
 
 ## Nominated Issues
 
