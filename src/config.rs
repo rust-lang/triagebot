@@ -1,5 +1,6 @@
 use crate::changelogs::ChangelogFormat;
 use crate::github::{GithubClient, Repository};
+use parser::command::relabel::{Label, LabelDelta, RelabelCommand};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::{Arc, LazyLock, RwLock};
@@ -250,10 +251,62 @@ pub(crate) struct MentionsEntryConfig {
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[serde(deny_unknown_fields)]
 pub(crate) struct RelabelConfig {
     #[serde(default)]
     pub(crate) allow_unauthenticated: Vec<String>,
+    // alias identifier -> labels
+    #[serde(flatten)]
+    pub(crate) aliases: HashMap<String, RelabelAliasConfig>,
+}
+
+impl RelabelConfig {
+    pub(crate) fn retrieve_command_from_alias(&self, input: RelabelCommand) -> RelabelCommand {
+        let mut deltas = vec![];
+        // parse all tokens: if one matches an alias, extract the labels
+        // else, it will assumed to be a label
+        for tk in input.0.into_iter() {
+            let name = tk.label() as &str;
+            if let Some(alias) = self.aliases.get(name) {
+                let cmd = alias.to_command(matches!(tk, LabelDelta::Remove(_)));
+                deltas.extend(cmd.0);
+            } else {
+                deltas.push(tk);
+            }
+        }
+        RelabelCommand(deltas)
+    }
+}
+
+#[derive(Default, PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RelabelAliasConfig {
+    /// Labels to be added
+    pub(crate) add_labels: Vec<String>,
+    /// Labels to be removed
+    pub(crate) rem_labels: Vec<String>,
+}
+
+impl RelabelAliasConfig {
+    /// Translate a RelabelAliasConfig into a RelabelCommand for GitHub consumption
+    fn to_command(&self, inverted: bool) -> RelabelCommand {
+        let mut deltas = Vec::new();
+        let mut add_labels = &self.add_labels;
+        let mut rem_labels = &self.rem_labels;
+
+        // if the polarity of the alias is inverted, swap labels before parsing the command
+        if inverted {
+            std::mem::swap(&mut add_labels, &mut rem_labels);
+        }
+
+        for l in add_labels.iter() {
+            deltas.push(LabelDelta::Add(Label(l.into())));
+        }
+        for l in rem_labels.iter() {
+            deltas.push(LabelDelta::Remove(Label(l.into())));
+        }
+        RelabelCommand(deltas)
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -761,11 +814,11 @@ mod tests {
 
             [mentions."src/"]
             cc = ["@someone"]
-            
+
             [mentions."target/"]
             message = "This is a message."
             cc = ["@someone"]
-            
+
             [mentions."#[rustc_attr]"]
             type = "content"
             message = "This is a message."
@@ -835,6 +888,7 @@ mod tests {
             Config {
                 relabel: Some(RelabelConfig {
                     allow_unauthenticated: vec!["C-*".into()],
+                    aliases: HashMap::new()
                 }),
                 assign: Some(AssignConfig {
                     warn_non_default_branch: WarnNonDefaultBranchConfig::Simple(false),
@@ -1034,6 +1088,93 @@ mod tests {
     }
 
     #[test]
+    fn relabel_alias_config() {
+        let config = r#"
+            [relabel.to-stable]
+            add-labels = ["regression-from-stable-to-stable"]
+            rem-labels = ["regression-from-stable-to-beta", "regression-from-stable-to-nightly"]
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+
+        let mut relabel_configs = HashMap::new();
+        relabel_configs.insert(
+            "to-stable".into(),
+            RelabelAliasConfig {
+                add_labels: vec!["regression-from-stable-to-stable".to_string()],
+                rem_labels: vec![
+                    "regression-from-stable-to-beta".to_string(),
+                    "regression-from-stable-to-nightly".to_string(),
+                ],
+            },
+        );
+
+        let expected_cfg = RelabelConfig {
+            allow_unauthenticated: vec![],
+            aliases: relabel_configs,
+        };
+
+        assert_eq!(config.relabel, Some(expected_cfg));
+    }
+
+    #[test]
+    fn relabel_alias() {
+        // [relabel.my-alias]
+        // add-labels = ["Alpha"]
+        // rem-labels = ["Bravo", "Charlie"]
+        let relabel_cfg = RelabelConfig {
+            allow_unauthenticated: vec![],
+            aliases: HashMap::from([(
+                "my-alias".to_string(),
+                RelabelAliasConfig {
+                    add_labels: vec!["Alpha".to_string()],
+                    rem_labels: vec!["Bravo".to_string(), "Charlie".to_string()],
+                },
+            )]),
+        };
+
+        // @triagebot label my-alias
+        let deltas = vec![LabelDelta::Add(Label("my-alias".into()))];
+        let new_input = relabel_cfg.retrieve_command_from_alias(RelabelCommand(deltas));
+        assert_eq!(
+            new_input,
+            RelabelCommand(vec![
+                LabelDelta::Add(Label("Alpha".into())),
+                LabelDelta::Remove(Label("Bravo".into())),
+                LabelDelta::Remove(Label("Charlie".into())),
+            ])
+        );
+
+        // @triagebot label -my-alias
+        let deltas = vec![LabelDelta::Remove(Label("my-alias".into()))];
+        let new_input = relabel_cfg.retrieve_command_from_alias(RelabelCommand(deltas));
+        assert_eq!(
+            new_input,
+            RelabelCommand(vec![
+                LabelDelta::Add(Label("Bravo".into())),
+                LabelDelta::Add(Label("Charlie".into())),
+                LabelDelta::Remove(Label("Alpha".into())),
+            ])
+        );
+    }
+
+    #[test]
+    fn relabel_alias_empty_config() {
+        // empty alias config
+        let relabel_cfg = RelabelConfig {
+            allow_unauthenticated: vec![],
+            aliases: HashMap::new(),
+        };
+
+        // @triagebot label T-compiler
+        let deltas = vec![LabelDelta::Add(Label("T-compiler".into()))];
+        let new_input = relabel_cfg.retrieve_command_from_alias(RelabelCommand(deltas));
+        assert_eq!(
+            new_input,
+            RelabelCommand(vec![LabelDelta::Add(Label("T-compiler".into())),])
+        );
+    }
+
+    #[test]
     fn issue_links_uncanonicalized() {
         let config = r#"
             [issue-links]
@@ -1092,5 +1233,37 @@ Multi text body with ${mcp_issue} and ${mcp_title}
                 })
             })
         );
+    }
+
+    #[test]
+    fn relabel_new_config() {
+        let config = r#"
+            [relabel]
+            allow-unauthenticated = ["ABCD-*"]
+
+            [relabel.to-stable]
+            add-labels = ["regression-from-stable-to-stable"]
+            rem-labels = ["regression-from-stable-to-beta", "regression-from-stable-to-nightly"]
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+
+        let mut relabel_configs = HashMap::new();
+        relabel_configs.insert(
+            "to-stable".into(),
+            RelabelAliasConfig {
+                add_labels: vec!["regression-from-stable-to-stable".to_string()],
+                rem_labels: vec![
+                    "regression-from-stable-to-beta".to_string(),
+                    "regression-from-stable-to-nightly".to_string(),
+                ],
+            },
+        );
+
+        let expected_cfg = RelabelConfig {
+            allow_unauthenticated: vec!["ABCD-*".to_string()],
+            aliases: relabel_configs,
+        };
+
+        assert_eq!(config.relabel, Some(expected_cfg));
     }
 }
