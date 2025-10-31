@@ -49,13 +49,20 @@ pub(super) async fn parse_input(
         return Ok(None);
     };
 
-    // Only handle events when the PR is opened or the first comment is edited
-    let should_check = matches!(event.action, IssuesAction::Opened | IssuesAction::Edited);
-    if !should_check || !event.issue.is_pr() {
+    // Only handle the event when the PR:
+    // - is opened (and not a draft)
+    // - is converted from draft to ready for review
+    // - when the first comment is edited
+    let skip_check = !matches!(
+        event.action,
+        IssuesAction::Opened | IssuesAction::Edited | IssuesAction::ReadyForReview
+    );
+    if skip_check || !event.issue.is_pr() || event.issue.draft {
         log::debug!(
-            "Skipping backport event because: IssuesAction = {:?} issue.is_pr() {}",
+            "Skipping backport event because: IssuesAction = {:?}, issue.is_pr() {}, draft = {}",
             event.action,
-            event.issue.is_pr()
+            event.issue.is_pr(),
+            event.issue.draft
         );
         return Ok(None);
     }
