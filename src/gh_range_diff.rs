@@ -564,6 +564,13 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
                 )?;
             }
 
+            // Add potentially missing new-line after the last before diff line
+            if let Some(&last) = before.last() {
+                if !self.0[last].ends_with('\n') {
+                    writeln!(f)?;
+                }
+            }
+
             // Then process all after lines
             for (diff, input) in &diffs_and_inputs {
                 self.handle_hunk_line(
@@ -573,6 +580,13 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
                         (input.interner[*a_token], diff.is_added(a_pos as u32))
                     }),
                 )?;
+            }
+
+            // Add potentially missing new-line after the last after diff line
+            if let Some(&last) = after.last() {
+                if !self.0[last].ends_with('\n') {
+                    writeln!(f)?;
+                }
             }
         } else {
             // Can't do word-highlighting, simply print each line.
