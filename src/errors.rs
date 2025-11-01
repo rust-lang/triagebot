@@ -61,12 +61,27 @@ pub struct AppError(anyhow::Error);
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        tracing::error!("{:?}", &self.0);
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Something went wrong: {}\n\n{REPORT_TO}", self.0),
-        )
-            .into_response()
+        tracing::error!("app error: {:?}", &self.0);
+
+        // Let's avoid returning 500 when it's a network error and instead return the status
+        // code of the network request (useful for GHA logs which can get 404, 410 from GitHub).
+        if let Some(err) = self.0.downcast_ref::<reqwest::Error>()
+            && let Some(status) = err.status()
+        {
+            (
+                status,
+                format!(
+                    "Something went wrong: {}\n\nNetwork error: {err}\n\n{REPORT_TO}",
+                    self.0
+                ),
+            )
+        } else {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Something went wrong: {}\n\n{REPORT_TO}", self.0),
+            )
+        }
+        .into_response()
     }
 }
 
