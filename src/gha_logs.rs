@@ -88,11 +88,11 @@ pub async fn gha_logs(
         logs,
     } = &*'logs: {
         if let Some(logs) = ctx.gha_logs.write().await.get(&log_uuid) {
-            tracing::info!("gha_logs: cache hit for {log_uuid}");
+            tracing::info!("gha_logs: cache hit for log {log_uuid}");
             break 'logs logs;
         }
 
-        tracing::info!("gha_logs: cache miss for {log_uuid}");
+        tracing::info!("gha_logs: cache miss for log {log_uuid}");
 
         let repo = github::IssueRepository {
             organization: owner.to_string(),
@@ -104,7 +104,7 @@ pub async fn gha_logs(
                 .github
                 .workflow_run_job(&repo, log_id)
                 .await
-                .context("unable to fetch job details")?;
+                .with_context(|| format!("unable to fetch the job details for log {log_id}"))?;
 
             // To minimize false positives in paths linked to the GitHub repositories, we
             // restrict matching to only the second-level directories of the repository.
@@ -164,7 +164,7 @@ pub async fn gha_logs(
                 .github
                 .raw_job_logs(&repo, log_id)
                 .await
-                .context("unable to get the raw logs")?;
+                .with_context(|| format!("unable to get the raw logs for log {log_id}"))?;
 
             let json_logs =
                 serde_json::to_string(&*logs).context("unable to JSON-ify the raw logs")?;
