@@ -275,14 +275,14 @@ body {{
         html = html.replace(/^\uFEFF/gm, "");
         
         // 3. Transform each log lines that doesn't start with a timestamp into a row where everything is in the second column
-        const untsRegex = /^(?!\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z)(.*)$/gm;
+        const untsRegex = /^(?!\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z)(.*)(\r?\n)?/gm;
         html = html.replace(untsRegex, (match, log) => 
             `<tr><td></td><td>${{log}}</td></tr>`
         );
         
         // 3.b Transform each log lines that start with a timestamp in a row with two columns and make the timestamp be a
         //  self-referencial anchor.
-        const tsRegex = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z) (.*)$/gm;
+        const tsRegex = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z) (.*)(\r?\n)?/gm;
         html = html.replace(tsRegex, (match, ts, log) => 
             `<tr><td><a id="${{ts}}" href="#${{ts}}" class="timestamp">${{ts}}</a></td><td>${{log}}</td></tr>`
         );
