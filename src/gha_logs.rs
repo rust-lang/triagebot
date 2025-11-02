@@ -216,7 +216,11 @@ body {{
   font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
   background: #0C0C0C;
   color: #CCC;
+}}
+table {{
   white-space: pre;
+  table-layout: fixed;
+  width: 100%;
 }}
 .timestamp {{
   color: #848484;
@@ -358,7 +362,7 @@ body {{
     </script>
 </head>
 <body>
-<table style="table-layout: fixed; width: 100%">
+<table>
     <colgroup>
         <col style="width: 29ch">
         <col style="width: 100%">
