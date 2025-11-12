@@ -35,3 +35,24 @@ pub(crate) async fn is_repo_autorized(
 
     Ok(true)
 }
+
+pub(crate) async fn is_issue_under_rfcbot_fcp(
+    issue_full_repo_name: &str,
+    issue_number: u64,
+) -> bool {
+    match crate::rfcbot::get_all_fcps().await {
+        Ok(fcps) => {
+            if fcps.iter().any(|(_, fcp)| {
+                u64::from(fcp.issue.number) == issue_number
+                    && fcp.issue.repository == issue_full_repo_name
+            }) {
+                return true;
+            }
+        }
+        Err(err) => {
+            tracing::warn!("unable to fetch rfcbot active FCPs: {err:?}, skipping check");
+        }
+    }
+
+    false
+}
