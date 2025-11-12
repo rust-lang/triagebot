@@ -8,6 +8,7 @@ use crate::{
     github::{Event, Label},
     handlers::Context,
     interactions::EditIssueBody,
+    utils::is_issue_under_rfcbot_fcp,
 };
 use parser::command::concern::ConcernCommand;
 
@@ -45,24 +46,11 @@ pub(super) async fn handle_command(
     };
     let issue = &issue_comment.issue;
 
-    // Verify that this issue isn't a rfcbot FCP, skip if it is
-    match crate::rfcbot::get_all_fcps().await {
-        Ok(fcps) => {
-            if fcps.iter().any(|(_, fcp)| {
-                u64::from(fcp.issue.number) == issue.number
-                    && fcp.issue.repository == issue_comment.repository.full_name
-            }) {
-                tracing::info!(
-                    "{}#{} tried to register a concern, blocked by our rfcbot FCP check",
-                    issue_comment.repository.full_name,
-                    issue.number,
-                );
-                return Ok(());
-            }
-        }
-        Err(err) => {
-            tracing::warn!("unable to fetch rfcbot active FCPs: {err:?}, skipping check");
-        }
+    // Verify that this issue isn't a rfcbot FCP
+    if is_issue_under_rfcbot_fcp(&issue_comment.repository.full_name, issue.number).await {
+        return user_error!(
+            "Cannot set `@rustbot concern` on an active [rfcbot](https://rfcbot.rs/) FCP, use `@rfcbot concern` instead."
+        );
     }
 
     // Verify that the comment author is a team member in our team repo
