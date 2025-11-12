@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use crate::errors::user_error;
 use crate::jobs::Job;
+use crate::utils::is_issue_under_rfcbot_fcp;
 use crate::zulip::api::Recipient;
 use crate::{
     config::MajorChangeConfig,
@@ -262,6 +263,13 @@ pub(super) async fn handle_command(
         return user_error!("Only team members can second issues.");
     }
 
+    // Verify that this issue isn't a rfcbot FCP
+    if is_issue_under_rfcbot_fcp(&issue.repository().full_repo_name(), issue.number).await {
+        return user_error!(
+            "Cannot second a major change on an active [rfcbot](https://rfcbot.rs/) FCP."
+        );
+    }
+
     let has_concerns = if let Some(concerns_label) = &config.concerns_label {
         issue.labels().iter().any(|l| &l.name == concerns_label)
     } else {
@@ -474,6 +482,7 @@ enum SecondedLogicError {
         at: DateTime<Utc>,
     },
     NoMajorChangeConfig,
+    UnderRfcBotFcp,
 }
 
 impl std::error::Error for SecondedLogicError {}
@@ -506,6 +515,7 @@ impl Display for SecondedLogicError {
                 write!(f, "concerns label added at {at}")
             }
             SecondedLogicError::NoMajorChangeConfig => write!(f, "no `[major_change]` config"),
+            SecondedLogicError::UnderRfcBotFcp => write!(f, "under rfcbot fcp"),
         }
     }
 }
@@ -678,6 +688,10 @@ async fn try_accept_mcp(
                 draft: issue.draft,
                 open: issue.is_open()
             });
+        }
+
+        if is_issue_under_rfcbot_fcp(&major_change.repo, major_change.issue).await {
+            anyhow::bail!(SecondedLogicError::UnderRfcBotFcp);
         }
     }
 
