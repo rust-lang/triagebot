@@ -4,27 +4,16 @@
 
 use crate::{
     config::ShortcutConfig,
-    db::issue_data::IssueData,
     errors::user_error,
     github::{Event, Label},
     handlers::Context,
 };
-use octocrab::models::AuthorAssociation;
+use anyhow::Context as _;
 use parser::command::shortcut::ShortcutCommand;
-
-/// Key for the state in the database
-const AUTHOR_REMINDER_KEY: &str = "author-reminder";
-
-/// State stored in the database for a PR.
-#[derive(Debug, Default, serde::Deserialize, serde::Serialize, Clone, PartialEq)]
-struct AuthorReminderState {
-    /// ID of the reminder comment.
-    reminder_comment: Option<String>,
-}
 
 pub(super) async fn handle_command(
     ctx: &Context,
-    _config: &ShortcutConfig,
+    config: &ShortcutConfig,
     event: &Event,
     input: ShortcutCommand,
 ) -> anyhow::Result<()> {
@@ -75,29 +64,10 @@ pub(super) async fn handle_command(
     // Except if the author is a member (or the owner) of the repository, as
     // the author should already know about the `ready` command and already
     // have the required permissions to update the labels manually anyway.
-    if matches!(input, ShortcutCommand::Author)
-        && !matches!(
-            issue.author_association,
-            AuthorAssociation::Member | AuthorAssociation::Owner
-        )
-    {
-        // Get the state of the author reminder for this PR
-        let mut db = ctx.db.get().await;
-        let mut state: IssueData<'_, AuthorReminderState> =
-            IssueData::load(&mut db, issue, AUTHOR_REMINDER_KEY).await?;
-
-        if state.data.reminder_comment.is_none() {
-            let comment_body = format!(
-                "Reminder, once the PR becomes ready for a review, use `@{bot} ready`.",
-                bot = &ctx.username,
-            );
-            let comment = issue
-                .post_comment(&ctx.github, comment_body.as_str())
-                .await?;
-
-            state.data.reminder_comment = Some(comment.node_id);
-            state.save().await?;
-        }
+    if matches!(input, ShortcutCommand::Author) {
+        super::review_reminder::remind_author_of_bot_ready(ctx, issue, Some(config))
+            .await
+            .context("failed to send @bot review reminder")?;
     }
 
     Ok(())
