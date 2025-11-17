@@ -37,6 +37,7 @@ mod relabel;
 mod relnotes;
 mod rendered_link;
 mod review_changes_since;
+mod review_reminder;
 mod review_requested;
 mod review_submitted;
 pub mod rustc_commits;
@@ -144,9 +145,14 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
             .ok()
             .and_then(|c| c.review_submitted.as_ref())
         {
-            review_submitted::handle(ctx, event, review_submitted_config)
-                .await
-                .map_err(|e| HandlerError::Other(e.context("review_submitted handler failed")))
+            review_submitted::handle(
+                ctx,
+                event,
+                review_submitted_config,
+                config.as_ref().ok().and_then(|c| c.shortcut.as_ref()),
+            )
+            .await
+            .map_err(|e| HandlerError::Other(e.context("review_submitted handler failed")))
         } else {
             Ok(())
         }

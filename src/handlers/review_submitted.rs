@@ -1,5 +1,6 @@
 use anyhow::Context as _;
 
+use crate::config::ShortcutConfig;
 use crate::github::{Issue, IssueCommentAction, IssueCommentEvent, Label, PullRequestReviewState};
 use crate::{config::ReviewSubmittedConfig, github::Event, handlers::Context};
 
@@ -7,6 +8,7 @@ pub(crate) async fn handle(
     ctx: &Context,
     event: &Event,
     config: &ReviewSubmittedConfig,
+    shortcut_config: Option<&ShortcutConfig>,
 ) -> anyhow::Result<()> {
     if let Event::IssueComment(
         event @ IssueCommentEvent {
@@ -61,6 +63,11 @@ pub(crate) async fn handle(
                     }],
                 )
                 .await?;
+
+            // Add reminder about `@bot review`
+            super::review_reminder::remind_author_of_bot_ready(ctx, &event.issue, shortcut_config)
+                .await
+                .context("failed to remind author of @bot review")?;
         }
     }
 
