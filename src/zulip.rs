@@ -29,6 +29,7 @@ use commands::BackportArgs;
 use itertools::Itertools;
 use octocrab::Octocrab;
 use rust_team_data::v1::{TeamKind, TeamMember};
+use secrecy::{ExposeSecret, SecretString};
 use std::cmp::Reverse;
 use std::fmt::Write as _;
 use std::sync::Arc;
@@ -68,7 +69,7 @@ pub struct Request {
     message: Message,
 
     /// Authentication token. The same for all Zulip messages.
-    token: String,
+    token: SecretString,
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
@@ -163,7 +164,7 @@ pub async fn webhook(
     }
 }
 
-pub fn get_token_from_env() -> Result<String, anyhow::Error> {
+pub fn get_token_from_env() -> Result<SecretString, anyhow::Error> {
     #[expect(clippy::bind_instead_of_map, reason = "`.map_err` is suggested, but we don't really map the error")]
     // ZULIP_WEBHOOK_SECRET is preferred, ZULIP_TOKEN is kept for retrocompatibility but will be deprecated
     std::env::var("ZULIP_WEBHOOK_SECRET")
@@ -174,6 +175,7 @@ pub fn get_token_from_env() -> Result<String, anyhow::Error> {
             );
             Err(anyhow::anyhow!("Cannot communicate with Zulip."))
         })
+        .map(|v| v.into())
 }
 
 /// Processes a Zulip webhook.
@@ -181,7 +183,12 @@ pub fn get_token_from_env() -> Result<String, anyhow::Error> {
 /// Returns a string of the response, or None if no response is needed.
 async fn process_zulip_request(ctx: Arc<Context>, req: Request) -> anyhow::Result<Option<String>> {
     let expected_token = get_token_from_env()?;
-    if !bool::from(req.token.as_bytes().ct_eq(expected_token.as_bytes())) {
+    if !bool::from(
+        req.token
+            .expose_secret()
+            .as_bytes()
+            .ct_eq(expected_token.expose_secret().as_bytes()),
+    ) {
         anyhow::bail!("Invalid authorization.");
     }
 

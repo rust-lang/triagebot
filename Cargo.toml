@@ -52,6 +52,7 @@ imara-diff = "0.2.0"
 pulldown-cmark-escape = "0.11.0"
 axum-extra = { version = "0.10.1", default-features = false }
 unicode-segmentation = "1.12.0"
+secrecy = { version = "0.10", features = ["serde"] }
 
 [dependencies.serde]
 version = "1"
