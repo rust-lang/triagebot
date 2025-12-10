@@ -64,7 +64,7 @@ impl TestContext {
 
         let octocrab = Octocrab::builder().build().unwrap();
         let github = GithubClient::new(
-            "gh-test-fake-token".to_string(),
+            "gh-test-fake-token".into(),
             "https://api.github.com".to_string(),
             "https://api.github.com/graphql".to_string(),
             "https://raw.githubusercontent.com".to_string(),

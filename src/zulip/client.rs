@@ -2,6 +2,7 @@ use crate::zulip::Recipient;
 use crate::zulip::api::{MessageApiResponse, ZulipUser, ZulipUsers};
 use anyhow::Context;
 use reqwest::{Client, Method, RequestBuilder, Response};
+use secrecy::{ExposeSecret, SecretString};
 use serde::de::DeserializeOwned;
 use std::env;
 use std::sync::OnceLock;
@@ -13,7 +14,7 @@ pub struct ZulipClient {
     bot_email: String,
     // The token is loaded lazily, to avoid requiring the API token if Zulip APIs are not
     // actually accessed.
-    bot_api_token: OnceLock<String>,
+    bot_api_token: OnceLock<SecretString>,
 }
 
 impl ZulipClient {
@@ -170,13 +171,15 @@ impl ZulipClient {
         let api_token = self.get_api_token();
         self.client
             .request(method, format!("{}/api/v1/{url}", self.instance_url))
-            .basic_auth(&self.bot_email, Some(api_token))
+            .basic_auth(&self.bot_email, Some(api_token.expose_secret()))
     }
 
-    fn get_api_token(&self) -> &str {
-        self.bot_api_token
-            .get_or_init(|| env::var("ZULIP_API_TOKEN").expect("ZULIP_API_TOKEN is missing"))
-            .as_ref()
+    fn get_api_token(&self) -> &SecretString {
+        self.bot_api_token.get_or_init(|| {
+            env::var("ZULIP_API_TOKEN")
+                .expect("ZULIP_API_TOKEN is missing")
+                .into()
+        })
     }
 }
 

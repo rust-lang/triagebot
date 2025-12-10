@@ -10,6 +10,7 @@ use octocrab::models::{Author, AuthorAssociation};
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
+use secrecy::{ExposeSecret, SecretString};
 use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 use std::{
@@ -2462,8 +2463,11 @@ trait RequestSend: Sized {
 
 impl RequestSend for RequestBuilder {
     fn configure(self, g: &GithubClient) -> RequestBuilder {
-        let mut auth =
-            reqwest::header::HeaderValue::from_maybe_shared(format!("token {}", g.token)).unwrap();
+        let mut auth = reqwest::header::HeaderValue::from_maybe_shared(format!(
+            "token {}",
+            g.token.expose_secret()
+        ))
+        .unwrap();
         auth.set_sensitive(true);
         self.header(USER_AGENT, "rust-lang-triagebot")
             .header(AUTHORIZATION, &auth)
@@ -2472,12 +2476,13 @@ impl RequestSend for RequestBuilder {
 
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
-pub fn default_token_from_env() -> String {
+pub fn default_token_from_env() -> SecretString {
     std::env::var("GITHUB_TOKEN")
         // kept for retrocompatibility but usage is discouraged and will be deprecated
         .or_else(|_| std::env::var("GITHUB_API_TOKEN"))
         .or_else(|_| get_token_from_git_config())
         .expect("could not find token in GITHUB_TOKEN, GITHUB_API_TOKEN or .gitconfig/github.oath-token")
+        .into()
 }
 
 fn get_token_from_git_config() -> anyhow::Result<String> {
@@ -2495,7 +2500,7 @@ fn get_token_from_git_config() -> anyhow::Result<String> {
 
 #[derive(Clone)]
 pub struct GithubClient {
-    token: String,
+    token: SecretString,
     client: Client,
     api_url: String,
     graphql_url: String,
@@ -2505,7 +2510,7 @@ pub struct GithubClient {
 }
 
 impl GithubClient {
-    pub fn new(token: String, api_url: String, graphql_url: String, raw_url: String) -> Self {
+    pub fn new(token: SecretString, api_url: String, graphql_url: String, raw_url: String) -> Self {
         GithubClient {
             client: Client::new(),
             token,

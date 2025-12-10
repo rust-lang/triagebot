@@ -2451,6 +2451,7 @@ version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
 dependencies = [
+ "serde",
  "zeroize",
 ]
 
@@ -3202,6 +3203,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rust_team_data",
+ "secrecy",
  "serde",
  "serde_json",
  "serde_path_to_error",
