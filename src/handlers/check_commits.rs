@@ -19,7 +19,6 @@ mod behind_upstream;
 mod force_push_range_diff;
 mod issue_links;
 mod modified_submodule;
-mod no_mentions;
 mod no_merges;
 mod non_default_branch;
 mod validate_config;
@@ -110,14 +109,6 @@ pub(super) async fn handle(
             warnings.extend(non_default_branch::non_default_branch(exceptions, event));
         }
         warnings.extend(modified_submodule::modifies_submodule(diff));
-    }
-
-    if let Some(no_mentions) = &config.no_mentions {
-        warnings.extend(no_mentions::mentions_in_commits(
-            &event.issue.title,
-            no_mentions,
-            &commits,
-        ));
     }
 
     if let Some(issue_links) = &config.issue_links {

@@ -47,7 +47,6 @@ pub(crate) struct Config {
     pub(crate) rendered_link: Option<RenderedLinkConfig>,
     #[serde(alias = "canonicalize-issue-links")]
     pub(crate) issue_links: Option<IssueLinksConfig>,
-    pub(crate) no_mentions: Option<NoMentionsConfig>,
     pub(crate) behind_upstream: Option<BehindUpstreamConfig>,
     pub(crate) backport: Option<BackportConfig>,
     pub(crate) range_diff: Option<RangeDiffConfig>,
@@ -642,16 +641,6 @@ impl<'de> serde::Deserialize<'de> for IssueLinksCheckCommitsConfig {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
-#[serde(rename_all = "kebab-case")]
-#[serde(deny_unknown_fields)]
-pub(crate) struct NoMentionsConfig {
-    /// The check will not be performed on titles that include any of these substrings (case
-    /// insensitive)
-    #[serde(default)]
-    pub(crate) exclude_titles: Vec<String>,
-}
-
 /// Configuration for PR behind commits checks
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -831,9 +820,6 @@ mod tests {
             [rendered-link]
             trigger-files = ["posts/"]
 
-            [no-mentions]
-            exclude-titles = ["subtree update"]
-
             [behind-upstream]
             days-threshold = 14
 
@@ -953,9 +939,6 @@ mod tests {
                 issue_links: Some(IssueLinksConfig {
                     check_commits: IssueLinksCheckCommitsConfig::All,
                 }),
-                no_mentions: Some(NoMentionsConfig {
-                    exclude_titles: vec!["subtree update".into()],
-                }),
                 behind_upstream: Some(BehindUpstreamConfig {
                     days_threshold: Some(14),
                 }),
@@ -1048,7 +1031,6 @@ mod tests {
                 issue_links: Some(IssueLinksConfig {
                     check_commits: IssueLinksCheckCommitsConfig::Off,
                 }),
-                no_mentions: None,
                 behind_upstream: Some(BehindUpstreamConfig {
                     days_threshold: Some(7),
                 }),
