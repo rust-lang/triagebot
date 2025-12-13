@@ -4,6 +4,8 @@ const logsEl = document.getElementById("logs");
 const ansi_up = new AnsiUp();
 ansi_up.use_classes = true;
 
+let startingAnchorId = null;
+
 // 1. Tranform the ANSI escape codes to HTML
 var html = ansi_up.ansi_to_html(logs);
 
@@ -81,9 +83,76 @@ if (location.hash === "" && errorCounter >= 0) {
     });
 }
 
-// 8. Add a copy handler that force plain/text copy
+// 8. If a anchor is given, highlight and scroll to the selection
+if (location.hash !== "") {
+    const match = window.location.hash
+        .match(/L?(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)(?:-L(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z))?/);
+
+    if (match) {
+        const [startId, endId] = [match[1], match[2] || match[1]].map(decodeURIComponent);
+        const startRow = logsEl.querySelector(`a[id="${startId}"]`)?.closest('tr');
+
+        if (startRow) {
+            startingAnchorId = startId;
+            highlightTimestampRange(startId, endId);
+            startRow.scrollIntoView({ block: 'center' });
+        }
+    }
+}
+
+// 9. Add a copy handler that force plain/text copy
 logsEl.addEventListener("copy", function(e) {
     var text = window.getSelection().toString();
     e.clipboardData.setData('text/plain', text);
     e.preventDefault();
 });
+
+// 10. Add click event to handle custom hightling
+logsEl.addEventListener('click', (e) => {
+    const rowEl = e.target.closest('tr');
+    if (!rowEl || !e.target.classList.contains("timestamp")) return;
+
+    const ctrlOrMeta = e.ctrlKey || e.metaKey;
+    const shiftKey = e.shiftKey;
+    const rowId = getRowId(rowEl);
+
+    // Prevent default link behavior
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!ctrlOrMeta && !shiftKey) {
+        // Normal click: select single row, set anchor
+        startingAnchorId = rowId;
+        highlightTimestampRange(startingAnchorId, startingAnchorId);
+    } else if (shiftKey && startingAnchorId !== null) {
+        // Shift+click: extend selection from anchor
+        highlightTimestampRange(startingAnchorId, rowId);
+    } else if (ctrlOrMeta) {
+        // Ctrl/Cmd+click: new anchor (resets selection)
+        startingAnchorId = rowId;
+        highlightTimestampRange(startingAnchorId, startingAnchorId);
+    }
+
+    // Update our URL hash after every selection change
+    const ids = Array.from(logsEl.querySelectorAll('tr.selected')).map(getRowId).sort();
+    window.location.hash = ids.length ? 
+        (ids.length === 1 ? `L${ids[0]}` : `L${ids[0]}-L${ids[ids.length-1]}`) : '';
+});
+
+// Helper function to get the ID of the given row
+function getRowId(rowEl) {
+    return rowEl.querySelector('a.timestamp').id; // "2025-12-12T21:28:09.6347029Z"
+}
+
+// Helper function to highlight (toggle the selected class) on the given timestamp range
+function highlightTimestampRange(startId, endId) {
+    const rows = Array.from(logsEl.querySelectorAll('tr')).filter(r => r.querySelector('.timestamp'));
+
+    const startIndex = rows.findIndex(row => getRowId(row) === startId);
+    const endIndex = rows.findIndex(row => getRowId(row) === endId);
+
+    const start = Math.min(startIndex, endIndex);
+    const end = Math.max(startIndex, endIndex);
+
+    rows.forEach((row, index) => row.classList.toggle('selected', index >= start && index <= end));
+}

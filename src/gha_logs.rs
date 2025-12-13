@@ -225,6 +225,11 @@ table {{
   white-space: pre;
   table-layout: fixed;
   width: 100%;
+  border-spacing: 0;
+  border-collapse: collapse;
+}}
+tr.selected {{
+  background: #1d1a16; /* similar to GitHub’s yellow-ish */
 }}
 .timestamp {{
   color: #848484;
