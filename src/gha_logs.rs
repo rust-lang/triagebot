@@ -212,6 +212,9 @@ pub async fn gha_logs(
     <title>{job_name} - {owner}/{repo}@{short_sha}</title>
     {icon_status}
     <style>
+[data-pseudo-content]::before {{
+  content: attr(data-pseudo-content);
+}}
 body {{
   font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
   background: #0C0C0C;
@@ -224,7 +227,6 @@ table {{
 }}
 .timestamp {{
   color: #848484;
-  user-select: none;
   text-decoration: none;
 }}
 .timestamp:hover {{
@@ -289,7 +291,7 @@ table {{
         //  self-referencial anchor.
         const tsRegex = /^(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}\.\d+Z) (.*)(\n)?/gm;
         html = html.replace(tsRegex, (match, ts, log) => 
-            `<tr><td><a id="${{ts}}" href="#${{ts}}" class="timestamp">${{ts}}</a></td><td>${{log}}</td></tr>`
+            `<tr><td><a id="${{ts}}" href="#${{ts}}" class="timestamp" data-pseudo-content="${{ts}}"></a></td><td>${{log}}</td></tr>`
         );
 
         // 4. Add a anchor around every "##[error]" string
