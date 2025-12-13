@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use crate::errors::user_error;
+use crate::github::LockReason;
 use crate::jobs::Job;
 use crate::utils::is_issue_under_rfcbot_fcp;
 use crate::zulip::api::Recipient;
@@ -781,6 +782,10 @@ As the automated representative, I want to express gratitude to the author for t
         .close(&ctx.github)
         .await
         .context("unable to close the issue")?;
+    issue
+        .lock(&ctx.github, Some(LockReason::Resolved))
+        .await
+        .context("unable to lock the major change issue")?;
 
     Ok(())
 }
