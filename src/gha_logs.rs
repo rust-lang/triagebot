@@ -223,16 +223,16 @@ body {{
 }}
 table {{
   white-space: pre;
-  table-layout: fixed;
-  width: 100%;
+  width: auto;
   border-spacing: 0;
   border-collapse: collapse;
 }}
 tr.selected {{
-  background: #1d1a16; /* similar to GitHub’s yellow-ish */
+  background-color: #ae7c1426; /* similar to GitHub’s yellow-ish */
 }}
 .timestamp {{
   color: #848484;
+  margin-right: 1ch;
   text-decoration: none;
 }}
 .timestamp:hover {{
@@ -291,10 +291,6 @@ tr.selected {{
 </head>
 <body>
 <table>
-    <colgroup>
-        <col style="width: 29ch">
-        <col style="width: 100%">
-    </colgroup>
     <tbody id="logs">
     </tbody>
 </table>

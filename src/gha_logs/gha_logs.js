@@ -13,18 +13,21 @@ var html = ansi_up.ansi_to_html(logs);
 html = html.replace(/^\uFEFF/gm, "");
 html = html.replace(/\r\n/g, "\n");
 
-// 3. Transform each log lines that doesn't start with a timestamp into a row where everything is in the second column
-const untsRegex = /^(?!\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)(.*)(\n)?/gm;
-html = html.replace(untsRegex, (match, log) => 
-    `<tr><td></td><td>${log}</td></tr>`
-);
+// 3 Transform each log lines.
+//  If it starts start with a timestamp, make two column and make the timestamp be a self-referencial anchor.
+//  If it doesn't start with a timestamp, put everything in the second column.
+const tsRegex = /^(?:(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) )?(.*)/;
+const lines = html.split('\n');
 
-// 3.b Transform each log lines that start with a timestamp in a row with two columns and make the timestamp be a
-//  self-referencial anchor.
-const tsRegex = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) (.*)(\n)?/gm;
-html = html.replace(tsRegex, (match, ts, log) => 
-    `<tr><td><a id="${ts}" href="#${ts}" class="timestamp" data-pseudo-content="${ts}"></a></td><td>${log}</td></tr>`
-);
+html = "";
+for (let line of lines) {
+    const [, ts, log] = line.match(tsRegex);
+    if (ts !== undefined) {
+        html += `<tr><td><a id="${ts}" href="#${ts}" class="timestamp" data-pseudo-content="${ts}"></a></td><td>${log}</td></tr>`;
+    } else {
+        html += `<tr><td></td><td>${log}</td></tr>`;
+    }
+}
 
 // 4. Add a anchor around every "##[error]" string
 let errorCounter = -1;
@@ -95,7 +98,16 @@ if (location.hash !== "") {
         if (startRow) {
             startingAnchorId = startId;
             highlightTimestampRange(startId, endId);
-            startRow.scrollIntoView({ block: 'center' });
+
+            // Scroll to the highlighted part (either the timestamp or the log line depending on the viewport size)
+            const hasSmallViewport = window.innerWidth <= 750;
+            const scrollToElement = hasSmallViewport ? startRow.querySelector("td:nth-child(2)") : startRow;
+
+            scrollToElement.scrollIntoView({
+                behavior: 'instant',
+                block: 'center',
+                inline: 'start'
+            });
         }
     }
 }
