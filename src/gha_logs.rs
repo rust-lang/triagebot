@@ -229,7 +229,7 @@ table {{
   border-collapse: collapse;
 }}
 tr.selected {{
-  background: #1d1a16; /* similar to GitHub’s yellow-ish */
+  background-color: #ae7c1426; /* similar to GitHub’s yellow-ish */
 }}
 .timestamp {{
   color: #848484;
