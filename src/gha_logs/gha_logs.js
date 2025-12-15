@@ -98,7 +98,16 @@ if (location.hash !== "") {
         if (startRow) {
             startingAnchorId = startId;
             highlightTimestampRange(startId, endId);
-            startRow.scrollIntoView({ block: 'center' });
+
+            // Scroll to the highlighted part (either the timestamp or the log line depending on the viewport size)
+            const hasSmallViewport = window.innerWidth <= 750;
+            const scrollToElement = hasSmallViewport ? startRow.querySelector("td:nth-child(2)") : startRow;
+
+            scrollToElement.scrollIntoView({
+                behavior: 'instant',
+                block: 'center',
+                inline: 'start'
+            });
         }
     }
 }
