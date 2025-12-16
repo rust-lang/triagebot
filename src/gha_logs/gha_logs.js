@@ -78,7 +78,7 @@ logsEl.innerHTML = html;
 
 // 7. If no anchor is given, scroll to the last error
 if (location.hash === "" && errorCounter >= 0) {
-    const hasSmallViewport = window.innerWidth <= 750;
+    const hasSmallViewport = window.outerWidth <= 750;
     document.getElementById(`error-${errorCounter}`).scrollIntoView({
         behavior: 'instant',
         block: 'end',
@@ -100,7 +100,7 @@ if (location.hash !== "") {
             highlightTimestampRange(startId, endId);
 
             // Scroll to the highlighted part (either the timestamp or the log line depending on the viewport size)
-            const hasSmallViewport = window.innerWidth <= 750;
+            const hasSmallViewport = window.outerWidth <= 750;
             const scrollToElement = hasSmallViewport ? startRow.querySelector("td:nth-child(2)") : startRow;
 
             scrollToElement.scrollIntoView({
