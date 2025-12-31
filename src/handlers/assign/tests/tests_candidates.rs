@@ -369,6 +369,7 @@ async fn circular_groups() {
                 &["compiler"],
                 Err(FindReviewerError::NoReviewer {
                     initial: vec!["compiler".to_string()],
+                    unavailable_reviewers: 0,
                 }),
             )
             .await
@@ -406,6 +407,7 @@ async fn candidate_filtered_author_only_candidate() {
                 &["compiler"],
                 Err(FindReviewerError::NoReviewer {
                     initial: vec!["compiler".to_string()],
+                    unavailable_reviewers: 1,
                 }),
             )
             .await
@@ -602,6 +604,7 @@ async fn previous_reviewers_ignore_in_team_failed() {
                 &["compiler"],
                 Err(FindReviewerError::NoReviewer {
                     initial: vec!["compiler".to_string()],
+                    unavailable_reviewers: 2,
                 }),
             )
             .await

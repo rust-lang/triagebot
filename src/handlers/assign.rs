@@ -738,7 +738,12 @@ enum FindReviewerError {
     ///
     /// This could happen if there is a cyclical group or other misconfiguration.
     /// `initial` is the initial list of candidate names.
-    NoReviewer { initial: Vec<String> },
+    /// `unavailable_reviewers` is a number of reviewers that could not have been chosen, as they
+    /// are not available for a review at this time.
+    NoReviewer {
+        initial: Vec<String>,
+        unavailable_reviewers: u32,
+    },
     /// Requested reviewer is off the review rotation (e.g. on a vacation).
     /// Either the username is in [users_on_vacation] in `triagebot.toml` or the user has
     /// configured [`RotationMode::OffRotation`] in their reviewer preferences.
@@ -769,11 +774,14 @@ impl fmt::Display for FindReviewerError {
                     Reviewer group names can be found in `triagebot.toml` in this repo."
                 )
             }
-            FindReviewerError::NoReviewer { initial } => {
+            FindReviewerError::NoReviewer {
+                initial,
+                unavailable_reviewers,
+            } => {
                 write!(
                     f,
-                    "No reviewers could be found from initial request `{}`\n\
-                     This repo may be misconfigured.\n\
+                    "The review request `{}` corresponds to {unavailable_reviewers} reviewer(s).\n\
+                     However, none of them are available for a review at this time.\n\
                      Use `r?` to specify someone else to assign.",
                     initial.join(",")
                 )
@@ -1164,6 +1172,7 @@ async fn candidate_reviewers_from_names<'a>(
             );
             Err(FindReviewerError::NoReviewer {
                 initial: names.to_vec(),
+                unavailable_reviewers: expanded_count as u32,
             })
         }
     } else {
