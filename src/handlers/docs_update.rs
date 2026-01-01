@@ -65,6 +65,15 @@ impl Job for DocsUpdateJob {
 
 pub async fn docs_update() -> Result<Option<Issue>> {
     let gh = GithubClient::new_from_env();
+
+    if is_pr_already_open(&gh)
+        .await
+        .context("failed to determine if a PR is already open for updating the docs")?
+    {
+        tracing::trace!("pr is already open");
+        return Ok(None);
+    }
+
     let dest_repo = gh.repository(DEST_REPO).await?;
     let work_repo = gh.repository(WORK_REPO).await?;
 
@@ -76,6 +85,15 @@ pub async fn docs_update() -> Result<Option<Issue>> {
 
     create_commit(&gh, &dest_repo, &work_repo, &updates).await?;
     Ok(Some(create_pr(&gh, &dest_repo, &updates).await?))
+}
+
+async fn is_pr_already_open(gh: &GithubClient) -> Result<bool> {
+    let count = gh
+        .issue_search_count(&format!(
+            "repo:{DEST_REPO} is:pr is:open author:rustbot head:{BRANCH_NAME}"
+        ))
+        .await?;
+    Ok(count != 0)
 }
 
 struct Update {

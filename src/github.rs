@@ -2883,6 +2883,35 @@ impl GithubClient {
         };
         Ok(repo_id)
     }
+
+    /// Returns the number of issues or PRs that match the given query.
+    ///
+    /// See
+    /// <https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests>
+    /// and
+    /// <https://docs.github.com/en/search-github/getting-started-with-searching-on-github/understanding-the-search-syntax>
+    /// for the query syntax.
+    pub async fn issue_search_count(&self, query: &str) -> anyhow::Result<u64> {
+        let data = self
+            .graphql_query(
+                "query($query: String!) {
+                  search(query: $query, type: ISSUE, first: 0) {
+                    issueCount
+                  }
+                }",
+                serde_json::json!({
+                    "query": query,
+                }),
+            )
+            .await?;
+        if let serde_json::Value::Number(count) = &data["data"]["search"]["issueCount"]
+            && let Some(count) = count.as_u64()
+        {
+            Ok(count)
+        } else {
+            anyhow::bail!("expected issue count, got {data}");
+        }
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
