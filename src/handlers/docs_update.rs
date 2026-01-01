@@ -66,7 +66,10 @@ impl Job for DocsUpdateJob {
 pub async fn docs_update() -> Result<Option<Issue>> {
     let gh = GithubClient::new_from_env();
 
-    if is_pr_already_open(&gh).await? {
+    if is_pr_already_open(&gh)
+        .await
+        .context("failed to determine if a PR is already open for updating the docs")?
+    {
         tracing::trace!("pr is already open");
         return Ok(None);
     }
