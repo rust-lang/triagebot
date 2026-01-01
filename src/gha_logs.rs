@@ -174,7 +174,22 @@ pub async fn gha_logs(
         };
 
         let (job_and_tree_roots, logs) = futures::join!(job_and_tree_roots, logs);
-        let ((job, tree_roots), logs) = (job_and_tree_roots?, logs?);
+        let (job, tree_roots) = job_and_tree_roots?;
+
+        let logs = match logs {
+            Ok(logs) => logs,
+            Err(err) if matches!(err.downcast_ref::<reqwest::Error>(), Some(err) if err.status() == Some(StatusCode::GONE)) =>
+            {
+                // Return a friendly error message for no longer available logs.
+                tracing::info!("gha_logs: raw logs gone for log {log_uuid}");
+                return Ok((
+                    StatusCode::GONE,
+                    HeaderMap::new(),
+                    "The requested logs are no longer available.\n\nGitHub only retains logs for up to 90 days, after which they become permanently inaccessible.".to_string(),
+                ));
+            }
+            Err(err) => return Err(err.into()),
+        };
 
         ctx.gha_logs.write().await.put(
             log_uuid.clone(),
