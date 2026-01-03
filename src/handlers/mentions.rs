@@ -159,11 +159,35 @@ pub(super) async fn handle_input(
 }
 
 fn modified_paths_matches(modified_paths: &[&Path], entry: &str) -> Vec<PathBuf> {
-    let path = Path::new(entry);
+    // Prepare the glob pattern from the entry.
+    //
+    // Note that we add an extra `*` at the end in order to get the "starts with" mode
+    // that we want.
+    let pattern = if entry.ends_with('*') {
+        entry.to_string()
+    } else {
+        format!("{entry}*")
+    };
+
+    // Create the glob pattern and log an error (should have already been reported to
+    // the user).
+    let pattern = match globset::GlobBuilder::new(&pattern)
+        .empty_alternates(true)
+        .build()
+    {
+        Ok(pattern) => pattern,
+        Err(err) => {
+            tracing::error!("invalid glob pattern for {entry}: {err:?}");
+            return Vec::new();
+        }
+    };
+
+    // Compile the glob pattern to a (Regex) matcher
+    let matcher = pattern.compile_matcher();
 
     modified_paths
         .iter()
-        .filter(|p| p.starts_with(path))
+        .filter(|p| matcher.is_match(p))
         .map(PathBuf::from)
         .collect()
 }
@@ -289,6 +313,96 @@ mod tests {
                 "Cargo.lock",
             ),
             vec![PathBuf::from("Cargo.lock")]
+        );
+    }
+
+    #[test]
+    fn entry_modified_glob_either() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("Cargo.lock"),
+                    Path::new("Cargo.toml"),
+                    Path::new("library/dec2flt/lib.rs"),
+                    Path::new("library/flt2dec/lib.rs"),
+                ],
+                "library/{dec2flt,flt2dec}",
+            ),
+            vec![
+                PathBuf::from("library/dec2flt/lib.rs"),
+                PathBuf::from("library/flt2dec/lib.rs"),
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_modified_glob_star() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("Cargo.lock"),
+                    Path::new("Cargo.toml"),
+                    Path::new("library/dec2flt/lib.rs"),
+                    Path::new("library/flt2dec/lib.rs"),
+                ],
+                "library/dec2*",
+            ),
+            vec![PathBuf::from("library/dec2flt/lib.rs")]
+        );
+    }
+
+    #[test]
+    fn entry_modified_glob_star_middle() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("compiler/x86-64-none_eabi.rs"),
+                    Path::new("compiler/armv7-none_eabi-something.rs"),
+                    Path::new("compiler/armv7-none_eabi-something.txt"),
+                    Path::new("compiler/none_eabi.rs"),
+                ],
+                "compiler/*none_eabi*.rs",
+            ),
+            vec![
+                PathBuf::from("compiler/x86-64-none_eabi.rs"),
+                PathBuf::from("compiler/armv7-none_eabi-something.rs"),
+                PathBuf::from("compiler/none_eabi.rs"),
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_modified_glob_double_star() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("Cargo.lock"),
+                    Path::new("Cargo.toml"),
+                    Path::new("library/.empty"),
+                    Path::new("library/dec2flt/lib.rs"),
+                    Path::new("library/flt2dec/lib.rs"),
+                ],
+                "library/**",
+            ),
+            vec![
+                PathBuf::from("library/.empty"),
+                PathBuf::from("library/dec2flt/lib.rs"),
+                PathBuf::from("library/flt2dec/lib.rs"),
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_modified_glob_empty_alternates() {
+        assert_eq!(
+            modified_paths_matches(
+                &[Path::new("result.rs"), Path::new("result.rs.stdout")],
+                "result.rs{,.stdout}",
+            ),
+            vec![
+                PathBuf::from("result.rs"),
+                PathBuf::from("result.rs.stdout"),
+            ]
         );
     }
 }
