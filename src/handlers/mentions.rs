@@ -13,7 +13,6 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::{fmt::Write, path::PathBuf};
-use tracing as log;
 
 const MENTIONS_KEY: &str = "mentions";
 
@@ -51,54 +50,59 @@ pub(super) async fn parse_input(
         return Ok(None);
     }
 
-    if let Some(files) = event
-        .issue
-        .diff(&ctx.github)
-        .await
-        .map_err(|e| log::error!("failed to fetch diff: {e:?}"))
-        .unwrap_or_default()
-    {
-        let file_paths: Vec<_> = files.iter().map(|fd| Path::new(&fd.filename)).collect();
-        let to_mention: Vec<_> = config
-            .entries
-            .iter()
-            .filter_map(|(entry, MentionsEntryConfig { cc, type_, .. })| {
-                let relevant_file_paths: Vec<PathBuf> = match type_ {
-                    MentionsEntryType::Filename => {
-                        let path = Path::new(entry);
-                        // Only mention matching paths.
-                        file_paths
-                            .iter()
-                            .filter(|p| p.starts_with(path))
-                            .map(PathBuf::from)
-                            .collect()
-                    }
-                    MentionsEntryType::Content => {
-                        // Only mentions byte-for-byte matching content inside the patch.
-                        files
-                            .iter()
-                            .filter(|f| patch_adds(&f.patch, entry))
-                            .map(|f| PathBuf::from(&f.filename))
-                            .collect()
-                    }
-                };
-                // Don't mention if only the author is in the list.
-                let pings_non_author = match &cc[..] {
-                    [only_cc] => only_cc.trim_start_matches('@') != event.issue.user.login,
-                    _ => true,
-                };
-                if !relevant_file_paths.is_empty() && pings_non_author {
-                    Some((entry.to_string(), relevant_file_paths))
-                } else {
-                    None
-                }
-            })
-            .collect();
-        if !to_mention.is_empty() {
-            return Ok(Some(MentionsInput { to_mention }));
+    // Fetch the PR diff
+    let diff = event.issue.diff(&ctx.github).await;
+
+    // Print the error if we got one
+    let Ok(Some(modified_files)) = diff else {
+        if let Err(err) = diff {
+            tracing::error!("failed to fetch diff for mentions handler: {err:?}");
         }
+        return Ok(None);
+    };
+
+    let modified_paths: Vec<_> = modified_files
+        .iter()
+        .map(|fd| Path::new(&fd.filename))
+        .collect();
+
+    let to_mention: Vec<_> = config
+        .entries
+        .iter()
+        .filter_map(|(entry, MentionsEntryConfig { cc, type_, .. })| {
+            let relevant_file_paths: Vec<PathBuf> = match type_ {
+                MentionsEntryType::Filename => {
+                    // Only mention matching paths.
+                    modified_paths_matches(&modified_paths, entry)
+                }
+                MentionsEntryType::Content => {
+                    // Only mentions byte-for-byte matching content inside the patch.
+                    modified_files
+                        .iter()
+                        .filter(|f| patch_adds(&f.patch, entry))
+                        .map(|f| PathBuf::from(&f.filename))
+                        .collect()
+                }
+            };
+
+            // Don't mention if only the author is in the list.
+            let pings_non_author = match &cc[..] {
+                [only_cc] => only_cc.trim_start_matches('@') != event.issue.user.login,
+                _ => true,
+            };
+            if !relevant_file_paths.is_empty() && pings_non_author {
+                Some((entry.to_string(), relevant_file_paths))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if to_mention.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(MentionsInput { to_mention }))
     }
-    Ok(None)
 }
 
 pub(super) async fn handle_input(
@@ -152,6 +156,16 @@ pub(super) async fn handle_input(
         state.save().await?;
     }
     Ok(())
+}
+
+fn modified_paths_matches(modified_paths: &[&Path], entry: &str) -> Vec<PathBuf> {
+    let path = Path::new(entry);
+
+    modified_paths
+        .iter()
+        .filter(|p| p.starts_with(path))
+        .map(PathBuf::from)
+        .collect()
 }
 
 fn patch_adds(patch: &str, needle: &str) -> bool {
@@ -215,5 +229,66 @@ mod tests {
 +added line
 ";
         assert!(!patch_adds(patch, "missing"));
+    }
+
+    #[test]
+    fn entry_not_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("library/Cargo.lock"),
+                    Path::new("library/Cargo.toml")
+                ],
+                "compiler/rustc_span/",
+            ),
+            Vec::<PathBuf>::new()
+        );
+    }
+
+    #[test]
+    fn entry_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("Cargo.lock"),
+                    Path::new("compiler/rustc_span/src/lib.rs"),
+                    Path::new("compiler/rustc_span/src/symbol.rs"),
+                ],
+                "compiler/rustc_span/",
+            ),
+            vec![
+                PathBuf::from("compiler/rustc_span/src/lib.rs"),
+                PathBuf::from("compiler/rustc_span/src/symbol.rs"),
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_filename_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("compiler/rustc_span/src/lib.rs"),
+                    Path::new("compiler/rustc_span/src/symbol.rs"),
+                ],
+                "compiler/rustc_span/src/lib.rs",
+            ),
+            vec![PathBuf::from("compiler/rustc_span/src/lib.rs")]
+        );
+    }
+
+    #[test]
+    fn entry_top_level_filename_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("Cargo.lock"),
+                    Path::new("Cargo.toml"),
+                    Path::new(".git/submodules"),
+                ],
+                "Cargo.lock",
+            ),
+            vec![PathBuf::from("Cargo.lock")]
+        );
     }
 }
