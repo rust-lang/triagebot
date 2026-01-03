@@ -161,14 +161,15 @@ fn parse_open_close_reopen_input(
 
 fn has_all_required_labels(issue: &Issue, config: &NotifyZulipLabelConfig) -> bool {
     for req_label in &config.required_labels {
-        let pattern = match glob::Pattern::new(req_label) {
+        let pattern = match globset::Glob::new(req_label) {
             Ok(pattern) => pattern,
             Err(err) => {
                 log::error!("Invalid glob pattern: {err}");
                 continue;
             }
         };
-        if !issue.labels().iter().any(|l| pattern.matches(&l.name)) {
+        let matcher = pattern.compile_matcher();
+        if !issue.labels().iter().any(|l| matcher.is_match(&l.name)) {
             return false;
         }
     }

@@ -56,24 +56,29 @@ pub(super) async fn parse_input(
         let mut to_remove = Vec::new();
 
         'outer: for (label, cfg) in &config.labels {
-            let exclude_patterns: Vec<glob::Pattern> = cfg
-                .exclude_labels
-                .iter()
-                .filter_map(|label| match glob::Pattern::new(label) {
-                    Ok(exclude_glob) => Some(exclude_glob),
-                    Err(error) => {
-                        log::error!("Invalid glob pattern: {error}");
-                        None
-                    }
-                })
-                .collect();
+            let exclude_patterns =
+                cfg.exclude_labels
+                    .iter()
+                    .filter_map(|label| match globset::Glob::new(label) {
+                        Ok(exclude_glob) => Some(exclude_glob),
+                        Err(error) => {
+                            log::error!("invalid glob pattern: {error}");
+                            None
+                        }
+                    });
+
+            let exclude_patterns = match globset::GlobSet::new(exclude_patterns) {
+                Ok(exclude_patterns) => exclude_patterns,
+                Err(err) => {
+                    log::error!("failed to create a glob set: {err:?}");
+                    continue;
+                }
+            };
 
             for label in event.issue.labels() {
-                for pat in &exclude_patterns {
-                    if pat.matches(&label.name) {
-                        // If we hit an excluded label, ignore this autolabel and check the next
-                        continue 'outer;
-                    }
+                if exclude_patterns.is_match(&label.name) {
+                    // If we hit an excluded label, ignore this autolabel and check the next
+                    continue 'outer;
                 }
             }
 
@@ -161,24 +166,30 @@ pub(super) async fn parse_input(
         let applied_label = &label.name;
 
         'outer: for (label, config) in config.get_by_trigger(applied_label) {
-            let exclude_patterns: Vec<glob::Pattern> = config
-                .exclude_labels
-                .iter()
-                .filter_map(|label| match glob::Pattern::new(label) {
-                    Ok(exclude_glob) => Some(exclude_glob),
-                    Err(error) => {
-                        log::error!("Invalid glob pattern: {error}");
-                        None
-                    }
-                })
-                .collect();
+            let exclude_patterns =
+                config
+                    .exclude_labels
+                    .iter()
+                    .filter_map(|label| match globset::Glob::new(label) {
+                        Ok(exclude_glob) => Some(exclude_glob),
+                        Err(error) => {
+                            log::error!("invalid glob pattern: {error}");
+                            None
+                        }
+                    });
+
+            let exclude_patterns = match globset::GlobSet::new(exclude_patterns) {
+                Ok(exclude_patterns) => exclude_patterns,
+                Err(err) => {
+                    log::error!("failed to create a glob set: {err:?}");
+                    continue;
+                }
+            };
 
             for label in event.issue.labels() {
-                for pat in &exclude_patterns {
-                    if pat.matches(&label.name) {
-                        // If we hit an excluded label, ignore this autolabel and check the next
-                        continue 'outer;
-                    }
+                if exclude_patterns.is_match(&label.name) {
+                    // If we hit an excluded label, ignore this autolabel and check the next
+                    continue 'outer;
                 }
             }
 
