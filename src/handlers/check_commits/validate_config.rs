@@ -2,7 +2,7 @@
 //! changes are a valid configuration file.
 
 use crate::{
-    config::CONFIG_FILE_NAME,
+    config::{CONFIG_FILE_NAME, MentionsEntryConfig, MentionsEntryType},
     github::FileDiff,
     handlers::{Context, IssuesEvent},
 };
@@ -66,6 +66,20 @@ pub(super) async fn validate_config(
                     "Invalid `triagebot.toml`:\n\
                     `[assign.owners]` is populated but `[assign.custom_messages.auto-assign-someone]` is not set!".to_string()
                 ));
+            }
+
+            // Error if one the mentions entry is not a valid glob.
+            if let Some(mentions) = config.mentions {
+                for (entry, MentionsEntryConfig { type_, .. }) in mentions.entries {
+                    if type_ == MentionsEntryType::Filename
+                        && let Err(err) = globset::Glob::new(&entry)
+                    {
+                        return Ok(Some(format!(
+                            "Invalid `triagebot.toml`:\n\
+                            `[mentions.\"{entry}\"]` has an invalid glob syntax: {err}"
+                        )));
+                    }
+                }
             }
 
             Ok(None)
