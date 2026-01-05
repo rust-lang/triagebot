@@ -148,13 +148,11 @@ fn match_pattern(pattern: &str, label: &str) -> anyhow::Result<MatchPatternResul
         (pattern, false)
     };
 
-    let glob = glob::Pattern::new(pattern)?;
-    let matchopts = glob::MatchOptions {
-        case_sensitive: false,
-        ..Default::default()
-    };
+    let glob = globset::GlobBuilder::new(pattern)
+        .case_insensitive(true)
+        .build()?;
 
-    Ok(match (glob.matches_with(label, matchopts), inverse) {
+    Ok(match (glob.compile_matcher().is_match(label), inverse) {
         (true, false) => MatchPatternResult::Allow,
         (true, true) => MatchPatternResult::Deny,
         (false, _) => MatchPatternResult::NoMatch,
