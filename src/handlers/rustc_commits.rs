@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use std::collections::VecDeque;
 use tracing as log;
 
-const BORS_GH_ID: u64 = 3_372_342;
+const BORS_GH_ID: u64 = 122_020_455; // https://api.github.com/users/rust-bors[bot]
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let Some(body) = event.comment_body() else {
