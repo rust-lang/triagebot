@@ -38,13 +38,33 @@ pub async fn gh_changes_since(
         repository: repo.to_string(),
     };
 
-    let pr = ctx.github.pull_request(&issue_repo, pr_num).await?;
+    let pr = ctx
+        .github
+        .pull_request(&issue_repo, pr_num)
+        .await
+        .context("could not get the pull request details")?;
 
     let newbase = &pr.base.as_ref().context("no base")?.sha;
     let newhead = &pr.head.as_ref().context("no head")?.sha;
 
     // Has the base changed?
     if oldbase == newbase {
+        // No, try finding if only new commits have been added by trying to finding the oldhead between oldbase..newhead
+        let cmp = ctx
+            .github
+            .compare(&issue_repo, oldbase, newhead)
+            .await
+            .with_context(|| format!("unable to fetch the comparaison between the oldhead ({oldhead}) and newhead ({newhead})"))?;
+
+        // Have only new commits been added?
+        if cmp.commits.iter().find(|c| c.sha == oldhead).is_some() {
+            // Yes, redirect to GitHub PR changes page
+            return Ok(Redirect::to(&format!(
+                "https://github.com/{owner}/{repo}/pull/{pr_num}/changes/{oldhead}..{newhead}"
+            ))
+            .into_response());
+        }
+
         // No, redirect to GitHub native compare page
         return Ok(Redirect::to(&format!(
             "https://github.com/{owner}/{repo}/compare/{oldhead}..{newhead}"
