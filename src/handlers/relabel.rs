@@ -21,6 +21,8 @@ use crate::{
 use anyhow::Context as _;
 use parser::command::relabel::{LabelDelta, RelabelCommand};
 
+use tracing as log;
+
 pub(super) async fn handle_command(
     ctx: &Context,
     config: &RelabelConfig,
@@ -86,7 +88,7 @@ async fn is_member(user: &github::User, client: &TeamClient) -> TeamMembership {
         Ok(true) => TeamMembership::Member,
         Ok(false) => TeamMembership::Outsider,
         Err(err) => {
-            eprintln!("failed to check team membership: {err:?}");
+            log::error!("failed to check team membership: {err:?}");
             TeamMembership::Unknown
         }
     }
@@ -120,7 +122,7 @@ fn check_filter(
             }
             Ok(MatchPatternResult::NoMatch) => {}
             Err(err) => {
-                eprintln!("failed to match pattern {pattern}: {err}");
+                log::error!("failed to match pattern {pattern}: {err}");
                 return Err(format!("failed to match pattern {pattern}"));
             }
         }
