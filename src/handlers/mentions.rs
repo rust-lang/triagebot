@@ -430,6 +430,36 @@ mod tests {
     }
 
     #[test]
+    fn entry_submodule_and_normal_dir_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/tools/cargo{,test}"
+            ),
+            vec![
+                PathBuf::from("src/tools/cargo"),
+                PathBuf::from("src/tools/cargotest")
+            ]
+        );
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/tools/cargo*"
+            ),
+            vec![
+                PathBuf::from("src/tools/cargo"),
+                PathBuf::from("src/tools/cargotest")
+            ]
+        );
+    }
+
+    #[test]
     fn entry_submodule_modified_with_trailing_slash() {
         assert_eq!(
             modified_paths_matches(
