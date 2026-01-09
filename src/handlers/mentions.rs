@@ -159,15 +159,24 @@ pub(super) async fn handle_input(
 }
 
 fn modified_paths_matches(modified_paths: &[&Path], entry: &str) -> Vec<PathBuf> {
+    // Fast-path if entry has no glob components
+    if globset::escape(entry) == entry {
+        let path = Path::new(entry);
+
+        // Return paths that starts with entry
+        return modified_paths
+            .iter()
+            .filter(|p| p.starts_with(path))
+            .map(PathBuf::from)
+            .collect();
+    }
+
     // Prepare the glob pattern from the entry.
     //
-    // Note that we add an extra `*` at the end in order to get the "starts with" mode
-    // that we want.
-    let pattern = if entry.ends_with('*') {
-        entry.to_string()
-    } else {
-        format!("{entry}*")
-    };
+    // We first trim any excess `/` at the end of the pattern and then add an alternate
+    // to match on the path as is or in any sub-directories.
+    let pattern = entry.trim_end_matches('/');
+    let pattern = format!("{pattern}{{,/*}}");
 
     // Create the glob pattern and log an error (should have already been reported to
     // the user).
@@ -177,7 +186,7 @@ fn modified_paths_matches(modified_paths: &[&Path], entry: &str) -> Vec<PathBuf>
     {
         Ok(pattern) => pattern,
         Err(err) => {
-            tracing::error!("invalid glob pattern for {entry}: {err:?}");
+            tracing::error!("invalid glob pattern for [mentions.\"{entry}\"]: {err}");
             return Vec::new();
         }
     };
@@ -403,6 +412,108 @@ mod tests {
                 PathBuf::from("result.rs"),
                 PathBuf::from("result.rs.stdout"),
             ]
+        );
+    }
+
+    #[test]
+    fn entry_submodule_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/tools/cargo"
+            ),
+            vec![PathBuf::from("src/tools/cargo")]
+        );
+    }
+
+    #[test]
+    fn entry_submodule_and_normal_dir_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/tools/cargo{,test}"
+            ),
+            vec![
+                PathBuf::from("src/tools/cargo"),
+                PathBuf::from("src/tools/cargotest")
+            ]
+        );
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/tools/cargo*"
+            ),
+            vec![
+                PathBuf::from("src/tools/cargo"),
+                PathBuf::from("src/tools/cargotest")
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_submodule_modified_with_trailing_slash() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/tools/cargo/"
+            ),
+            vec![PathBuf::from("src/tools/cargo")]
+        );
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/tools/cargo//"
+            ),
+            vec![PathBuf::from("src/tools/cargo")]
+        );
+    }
+
+    #[test]
+    fn entry_submodule_modified_glob() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/*/cargo"
+            ),
+            vec![PathBuf::from("src/tools/cargo")]
+        );
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/*/cargo/"
+            ),
+            vec![PathBuf::from("src/tools/cargo")]
+        );
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/*/cargo//"
+            ),
+            vec![PathBuf::from("src/tools/cargo")]
         );
     }
 }
