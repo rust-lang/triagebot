@@ -159,6 +159,18 @@ pub(super) async fn handle_input(
 }
 
 fn modified_paths_matches(modified_paths: &[&Path], entry: &str) -> Vec<PathBuf> {
+    // Fast-path if entry has no glob components
+    if globset::escape(entry) == entry {
+        let path = Path::new(entry);
+
+        // Return paths that starts with entry
+        return modified_paths
+            .iter()
+            .filter(|p| p.starts_with(path))
+            .map(PathBuf::from)
+            .collect();
+    }
+
     // Prepare the glob pattern from the entry.
     //
     // We first trim any excess `/` at the end of the pattern and then add an alternate
