@@ -1,9 +1,17 @@
+//! Handles stable, beta backports for PRs fixing P-high/critical regressions
+//!
+//! Add proper labels, opens a poll on Zulip to gauge interest about a backport.
+//! Posts a closing messages on Zulip when the PR has been backport accepted.
+//!
+//! Configuration is done with the `[backport]` table.
+//!
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use crate::config::BackportConfig;
 use crate::github::{IssuesAction, IssuesEvent, Label};
 use crate::handlers::Context;
+use crate::utils::contains_any;
 use anyhow::Context as AnyhowContext;
 use futures::future::join_all;
 use regex::Regex;
@@ -15,12 +23,9 @@ static CLOSES_ISSUE_REGEXP: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new("(?i)(?P<action>close[sd]*|fix([e]*[sd]*)?|resolve[sd]*)(?P<spaces>:? +)(?P<org_repo>[a-zA-Z0-9_-]*/[a-zA-Z0-9_-]*)?#(?P<issue_num>[0-9]+)").unwrap()
 });
 
-const BACKPORT_LABELS: [&str; 4] = [
-    "beta-nominated",
-    "beta-accepted",
-    "stable-nominated",
-    "stable-accepted",
-];
+const BACKPORT_ACCEPTED_LABELS: [&str; 2] = ["beta-accepted", "stable-accepted"];
+
+const BACKPORT_NOMINATED_LABELS: [&str; 2] = ["beta-nominated", "stable-nominated"];
 
 const REGRESSION_LABELS: [&str; 3] = [
     "regression-from-stable-to-nightly",
@@ -53,13 +58,17 @@ pub(super) async fn parse_input(
     // - is opened (and not a draft)
     // - is converted from draft to ready for review
     // - when the first comment is edited
+    // - when a label is added (later we check which one)
     let skip_check = !matches!(
         event.action,
-        IssuesAction::Opened | IssuesAction::Edited | IssuesAction::ReadyForReview
+        IssuesAction::Opened
+            | IssuesAction::Edited
+            | IssuesAction::ReadyForReview
+            | IssuesAction::Labeled { label: _ }
     );
     if skip_check || !event.issue.is_pr() || event.issue.draft {
         log::debug!(
-            "Skipping backport event because: IssuesAction = {:?}, issue.is_pr() {}, draft = {}",
+            "Skipping backport event because: IssuesAction = {:?}, issue.is_pr() = {}, draft = {}",
             event.action,
             event.issue.is_pr(),
             event.issue.draft
@@ -69,9 +78,35 @@ pub(super) async fn parse_input(
     let pr = &event.issue;
 
     let pr_labels: Vec<&str> = pr.labels.iter().map(|l| l.name.as_str()).collect();
-    if contains_any(&pr_labels, &BACKPORT_LABELS) {
-        log::debug!("PR #{} already has a backport label", pr.number);
-        return Ok(None);
+
+    // if adding a "-nominated" label to a PR, proceed if PR does not have it already
+    // (we don't check for "-accepted" labels)
+    let re = Regex::new("(beta|stable)-nominated").unwrap();
+    if matches!(&event.action, IssuesAction::Labeled { label } if re.is_match(&label.name)) {
+        if contains_any(&pr_labels, &BACKPORT_NOMINATED_LABELS) {
+            log::debug!(
+                "PR #{} is already backport nominated (found labels: {:?})",
+                pr.number,
+                pr_labels
+            );
+            // NOTE: this won't revert the label added by github
+            return Ok(None);
+        }
+    }
+
+    // If adding an "-accepted" label to a PR, proceed if PR does not have it already
+    // (we skip checking the "-nominated" labels, sometimes T-release straight backport accepts PRs)
+    let re = Regex::new("(beta|stable)-accepted").unwrap();
+    if matches!(&event.action, IssuesAction::Labeled { label } if re.is_match(&label.name)) {
+        if contains_any(&pr_labels, &BACKPORT_ACCEPTED_LABELS) {
+            log::debug!(
+                "PR #{} is already backport accepted (found labels: {:?})",
+                pr.number,
+                pr_labels
+            );
+            // NOTE: this won't revert the label added by github
+            return Ok(None);
+        }
     }
 
     // Retrieve backport config for this PR, based on its team label(s)
@@ -187,7 +222,8 @@ pub(super) async fn handle_input(
             continue;
         }
 
-        // Add backport nomination label(s) to PR
+        // When backport nominating/accepting a PR, if a `[notify-zulip]` table is configured in triagebot.toml
+        // that will trigger the notify_zulip handler
         let mut new_labels = pr.labels().to_owned();
         new_labels.extend(
             add_labels
@@ -210,16 +246,12 @@ pub(super) async fn handle_input(
     Ok(())
 }
 
-fn contains_any(haystack: &[&str], needles: &[&str]) -> bool {
-    needles.iter().any(|needle| haystack.contains(needle))
-}
-
 #[cfg(test)]
 mod tests {
     use crate::handlers::backport::CLOSES_ISSUE_REGEXP;
 
-    #[tokio::test]
-    async fn backport_match_comment() {
+    #[test]
+    fn backport_match_comment() {
         let test_strings = vec![
             ("close #10", vec![10]),
             ("closes #10", vec![10]),
