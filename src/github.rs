@@ -359,6 +359,8 @@ pub struct GithubCompare {
     pub merge_base_commit: GithubCommit,
     /// List of file differences
     pub files: Vec<FileDiff>,
+    /// List of commits
+    pub commits: Vec<GithubCommit>,
 }
 
 /// Representation of a diff to a single file.

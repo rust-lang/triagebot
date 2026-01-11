@@ -159,7 +159,8 @@ mod tests {
                         "same-merge-commit",
                         "merge-commit-body"
                     ),
-                    files: vec![]
+                    files: vec![],
+                    commits: vec![],
                 },
                 &crate::github::GithubCompare {
                     base_commit: dummy_commit_from_body("base-commit-sha", "base-commit-body"),
@@ -167,7 +168,8 @@ mod tests {
                         "same-merge-commit",
                         "merge-commit-body"
                     ),
-                    files: vec![]
+                    files: vec![],
+                    commits: vec![],
                 },
                 "oldhead",
                 "newhead"
@@ -196,7 +198,8 @@ mod tests {
                         "before-merge-commit",
                         "merge-commit-body"
                     ),
-                    files: vec![]
+                    files: vec![],
+                    commits: vec![],
                 },
                 &crate::github::GithubCompare {
                     base_commit: dummy_commit_from_body("base-commit-sha", "base-commit-body"),
@@ -204,7 +207,8 @@ mod tests {
                         "after-merge-commit",
                         "merge-commit-body"
                     ),
-                    files: vec![]
+                    files: vec![],
+                    commits: vec![],
                 },
                 "oldhead",
                 "newhead"
