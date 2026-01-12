@@ -59,6 +59,15 @@ pub async fn gh_comments(
   <link rel="icon" sizes="32x32" type="image/png" href="https://rust-lang.org/static/images/favicon-32x32.png">
   <link rel="stylesheet" href="{MARKDOWN_URL}" />
   <link rel="stylesheet" href="{STYLE_URL}" />
+  <script nonce="triagebot-gh-comments">
+    document.addEventListener('DOMContentLoaded', function() {{
+      document.querySelectorAll('[data-utc-time]').forEach(element => {{
+        const utcString = element.getAttribute('data-utc-time');
+        const utcDate = new Date(utcString);
+        element.textContent = utcDate.toLocaleString();
+      }});
+    }});
+  </script>
 </head>
 <body>
 <div class="comments-container">
@@ -102,7 +111,9 @@ pub async fn gh_comments(
     );
     headers.insert(
         CONTENT_SECURITY_POLICY,
-        HeaderValue::from_static("default-src 'none'; style-src 'self'; img-src *"),
+        HeaderValue::from_static(
+            "default-src 'none'; script-src 'nonce-triagebot-gh-comments'; style-src 'self'; img-src *",
+        ),
     );
 
     Ok((StatusCode::OK, headers, html).into_response())
@@ -131,6 +142,7 @@ fn write_comment_as_html(
 ) -> anyhow::Result<()> {
     let author_login = &author.login;
     let author_avatar_url = &author.avatar_url;
+    let created_at_rfc3339 = created_at.to_rfc3339();
 
     writeln!(
         buffer,
@@ -144,7 +156,7 @@ fn write_comment_as_html(
         <div class="comment-header">
           <div class="author-info desktop">
             <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
-            <span>commented on {created_at}</span>
+            <span>on </span><span data-utc-time="{created_at_rfc3339}">{created_at}</span>
           </div>
 
           <div class="author-mobile">
@@ -153,7 +165,7 @@ fn write_comment_as_html(
             </a>
             <div class="author-info">
               <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
-              <span>commented on Jan 11, 2026</span>
+              <span>on </span><span data-utc-time="{created_at_rfc3339}">{created_at}</span>
             </div>
           </div>
 
