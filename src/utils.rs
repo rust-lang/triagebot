@@ -1,6 +1,11 @@
 use crate::handlers::Context;
 
 use anyhow::Context as _;
+use axum::http::HeaderValue;
+use hyper::{
+    HeaderMap,
+    header::{CACHE_CONTROL, CONTENT_TYPE},
+};
 use std::borrow::Cow;
 
 /// Pluralize (add an 's' sufix) to `text` based on `count`.
@@ -55,4 +60,16 @@ pub(crate) async fn is_issue_under_rfcbot_fcp(
     }
 
     false
+}
+
+pub(crate) fn immutable_headers(content_type: &'static str) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+
+    headers.insert(
+        CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=15552000, immutable"),
+    );
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static(content_type));
+
+    headers
 }

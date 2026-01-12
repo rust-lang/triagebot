@@ -2,12 +2,12 @@ use crate::errors::AppError;
 use crate::github::{self, WorkflowRunJob};
 use crate::handlers::Context;
 use crate::interactions::REPORT_TO;
-use crate::utils::is_repo_autorized;
+use crate::utils::{immutable_headers, is_repo_autorized};
 use anyhow::Context as _;
 use axum::extract::{Path, State};
 use axum::http::HeaderValue;
 use axum::response::IntoResponse;
-use hyper::header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE};
+use hyper::header::{CONTENT_SECURITY_POLICY, CONTENT_TYPE};
 use hyper::{HeaderMap, StatusCode};
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -355,16 +355,4 @@ pub async fn failure_svg() -> impl IntoResponse {
         immutable_headers("image/svg+xml; charset=utf-8"),
         FAILURE_SVG,
     )
-}
-
-fn immutable_headers(content_type: &'static str) -> HeaderMap {
-    let mut headers = HeaderMap::new();
-
-    headers.insert(
-        CACHE_CONTROL,
-        HeaderValue::from_static("public, max-age=15552000, immutable"),
-    );
-    headers.insert(CONTENT_TYPE, HeaderValue::from_static(content_type));
-
-    headers
 }
