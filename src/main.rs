@@ -198,6 +198,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             "/gh-changes-since/{owner}/{repo}/{pr}/{oldbasehead}",
             get(triagebot::gh_changes_since::gh_changes_since),
         )
+        .route(
+            "/gh-comments/{owner}/{repo}/{pr}",
+            get(triagebot::gh_comments::gh_comments),
+        )
         .layer(GovernorLayer::new(ratelimit_config));
 
     let app = Router::new()
@@ -219,6 +223,14 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .route(
             triagebot::gha_logs::FAILURE_URL,
             get(triagebot::gha_logs::failure_svg),
+        )
+        .route(
+            triagebot::gh_comments::STYLE_URL,
+            get(triagebot::gh_comments::style_css),
+        )
+        .route(
+            triagebot::gh_comments::MARKDOWN_URL,
+            get(triagebot::gh_comments::markdown_css),
         )
         .merge(protected)
         .nest("/agenda", agenda)

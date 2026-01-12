@@ -2914,6 +2914,144 @@ impl GithubClient {
             anyhow::bail!("expected issue count, got {data}");
         }
     }
+
+    pub async fn issue_with_comments(
+        &self,
+        owner: &str,
+        repo: &str,
+        issue: u64,
+    ) -> anyhow::Result<GitHubIssueWithComments> {
+        let mut cursor: Option<String> = None;
+        let mut all_comments = Vec::new();
+        let mut issue_json;
+
+        loop {
+            let mut data = self
+                .graphql_query(
+                    "
+query ($owner: String!, $repo: String!, $issueNumber: Int!, $cursor: String) {
+  repository(owner: $owner, name: $repo) {
+    issue(number: $issueNumber) {
+      url
+      title
+      titleHTML
+      bodyHTML
+      createdAt
+      updatedAt
+      author {
+        login
+        avatarUrl
+      }
+      comments(first: 100, after: $cursor) {
+        nodes {
+          author {
+            login
+            avatarUrl
+          }
+          createdAt
+          updatedAt
+          isMinimized
+          minimizedReason
+          bodyHTML
+          url
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  }
+}
+                ",
+                    serde_json::json!({
+                        "owner": owner,
+                        "repo": repo,
+                        "issueNumber": issue,
+                        "cursor": cursor.as_deref(),
+                    }),
+                )
+                .await
+                .context("failed to fetch the issue with comments")?;
+
+            issue_json = data["data"]["repository"]["issue"].take();
+
+            let has_next_page = issue_json["comments"]["pageInfo"]["hasNextPage"]
+                .as_bool()
+                .unwrap_or(false);
+            let end_cursor = issue_json["comments"]["pageInfo"]["endCursor"]
+                .as_str()
+                .map(|s| s.to_string());
+
+            // Early return if first page has no more pages (1 API call)
+            if all_comments.is_empty() && !has_next_page {
+                return serde_json::from_value(issue_json)
+                    .context("fail to deserialize the GraphQl json response");
+            }
+
+            // Store cursor for next iteration
+            cursor = end_cursor;
+
+            // Extract and accumulate comments (avoid full deserialization)
+            if let Some(comments_array) = issue_json["comments"]["nodes"].as_array_mut() {
+                all_comments.append(comments_array);
+            }
+
+            if !has_next_page {
+                break;
+            }
+        }
+
+        // Reconstruct final result with all comments
+        let mut final_issue = issue_json;
+        final_issue["comments"]["nodes"] = serde_json::Value::Array(all_comments);
+
+        serde_json::from_value(final_issue).context("fail to deserialize final response")
+    }
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct GitHubIssueWithComments {
+    pub title: String,
+    #[serde(rename = "titleHTML")]
+    pub title_html: String,
+    #[serde(rename = "bodyHTML")]
+    pub body_html: String,
+    pub url: String,
+    pub author: GitHubSimplifiedAuthor,
+    #[serde(rename = "createdAt")]
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub comments: GitHubGraphQlComments,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct GitHubSimplifiedAuthor {
+    pub login: String,
+    #[serde(rename = "avatarUrl")]
+    pub avatar_url: String,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct GitHubGraphQlComments {
+    pub nodes: Vec<GitHubGraphQlComment>,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct GitHubGraphQlComment {
+    pub author: GitHubSimplifiedAuthor,
+    #[serde(rename = "createdAt")]
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "isMinimized")]
+    pub is_minimized: bool,
+    #[serde(rename = "minimizedReason")]
+    pub minimized_reason: Option<String>,
+    #[serde(rename = "bodyHTML")]
+    pub body_html: String,
+    pub url: String,
 }
 
 #[derive(Debug, serde::Deserialize)]

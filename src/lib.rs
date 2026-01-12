@@ -8,6 +8,7 @@ mod config;
 pub mod db;
 mod errors;
 pub mod gh_changes_since;
+pub mod gh_comments;
 pub mod gh_range_diff;
 pub mod gha_logs;
 pub mod github;
