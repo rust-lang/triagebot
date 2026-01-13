@@ -1,5 +1,6 @@
 use std::fmt::Write;
 use std::sync::Arc;
+use std::time::Instant;
 
 use anyhow::Context as _;
 use axum::{
@@ -35,11 +36,17 @@ pub async fn gh_comments(
             .into_response());
     }
 
+    let start = Instant::now();
+
     let issue_with_comments = ctx
         .github
         .issue_with_comments(&owner, &repo, issue_id)
         .await
         .context("unable to fetch the issue and it's comments")?;
+
+    let duration = start.elapsed();
+    let duration_secs = duration.as_secs_f64();
+    let comment_count = issue_with_comments.comments.nodes.len();
 
     let mut title = String::new();
     pulldown_cmark_escape::escape_html(&mut title, &issue_with_comments.title)?;
@@ -72,6 +79,7 @@ pub async fn gh_comments(
 <body>
 <div class="comments-container">
 <h1 class="markdown-body title">{title_html} #{issue_id}</h1>
+<p>{comment_count} comments loaded in {duration_secs:.2}s</p>
 "###,
     )
     .unwrap();
