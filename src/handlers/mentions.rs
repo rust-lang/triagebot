@@ -17,7 +17,13 @@ use std::{fmt::Write, path::PathBuf};
 const MENTIONS_KEY: &str = "mentions";
 
 pub(super) struct MentionsInput {
-    to_mention: Vec<(String, Vec<PathBuf>)>,
+    to_mention: Vec<ToMention>,
+}
+
+struct ToMention {
+    entry: String,
+    relevant_file_paths: Vec<PathBuf>,
+    relevant_ccs: Vec<String>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
@@ -85,13 +91,22 @@ pub(super) async fn parse_input(
                 }
             };
 
-            // Don't mention if only the author is in the list.
-            let pings_non_author = match &cc[..] {
-                [only_cc] => only_cc.trim_start_matches('@') != event.issue.user.login,
-                _ => true,
-            };
-            if !relevant_file_paths.is_empty() && pings_non_author {
-                Some((entry.to_string(), relevant_file_paths))
+            // Filter author from the cc list
+            let relevant_ccs = cc
+                .iter()
+                .filter(|cc| {
+                    cc.trim_start_matches('@').to_lowercase()
+                        != event.issue.user.login.to_lowercase()
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+
+            if !relevant_file_paths.is_empty() && !relevant_ccs.is_empty() {
+                Some(ToMention {
+                    entry: entry.to_string(),
+                    relevant_file_paths,
+                    relevant_ccs,
+                })
             } else {
                 None
             }
@@ -116,12 +131,17 @@ pub(super) async fn handle_input(
         IssueData::load(&mut client, &event.issue, MENTIONS_KEY).await?;
     // Build the message to post to the issue.
     let mut result = String::new();
-    for (entry, relevant_file_paths) in input.to_mention {
+    for ToMention {
+        entry,
+        relevant_file_paths,
+        relevant_ccs,
+    } in input.to_mention
+    {
         if state.data.entries.iter().any(|e| e == &entry) {
             // Avoid duplicate mentions.
             continue;
         }
-        let MentionsEntryConfig { message, cc, type_ } = &config.entries[&entry];
+        let MentionsEntryConfig { message, type_, .. } = &config.entries[&entry];
         if !result.is_empty() {
             result.push_str("\n\n");
         }
@@ -142,8 +162,9 @@ pub(super) async fn handle_input(
                 .unwrap(),
             },
         }
-        if !cc.is_empty() {
-            write!(result, "\n\ncc {}", cc.join(", ")).unwrap();
+
+        if !relevant_ccs.is_empty() {
+            write!(result, "\n\ncc {}", relevant_ccs.join(", ")).unwrap();
         }
         state.data.entries.push(entry);
     }
