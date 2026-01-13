@@ -84,6 +84,7 @@ pub async fn gh_comments(
         &issue_with_comments.created_at,
         &issue_with_comments.updated_at,
         false,
+        None,
     )?;
 
     for comment in &issue_with_comments.comments.nodes {
@@ -94,7 +95,8 @@ pub async fn gh_comments(
             &comment.author,
             &comment.created_at,
             &comment.updated_at,
-            false,
+            comment.is_minimized,
+            comment.minimized_reason.as_deref(),
         )?;
     }
 
@@ -137,16 +139,54 @@ fn write_comment_as_html(
     comment_url: &str,
     author: &GitHubSimplifiedAuthor,
     created_at: &chrono::DateTime<Utc>,
-    _updated_at: &chrono::DateTime<Utc>,
-    _minimized: bool,
+    updated_at: &chrono::DateTime<Utc>,
+    minimized: bool,
+    minimized_reason: Option<&str>,
 ) -> anyhow::Result<()> {
     let author_login = &author.login;
     let author_avatar_url = &author.avatar_url;
     let created_at_rfc3339 = created_at.to_rfc3339();
 
-    writeln!(
-        buffer,
-        r###"
+    if minimized && let Some(minimized_reason) = minimized_reason {
+        writeln!(
+            buffer,
+            r###"
+    <div class="comment-wrapper">
+      <a href="https://github.com/{author_login}" target="_blank" class="desktop">
+        <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
+      </a>
+      
+      <details class="comment">
+        <summary class="comment-header">
+          <div class="author-info desktop">
+            <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+            <span>on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></span><span> · hidden as {minimized_reason}</span>
+          </div>
+
+          <div class="author-mobile">
+            <a href="https://github.com/{author_login}" target="_blank">
+              <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
+            </a>
+            <div class="author-info">
+              <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+              <span>on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></span><span> · hidden as {minimized_reason}</span>
+            </div>
+          </div>
+
+          <a href="{comment_url}" target="_blank" class="github-link">View on GitHub</a>
+        </summary>
+
+        <div class="comment-body markdown-body">
+          {body_html}
+        </div>
+      </details>
+    </div>
+"###
+        )?;
+    } else {
+        writeln!(
+            buffer,
+            r###"
     <div class="comment-wrapper">
       <a href="https://github.com/{author_login}" target="_blank" class="desktop">
         <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
@@ -178,8 +218,8 @@ fn write_comment_as_html(
       </div>
     </div>
 "###
-    )
-    .unwrap();
+        )?;
+    }
 
     Ok(())
 }

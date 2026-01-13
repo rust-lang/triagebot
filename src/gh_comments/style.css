@@ -66,6 +66,10 @@ body {
     color: var(--fg-muted);
 }
 
+details:not([open]) > .comment-header {
+    border-bottom: 0px;
+}
+
 .comment-body {
     padding: 16px;
 }
