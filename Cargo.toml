@@ -53,6 +53,7 @@ axum-extra = { version = "0.10.1", default-features = false }
 unicode-segmentation = "1.12.0"
 secrecy = { version = "0.10", features = ["serde"] }
 globset = { version = "0.4.18", default-features = false }
+tower_governor = { version = "0.8.0", default-features = false, features = ["axum", "tracing"] }
 
 [dependencies.serde]
 version = "1"

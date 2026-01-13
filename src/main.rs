@@ -15,6 +15,9 @@ use tokio::{task, time};
 use tower::ServiceBuilder;
 use tower::buffer::BufferLayer;
 use tower::limit::RateLimitLayer;
+use tower_governor::GovernorLayer;
+use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::key_extractor::SmartIpKeyExtractor;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::compression::CompressionLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
@@ -102,6 +105,27 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         spawn_job_runner(ctx.clone());
     }
 
+    let ratelimit_config = if !std::env::var("DISABLE_RATE_LIMIT").is_ok_and(|value| value == "1") {
+        // Allow bursts with up to 3 requests per IP address
+        // and replenishes one element every 15 seconds
+        GovernorConfigBuilder::default()
+            .per_second(15)
+            .burst_size(3)
+            .key_extractor(SmartIpKeyExtractor)
+            .use_headers()
+            .finish()
+            .context("fail to create the governor configuration")?
+    } else {
+        tracing::warn!("Endpoints ratelimits are disabled");
+        GovernorConfigBuilder::default()
+            .per_second(1)
+            .burst_size(300)
+            .key_extractor(SmartIpKeyExtractor)
+            .use_headers()
+            .finish()
+            .context("fail to create the governor configuration")?
+    };
+
     const REQUEST_ID_HEADER: &str = "x-request-id";
     const X_REQUEST_ID: HeaderName = HeaderName::from_static(REQUEST_ID_HEADER);
 
@@ -157,6 +181,25 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
                 .layer(RateLimitLayer::new(2, Duration::from_secs(60))),
         );
 
+    let protected = Router::new()
+        .route(
+            "/gha-logs/{owner}/{repo}/{log-id}",
+            get(triagebot::gha_logs::gha_logs),
+        )
+        .route(
+            "/gh-range-diff/{owner}/{repo}/{basehead}",
+            get(triagebot::gh_range_diff::gh_range_diff),
+        )
+        .route(
+            "/gh-range-diff/{owner}/{repo}/{oldbasehead}/{newbasehead}",
+            get(triagebot::gh_range_diff::gh_ranges_diff),
+        )
+        .route(
+            "/gh-changes-since/{owner}/{repo}/{pr}/{oldbasehead}",
+            get(triagebot::gh_changes_since::gh_changes_since),
+        )
+        .layer(GovernorLayer::new(ratelimit_config));
+
     let app = Router::new()
         .route("/", get(|| async { "Triagebot is awaiting triage." }))
         .route(
@@ -177,22 +220,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             triagebot::gha_logs::FAILURE_URL,
             get(triagebot::gha_logs::failure_svg),
         )
-        .route(
-            "/gha-logs/{owner}/{repo}/{log-id}",
-            get(triagebot::gha_logs::gha_logs),
-        )
-        .route(
-            "/gh-range-diff/{owner}/{repo}/{basehead}",
-            get(triagebot::gh_range_diff::gh_range_diff),
-        )
-        .route(
-            "/gh-range-diff/{owner}/{repo}/{oldbasehead}/{newbasehead}",
-            get(triagebot::gh_range_diff::gh_ranges_diff),
-        )
-        .route(
-            "/gh-changes-since/{owner}/{repo}/{pr}/{oldbasehead}",
-            get(triagebot::gh_changes_since::gh_changes_since),
-        )
+        .merge(protected)
         .nest("/agenda", agenda)
         .route("/bors-commit-list", get(triagebot::bors::bors_commit_list))
         .route(
@@ -207,7 +235,12 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     log::info!("Listening on http://{}", addr);
 
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .unwrap();
 
     Ok(())
 }
