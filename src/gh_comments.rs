@@ -184,6 +184,12 @@ fn write_comment_as_html(
 "###
         )?;
     } else {
+        let edited = if created_at != updated_at {
+            "<span> · edited</span>"
+        } else {
+            ""
+        };
+
         writeln!(
             buffer,
             r###"
@@ -196,7 +202,7 @@ fn write_comment_as_html(
         <div class="comment-header">
           <div class="author-info desktop">
             <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
-            <span>on </span><span data-utc-time="{created_at_rfc3339}">{created_at}</span>
+            <span>on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></span>{edited}
           </div>
 
           <div class="author-mobile">
@@ -205,7 +211,7 @@ fn write_comment_as_html(
             </a>
             <div class="author-info">
               <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
-              <span>on </span><span data-utc-time="{created_at_rfc3339}">{created_at}</span>
+              <span>on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></span>{edited}
             </div>
           </div>
 
