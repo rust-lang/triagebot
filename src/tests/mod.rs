@@ -83,6 +83,7 @@ impl TestContext {
             octocrab,
             workqueue: Arc::new(RwLock::new(Default::default())),
             gha_logs: Arc::new(RwLock::new(Default::default())),
+            gh_comments: Arc::new(RwLock::new(Default::default())),
         };
 
         Self {

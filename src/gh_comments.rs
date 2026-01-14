@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Instant;
@@ -14,6 +15,7 @@ use hyper::{
     header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE},
 };
 
+use crate::github::{GitHubGraphQlComment, GitHubIssueWithComments};
 use crate::{
     errors::AppError,
     github::GitHubSimplifiedAuthor,
@@ -24,8 +26,70 @@ use crate::{
 pub const STYLE_URL: &str = "/gh-comments/style@0.0.1.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@5.8.1.css";
 
+const MAX_CACHE_CAPACITY_BYTES: u64 = 35 * 1024 * 1024; // 35 Mb
+
+type CacheKey = (String, String, u64);
+
+#[derive(Default)]
+pub struct GitHubCommentsCache {
+    capacity: u64,
+    entries: VecDeque<(CacheKey, Arc<CachedComments>)>,
+}
+
+pub struct CachedComments {
+    estimated_size: usize,
+    duration_secs: f64,
+    issue_with_comments: GitHubIssueWithComments,
+}
+
+impl GitHubCommentsCache {
+    pub fn get(&mut self, key: &CacheKey) -> Option<Arc<CachedComments>> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            // Move previously cached entry to the front
+            let entry = self.entries.remove(pos).unwrap();
+            self.entries.push_front(entry.clone());
+            Some(entry.1)
+        } else {
+            None
+        }
+    }
+
+    pub fn put(&mut self, key: CacheKey, value: Arc<CachedComments>) -> Arc<CachedComments> {
+        if value.estimated_size as u64 > MAX_CACHE_CAPACITY_BYTES {
+            // Entry is too large, don't cache, return as is
+            return value;
+        }
+
+        // Remove duplicate or last entry when necessary
+        let removed = if let Some(pos) = self.entries.iter().position(|(k, _)| k == &key) {
+            self.entries.remove(pos)
+        } else if self.capacity + value.estimated_size as u64 >= MAX_CACHE_CAPACITY_BYTES {
+            self.entries.pop_back()
+        } else {
+            None
+        };
+        if let Some(removed) = removed {
+            self.capacity -= removed.1.estimated_size as u64;
+        }
+
+        // Add entry the front of the list and return it
+        self.capacity += value.estimated_size as u64;
+        self.entries.push_front((key, value.clone()));
+        value
+    }
+
+    pub fn prune(&mut self, key: &CacheKey) -> bool {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            self.entries.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+}
+
 pub async fn gh_comments(
-    Path((owner, repo, issue_id)): Path<(String, String, u64)>,
+    Path(ref key @ (ref owner, ref repo, issue_id)): Path<(String, String, u64)>,
     State(ctx): State<Arc<Context>>,
 ) -> axum::response::Result<Response, AppError> {
     if !is_repo_autorized(&ctx, &owner, &repo).await? {
@@ -36,16 +100,59 @@ pub async fn gh_comments(
             .into_response());
     }
 
-    let start = Instant::now();
+    let CachedComments {
+        estimated_size: _,
+        duration_secs,
+        issue_with_comments,
+    } = &*'comments: {
+        if let Some(logs) = ctx.gh_comments.write().await.get(&key) {
+            tracing::info!("gh_comments: cache hit for issue #{issue_id}");
+            break 'comments logs;
+        }
 
-    let issue_with_comments = ctx
-        .github
-        .issue_with_comments(&owner, &repo, issue_id)
-        .await
-        .context("unable to fetch the issue and it's comments")?;
+        tracing::info!("gh_comments: cache miss for issue #{issue_id}");
 
-    let duration = start.elapsed();
-    let duration_secs = duration.as_secs_f64();
+        let start = Instant::now();
+
+        let issue_with_comments = ctx
+            .github
+            .issue_with_comments(&owner, &repo, issue_id)
+            .await
+            .context("unable to fetch the issue and it's comments")?;
+
+        let duration = start.elapsed();
+        let duration_secs = duration.as_secs_f64();
+
+        // Rough estimation of the byte size of the issue with comments
+        let estimated_size: usize = std::mem::size_of::<GitHubIssueWithComments>()
+            + issue_with_comments.url.len()
+            + issue_with_comments.title.len()
+            + issue_with_comments.body_html.len()
+            + issue_with_comments.title_html.len()
+            + issue_with_comments
+                .comments
+                .nodes
+                .iter()
+                .map(|c| {
+                    std::mem::size_of::<GitHubGraphQlComment>()
+                        + c.url.len()
+                        + c.body_html.len()
+                        + c.author.login.len()
+                        + c.author.avatar_url.len()
+                })
+                .sum::<usize>();
+
+        ctx.gh_comments.write().await.put(
+            key.clone(),
+            CachedComments {
+                estimated_size,
+                duration_secs,
+                issue_with_comments,
+            }
+            .into(),
+        )
+    };
+
     let comment_count = issue_with_comments.comments.nodes.len();
 
     let mut title = String::new();

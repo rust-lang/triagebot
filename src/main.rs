@@ -23,6 +23,7 @@ use tower_http::compression::CompressionLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{self as log, info_span};
+use triagebot::gh_comments::GitHubCommentsCache;
 use triagebot::gha_logs::GitHubActionLogsCache;
 use triagebot::handlers::Context;
 use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
@@ -96,6 +97,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         octocrab: oc,
         workqueue: Arc::new(RwLock::new(workqueue)),
         gha_logs: Arc::new(RwLock::new(GitHubActionLogsCache::default())),
+        gh_comments: Arc::new(RwLock::new(GitHubCommentsCache::default())),
         zulip,
     });
 
