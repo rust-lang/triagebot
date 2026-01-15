@@ -205,7 +205,11 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             get(triagebot::gh_changes_since::gh_changes_since),
         )
         .route(
-            "/gh-comments/{owner}/{repo}/{pr}",
+            "/gh-comments/{owner}/{repo}/{issue}",
+            get(triagebot::gh_comments::gh_comments),
+        )
+        .route(
+            "/gh-comments/{owner}/{repo}/issues/{issue}",
             get(triagebot::gh_comments::gh_comments),
         )
         .layer(GovernorLayer::new(ratelimit_config));
