@@ -24,7 +24,7 @@ use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetReques
 use tower_http::trace::TraceLayer;
 use tracing::{self as log, info_span};
 use triagebot::gh_comments::{GH_COMMENTS_CACHE_CAPACITY_BYTES, GitHubCommentsCache};
-use triagebot::gha_logs::GitHubActionLogsCache;
+use triagebot::gha_logs::{GHA_LOGS_CACHE_CAPACITY_BYTES, GitHubActionLogsCache};
 use triagebot::handlers::Context;
 use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
 use triagebot::handlers::pr_tracking::load_workqueue;
@@ -96,7 +96,9 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         team: team_api,
         octocrab: oc,
         workqueue: Arc::new(RwLock::new(workqueue)),
-        gha_logs: Arc::new(RwLock::new(GitHubActionLogsCache::default())),
+        gha_logs: Arc::new(RwLock::new(GitHubActionLogsCache::new(
+            GHA_LOGS_CACHE_CAPACITY_BYTES,
+        ))),
         gh_comments: Arc::new(RwLock::new(GitHubCommentsCache::new(
             GH_COMMENTS_CACHE_CAPACITY_BYTES,
         ))),
