@@ -56,3 +56,7 @@ pub(crate) async fn is_issue_under_rfcbot_fcp(
 
     false
 }
+
+pub fn contains_any(haystack: &[&str], needles: &[&str]) -> bool {
+    needles.iter().any(|needle| haystack.contains(needle))
+}
