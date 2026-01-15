@@ -74,7 +74,7 @@ pub async fn gh_comments(
             .github
             .issue_with_comments(&owner, &repo, issue_id)
             .await
-            .context("unable to fetch the issue and it's comments")?;
+            .context("unable to fetch the issue and it's comments (PRs are not yet supported)")?;
 
         let duration = start.elapsed();
         let duration_secs = duration.as_secs_f64();
