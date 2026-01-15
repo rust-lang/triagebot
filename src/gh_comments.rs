@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Instant;
@@ -15,7 +14,10 @@ use hyper::{
     header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE},
 };
 
-use crate::github::{GitHubGraphQlComment, GitHubIssueWithComments};
+use crate::{
+    cache,
+    github::{GitHubGraphQlComment, GitHubIssueWithComments},
+};
 use crate::{
     errors::AppError,
     github::GitHubSimplifiedAuthor,
@@ -26,15 +28,9 @@ use crate::{
 pub const STYLE_URL: &str = "/gh-comments/style@0.0.1.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@5.8.1.css";
 
-const MAX_CACHE_CAPACITY_BYTES: u64 = 35 * 1024 * 1024; // 35 Mb
+pub const GH_COMMENTS_CACHE_CAPACITY_BYTES: usize = 35 * 1024 * 1024; // 35 Mb
 
-type CacheKey = (String, String, u64);
-
-#[derive(Default)]
-pub struct GitHubCommentsCache {
-    capacity: u64,
-    entries: VecDeque<(CacheKey, Arc<CachedComments>)>,
-}
+pub type GitHubCommentsCache = cache::LeastRecentlyUsedCache<(String, String, u64), CachedComments>;
 
 pub struct CachedComments {
     estimated_size: usize,
@@ -42,49 +38,9 @@ pub struct CachedComments {
     issue_with_comments: GitHubIssueWithComments,
 }
 
-impl GitHubCommentsCache {
-    pub fn get(&mut self, key: &CacheKey) -> Option<Arc<CachedComments>> {
-        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
-            // Move previously cached entry to the front
-            let entry = self.entries.remove(pos).unwrap();
-            self.entries.push_front(entry.clone());
-            Some(entry.1)
-        } else {
-            None
-        }
-    }
-
-    pub fn put(&mut self, key: CacheKey, value: Arc<CachedComments>) -> Arc<CachedComments> {
-        if value.estimated_size as u64 > MAX_CACHE_CAPACITY_BYTES {
-            // Entry is too large, don't cache, return as is
-            return value;
-        }
-
-        // Remove duplicate or last entry when necessary
-        let removed = if let Some(pos) = self.entries.iter().position(|(k, _)| k == &key) {
-            self.entries.remove(pos)
-        } else if self.capacity + value.estimated_size as u64 >= MAX_CACHE_CAPACITY_BYTES {
-            self.entries.pop_back()
-        } else {
-            None
-        };
-        if let Some(removed) = removed {
-            self.capacity -= removed.1.estimated_size as u64;
-        }
-
-        // Add entry the front of the list and return it
-        self.capacity += value.estimated_size as u64;
-        self.entries.push_front((key, value.clone()));
-        value
-    }
-
-    pub fn prune(&mut self, key: &CacheKey) -> bool {
-        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
-            self.entries.remove(pos);
-            true
-        } else {
-            false
-        }
+impl cache::EstimatedSize for CachedComments {
+    fn estimated_size(&self) -> usize {
+        self.estimated_size
     }
 }
 

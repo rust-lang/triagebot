@@ -3,6 +3,7 @@
 mod actions;
 pub mod agenda;
 pub mod bors;
+mod cache;
 mod changelogs;
 mod config;
 pub mod db;
