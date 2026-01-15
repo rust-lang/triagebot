@@ -23,6 +23,7 @@ use tower_http::compression::CompressionLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{self as log, info_span};
+use triagebot::gh_comments::GitHubCommentsCache;
 use triagebot::gha_logs::GitHubActionLogsCache;
 use triagebot::handlers::Context;
 use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
@@ -96,6 +97,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         octocrab: oc,
         workqueue: Arc::new(RwLock::new(workqueue)),
         gha_logs: Arc::new(RwLock::new(GitHubActionLogsCache::default())),
+        gh_comments: Arc::new(RwLock::new(GitHubCommentsCache::default())),
         zulip,
     });
 
@@ -198,6 +200,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             "/gh-changes-since/{owner}/{repo}/{pr}/{oldbasehead}",
             get(triagebot::gh_changes_since::gh_changes_since),
         )
+        .route(
+            "/gh-comments/{owner}/{repo}/{pr}",
+            get(triagebot::gh_comments::gh_comments),
+        )
         .layer(GovernorLayer::new(ratelimit_config));
 
     let app = Router::new()
@@ -219,6 +225,14 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .route(
             triagebot::gha_logs::FAILURE_URL,
             get(triagebot::gha_logs::failure_svg),
+        )
+        .route(
+            triagebot::gh_comments::STYLE_URL,
+            get(triagebot::gh_comments::style_css),
+        )
+        .route(
+            triagebot::gh_comments::MARKDOWN_URL,
+            get(triagebot::gh_comments::markdown_css),
         )
         .merge(protected)
         .nest("/agenda", agenda)

@@ -1,4 +1,5 @@
 use crate::config::{self, Config, ConfigurationError};
+use crate::gh_comments::GitHubCommentsCache;
 use crate::gha_logs::GitHubActionLogsCache;
 use crate::github::{Event, GithubClient, IssueCommentAction, IssuesAction, IssuesEvent};
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
@@ -56,6 +57,7 @@ pub struct Context {
     /// tokio's `RwLock` is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
     pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
     pub gha_logs: Arc<tokio::sync::RwLock<GitHubActionLogsCache>>,
+    pub gh_comments: Arc<tokio::sync::RwLock<GitHubCommentsCache>>,
 }
 
 #[expect(
@@ -76,6 +78,23 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
     if let Some(body) = event.comment_body() {
         handle_command(ctx, event, &config, body, &mut errors).await;
     }
+
+    let prune_gh_comments = async {
+        if let Some(issue) = event.issue() {
+            let repo = issue.repository();
+
+            let owner = &*repo.organization;
+            let repo = &*repo.repository;
+            let issue_id = issue.number;
+
+            let cache_key = (owner.to_string(), repo.to_string(), issue_id);
+
+            if ctx.gh_comments.write().await.prune(&cache_key) {
+                log::info!("pruned {owner}/{repo}#{issue_id} from gh_comments cache");
+            }
+        }
+        Ok(())
+    };
 
     let check_commits = async {
         if let Ok(check_commits_config) = &config {
@@ -201,6 +220,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
     };
 
     let (
+        prune_gh_comments,
         check_commits,
         project_goals,
         notification,
@@ -214,6 +234,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         github_releases,
         merge_conflicts,
     ) = futures::join!(
+        prune_gh_comments,
         check_commits,
         project_goals,
         notification,
@@ -229,6 +250,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
     );
 
     for result in [
+        prune_gh_comments,
         check_commits,
         project_goals,
         notification,

@@ -1,0 +1,149 @@
+/* === Theme variables === */
+:root {
+    --bg-default: #ffffff;
+    --bg-muted: #f6f8fa;
+    --fg-default: #24292f;
+    --fg-muted: #57606a;
+    --fg-accent: #0969da;
+    --border-default: #d0d7de;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-default: #0d1117;
+        --bg-muted: #161b22;
+        --fg-default: #e6edf3;
+        --fg-muted: #8b949e;
+        --fg-accent: #58a6ff;
+        --border-default: #30363d;
+    }
+}
+
+/* === Base layout === */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg-default);
+    color: var(--fg-default);
+    margin: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.comments-container {
+    width: 100%;
+    max-width: 980px;
+}
+
+.title {
+    font-size: 28px;
+    margin-bottom: 15px;
+}
+
+/* === Comment box === */
+.comment-wrapper {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.comment {
+    background: var(--bg-default);
+    border: 1px solid var(--border-default);
+    border-radius: 6px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-muted);
+    border-bottom: 1px solid var(--border-default);
+    padding: 8px 12px;
+    font-size: 0.9em;
+    color: var(--fg-muted);
+}
+
+details:not([open]) > .comment-header {
+    border-bottom: 0px;
+}
+
+.comment-body {
+    padding: 16px;
+}
+
+/* === Avatars and author info === */
+.avatar-link {
+    display: block;
+    flex-shrink: 0;
+    margin-top: 6px;
+}
+
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
+.author-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.author-info a {
+    color: var(--fg-default);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.author-info a:hover {
+    text-decoration: underline;
+}
+
+.github-link {
+    font-size: 0.85em;
+    color: var(--fg-muted);
+    text-decoration: none;
+}
+
+.github-link:hover {
+    text-decoration: underline;
+}
+
+/* === Markdown overrides === */
+.markdown-body .user-mention {
+    color: var(--fg-default);
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+/* === Responsive === */
+@media (max-width: 640px) {
+    /* mobile layout */
+    .author-info {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.3;
+    }
+
+    .author-mobile {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .desktop {
+        display: none;
+    }
+}
+
+@media (min-width: 641px) {
+    .author-mobile {
+        display: none !important;
+    }
+}
