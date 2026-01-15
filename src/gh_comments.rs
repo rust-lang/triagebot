@@ -185,7 +185,7 @@ pub async fn gh_comments(
     headers.insert(
         CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(
-            "default-src 'none'; script-src 'nonce-triagebot-gh-comments'; style-src 'self'; img-src *",
+            "default-src 'none'; script-src 'nonce-triagebot-gh-comments'; style-src 'self' 'unsafe-inline'; img-src *",
         ),
     );
 
