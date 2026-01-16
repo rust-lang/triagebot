@@ -47,7 +47,7 @@ body {
     margin-bottom: 24px;
 }
 
-.comment {
+.comment, .review-thread {
     background: var(--bg-default);
     border: 1px solid var(--border-default);
     border-radius: 6px;
@@ -55,7 +55,12 @@ body {
     overflow: hidden;
 }
 
-.comment-header {
+.review-thread {
+    margin-left: 80px;
+    margin-bottom: 1rem;
+}
+
+.comment-header, .review-thread-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -66,12 +71,35 @@ body {
     color: var(--fg-muted);
 }
 
-details:not([open]) > .comment-header {
+details:not([open]) > .comment-header,
+details:not([open]) > .review-thread-header {
     border-bottom: 0px;
 }
 
 .comment-body {
     padding: 16px;
+}
+
+.review-thread-comment:first-child {
+    padding-top: 1rem;
+}
+
+.review-thread-comment {
+    position: relative;
+    padding: 0.5rem 1rem;
+}
+
+.review-thread-comment-header {
+    font-size: 0.9em;
+    color: var(--fg-muted);
+    display: flex;
+    justify-content: space-between;
+}
+
+.review-thread-comment-body {
+    margin-left: 2rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
 }
 
 /* === Avatars and author info === */
@@ -87,6 +115,11 @@ details:not([open]) > .comment-header {
     border-radius: 50%;
     object-fit: cover;
     display: block;
+}
+
+.avatar-small {
+    width: 24px;
+    height: 24px;
 }
 
 .author-info {
@@ -125,20 +158,24 @@ details:not([open]) > .comment-header {
 /* === Responsive === */
 @media (max-width: 640px) {
     /* mobile layout */
-    .author-info {
-        display: flex;
-        flex-direction: column;
-        line-height: 1.3;
-    }
-
     .author-mobile {
         display: flex;
         align-items: flex-start;
         gap: 8px;
     }
 
+    .author-mobile .author-info {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.3;
+    }
+
     .desktop {
         display: none;
+    }
+
+    .review-thread {
+        margin-left: 40px;
     }
 }
 

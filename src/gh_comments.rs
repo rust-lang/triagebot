@@ -16,7 +16,7 @@ use hyper::{
 
 use crate::{
     cache,
-    github::{GitHubGraphQlComment, GitHubIssueWithComments},
+    github::{GitHubGraphQlComment, GitHubGraphQlReviewThreadComment, GitHubIssueWithComments},
 };
 use crate::{
     errors::AppError,
@@ -171,6 +171,20 @@ pub async fn gh_comments(
         )?;
     }
 
+    // FIXME: Don't print review threads at the end, they should be mixed
+    if let Some(review_threads) = &issue_with_comments.review_threads {
+        for review_thread in &review_threads.nodes {
+            write_review_thread_as_html(
+                &mut html,
+                &review_thread.path,
+                review_thread.is_collapsed,
+                review_thread.is_resolved,
+                review_thread.is_outdated,
+                &review_thread.comments.nodes,
+            )?;
+        }
+    }
+
     writeln!(html, r###"</div></body>"###).unwrap();
 
     let mut headers = HeaderMap::new();
@@ -297,6 +311,86 @@ fn write_comment_as_html(
 "###
         )?;
     }
+
+    Ok(())
+}
+
+fn write_review_thread_as_html(
+    buffer: &mut String,
+    path: &str,
+    is_collapsed: bool,
+    is_resolved: bool,
+    is_outdated: bool,
+    comments: &[GitHubGraphQlReviewThreadComment],
+) -> anyhow::Result<()> {
+    let mut path_html = String::new();
+    pulldown_cmark_escape::escape_html(&mut path_html, &path)?;
+
+    let open = if is_collapsed { "" } else { "open" };
+    let status = if is_outdated {
+        " · outdated"
+    } else if is_resolved {
+        " · resolved"
+    } else {
+        ""
+    };
+
+    writeln!(
+        buffer,
+        r###"
+      <details class="review-thread" {open}>
+        <summary class="review-thread-header">
+            <span>{path_html}{status}</span>
+        </summary>
+
+        <div class="review-thread-comments">
+"###
+    )?;
+
+    for comment in comments {
+        let author_login = &comment.author.login;
+        let author_avatar_url = &comment.author.avatar_url;
+        let created_at = &comment.created_at;
+        let created_at_rfc3339 = comment.created_at.to_rfc3339();
+        let body_html = &comment.body_html;
+        let comment_url = &comment.url;
+
+        let edited = if comment.created_at != comment.updated_at {
+            "<span> · edited</span>"
+        } else {
+            ""
+        };
+
+        writeln!(
+            buffer,
+            r###"
+      <div class="review-thread-comment">
+          <div class="review-thread-comment-header">
+            <div class="author-info">
+              <a href="https://github.com/{author_login}" target="_blank">
+                <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar avatar-small">
+              </a>
+              <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+              <span>on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></span>{edited}
+            </div>
+            <a href="{comment_url}" target="_blank" class="github-link">View on GitHub</a>
+          </div>
+          
+          <div class="review-thread-comment-body markdown-body">
+            {body_html}
+          </div>
+      </div>
+"###
+        )?;
+    }
+
+    writeln!(
+        buffer,
+        r###"
+        </div>
+      </details>
+"###
+    )?;
 
     Ok(())
 }
