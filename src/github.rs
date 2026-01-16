@@ -2931,33 +2931,65 @@ impl GithubClient {
                     "
 query ($owner: String!, $repo: String!, $issueNumber: Int!, $cursor: String) {
   repository(owner: $owner, name: $repo) {
-    issue(number: $issueNumber) {
-      url
-      title
-      titleHTML
-      bodyHTML
-      createdAt
-      updatedAt
-      author {
-        login
-        avatarUrl
-      }
-      comments(first: 100, after: $cursor) {
-        nodes {
-          author {
-            login
-            avatarUrl
-          }
-          createdAt
-          updatedAt
-          isMinimized
-          minimizedReason
-          bodyHTML
-          url
+    issueOrPullRequest(number: $issueNumber) {
+      ... on Issue {
+        url
+        title
+        titleHTML
+        bodyHTML
+        createdAt
+        updatedAt
+        author {
+          login
+          avatarUrl
         }
-        pageInfo {
-          hasNextPage
-          endCursor
+        comments(first: 100, after: $cursor) {
+          nodes {
+            author {
+              login
+              avatarUrl
+            }
+            createdAt
+            updatedAt
+            isMinimized
+            minimizedReason
+            bodyHTML
+            url
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+      ... on PullRequest {
+        url
+        title
+        titleHTML
+        bodyHTML
+        createdAt
+        updatedAt
+        author {
+          login
+          avatarUrl
+        }
+        comments(first: 100, after: $cursor) {
+          nodes {
+            author {
+              login
+              avatarUrl
+            }
+            createdAt
+            updatedAt
+            isMinimized
+            minimizedReason
+            bodyHTML
+            url
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
         }
       }
     }
@@ -2974,7 +3006,7 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $cursor: String) {
                 .await
                 .context("failed to fetch the issue with comments")?;
 
-            issue_json = data["data"]["repository"]["issue"].take();
+            issue_json = data["data"]["repository"]["issueOrPullRequest"].take();
 
             let has_next_page = issue_json["comments"]["pageInfo"]["hasNextPage"]
                 .as_bool()
