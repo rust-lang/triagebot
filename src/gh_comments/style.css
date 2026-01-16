@@ -40,7 +40,7 @@ body {
 }
 
 /* === Comment box === */
-.comment-wrapper {
+.comment-wrapper, .review {
     display: flex;
     align-items: flex-start;
     gap: 12px;
@@ -89,11 +89,16 @@ details:not([open]) > .review-thread-header {
     padding: 0.5rem 1rem;
 }
 
-.review-thread-comment-header {
+.review-header, .review-thread-comment-header {
     font-size: 0.9em;
     color: var(--fg-muted);
     display: flex;
     justify-content: space-between;
+}
+
+.review-header {
+    margin-top: auto;
+    margin-bottom: auto;
 }
 
 .review-thread-comment-body {

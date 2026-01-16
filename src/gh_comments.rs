@@ -16,7 +16,10 @@ use hyper::{
 
 use crate::{
     cache,
-    github::{GitHubGraphQlComment, GitHubGraphQlReviewThreadComment, GitHubIssueWithComments},
+    github::{
+        GitHubGraphQlComment, GitHubGraphQlReviewThreadComment, GitHubIssueWithComments,
+        GitHubReviewState,
+    },
 };
 use crate::{
     errors::AppError,
@@ -185,6 +188,23 @@ pub async fn gh_comments(
         }
     }
 
+    // FIXME: Don't print reviews at the end, they should be mixed
+    if let Some(reviews) = &issue_with_comments.reviews {
+        for review in &reviews.nodes {
+            write_review_as_html(
+                &mut html,
+                &review.body_html,
+                &review.url,
+                &review.author,
+                review.state,
+                &review.submitted_at,
+                &review.updated_at,
+                review.is_minimized,
+                review.minimized_reason.as_deref(),
+            )?;
+        }
+    }
+
     writeln!(html, r###"</div></body>"###).unwrap();
 
     let mut headers = HeaderMap::new();
@@ -310,6 +330,96 @@ fn write_comment_as_html(
     </div>
 "###
         )?;
+    }
+
+    Ok(())
+}
+
+fn write_review_as_html(
+    buffer: &mut String,
+    body_html: &str,
+    review_url: &str,
+    author: &GitHubSimplifiedAuthor,
+    state: GitHubReviewState,
+    submitted_at: &chrono::DateTime<Utc>,
+    updated_at: &chrono::DateTime<Utc>,
+    minimized: bool,
+    minimized_reason: Option<&str>,
+) -> anyhow::Result<()> {
+    let author_login = &author.login;
+    let author_avatar_url = &author.avatar_url;
+    let submitted_at_rfc3339 = submitted_at.to_rfc3339();
+
+    writeln!(
+        buffer,
+        r###"
+    <div class="review">
+      <a href="https://github.com/{author_login}" target="_blank">
+        <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
+      </a>
+      
+      <div class="review-header">
+        <div class="author-info">
+          <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+          <span>{state:?} on <span data-utc-time="{submitted_at_rfc3339}">{submitted_at}</span></span>
+        </div>
+      </div>
+    </div>
+"###
+    )?;
+
+    if !body_html.is_empty() {
+        if minimized && let Some(minimized_reason) = minimized_reason {
+            writeln!(
+                buffer,
+                r###"
+    <div class="comment-wrapper">
+      <details class="comment">
+        <summary class="comment-header">
+          <div class="author-info">
+            <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+            <span>left a comment · hidden as {minimized_reason}</span>
+          </div>
+
+          <a href="{review_url}" target="_blank" class="github-link">View on GitHub</a>
+        </summary>
+
+        <div class="comment-body markdown-body">
+          {body_html}
+        </div>
+      </details>
+    </div>
+"###
+            )?;
+        } else {
+            let edited = if submitted_at != updated_at {
+                "<span> · edited</span>"
+            } else {
+                ""
+            };
+
+            writeln!(
+                buffer,
+                r###"
+    <div class="comment-wrapper">
+      <div class="comment">
+        <div class="comment-header">
+          <div class="author-info">
+            <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+            <span>left a comment</span>{edited}
+          </div>
+
+          <a href="{review_url}" target="_blank" class="github-link">View on GitHub</a>
+        </div>
+
+        <div class="comment-body markdown-body">
+          {body_html}
+        </div>
+      </div>
+    </div>
+"###
+            )?;
+        }
     }
 
     Ok(())
