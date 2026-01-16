@@ -2921,15 +2921,22 @@ impl GithubClient {
         repo: &str,
         issue: u64,
     ) -> anyhow::Result<GitHubIssueWithComments> {
+        fn page_info(data: &serde_json::Value, key: &str) -> (bool, Option<String>) {
+            if let Some(obj) = data.get(key) {
+                let has_next = obj["pageInfo"]["hasNextPage"].as_bool().unwrap_or(false);
+                let end_cursor = obj["pageInfo"]["endCursor"].as_str().map(|s| s.to_string());
+                (has_next, end_cursor)
+            } else {
+                (false, None)
+            }
+        }
+
         let mut comments_cursor: Option<String> = None;
         let mut review_threads_cursor: Option<String> = None;
         let mut reviews_cursor: Option<String> = None;
         let mut all_comments = Vec::new();
         let mut all_review_threads = Vec::new();
         let mut all_reviews = Vec::new();
-        let mut prev_comments_cursor: Option<String> = None;
-        let mut prev_review_threads_cursor: Option<String> = None;
-        let mut prev_reviews_cursor: Option<String> = None;
         let mut issue_json;
 
         loop {
@@ -3065,46 +3072,15 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             issue_json = data["data"]["repository"]["issueOrPullRequest"].take();
 
             // Update all cursors from pageInfo
-            let comments_has_next = issue_json["comments"]["pageInfo"]["hasNextPage"]
-                .as_bool()
-                .unwrap_or(false);
-            let comments_end_cursor = issue_json["comments"]["pageInfo"]["endCursor"]
-                .as_str()
-                .map(|s| s.to_string());
-            let comments_cursor_changed = comments_end_cursor != prev_comments_cursor;
+            let (comments_has_next, comments_end_cursor) = page_info(&issue_json, "comments");
+            let comments_cursor_changed = comments_end_cursor != comments_cursor;
 
-            let review_threads_has_next = if issue_json["reviewThreads"].is_object() {
-                issue_json["reviewThreads"]["pageInfo"]["hasNextPage"]
-                    .as_bool()
-                    .unwrap_or(false)
-            } else {
-                false
-            };
-            let review_threads_end_cursor = if issue_json["reviewThreads"].is_object() {
-                issue_json["reviewThreads"]["pageInfo"]["endCursor"]
-                    .as_str()
-                    .map(|s| s.to_string())
-            } else {
-                None
-            };
-            let review_threads_cursor_changed =
-                review_threads_end_cursor != prev_review_threads_cursor;
+            let (review_threads_has_next, review_threads_end_cursor) =
+                page_info(&issue_json, "reviewThreads");
+            let review_threads_cursor_changed = review_threads_end_cursor != review_threads_cursor;
 
-            let reviews_has_next = if issue_json["reviews"].is_object() {
-                issue_json["reviews"]["pageInfo"]["hasNextPage"]
-                    .as_bool()
-                    .unwrap_or(false)
-            } else {
-                false
-            };
-            let reviews_end_cursor = if issue_json["reviews"].is_object() {
-                issue_json["reviews"]["pageInfo"]["endCursor"]
-                    .as_str()
-                    .map(|s| s.to_string())
-            } else {
-                None
-            };
-            let reviews_cursor_changed = reviews_end_cursor != prev_reviews_cursor;
+            let (reviews_has_next, reviews_end_cursor) = page_info(&issue_json, "reviews");
+            let reviews_cursor_changed = reviews_end_cursor != reviews_cursor;
 
             // Update cursors for next iteration
             comments_cursor = comments_end_cursor;
@@ -3143,11 +3119,6 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
                     all_reviews.append(reviews_array);
                 }
             }
-
-            // Update previous cursors for next iteration comparison
-            prev_comments_cursor = comments_cursor.clone();
-            prev_review_threads_cursor = review_threads_cursor.clone();
-            prev_reviews_cursor = reviews_cursor.clone();
 
             // Continue if any field has more pages
             if !comments_has_next && !review_threads_has_next && !reviews_has_next {
