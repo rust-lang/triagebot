@@ -1,3 +1,4 @@
+use crate::cache;
 use crate::errors::AppError;
 use crate::github::{self, WorkflowRunJob};
 use crate::handlers::Context;
@@ -9,7 +10,6 @@ use axum::http::HeaderValue;
 use axum::response::IntoResponse;
 use hyper::header::{CONTENT_SECURITY_POLICY, CONTENT_TYPE};
 use hyper::{HeaderMap, StatusCode};
-use std::collections::VecDeque;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -18,13 +18,9 @@ pub const ANSI_UP_URL: &str = "/gha_logs/ansi_up@0.0.1-custom.js";
 pub const SUCCESS_URL: &str = "/gha_logs/success@1.svg";
 pub const FAILURE_URL: &str = "/gha_logs/failure@1.svg";
 
-const MAX_CACHE_CAPACITY_BYTES: u64 = 50 * 1024 * 1024; // 50 Mb
+pub const GHA_LOGS_CACHE_CAPACITY_BYTES: usize = 50 * 1024 * 1024; // 50 Mb
 
-#[derive(Default)]
-pub struct GitHubActionLogsCache {
-    capacity: u64,
-    entries: VecDeque<(String, Arc<CachedLog>)>,
-}
+pub type GitHubActionLogsCache = cache::LeastRecentlyUsedCache<String, CachedLog>;
 
 pub struct CachedLog {
     job: WorkflowRunJob,
@@ -32,40 +28,9 @@ pub struct CachedLog {
     logs: String,
 }
 
-impl GitHubActionLogsCache {
-    pub fn get(&mut self, key: &str) -> Option<Arc<CachedLog>> {
-        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
-            // Move previously cached entry to the front
-            let entry = self.entries.remove(pos).unwrap();
-            self.entries.push_front(entry.clone());
-            Some(entry.1)
-        } else {
-            None
-        }
-    }
-
-    pub fn put(&mut self, key: String, value: Arc<CachedLog>) -> Arc<CachedLog> {
-        if value.logs.len() as u64 > MAX_CACHE_CAPACITY_BYTES {
-            // Entry is too large, don't cache, return as is
-            return value;
-        }
-
-        // Remove duplicate or last entry when necessary
-        let removed = if let Some(pos) = self.entries.iter().position(|(k, _)| k == &key) {
-            self.entries.remove(pos)
-        } else if self.capacity + value.logs.len() as u64 >= MAX_CACHE_CAPACITY_BYTES {
-            self.entries.pop_back()
-        } else {
-            None
-        };
-        if let Some(removed) = removed {
-            self.capacity -= removed.1.logs.len() as u64;
-        }
-
-        // Add entry the front of the list ane return it
-        self.capacity += value.logs.len() as u64;
-        self.entries.push_front((key, value.clone()));
-        value
+impl cache::EstimatedSize for CachedLog {
+    fn estimated_size(&self) -> usize {
+        std::mem::size_of::<WorkflowRunJob>() + self.tree_roots.len() + self.logs.len()
     }
 }
 

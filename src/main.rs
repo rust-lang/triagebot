@@ -23,8 +23,8 @@ use tower_http::compression::CompressionLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{self as log, info_span};
-use triagebot::gh_comments::GitHubCommentsCache;
-use triagebot::gha_logs::GitHubActionLogsCache;
+use triagebot::gh_comments::{GH_COMMENTS_CACHE_CAPACITY_BYTES, GitHubCommentsCache};
+use triagebot::gha_logs::{GHA_LOGS_CACHE_CAPACITY_BYTES, GitHubActionLogsCache};
 use triagebot::handlers::Context;
 use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
 use triagebot::handlers::pr_tracking::load_workqueue;
@@ -96,8 +96,12 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         team: team_api,
         octocrab: oc,
         workqueue: Arc::new(RwLock::new(workqueue)),
-        gha_logs: Arc::new(RwLock::new(GitHubActionLogsCache::default())),
-        gh_comments: Arc::new(RwLock::new(GitHubCommentsCache::default())),
+        gha_logs: Arc::new(RwLock::new(GitHubActionLogsCache::new(
+            GHA_LOGS_CACHE_CAPACITY_BYTES,
+        ))),
+        gh_comments: Arc::new(RwLock::new(GitHubCommentsCache::new(
+            GH_COMMENTS_CACHE_CAPACITY_BYTES,
+        ))),
         zulip,
     });
 
@@ -201,7 +205,11 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             get(triagebot::gh_changes_since::gh_changes_since),
         )
         .route(
-            "/gh-comments/{owner}/{repo}/{pr}",
+            "/gh-comments/{owner}/{repo}/{issue}",
+            get(triagebot::gh_comments::gh_comments),
+        )
+        .route(
+            "/gh-comments/{owner}/{repo}/issues/{issue}",
             get(triagebot::gh_comments::gh_comments),
         )
         .layer(GovernorLayer::new(ratelimit_config));
