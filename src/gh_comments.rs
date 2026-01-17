@@ -351,6 +351,7 @@ fn write_comment_as_html(
     let author_login = &author.login;
     let author_avatar_url = &author.avatar_url;
     let created_at_rfc3339 = created_at.to_rfc3339();
+    let id = extract_id_from_github_link(comment_url);
 
     if minimized && let Some(minimized_reason) = minimized_reason {
         writeln!(
@@ -361,7 +362,7 @@ fn write_comment_as_html(
         <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
       </a>
       
-      <details class="comment">
+      <details id="{id}" class="comment">
         <summary class="comment-header">
           <div class="author-info desktop">
             <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
@@ -403,7 +404,7 @@ fn write_comment_as_html(
         <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
       </a>
 
-      <div class="comment">
+      <div id="{id}" class="comment">
         <div class="comment-header">
           <div class="author-info desktop">
             <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
@@ -449,6 +450,7 @@ fn write_review_as_html(
     let author_login = &author.login;
     let author_avatar_url = &author.avatar_url;
     let submitted_at_rfc3339 = submitted_at.to_rfc3339();
+    let id = extract_id_from_github_link(review_url);
 
     let (badge_color, badge_svg) = match state {
         GitHubReviewState::Approved => {
@@ -477,7 +479,7 @@ fn write_review_as_html(
     writeln!(
         buffer,
         r###"
-    <div class="review">
+    <div id="{id}" class="review">
       <a href="https://github.com/{author_login}" target="_blank">
         <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
       </a>
@@ -591,6 +593,7 @@ fn write_review_thread_as_html(
         let created_at_rfc3339 = comment.created_at.to_rfc3339();
         let body_html = &comment.body_html;
         let comment_url = &comment.url;
+        let id = extract_id_from_github_link(comment_url);
 
         let edited = if comment.created_at != comment.updated_at {
             "<span> · edited</span>"
@@ -601,7 +604,7 @@ fn write_review_thread_as_html(
         writeln!(
             buffer,
             r###"
-      <div class="review-thread-comment">
+      <div id="{id}" class="review-thread-comment">
           <div class="review-thread-comment-header">
             <div class="author-info">
               <a href="https://github.com/{author_login}" target="_blank">
@@ -630,4 +633,8 @@ fn write_review_thread_as_html(
     )?;
 
     Ok(())
+}
+
+fn extract_id_from_github_link(url: &str) -> &str {
+    url.rfind('#').map(|pos| &url[pos + 1..]).unwrap_or("")
 }
