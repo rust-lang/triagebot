@@ -221,6 +221,10 @@ details:not([open]) > .review-thread-header {
 }
 
 /* === Markdown overrides === */
+.markdown-body {
+    font-size: 14px;
+}
+
 .markdown-body .user-mention {
     color: var(--fg-default);
     font-weight: 600;

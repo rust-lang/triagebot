@@ -29,7 +29,7 @@ use crate::{
 };
 
 pub const STYLE_URL: &str = "/gh-comments/style@0.0.2.css";
-pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260115.css";
+pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
 
 pub const GH_COMMENTS_CACHE_CAPACITY_BYTES: usize = 35 * 1024 * 1024; // 35 Mb
 
@@ -356,7 +356,7 @@ pub async fn style_css() -> impl IntoResponse {
 }
 
 pub async fn markdown_css() -> impl IntoResponse {
-    const MARKDOWN_CSS: &str = include_str!("gh_comments/github-markdown@20260115.css");
+    const MARKDOWN_CSS: &str = include_str!("gh_comments/github-markdown@20260117.css");
 
     (immutable_headers("text/css; charset=utf-8"), MARKDOWN_CSS)
 }
