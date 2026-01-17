@@ -179,46 +179,98 @@ pub async fn gh_comments(
         None,
     )?;
 
-    for comment in &issue_with_comments.comments.nodes {
-        write_comment_as_html(
-            &mut html,
-            &comment.body_html,
-            &comment.url,
-            &comment.author,
-            &comment.created_at,
-            &comment.updated_at,
-            comment.is_minimized,
-            comment.minimized_reason.as_deref(),
-        )?;
-    }
-
-    // FIXME: Don't print review threads at the end, they should be mixed
-    if let Some(review_threads) = &issue_with_comments.review_threads {
-        for review_thread in &review_threads.nodes {
-            write_review_thread_as_html(
-                &mut html,
-                &review_thread.path,
-                review_thread.is_collapsed,
-                review_thread.is_resolved,
-                review_thread.is_outdated,
-                &review_thread.comments.nodes,
-            )?;
+    if let (Some(reviews), Some(review_threads)) = (
+        issue_with_comments.reviews.as_ref(),
+        issue_with_comments.review_threads.as_ref(),
+    ) {
+        // A pull-request
+        enum Item {
+            Comment(usize, chrono::DateTime<Utc>),
+            Review(usize, chrono::DateTime<Utc>),
         }
-    }
 
-    // FIXME: Don't print reviews at the end, they should be mixed
-    if let Some(reviews) = &issue_with_comments.reviews {
-        for review in &reviews.nodes {
-            write_review_as_html(
+        // Create the timeline
+        let mut timeline: Vec<_> = issue_with_comments
+            .comments
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(i, c)| Item::Comment(i, c.created_at))
+            .collect();
+        timeline.extend(
+            reviews
+                .nodes
+                .iter()
+                .enumerate()
+                .map(|(i, r)| Item::Review(i, r.submitted_at)),
+        );
+        timeline.sort_unstable_by_key(|i| match i {
+            Item::Comment(_i, created_at) => *created_at,
+            Item::Review(_i, submitted_at) => *submitted_at,
+        });
+
+        // Print the items
+        for item in timeline {
+            match item {
+                Item::Comment(pos, _) => {
+                    let comment = &issue_with_comments.comments.nodes[pos];
+
+                    write_comment_as_html(
+                        &mut html,
+                        &comment.body_html,
+                        &comment.url,
+                        &comment.author,
+                        &comment.created_at,
+                        &comment.updated_at,
+                        comment.is_minimized,
+                        comment.minimized_reason.as_deref(),
+                    )?;
+                }
+                Item::Review(pos, _) => {
+                    let review = &reviews.nodes[pos];
+
+                    write_review_as_html(
+                        &mut html,
+                        &review.body_html,
+                        &review.url,
+                        &review.author,
+                        review.state,
+                        &review.submitted_at,
+                        &review.updated_at,
+                        review.is_minimized,
+                        review.minimized_reason.as_deref(),
+                    )?;
+
+                    // Try to print the associated review threads
+                    for review_thread in review_threads
+                        .nodes
+                        .iter()
+                        .filter(|rt| rt.comments.nodes[0].pull_request_review.id == review.id)
+                    {
+                        write_review_thread_as_html(
+                            &mut html,
+                            &review_thread.path,
+                            review_thread.is_collapsed,
+                            review_thread.is_resolved,
+                            review_thread.is_outdated,
+                            &review_thread.comments.nodes,
+                        )?;
+                    }
+                }
+            }
+        }
+    } else {
+        // An issue
+        for comment in &issue_with_comments.comments.nodes {
+            write_comment_as_html(
                 &mut html,
-                &review.body_html,
-                &review.url,
-                &review.author,
-                review.state,
-                &review.submitted_at,
-                &review.updated_at,
-                review.is_minimized,
-                review.minimized_reason.as_deref(),
+                &comment.body_html,
+                &comment.url,
+                &comment.author,
+                &comment.created_at,
+                &comment.updated_at,
+                comment.is_minimized,
+                comment.minimized_reason.as_deref(),
             )?;
         }
     }
