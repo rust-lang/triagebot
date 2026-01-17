@@ -130,8 +130,6 @@ pub async fn gh_comments(
         )
     };
 
-    let comment_count = issue_with_comments.comments.nodes.len();
-
     let mut title = String::new();
     pulldown_cmark_escape::escape_html(&mut title, &issue_with_comments.title)?;
 
@@ -163,11 +161,26 @@ pub async fn gh_comments(
 <body>
 <div class="comments-container">
 <h1 class="markdown-body title">{title_html} #{issue_id}</h1>
-<p>{comment_count} comments loaded in {duration_secs:.2}s</p>
 "###,
-    )
-    .unwrap();
+    )?;
 
+    // Print time and number of comments (+ reviews) loaded
+    if let Some(reviews) = issue_with_comments.reviews.as_ref() {
+        let count = issue_with_comments.comments.nodes.len() + reviews.nodes.len();
+        writeln!(
+            html,
+            r###"<p>{count} comments and reviews loaded in {duration_secs:.2}s</p>"###,
+        )?;
+    } else {
+        let comment_count = issue_with_comments.comments.nodes.len();
+
+        writeln!(
+            html,
+            r###"<p>{comment_count} comments loaded in {duration_secs:.2}s</p>"###,
+        )?;
+    }
+
+    // Print issue/PR body
     write_comment_as_html(
         &mut html,
         &issue_with_comments.body_html,
