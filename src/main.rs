@@ -212,6 +212,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             "/gh-comments/{owner}/{repo}/issues/{issue}",
             get(triagebot::gh_comments::gh_comments),
         )
+        .route(
+            "/gh-comments/{owner}/{repo}/pull/{pr}",
+            get(triagebot::gh_comments::gh_comments),
+        )
         .layer(GovernorLayer::new(ratelimit_config));
 
     let app = Router::new()
