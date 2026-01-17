@@ -73,7 +73,7 @@ pub async fn gh_comments(
 
         let start = Instant::now();
 
-        let issue_with_comments = ctx
+        let mut issue_with_comments = ctx
             .github
             .issue_with_comments(&owner, &repo, issue_id)
             .await
@@ -81,6 +81,24 @@ pub async fn gh_comments(
 
         let duration = start.elapsed();
         let duration_secs = duration.as_secs_f64();
+
+        // Filter-out reviews that either don't have a body or aren't linked by the first
+        // comment of a review comments.
+        //
+        // We need to do that otherwise we will end up showing "intermediate" review when
+        // someone reply in a review thread.
+        if let (Some(reviews), Some(review_threads)) = (
+            issue_with_comments.reviews.as_mut(),
+            issue_with_comments.review_threads.as_ref(),
+        ) {
+            reviews.nodes.retain(|r| {
+                !r.body_html.is_empty()
+                    || review_threads
+                        .nodes
+                        .iter()
+                        .any(|rt| rt.comments.nodes[0].pull_request_review.id == r.id)
+            });
+        }
 
         // Rough estimation of the byte size of the issue with comments
         let estimated_size: usize = std::mem::size_of::<GitHubIssueWithComments>()
