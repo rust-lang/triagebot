@@ -197,6 +197,29 @@ pub async fn gh_comments(
     }
     writeln!(html, "</div>")?;
 
+    // Print shortcut links for PRs
+    if issue_with_comments.reviews.is_some() {
+        let base = format!("https://github.com/{owner}/{repo}/pull/{issue_id}");
+        writeln!(html, r##"<div class="meta-links">"##)?;
+        write!(
+            html,
+            r##"<a class="github-link selected" href="{base}">Conversations</a>"##
+        )?;
+        write!(
+            html,
+            r##" · <a class="github-link" href="{base}/commits">Commits</a>"##
+        )?;
+        write!(
+            html,
+            r##" · <a class="github-link" href="{base}/checks">Checks</a>"##
+        )?;
+        write!(
+            html,
+            r##" · <a class="github-link" href="{base}/changes">Files changes</a>"##
+        )?;
+        writeln!(html, "</div>")?;
+    }
+
     // Print issue/PR body
     write_comment_as_html(
         &mut html,

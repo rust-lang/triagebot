@@ -37,7 +37,7 @@ body {
     max-width: 980px;
 }
 
-.meta-header {
+.meta-header, .meta-links {
     display: flex;
     align-items: center;
     margin-bottom: 1rem;
@@ -208,6 +208,16 @@ details:not([open]) > .review-thread-header {
 
 .octicon {
     fill: currentColor;
+}
+
+/* === Tab links === */
+.meta-links .selected {
+    border-radius: 0.375rem;
+    border: 0.00625rem solid var(--border-default);
+}
+
+.meta-links .github-link {
+    padding: 0.375rem;
 }
 
 /* === Markdown overrides === */
