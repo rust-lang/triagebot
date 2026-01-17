@@ -2,6 +2,8 @@
 :root {
     --bg-default: #ffffff;
     --bg-muted: #f6f8fa;
+    --bg-success: #1f883d;
+    --bg-danger: #cf222e;
     --fg-default: #24292f;
     --fg-muted: #57606a;
     --fg-accent: #0969da;
@@ -100,7 +102,7 @@ details:not([open]) > .review-thread-header {
     justify-content: space-between;
 }
 
-.review-header {
+.review-header, .review-header .author-info {
     margin-top: auto;
     margin-bottom: auto;
 }
@@ -155,6 +157,33 @@ details:not([open]) > .review-thread-header {
 
 .github-link:hover {
     text-decoration: underline;
+}
+
+/* === Badge === */
+.review-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background-color: var(--bg-muted);
+    color: var(--fg-muted);
+    margin-right: 0.5rem;
+}
+
+.badge-success {
+    color: white;
+    background-color: var(--bg-success);
+}
+
+.badge-danger {
+    color: white;
+    background-color: var(--bg-danger);
+}
+
+.octicon {
+    fill: currentColor;
 }
 
 /* === Markdown overrides === */
