@@ -16,7 +16,10 @@ use hyper::{
 
 use crate::{
     cache,
-    github::{GitHubGraphQlComment, GitHubIssueWithComments},
+    github::{
+        GitHubGraphQlComment, GitHubGraphQlReviewThreadComment, GitHubIssueState,
+        GitHubIssueWithComments, GitHubReviewState,
+    },
 };
 use crate::{
     errors::AppError,
@@ -25,8 +28,8 @@ use crate::{
     utils::{immutable_headers, is_repo_autorized},
 };
 
-pub const STYLE_URL: &str = "/gh-comments/style@0.0.1.css";
-pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260115.css";
+pub const STYLE_URL: &str = "/gh-comments/style@0.0.2.css";
+pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
 
 pub const GH_COMMENTS_CACHE_CAPACITY_BYTES: usize = 35 * 1024 * 1024; // 35 Mb
 
@@ -70,14 +73,32 @@ pub async fn gh_comments(
 
         let start = Instant::now();
 
-        let issue_with_comments = ctx
+        let mut issue_with_comments = ctx
             .github
             .issue_with_comments(&owner, &repo, issue_id)
             .await
-            .context("unable to fetch the issue and it's comments (PRs are not yet supported)")?;
+            .context("unable to fetch the issue/pull-request and it's comments")?;
 
         let duration = start.elapsed();
         let duration_secs = duration.as_secs_f64();
+
+        // Filter-out reviews that either don't have a body or aren't linked by the first
+        // comment of a review comments.
+        //
+        // We need to do that otherwise we will end up showing "intermediate" review when
+        // someone reply in a review thread.
+        if let (Some(reviews), Some(review_threads)) = (
+            issue_with_comments.reviews.as_mut(),
+            issue_with_comments.review_threads.as_ref(),
+        ) {
+            reviews.nodes.retain(|r| {
+                !r.body_html.is_empty()
+                    || review_threads
+                        .nodes
+                        .iter()
+                        .any(|rt| rt.comments.nodes[0].pull_request_review.id == r.id)
+            });
+        }
 
         // Rough estimation of the byte size of the issue with comments
         let estimated_size: usize = std::mem::size_of::<GitHubIssueWithComments>()
@@ -109,8 +130,6 @@ pub async fn gh_comments(
         )
     };
 
-    let comment_count = issue_with_comments.comments.nodes.len();
-
     let mut title = String::new();
     pulldown_cmark_escape::escape_html(&mut title, &issue_with_comments.title)?;
 
@@ -141,12 +160,67 @@ pub async fn gh_comments(
 </head>
 <body>
 <div class="comments-container">
-<h1 class="markdown-body title">{title_html} #{issue_id}</h1>
-<p>{comment_count} comments loaded in {duration_secs:.2}s</p>
+<h1 class="title"><bdi class="markdown-body">{title_html}</bdi> <a class="github-link" href="https://github.com/{owner}/{repo}/issues/{issue_id}">{owner}/{repo}#{issue_id}</a></h1>
 "###,
-    )
-    .unwrap();
+    )?;
 
+    // Print the state
+    writeln!(html, r##"<div class="meta-header">"##)?;
+
+    {
+        let state = issue_with_comments.state;
+        let badge_color = match state {
+            GitHubIssueState::Open => "badge-success",
+            GitHubIssueState::Closed => "badge-danger",
+            GitHubIssueState::Merged => "badge-done",
+        };
+        writeln!(
+            html,
+            r##"<div class="state-badge {badge_color}">{state:?}</div>"##
+        )?;
+    }
+
+    // Print time and number of comments (+ reviews) loaded
+    if let Some(reviews) = issue_with_comments.reviews.as_ref() {
+        let count = issue_with_comments.comments.nodes.len() + reviews.nodes.len();
+        writeln!(
+            html,
+            r###"<p>{count} comments and reviews loaded in {duration_secs:.2}s</p>"###,
+        )?;
+    } else {
+        let comment_count = issue_with_comments.comments.nodes.len();
+
+        writeln!(
+            html,
+            r###"<p>{comment_count} comments loaded in {duration_secs:.2}s</p>"###,
+        )?;
+    }
+    writeln!(html, "</div>")?;
+
+    // Print shortcut links for PRs
+    if issue_with_comments.reviews.is_some() {
+        let base = format!("https://github.com/{owner}/{repo}/pull/{issue_id}");
+        writeln!(html, r##"<div class="meta-links">"##)?;
+        write!(
+            html,
+            r##"<a class="github-link selected" href="{base}">Conversations</a>"##
+        )?;
+        write!(
+            html,
+            r##" · <a class="github-link" href="{base}/commits">Commits</a>"##
+        )?;
+        write!(
+            html,
+            r##" · <a class="github-link" href="{base}/checks">Checks</a>"##
+        )?;
+        write!(
+            html,
+            r##" · <a class="github-link" href="{base}/changes">Files changes</a>"##
+        )?;
+        writeln!(html, "</div>")?;
+    }
+
+    // Print issue/PR body
     write_comment_as_html(
         &mut html,
         &issue_with_comments.body_html,
@@ -158,17 +232,100 @@ pub async fn gh_comments(
         None,
     )?;
 
-    for comment in &issue_with_comments.comments.nodes {
-        write_comment_as_html(
-            &mut html,
-            &comment.body_html,
-            &comment.url,
-            &comment.author,
-            &comment.created_at,
-            &comment.updated_at,
-            comment.is_minimized,
-            comment.minimized_reason.as_deref(),
-        )?;
+    if let (Some(reviews), Some(review_threads)) = (
+        issue_with_comments.reviews.as_ref(),
+        issue_with_comments.review_threads.as_ref(),
+    ) {
+        // A pull-request
+        enum Item {
+            Comment(usize, chrono::DateTime<Utc>),
+            Review(usize, chrono::DateTime<Utc>),
+        }
+
+        // Create the timeline
+        let mut timeline: Vec<_> = issue_with_comments
+            .comments
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(i, c)| Item::Comment(i, c.created_at))
+            .collect();
+        timeline.extend(
+            reviews
+                .nodes
+                .iter()
+                .enumerate()
+                .map(|(i, r)| Item::Review(i, r.submitted_at)),
+        );
+        timeline.sort_unstable_by_key(|i| match i {
+            Item::Comment(_i, created_at) => *created_at,
+            Item::Review(_i, submitted_at) => *submitted_at,
+        });
+
+        // Print the items
+        for item in timeline {
+            match item {
+                Item::Comment(pos, _) => {
+                    let comment = &issue_with_comments.comments.nodes[pos];
+
+                    write_comment_as_html(
+                        &mut html,
+                        &comment.body_html,
+                        &comment.url,
+                        &comment.author,
+                        &comment.created_at,
+                        &comment.updated_at,
+                        comment.is_minimized,
+                        comment.minimized_reason.as_deref(),
+                    )?;
+                }
+                Item::Review(pos, _) => {
+                    let review = &reviews.nodes[pos];
+
+                    write_review_as_html(
+                        &mut html,
+                        &review.body_html,
+                        &review.url,
+                        &review.author,
+                        review.state,
+                        &review.submitted_at,
+                        &review.updated_at,
+                        review.is_minimized,
+                        review.minimized_reason.as_deref(),
+                    )?;
+
+                    // Try to print the associated review threads
+                    for review_thread in review_threads
+                        .nodes
+                        .iter()
+                        .filter(|rt| rt.comments.nodes[0].pull_request_review.id == review.id)
+                    {
+                        write_review_thread_as_html(
+                            &mut html,
+                            &review_thread.path,
+                            review_thread.is_collapsed,
+                            review_thread.is_resolved,
+                            review_thread.is_outdated,
+                            &review_thread.comments.nodes,
+                        )?;
+                    }
+                }
+            }
+        }
+    } else {
+        // An issue
+        for comment in &issue_with_comments.comments.nodes {
+            write_comment_as_html(
+                &mut html,
+                &comment.body_html,
+                &comment.url,
+                &comment.author,
+                &comment.created_at,
+                &comment.updated_at,
+                comment.is_minimized,
+                comment.minimized_reason.as_deref(),
+            )?;
+        }
     }
 
     writeln!(html, r###"</div></body>"###).unwrap();
@@ -199,7 +356,7 @@ pub async fn style_css() -> impl IntoResponse {
 }
 
 pub async fn markdown_css() -> impl IntoResponse {
-    const MARKDOWN_CSS: &str = include_str!("gh_comments/github-markdown@20260115.css");
+    const MARKDOWN_CSS: &str = include_str!("gh_comments/github-markdown@20260117.css");
 
     (immutable_headers("text/css; charset=utf-8"), MARKDOWN_CSS)
 }
@@ -217,6 +374,7 @@ fn write_comment_as_html(
     let author_login = &author.login;
     let author_avatar_url = &author.avatar_url;
     let created_at_rfc3339 = created_at.to_rfc3339();
+    let id = extract_id_from_github_link(comment_url);
 
     if minimized && let Some(minimized_reason) = minimized_reason {
         writeln!(
@@ -227,7 +385,7 @@ fn write_comment_as_html(
         <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
       </a>
       
-      <details class="comment">
+      <details id="{id}" class="comment">
         <summary class="comment-header">
           <div class="author-info desktop">
             <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
@@ -269,7 +427,7 @@ fn write_comment_as_html(
         <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
       </a>
 
-      <div class="comment">
+      <div id="{id}" class="comment">
         <div class="comment-header">
           <div class="author-info desktop">
             <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
@@ -299,4 +457,207 @@ fn write_comment_as_html(
     }
 
     Ok(())
+}
+
+fn write_review_as_html(
+    buffer: &mut String,
+    body_html: &str,
+    review_url: &str,
+    author: &GitHubSimplifiedAuthor,
+    state: GitHubReviewState,
+    submitted_at: &chrono::DateTime<Utc>,
+    updated_at: &chrono::DateTime<Utc>,
+    minimized: bool,
+    minimized_reason: Option<&str>,
+) -> anyhow::Result<()> {
+    let author_login = &author.login;
+    let author_avatar_url = &author.avatar_url;
+    let submitted_at_rfc3339 = submitted_at.to_rfc3339();
+    let id = extract_id_from_github_link(review_url);
+
+    let (badge_color, badge_svg) = match state {
+        GitHubReviewState::Approved => {
+            // https://primer.github.io/octicons/check-16
+            (
+                "badge-success",
+                r##"<svg class="octicon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path></svg>"##,
+            )
+        }
+        GitHubReviewState::RequestChanges => {
+            // https://primer.github.io/octicons/file-diff-16
+            (
+                "badge-danger",
+                r##"<svg class="octicon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path d="M1 1.75C1 .784 1.784 0 2.75 0h7.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16H2.75A1.75 1.75 0 0 1 1 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073ZM8 3.25a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0V7h-1.5a.75.75 0 0 1 0-1.5h1.5V4A.75.75 0 0 1 8 3.25Zm-3 8a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Z"></path></svg>"##,
+            )
+        }
+        GitHubReviewState::Dismissed | GitHubReviewState::Commented => {
+            // https://primer.github.io/octicons/eye-16
+            (
+                "",
+                r##"<svg class="octicon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path d="M8 2c1.981 0 3.671.992 4.933 2.078 1.27 1.091 2.187 2.345 2.637 3.023a1.62 1.62 0 0 1 0 1.798c-.45.678-1.367 1.932-2.637 3.023C11.67 13.008 9.981 14 8 14c-1.981 0-3.671-.992-4.933-2.078C1.797 10.83.88 9.576.43 8.898a1.62 1.62 0 0 1 0-1.798c.45-.677 1.367-1.931 2.637-3.022C4.33 2.992 6.019 2 8 2ZM1.679 7.932a.12.12 0 0 0 0 .136c.411.622 1.241 1.75 2.366 2.717C5.176 11.758 6.527 12.5 8 12.5c1.473 0 2.825-.742 3.955-1.715 1.124-.967 1.954-2.096 2.366-2.717a.12.12 0 0 0 0-.136c-.412-.621-1.242-1.75-2.366-2.717C10.824 4.242 9.473 3.5 8 3.5c-1.473 0-2.825.742-3.955 1.715-1.124.967-1.954 2.096-2.366 2.717ZM8 10a2 2 0 1 1-.001-3.999A2 2 0 0 1 8 10Z"></path></svg>"##,
+            )
+        }
+    };
+
+    writeln!(
+        buffer,
+        r###"
+    <div id="{id}" class="review">
+      <a href="https://github.com/{author_login}" target="_blank">
+        <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
+      </a>
+      
+      <div class="review-header">
+        <div class="review-badge {badge_color}">{badge_svg}</div>
+        <div class="author-info">
+          <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+          <span>{state:?} on <span data-utc-time="{submitted_at_rfc3339}">{submitted_at}</span></span>
+        </div>
+      </div>
+    </div>
+"###
+    )?;
+
+    if !body_html.is_empty() {
+        if minimized && let Some(minimized_reason) = minimized_reason {
+            writeln!(
+                buffer,
+                r###"
+    <div class="comment-wrapper">
+      <div class="avatar desktop"></div>
+      <details class="comment">
+        <summary class="comment-header">
+          <div class="author-info">
+            <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+            <span>left a comment · hidden as {minimized_reason}</span>
+          </div>
+
+          <a href="{review_url}" target="_blank" class="github-link">View on GitHub</a>
+        </summary>
+
+        <div class="comment-body markdown-body">
+          {body_html}
+        </div>
+      </details>
+    </div>
+"###
+            )?;
+        } else {
+            let edited = if submitted_at != updated_at {
+                "<span> · edited</span>"
+            } else {
+                ""
+            };
+
+            writeln!(
+                buffer,
+                r###"
+    <div class="comment-wrapper">
+      <div class="avatar desktop"></div>
+      <div class="comment">
+        <div class="comment-header">
+          <div class="author-info">
+            <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+            <span>left a comment</span>{edited}
+          </div>
+
+          <a href="{review_url}" target="_blank" class="github-link">View on GitHub</a>
+        </div>
+
+        <div class="comment-body markdown-body">
+          {body_html}
+        </div>
+      </div>
+    </div>
+"###
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn write_review_thread_as_html(
+    buffer: &mut String,
+    path: &str,
+    is_collapsed: bool,
+    is_resolved: bool,
+    is_outdated: bool,
+    comments: &[GitHubGraphQlReviewThreadComment],
+) -> anyhow::Result<()> {
+    let mut path_html = String::new();
+    pulldown_cmark_escape::escape_html(&mut path_html, &path)?;
+
+    let open = if is_collapsed { "" } else { "open" };
+    let status = if is_outdated {
+        " · outdated"
+    } else if is_resolved {
+        " · resolved"
+    } else {
+        ""
+    };
+
+    writeln!(
+        buffer,
+        r###"
+      <details class="review-thread" {open}>
+        <summary class="review-thread-header">
+            <span>{path_html}{status}</span>
+        </summary>
+
+        <div class="review-thread-comments">
+"###
+    )?;
+
+    for comment in comments {
+        let author_login = &comment.author.login;
+        let author_avatar_url = &comment.author.avatar_url;
+        let created_at = &comment.created_at;
+        let created_at_rfc3339 = comment.created_at.to_rfc3339();
+        let body_html = &comment.body_html;
+        let comment_url = &comment.url;
+        let id = extract_id_from_github_link(comment_url);
+
+        let edited = if comment.created_at != comment.updated_at {
+            "<span> · edited</span>"
+        } else {
+            ""
+        };
+
+        writeln!(
+            buffer,
+            r###"
+      <div id="{id}" class="review-thread-comment">
+          <div class="review-thread-comment-header">
+            <div class="author-info">
+              <a href="https://github.com/{author_login}" target="_blank">
+                <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar avatar-small">
+              </a>
+              <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+              <span>on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></span>{edited}
+            </div>
+            <a href="{comment_url}" target="_blank" class="github-link">View on GitHub</a>
+          </div>
+          
+          <div class="review-thread-comment-body markdown-body">
+            {body_html}
+          </div>
+      </div>
+"###
+        )?;
+    }
+
+    writeln!(
+        buffer,
+        r###"
+        </div>
+      </details>
+"###
+    )?;
+
+    Ok(())
+}
+
+fn extract_id_from_github_link(url: &str) -> &str {
+    url.rfind('#').map(|pos| &url[pos + 1..]).unwrap_or("")
 }

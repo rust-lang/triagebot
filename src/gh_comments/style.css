@@ -2,6 +2,9 @@
 :root {
     --bg-default: #ffffff;
     --bg-muted: #f6f8fa;
+    --bg-success: #1f883d;
+    --bg-danger: #cf222e;
+    --bg-done: #8250df;
     --fg-default: #24292f;
     --fg-muted: #57606a;
     --fg-accent: #0969da;
@@ -34,20 +37,36 @@ body {
     max-width: 980px;
 }
 
-.title {
-    font-size: 28px;
-    margin-bottom: 15px;
+.meta-header, .meta-links {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    gap: 9px;
 }
 
-/* === Comment box === */
-.comment-wrapper {
+.title {
+    margin-bottom: 0;
+}
+
+.title bdi {
+    font-size: 28px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+/* === Comment, review and review thread box === */
+.comment-wrapper, .review {
     display: flex;
     align-items: flex-start;
     gap: 12px;
     margin-bottom: 24px;
 }
 
-.comment {
+.review {
+    margin-bottom: 0.5rem;
+}
+
+.comment, .review-thread {
     background: var(--bg-default);
     border: 1px solid var(--border-default);
     border-radius: 6px;
@@ -55,7 +74,12 @@ body {
     overflow: hidden;
 }
 
-.comment-header {
+.review-thread {
+    margin-left: 80px;
+    margin-bottom: 1rem;
+}
+
+.comment-header, .review-thread-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -66,12 +90,40 @@ body {
     color: var(--fg-muted);
 }
 
-details:not([open]) > .comment-header {
+details:not([open]) > .comment-header,
+details:not([open]) > .review-thread-header {
     border-bottom: 0px;
 }
 
 .comment-body {
     padding: 16px;
+}
+
+.review-thread-comment:first-child {
+    padding-top: 1rem;
+}
+
+.review-thread-comment {
+    position: relative;
+    padding: 0.5rem 1rem;
+}
+
+.review-header, .review-thread-comment-header {
+    font-size: 0.9em;
+    color: var(--fg-muted);
+    display: flex;
+    justify-content: space-between;
+}
+
+.review-header, .review-header .author-info {
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+.review-thread-comment-body {
+    margin-left: 2rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
 }
 
 /* === Avatars and author info === */
@@ -87,6 +139,11 @@ details:not([open]) > .comment-header {
     border-radius: 50%;
     object-fit: cover;
     display: block;
+}
+
+.avatar-small {
+    width: 24px;
+    height: 24px;
 }
 
 .author-info {
@@ -115,7 +172,59 @@ details:not([open]) > .comment-header {
     text-decoration: underline;
 }
 
+/* === Review and state badge === */
+.review-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background-color: var(--bg-muted);
+    color: var(--fg-muted);
+    margin-right: 0.5rem;
+}
+
+.state-badge {
+    border-radius: 2em;
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+}
+
+.badge-success {
+    color: white;
+    background-color: var(--bg-success);
+}
+
+.badge-done {
+    color: white;
+    background-color: var(--bg-done);
+}
+
+.badge-danger {
+    color: white;
+    background-color: var(--bg-danger);
+}
+
+.octicon {
+    fill: currentColor;
+}
+
+/* === Tab links === */
+.meta-links .selected {
+    border-radius: 0.375rem;
+    border: 0.00625rem solid var(--border-default);
+}
+
+.meta-links .github-link {
+    padding: 0.375rem;
+}
+
 /* === Markdown overrides === */
+.markdown-body {
+    font-size: 14px;
+}
+
 .markdown-body .user-mention {
     color: var(--fg-default);
     font-weight: 600;
@@ -125,20 +234,24 @@ details:not([open]) > .comment-header {
 /* === Responsive === */
 @media (max-width: 640px) {
     /* mobile layout */
-    .author-info {
-        display: flex;
-        flex-direction: column;
-        line-height: 1.3;
-    }
-
     .author-mobile {
         display: flex;
         align-items: flex-start;
         gap: 8px;
     }
 
+    .author-mobile .author-info {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.3;
+    }
+
     .desktop {
         display: none;
+    }
+
+    .review-thread {
+        margin-left: 40px;
     }
 }
 
