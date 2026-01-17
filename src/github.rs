@@ -2948,6 +2948,7 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
     issueOrPullRequest(number: $issueNumber) {
       ... on Issue {
         url
+        state
         title
         titleHTML
         bodyHTML
@@ -2978,6 +2979,7 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
       }
       ... on PullRequest {
         url
+        state
         title
         titleHTML
         bodyHTML
@@ -3147,6 +3149,7 @@ pub struct GitHubIssueWithComments {
     pub title_html: String,
     #[serde(rename = "bodyHTML")]
     pub body_html: String,
+    pub state: GitHubIssueState,
     pub url: String,
     pub author: GitHubSimplifiedAuthor,
     #[serde(rename = "createdAt")]
@@ -3258,6 +3261,14 @@ pub enum GitHubReviewState {
     Approved,
     RequestChanges,
     Dismissed,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum GitHubIssueState {
+    Open,
+    Closed,
+    Merged,
 }
 
 #[derive(Debug, serde::Deserialize)]

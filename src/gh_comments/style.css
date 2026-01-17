@@ -4,6 +4,7 @@
     --bg-muted: #f6f8fa;
     --bg-success: #1f883d;
     --bg-danger: #cf222e;
+    --bg-done: #8250df;
     --fg-default: #24292f;
     --fg-muted: #57606a;
     --fg-accent: #0969da;
@@ -34,6 +35,13 @@ body {
 .comments-container {
     width: 100%;
     max-width: 980px;
+}
+
+.meta-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    gap: 9px;
 }
 
 .title {
@@ -164,7 +172,7 @@ details:not([open]) > .review-thread-header {
     text-decoration: underline;
 }
 
-/* === Badge === */
+/* === Review and state badge === */
 .review-badge {
     display: flex;
     align-items: center;
@@ -177,9 +185,20 @@ details:not([open]) > .review-thread-header {
     margin-right: 0.5rem;
 }
 
+.state-badge {
+    border-radius: 2em;
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+}
+
 .badge-success {
     color: white;
     background-color: var(--bg-success);
+}
+
+.badge-done {
+    color: white;
+    background-color: var(--bg-done);
 }
 
 .badge-danger {

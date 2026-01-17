@@ -17,8 +17,8 @@ use hyper::{
 use crate::{
     cache,
     github::{
-        GitHubGraphQlComment, GitHubGraphQlReviewThreadComment, GitHubIssueWithComments,
-        GitHubReviewState,
+        GitHubGraphQlComment, GitHubGraphQlReviewThreadComment, GitHubIssueState,
+        GitHubIssueWithComments, GitHubReviewState,
     },
 };
 use crate::{
@@ -164,6 +164,22 @@ pub async fn gh_comments(
 "###,
     )?;
 
+    // Print the state
+    writeln!(html, r##"<div class="meta-header">"##)?;
+
+    {
+        let state = issue_with_comments.state;
+        let badge_color = match state {
+            GitHubIssueState::Open => "badge-success",
+            GitHubIssueState::Closed => "badge-danger",
+            GitHubIssueState::Merged => "badge-done",
+        };
+        writeln!(
+            html,
+            r##"<div class="state-badge {badge_color}">{state:?}</div>"##
+        )?;
+    }
+
     // Print time and number of comments (+ reviews) loaded
     if let Some(reviews) = issue_with_comments.reviews.as_ref() {
         let count = issue_with_comments.comments.nodes.len() + reviews.nodes.len();
@@ -179,6 +195,7 @@ pub async fn gh_comments(
             r###"<p>{comment_count} comments loaded in {duration_secs:.2}s</p>"###,
         )?;
     }
+    writeln!(html, "</div>")?;
 
     // Print issue/PR body
     write_comment_as_html(
