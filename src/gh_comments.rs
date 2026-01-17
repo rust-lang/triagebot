@@ -28,7 +28,7 @@ use crate::{
     utils::{immutable_headers, is_repo_autorized},
 };
 
-pub const STYLE_URL: &str = "/gh-comments/style@0.0.1.css";
+pub const STYLE_URL: &str = "/gh-comments/style@0.0.2.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260115.css";
 
 pub const GH_COMMENTS_CACHE_CAPACITY_BYTES: usize = 35 * 1024 * 1024; // 35 Mb
@@ -444,6 +444,7 @@ fn write_review_as_html(
                 buffer,
                 r###"
     <div class="comment-wrapper">
+      <div class="avatar desktop"></div>
       <details class="comment">
         <summary class="comment-header">
           <div class="author-info">
@@ -472,6 +473,7 @@ fn write_review_as_html(
                 buffer,
                 r###"
     <div class="comment-wrapper">
+      <div class="avatar desktop"></div>
       <div class="comment">
         <div class="comment-header">
           <div class="author-info">

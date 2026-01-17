@@ -39,12 +39,16 @@ body {
     margin-bottom: 15px;
 }
 
-/* === Comment box === */
+/* === Comment, review and review thread box === */
 .comment-wrapper, .review {
     display: flex;
     align-items: flex-start;
     gap: 12px;
     margin-bottom: 24px;
+}
+
+.review {
+    margin-bottom: 0.5rem;
 }
 
 .comment, .review-thread {
