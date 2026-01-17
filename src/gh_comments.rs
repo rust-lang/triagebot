@@ -160,7 +160,7 @@ pub async fn gh_comments(
 </head>
 <body>
 <div class="comments-container">
-<h1 class="markdown-body title">{title_html} #{issue_id}</h1>
+<h1 class="title"><bdi class="markdown-body">{title_html}</bdi> <a class="github-link" href="https://github.com/{owner}/{repo}/issues/{issue_id}">{owner}/{repo}#{issue_id}</a></h1>
 "###,
     )?;
 

@@ -37,8 +37,13 @@ body {
 }
 
 .title {
+    margin-bottom: 0;
+}
+
+.title bdi {
     font-size: 28px;
-    margin-bottom: 15px;
+    font-weight: 600;
+    display: inline-block;
 }
 
 /* === Comment, review and review thread box === */
