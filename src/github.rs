@@ -2958,6 +2958,12 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
           login
           avatarUrl
         }
+        reactionGroups {
+          content
+          users {
+            totalCount
+          }
+        }
         comments(first: 100, after: $commentsCursor) {
           nodes {
             author {
@@ -2970,6 +2976,12 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             minimizedReason
             bodyHTML
             url
+            reactionGroups {
+              content
+              users {
+                totalCount
+              }
+            }
           }
           pageInfo {
             hasNextPage
@@ -2989,6 +3001,12 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
           login
           avatarUrl
         }
+        reactionGroups {
+          content
+          users {
+            totalCount
+          }
+        }
         comments(first: 100, after: $commentsCursor) {
           nodes {
             author {
@@ -3001,6 +3019,12 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             minimizedReason
             bodyHTML
             url
+            reactionGroups {
+              content
+              users {
+                totalCount
+              }
+            }
           }
           pageInfo {
             hasNextPage
@@ -3023,6 +3047,12 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
                 updatedAt
                 bodyHTML
                 url
+                reactionGroups {
+                  content
+                  users {
+                    totalCount
+                  }
+                }
                 pullRequestReview {
                   id
                 }
@@ -3048,6 +3078,12 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             minimizedReason
             bodyHTML
             url
+            reactionGroups {
+              content
+              users {
+                totalCount
+              }
+            }
           }
           pageInfo {
             hasNextPage
@@ -3156,6 +3192,8 @@ pub struct GitHubIssueWithComments {
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "updatedAt")]
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "reactionGroups")]
+    pub reactions: Vec<GitHubGraphQlReactionGroup>,
     pub comments: GitHubGraphQlComments,
     #[serde(rename = "reviewThreads")]
     pub review_threads: Option<GitHubGraphQlReviewThreads>,
@@ -3188,6 +3226,8 @@ pub struct GitHubGraphQlComment {
     #[serde(rename = "bodyHTML")]
     pub body_html: String,
     pub url: String,
+    #[serde(rename = "reactionGroups")]
+    pub reactions: Vec<GitHubGraphQlReactionGroup>,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -3222,6 +3262,8 @@ pub struct GitHubGraphQlReviewThreadComment {
     #[serde(rename = "bodyHTML")]
     pub body_html: String,
     pub url: String,
+    #[serde(rename = "reactionGroups")]
+    pub reactions: Vec<GitHubGraphQlReactionGroup>,
     #[serde(rename = "pullRequestReview")]
     pub pull_request_review: GitHubGraphQlPullRequestReview,
 }
@@ -3252,6 +3294,33 @@ pub struct GitHubGraphQlReview {
     #[serde(rename = "minimizedReason")]
     pub minimized_reason: Option<String>,
     pub url: String,
+    #[serde(rename = "reactionGroups")]
+    pub reactions: Vec<GitHubGraphQlReactionGroup>,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct GitHubGraphQlReactionGroup {
+    pub content: GitHubGraphQlReactionContent,
+    pub users: GitHubGraphQlReactionGroupUsers,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct GitHubGraphQlReactionGroupUsers {
+    #[serde(rename = "totalCount")]
+    pub total_count: u32,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum GitHubGraphQlReactionContent {
+    ThumbsUp,
+    ThumbsDown,
+    Laugh,
+    Hooray,
+    Confused,
+    Heart,
+    Rocket,
+    Eyes,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy, PartialEq, Eq)]
