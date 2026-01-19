@@ -1,3 +1,11 @@
+/* SPDX-License-Identifier: MIT */
+
+/*
+ * Style for the /gh-comments endpoints in Triagebot.
+ *
+ * Be sure to update the version number in src/gh_comments.rs to reset the cache.
+ */
+
 /* === Theme variables === */
 :root {
     --bg-default: #ffffff;
