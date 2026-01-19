@@ -17,8 +17,8 @@ use hyper::{
 use crate::{
     cache,
     github::{
-        GitHubGraphQlComment, GitHubGraphQlReviewThreadComment, GitHubIssueState,
-        GitHubIssueWithComments, GitHubReviewState,
+        GitHubGraphQlComment, GitHubGraphQlReactionGroup, GitHubGraphQlReviewThreadComment,
+        GitHubIssueState, GitHubIssueWithComments, GitHubReviewState,
     },
 };
 use crate::{
@@ -28,7 +28,7 @@ use crate::{
     utils::{immutable_headers, is_repo_autorized},
 };
 
-pub const STYLE_URL: &str = "/gh-comments/style@0.0.2.css";
+pub const STYLE_URL: &str = "/gh-comments/style@0.0.3.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
 
 pub const GH_COMMENTS_CACHE_CAPACITY_BYTES: usize = 35 * 1024 * 1024; // 35 Mb
@@ -228,6 +228,7 @@ pub async fn gh_comments(
         &issue_with_comments.author,
         &issue_with_comments.created_at,
         &issue_with_comments.updated_at,
+        &issue_with_comments.reactions,
         false,
         None,
     )?;
@@ -275,6 +276,7 @@ pub async fn gh_comments(
                         &comment.author,
                         &comment.created_at,
                         &comment.updated_at,
+                        &comment.reactions,
                         comment.is_minimized,
                         comment.minimized_reason.as_deref(),
                     )?;
@@ -290,6 +292,7 @@ pub async fn gh_comments(
                         review.state,
                         &review.submitted_at,
                         &review.updated_at,
+                        &review.reactions,
                         review.is_minimized,
                         review.minimized_reason.as_deref(),
                     )?;
@@ -322,6 +325,7 @@ pub async fn gh_comments(
                 &comment.author,
                 &comment.created_at,
                 &comment.updated_at,
+                &comment.reactions,
                 comment.is_minimized,
                 comment.minimized_reason.as_deref(),
             )?;
@@ -368,6 +372,7 @@ fn write_comment_as_html(
     author: &GitHubSimplifiedAuthor,
     created_at: &chrono::DateTime<Utc>,
     updated_at: &chrono::DateTime<Utc>,
+    reaction_groups: &[GitHubGraphQlReactionGroup],
     minimized: bool,
     minimized_reason: Option<&str>,
 ) -> anyhow::Result<()> {
@@ -408,10 +413,10 @@ fn write_comment_as_html(
         <div class="comment-body markdown-body">
           {body_html}
         </div>
-      </details>
-    </div>
 "###
         )?;
+        write_reaction_groups_as_html(buffer, reaction_groups)?;
+        writeln!(buffer, "</details></div>")?;
     } else {
         let edited = if created_at != updated_at {
             "<span> · edited</span>"
@@ -450,10 +455,10 @@ fn write_comment_as_html(
         <div class="comment-body markdown-body">
           {body_html}
         </div>
-      </div>
-    </div>
 "###
         )?;
+        write_reaction_groups_as_html(buffer, reaction_groups)?;
+        writeln!(buffer, "</div></div>")?;
     }
 
     Ok(())
@@ -467,6 +472,7 @@ fn write_review_as_html(
     state: GitHubReviewState,
     submitted_at: &chrono::DateTime<Utc>,
     updated_at: &chrono::DateTime<Utc>,
+    reaction_groups: &[GitHubGraphQlReactionGroup],
     minimized: bool,
     minimized_reason: Option<&str>,
 ) -> anyhow::Result<()> {
@@ -538,10 +544,10 @@ fn write_review_as_html(
         <div class="comment-body markdown-body">
           {body_html}
         </div>
-      </details>
-    </div>
 "###
             )?;
+            write_reaction_groups_as_html(buffer, reaction_groups)?;
+            writeln!(buffer, "</details></div>")?;
         } else {
             let edited = if submitted_at != updated_at {
                 "<span> · edited</span>"
@@ -567,10 +573,10 @@ fn write_review_as_html(
         <div class="comment-body markdown-body">
           {body_html}
         </div>
-      </div>
-    </div>
 "###
             )?;
+            write_reaction_groups_as_html(buffer, reaction_groups)?;
+            writeln!(buffer, "</div></div>")?;
         }
     }
 
@@ -616,6 +622,7 @@ fn write_review_thread_as_html(
         let created_at_rfc3339 = comment.created_at.to_rfc3339();
         let body_html = &comment.body_html;
         let comment_url = &comment.url;
+        let reaction_groups = &*comment.reactions;
         let id = extract_id_from_github_link(comment_url);
 
         let edited = if comment.created_at != comment.updated_at {
@@ -642,9 +649,10 @@ fn write_review_thread_as_html(
           <div class="review-thread-comment-body markdown-body">
             {body_html}
           </div>
-      </div>
 "###
         )?;
+        write_reaction_groups_as_html(buffer, reaction_groups)?;
+        writeln!(buffer, "</div>")?;
     }
 
     writeln!(
@@ -654,6 +662,46 @@ fn write_review_thread_as_html(
       </details>
 "###
     )?;
+
+    Ok(())
+}
+
+fn write_reaction_groups_as_html(
+    buffer: &mut String,
+    reaction_groups: &[GitHubGraphQlReactionGroup],
+) -> anyhow::Result<()> {
+    let any_reactions = reaction_groups.iter().any(|rg| rg.users.total_count > 0);
+
+    if any_reactions {
+        writeln!(buffer, r##"<div class="reactions">"##)?;
+
+        for reaction_group in reaction_groups {
+            let total_count = reaction_group.users.total_count;
+
+            if total_count == 0 {
+                continue;
+            }
+
+            use crate::github::GitHubGraphQlReactionContent::*;
+            let emoji = match reaction_group.content {
+                ThumbsUp => "👍",
+                ThumbsDown => "👎",
+                Laugh => "😄",
+                Hooray => "🎉",
+                Confused => "😕",
+                Heart => "❤️",
+                Rocket => "🚀",
+                Eyes => "👀",
+            };
+
+            write!(
+                buffer,
+                r##"<div class="reaction">{emoji}<span class="reaction-number">{total_count}</span></div>"##
+            )?;
+        }
+
+        writeln!(buffer, r##"</div>"##)?;
+    }
 
     Ok(())
 }

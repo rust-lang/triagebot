@@ -1,3 +1,11 @@
+/* SPDX-License-Identifier: MIT */
+
+/*
+ * Style for the /gh-comments endpoints in Triagebot.
+ *
+ * Be sure to update the version number in src/gh_comments.rs to reset the cache.
+ */
+
 /* === Theme variables === */
 :root {
     --bg-default: #ffffff;
@@ -208,6 +216,31 @@ details:not([open]) > .review-thread-header {
 
 .octicon {
     fill: currentColor;
+}
+
+/* === Reactions === */
+.reactions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-left: 16px;
+    margin-bottom: 16px;
+}
+
+.review-thread-comment .reactions {
+    margin-left: 2rem;
+    margin-bottom: 0px;
+}
+
+.reaction {
+    border-radius: 100px;
+    border: 0.00625rem solid var(--border-default);
+    padding: 5px 9px;
+    font-size: 13px;
+}
+
+.reaction .reaction-number {
+    margin-left: 0.35rem;
 }
 
 /* === Tab links === */
