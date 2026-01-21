@@ -71,13 +71,20 @@ pub(super) async fn validate_config(
             // Error if one the mentions entry is not a valid glob.
             if let Some(mentions) = config.mentions {
                 for (entry, MentionsEntryConfig { type_, .. }) in mentions.entries {
-                    if type_ == MentionsEntryType::Filename
-                        && let Err(err) = globset::Glob::new(&entry)
-                    {
-                        return Ok(Some(format!(
-                            "Invalid `triagebot.toml`:\n\
-                            `[mentions.\"{entry}\"]` has an invalid glob syntax: {err}"
-                        )));
+                    if type_ == MentionsEntryType::Filename {
+                        if let Err(err) = globset::Glob::new(&entry) {
+                            return Ok(Some(format!(
+                                "Invalid `triagebot.toml`:\n\
+                                `[mentions.\"{entry}\"]` has an invalid glob syntax: {err}"
+                            )));
+                        }
+
+                        if entry.starts_with('/') {
+                            return Ok(Some(format!(
+                                "Invalid `triagebot.toml`:\n\
+                                `[mentions.\"{entry}\"]` has an invalid pattern: path must be relative (remove the `/` at the start)"
+                            )));
+                        }
                     }
                 }
             }
