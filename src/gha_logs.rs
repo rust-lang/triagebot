@@ -193,22 +193,17 @@ pub async fn gha_logs(
     <title>{job_name} - {owner}/{repo}@{short_sha}</title>
     {icon_status}
     <style>
-[data-pseudo-content]::before {{
-  content: attr(data-pseudo-content);
-}}
 body {{
   font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
   background: #0C0C0C;
   color: #CCC;
 }}
-table {{
-  white-space: pre;
-  width: auto;
-  border-spacing: 0;
-  border-collapse: collapse;
+.logs {{
+  display: flex;
+  line-height: 1.5;
 }}
-tr.selected {{
-  background-color: #ae7c1426; /* similar to GitHub’s yellow-ish */
+.logs > div {{
+  white-space: pre;
 }}
 .timestamp {{
   color: #848484;
@@ -217,6 +212,9 @@ tr.selected {{
 }}
 .timestamp:hover {{
   text-decoration: underline;
+}}
+.selected {{
+  background-color: #ae7c1426; /* similar to GitHub’s yellow-ish */
 }}
 .error-marker {{
   scroll-margin-bottom: 15vh;
@@ -270,10 +268,9 @@ tr.selected {{
     </script>
 </head>
 <body>
-<table>
-    <tbody id="logs">
-    </tbody>
-</table>
+<div class="logs">
+    <div id="logs-timestamps"></div>
+    <div id="logs-lines"></div>
 </body>
 </html>"###,
     );
