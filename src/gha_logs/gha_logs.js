@@ -114,8 +114,17 @@ if (location.hash !== "") {
 
 // 9. Add a copy handler that force plain/text copy
 logsEl.addEventListener("copy", function(e) {
-    var text = window.getSelection().toString();
-    e.clipboardData.setData('text/plain', text);
+    // Get the browser selection as string
+    const text = window.getSelection().toString();
+
+    // Let's strip the first tabulation on each line as
+    // WebBrowsers tend to add tabulations to the copy between
+    // each column in a table.
+    //
+    // See https://github.com/rust-lang/triagebot/issues/2257
+    const stripped = text.replace(/^\t/gm, "");
+
+    e.clipboardData.setData('text/plain', stripped);
     e.preventDefault();
 });
 
