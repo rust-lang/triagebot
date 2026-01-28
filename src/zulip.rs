@@ -268,7 +268,9 @@ async fn handle_command<'a>(
                 ping_goals_cmd(ctx.clone(), gh_id, message_data, args).await
             }
             ChatCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
-            ChatCommand::TeamStats { name } => team_status_cmd(&ctx, name).await,
+            ChatCommand::TeamStats { name, repo } => {
+                team_status_cmd(&ctx, name, repo.as_deref()).await
+            }
         };
 
         let output = output?;
@@ -463,7 +465,11 @@ async fn ping_goals_cmd(
     }
 }
 
-async fn team_status_cmd(ctx: &Context, team_name: &str) -> anyhow::Result<Option<String>> {
+async fn team_status_cmd(
+    ctx: &Context,
+    team_name: &str,
+    repo: Option<&str>,
+) -> anyhow::Result<Option<String>> {
     use std::fmt::Write;
 
     let Some(team) = ctx.team.get_team(team_name).await? else {
@@ -483,21 +489,52 @@ async fn team_status_cmd(ctx: &Context, team_name: &str) -> anyhow::Result<Optio
         .await
         .context("cannot load review preferences")?;
 
+    // If a repository name was provided then check for an adhoc group named after that team in
+    // that repository's `triagebot.toml` and require that team members be in that list to be
+    // considered on rotation.
+    let reviewers_for_repository: Option<Vec<String>> = if let Some(repo) = repo {
+        let repo = ctx
+            .github
+            .repository(repo)
+            .await
+            .context("failed retrieving the repository informations")?;
+        let config = crate::config::get(&ctx.github, &repo)
+            .await
+            .context("failed to get triagebot configuration")?;
+        Some(
+            config
+                .assign
+                .as_ref()
+                .and_then(|a| a.adhoc_groups.get(team_name))
+                .context("team missing in `adhoc_groups`")?
+                .clone(),
+        )
+    } else {
+        None
+    };
+
     let workqueue = ctx.workqueue.read().await;
     let total_assigned: u64 = members
         .iter()
         .map(|member| workqueue.assigned_pr_count(member.github_id))
         .sum();
 
-    let table_header = |title: &str| {
+    let on_rotation_table_header = |title: &str| {
         format!(
             r"### {title}
 | Username | Name | Assigned PRs | Review capacity |
 |----------|------|-------------:|----------------:|"
         )
     };
+    let off_rotation_table_header = |title: &str| {
+        format!(
+            r"### {title}
+| Username | Name | Assigned PRs | Review capacity | Reason for Off Rotation |
+|----------|------|-------------:|----------------:|-------------------------|"
+        )
+    };
 
-    let format_member_row = |member: &TeamMember| {
+    let format_on_rotation_member_row = |member: &TeamMember| {
         let review_prefs = review_prefs.get(member.github.as_str());
         let max_capacity = review_prefs
             .as_ref()
@@ -511,25 +548,42 @@ async fn team_status_cmd(ctx: &Context, team_name: &str) -> anyhow::Result<Optio
             member.github, member.name
         )
     };
+    let format_off_rotation_member_row = |member: &TeamMember| {
+        let in_review_queue_for_repository = reviewers_for_repository
+            .as_ref()
+            .map(|reviewers| reviewers.contains(&member.github))
+            .unwrap_or(true);
+        let reason = if in_review_queue_for_repository {
+            "Review Preferences"
+        } else {
+            "`triagebot.toml` Configuration"
+        };
+        format!("{} {reason} |", format_on_rotation_member_row(member))
+    };
 
+    let reviewers_for_repository = &reviewers_for_repository;
     let (mut on_rotation, mut off_rotation): (Vec<&TeamMember>, Vec<&TeamMember>) =
         members.iter().partition(|member| {
             let rotation_mode = review_prefs
                 .get(member.github.as_str())
                 .map(|prefs| prefs.rotation_mode)
                 .unwrap_or_default();
-            matches!(rotation_mode, RotationMode::OnRotation)
+            let in_review_queue_for_repository = reviewers_for_repository
+                .as_ref()
+                .map(|reviewers| reviewers.contains(&member.github))
+                .unwrap_or(true);
+            matches!(rotation_mode, RotationMode::OnRotation) && in_review_queue_for_repository
         });
     on_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
     off_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
 
     let on_rotation = on_rotation
         .into_iter()
-        .map(format_member_row)
+        .map(format_on_rotation_member_row)
         .collect::<Vec<_>>();
     let off_rotation = off_rotation
         .into_iter()
-        .map(format_member_row)
+        .map(format_off_rotation_member_row)
         .collect::<Vec<_>>();
 
     // e.g. 2 members, 5 PRs assigned
@@ -544,7 +598,7 @@ async fn team_status_cmd(ctx: &Context, team_name: &str) -> anyhow::Result<Optio
         writeln!(
             msg,
             "{}",
-            table_header(&format!("ON rotation ({})", on_rotation.len()))
+            on_rotation_table_header(&format!("ON rotation ({})", on_rotation.len()))
         )?;
         writeln!(msg, "{}\n", on_rotation.join("\n"))?;
     }
@@ -552,7 +606,7 @@ async fn team_status_cmd(ctx: &Context, team_name: &str) -> anyhow::Result<Optio
         writeln!(
             msg,
             "{}",
-            table_header(&format!("OFF rotation ({})", off_rotation.len()))
+            off_rotation_table_header(&format!("OFF rotation ({})", off_rotation.len()))
         )?;
         writeln!(msg, "{}\n", off_rotation.join("\n"))?;
     }
