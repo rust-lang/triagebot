@@ -15,13 +15,6 @@ static CLOSES_ISSUE_REGEXP: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new("(?i)(?P<action>close[sd]*|fix([e]*[sd]*)?|resolve[sd]*)(?P<spaces>:? +)(?P<org_repo>[a-zA-Z0-9_-]*/[a-zA-Z0-9_-]*)?#(?P<issue_num>[0-9]+)").unwrap()
 });
 
-const BACKPORT_LABELS: [&str; 4] = [
-    "beta-nominated",
-    "beta-accepted",
-    "stable-nominated",
-    "stable-accepted",
-];
-
 const REGRESSION_LABELS: [&str; 3] = [
     "regression-from-stable-to-nightly",
     "regression-from-stable-to-beta",
@@ -41,7 +34,7 @@ pub(crate) struct BackportInput {
 }
 
 pub(super) async fn parse_input(
-    _ctx: &Context,
+    ctx: &Context,
     event: &IssuesEvent,
     config: Option<&BackportConfig>,
 ) -> Result<Option<BackportInput>, String> {
@@ -69,9 +62,26 @@ pub(super) async fn parse_input(
     let pr = &event.issue;
 
     let pr_labels: Vec<&str> = pr.labels.iter().map(|l| l.name.as_str()).collect();
-    if contains_any(&pr_labels, &BACKPORT_LABELS) {
-        log::debug!("PR #{} already has a backport label", pr.number);
-        return Ok(None);
+
+    if let IssuesAction::Labeled { label } = &event.action {
+        if (label.name == "beta-nominated" && contains_any(&pr_labels, &["beta-accepted"]))
+            || (label.name == "stable-nominated" && contains_any(&pr_labels, &["stable-accepted"]))
+        {
+            log::debug!(
+                "Will not nominate for backport, PR #{} is already backport accepted (found labels: {:?})",
+                pr.number,
+                pr_labels
+            );
+            let label_to_remove = vec![Label {
+                name: label.name.clone(),
+            }];
+            let _ = event
+                .issue
+                .remove_labels(&ctx.github, label_to_remove)
+                .await
+                .context("failed to remove labels from the issue");
+            return Ok(None);
+        }
     }
 
     // Retrieve backport config for this PR, based on its team label(s)
@@ -86,7 +96,7 @@ pub(super) async fn parse_input(
                 cfg.required_pr_labels.iter().map(String::as_str).collect();
             if !contains_any(&pr_labels, &required_pr_labels) {
                 log::warn!(
-                    "Skipping backport nomination: PR is missing one required label: {:?}",
+                    "Skipping backport nomination: PR is missing the required labels. Labels found: {:?}",
                     pr_labels
                 );
                 return false;
