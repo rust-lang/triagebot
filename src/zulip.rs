@@ -376,8 +376,8 @@ async fn accept_decline_backport(
 
     // Repository owner and name are hardcoded
     // This command is only used in this repository
-    let repo_owner = "rust-lang";
-    let repo_name = "rust";
+    let repo_owner = std::env::var("MAIN_GH_REPO_OWNER").unwrap_or("rust-lang".to_string());
+    let repo_name = std::env::var("MAIN_GH_REPO_NAME").unwrap_or("rust".to_string());
 
     // TODO: factor out the Zulip "URL encoder" to make it practical to use
     let zulip_send_req = crate::zulip::MessageApiRequest {
