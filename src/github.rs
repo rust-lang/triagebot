@@ -3187,7 +3187,7 @@ pub struct GitHubIssueWithComments {
     pub body_html: String,
     pub state: GitHubIssueState,
     pub url: String,
-    pub author: GitHubSimplifiedAuthor,
+    pub author: Option<GitHubSimplifiedAuthor>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "updatedAt")]
@@ -3207,6 +3207,16 @@ pub struct GitHubSimplifiedAuthor {
     pub avatar_url: String,
 }
 
+impl Default for GitHubSimplifiedAuthor {
+    fn default() -> Self {
+        // Default to the "Deleted user" (https://github.com/ghost)
+        GitHubSimplifiedAuthor {
+            login: "ghost".to_string(),
+            avatar_url: "https://avatars.githubusercontent.com/u/10137?v=4".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubGraphQlComments {
     pub nodes: Vec<GitHubGraphQlComment>,
@@ -3214,7 +3224,7 @@ pub struct GitHubGraphQlComments {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubGraphQlComment {
-    pub author: GitHubSimplifiedAuthor,
+    pub author: Option<GitHubSimplifiedAuthor>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "updatedAt")]
@@ -3254,7 +3264,7 @@ pub struct GitHubGraphQlReviewThreadComments {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubGraphQlReviewThreadComment {
-    pub author: GitHubSimplifiedAuthor,
+    pub author: Option<GitHubSimplifiedAuthor>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "updatedAt")]
@@ -3280,7 +3290,7 @@ pub struct GitHubGraphQlReviews {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubGraphQlReview {
-    pub author: GitHubSimplifiedAuthor,
+    pub author: Option<GitHubSimplifiedAuthor>,
     pub id: String,
     pub state: GitHubReviewState,
     #[serde(rename = "submittedAt")]
