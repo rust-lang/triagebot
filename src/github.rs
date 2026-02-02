@@ -3187,8 +3187,7 @@ pub struct GitHubIssueWithComments {
     pub body_html: String,
     pub state: GitHubIssueState,
     pub url: String,
-    #[serde(deserialize_with = "deserialize_author")]
-    pub author: GitHubSimplifiedAuthor,
+    pub author: Option<GitHubSimplifiedAuthor>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "updatedAt")]
@@ -3208,14 +3207,6 @@ pub struct GitHubSimplifiedAuthor {
     pub avatar_url: String,
 }
 
-fn deserialize_author<'de, D>(deserializer: D) -> Result<GitHubSimplifiedAuthor, D::Error>
-where
-    D: serde::de::Deserializer<'de>,
-{
-    let opt = <Option<GitHubSimplifiedAuthor> as serde::Deserialize>::deserialize(deserializer)?;
-    Ok(opt.unwrap_or_else(GitHubSimplifiedAuthor::default))
-}
-
 impl Default for GitHubSimplifiedAuthor {
     fn default() -> Self {
         // Default to the "Deleted user" (https://github.com/ghost)
@@ -3233,8 +3224,7 @@ pub struct GitHubGraphQlComments {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubGraphQlComment {
-    #[serde(deserialize_with = "deserialize_author")]
-    pub author: GitHubSimplifiedAuthor,
+    pub author: Option<GitHubSimplifiedAuthor>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "updatedAt")]
@@ -3274,8 +3264,7 @@ pub struct GitHubGraphQlReviewThreadComments {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubGraphQlReviewThreadComment {
-    #[serde(deserialize_with = "deserialize_author")]
-    pub author: GitHubSimplifiedAuthor,
+    pub author: Option<GitHubSimplifiedAuthor>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "updatedAt")]
@@ -3301,8 +3290,7 @@ pub struct GitHubGraphQlReviews {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubGraphQlReview {
-    #[serde(deserialize_with = "deserialize_author")]
-    pub author: GitHubSimplifiedAuthor,
+    pub author: Option<GitHubSimplifiedAuthor>,
     pub id: String,
     pub state: GitHubReviewState,
     #[serde(rename = "submittedAt")]

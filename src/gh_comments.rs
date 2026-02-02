@@ -1,6 +1,6 @@
-use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Instant;
+use std::{fmt::Write, sync::LazyLock};
 
 use anyhow::Context as _;
 use axum::{
@@ -46,6 +46,9 @@ impl cache::EstimatedSize for CachedComments {
         self.estimated_size
     }
 }
+
+static GHOST_ACCOUNT: LazyLock<GitHubSimplifiedAuthor> =
+    LazyLock::new(GitHubSimplifiedAuthor::default);
 
 pub async fn gh_comments(
     Path(ref key @ (ref owner, ref repo, issue_id)): Path<(String, String, u64)>,
@@ -114,8 +117,10 @@ pub async fn gh_comments(
                     std::mem::size_of::<GitHubGraphQlComment>()
                         + c.url.len()
                         + c.body_html.len()
-                        + c.author.login.len()
-                        + c.author.avatar_url.len()
+                        + c.author
+                            .as_ref()
+                            .map(|a| a.login.len() + a.avatar_url.len())
+                            .unwrap_or(0)
                 })
                 .sum::<usize>();
 
@@ -225,7 +230,10 @@ pub async fn gh_comments(
         &mut html,
         &issue_with_comments.body_html,
         &issue_with_comments.url,
-        &issue_with_comments.author,
+        issue_with_comments
+            .author
+            .as_ref()
+            .unwrap_or(&GHOST_ACCOUNT),
         &issue_with_comments.created_at,
         &issue_with_comments.updated_at,
         &issue_with_comments.reactions,
@@ -273,7 +281,7 @@ pub async fn gh_comments(
                         &mut html,
                         &comment.body_html,
                         &comment.url,
-                        &comment.author,
+                        comment.author.as_ref().unwrap_or(&GHOST_ACCOUNT),
                         &comment.created_at,
                         &comment.updated_at,
                         &comment.reactions,
@@ -288,7 +296,7 @@ pub async fn gh_comments(
                         &mut html,
                         &review.body_html,
                         &review.url,
-                        &review.author,
+                        review.author.as_ref().unwrap_or(&GHOST_ACCOUNT),
                         review.state,
                         &review.submitted_at,
                         &review.updated_at,
@@ -322,7 +330,7 @@ pub async fn gh_comments(
                 &mut html,
                 &comment.body_html,
                 &comment.url,
-                &comment.author,
+                comment.author.as_ref().unwrap_or(&GHOST_ACCOUNT),
                 &comment.created_at,
                 &comment.updated_at,
                 &comment.reactions,
@@ -616,8 +624,9 @@ fn write_review_thread_as_html(
     )?;
 
     for comment in comments {
-        let author_login = &comment.author.login;
-        let author_avatar_url = &comment.author.avatar_url;
+        let author = comment.author.as_ref().unwrap_or(&GHOST_ACCOUNT);
+        let author_login = &author.login;
+        let author_avatar_url = &author.avatar_url;
         let created_at = &comment.created_at;
         let created_at_rfc3339 = comment.created_at.to_rfc3339();
         let body_html = &comment.body_html;
