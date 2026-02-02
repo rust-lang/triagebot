@@ -3338,7 +3338,7 @@ pub enum GitHubGraphQlReactionContent {
 pub enum GitHubReviewState {
     Commented,
     Approved,
-    RequestChanges,
+    ChangesRequested,
     Dismissed,
 }
 
