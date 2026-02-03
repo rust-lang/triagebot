@@ -45,6 +45,11 @@ pub enum ChatCommand {
     TeamStats {
         /// Name of the team to query.
         name: String,
+        /// Name of the repository that is specifically being queried (e.g. `rust-lang/rust`)
+        ///
+        /// Someone might be on the review queue in the triagebot database but not listed in
+        /// `triagebot.toml` so in practice isn't getting reviews.
+        repo: Option<String>,
     },
 }
 
