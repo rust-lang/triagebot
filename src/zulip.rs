@@ -507,7 +507,13 @@ async fn team_status_cmd(
                 .as_ref()
                 .and_then(|a| a.adhoc_groups.get(team_name))
                 .context("team missing in `adhoc_groups`")?
-                .clone(),
+                .into_iter()
+                .map(|reviewer| {
+                    // Adhoc groups reviewers are by convention prefix with `@`, let's
+                    // strip it to avoid issues with un-prefixed GitHub handles
+                    reviewer.strip_prefix('@').unwrap_or(reviewer).to_string()
+                })
+                .collect(),
         )
     } else {
         None
