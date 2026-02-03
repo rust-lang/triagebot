@@ -100,6 +100,7 @@ pub(super) async fn parse_input(
 
                 let is_opened =
                     matches!(event.action, IssuesAction::Opened | IssuesAction::Reopened);
+                let is_closed = matches!(event.action, IssuesAction::Closed);
 
                 // Treat the following situations as a "new PR":
                 // 1) PRs that were (re)opened and are not draft
@@ -113,12 +114,20 @@ pub(super) async fn parse_input(
                 let is_opened_as_draft = is_opened && event.issue.draft;
                 let is_converted_to_draft = event.action == IssuesAction::ConvertedToDraft;
 
+                // Treat the following situations as a "pr merged":
+                // 1) PRs that were closed and have the merged status
+                let is_closed_as_merged = is_closed && event.issue.merged;
+
                 #[expect(clippy::if_same_then_else, reason = "suggested code looks ugly")]
                 if cfg.new_pr && (is_opened_non_draft || is_ready_for_review) {
                     autolabels.push(Label {
                         name: label.to_owned(),
                     });
                 } else if cfg.new_draft && (is_opened_as_draft || is_converted_to_draft) {
+                    autolabels.push(Label {
+                        name: label.to_owned(),
+                    });
+                } else if cfg.pr_merged && is_closed_as_merged {
                     autolabels.push(Label {
                         name: label.to_owned(),
                     });
