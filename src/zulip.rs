@@ -510,8 +510,14 @@ async fn team_status_cmd(
                 .into_iter()
                 .map(|reviewer| {
                     // Adhoc groups reviewers are by convention prefix with `@`, let's
-                    // strip it to avoid issues with un-prefixed GitHub handles
-                    reviewer.strip_prefix('@').unwrap_or(reviewer).to_string()
+                    // strip it to avoid issues with un-prefixed GitHub handles.
+                    //
+                    // Also lowercase the reviewer, in case it's has a different
+                    // casing between our different sources.
+                    reviewer
+                        .strip_prefix('@')
+                        .unwrap_or(reviewer)
+                        .to_lowercase()
                 })
                 .collect(),
         )
@@ -576,7 +582,7 @@ async fn team_status_cmd(
                 .unwrap_or_default();
             let in_review_queue_for_repository = reviewers_for_repository
                 .as_ref()
-                .map(|reviewers| reviewers.contains(&member.github))
+                .map(|reviewers| reviewers.contains(&member.github.to_lowercase()))
                 .unwrap_or(true);
             matches!(rotation_mode, RotationMode::OnRotation) && in_review_queue_for_repository
         });
