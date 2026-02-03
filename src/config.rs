@@ -354,6 +354,8 @@ pub(crate) struct AutolabelLabelConfig {
     pub(crate) new_issue: bool,
     #[serde(default)]
     pub(crate) new_draft: bool,
+    #[serde(default)]
+    pub(crate) pr_merged: bool,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -1247,5 +1249,35 @@ Multi text body with ${mcp_issue} and ${mcp_title}
         };
 
         assert_eq!(config.relabel, Some(expected_cfg));
+    }
+
+    #[test]
+    fn autolabel() {
+        let config = r#"
+            [autolabel."needs-relnotes-triage"]
+            pr_merged = true
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        assert_eq!(
+            config.autolabel,
+            Some(AutolabelConfig {
+                labels: {
+                    let mut hm = HashMap::new();
+                    hm.insert(
+                        "needs-relnotes-triage".to_string(),
+                        AutolabelLabelConfig {
+                            trigger_labels: vec![],
+                            exclude_labels: vec![],
+                            trigger_files: vec![],
+                            new_pr: false,
+                            new_issue: false,
+                            new_draft: false,
+                            pr_merged: true,
+                        },
+                    );
+                    hm
+                }
+            })
+        );
     }
 }
