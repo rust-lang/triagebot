@@ -2367,6 +2367,32 @@ pub struct PushEvent {
     sender: User,
 }
 
+/// The action that occurred in an org_block event.
+#[derive(Debug, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OrgBlockAction {
+    /// User was banned
+    Blocked,
+    /// User was unbannded
+    Unblocked,
+}
+
+/// Organization information from an org_block event.
+#[derive(Debug, serde::Deserialize)]
+pub struct Organization {
+    pub login: String,
+    pub id: u64,
+}
+
+/// Event triggered when a user is blocked or unblocked from an organization.
+#[derive(Debug, serde::Deserialize)]
+pub struct OrgBlockEvent {
+    pub action: OrgBlockAction,
+    pub blocked_user: User,
+    pub organization: Organization,
+    pub sender: User,
+}
+
 /// An event triggered by a webhook.
 #[derive(Debug)]
 pub enum Event {
