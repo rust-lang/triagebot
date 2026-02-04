@@ -216,17 +216,73 @@ pub(super) async fn handle_input(
             // No welcome is posted if they are not new and they used `r?` in the opening body.
             None
         };
-        if let Some(assignee) = assignee {
-            set_assignee(ctx, &event.issue, &ctx.github, &assignee).await?;
+        if let Some(assignee) = &assignee {
+            set_assignee(ctx, &event.issue, &ctx.github, assignee).await?;
         }
 
-        if let Some(welcome) = welcome
-            && let Err(e) = event.issue.post_comment(&ctx.github, &welcome).await
-        {
-            log::warn!(
-                "failed to post welcome comment to {}: {e}",
-                event.issue.global_id()
-            );
+        if let Some(mut welcome) = welcome {
+            // Add some explanation of why the given reviewer was chosen
+            if let Some(assignee) = assignee
+                && !assignee.selection_steps.is_empty()
+            {
+                fn format_candidates(candidates: &[String]) -> String {
+                    if candidates.len() > 5 {
+                        format!("{} candidates", candidates.len())
+                    } else {
+                        let mut candidates = candidates.to_vec();
+                        candidates.sort();
+                        candidates
+                            .into_iter()
+                            .map(|c| format!("`{c}`"))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    }
+                }
+
+                let mut explanation = String::new();
+                for step in &assignee.selection_steps {
+                    let msg = match step {
+                        SelectionStep::SelfAssign => "Self-assignment".to_string(),
+                        SelectionStep::RandomlySelectedFrom(candidates) => {
+                            format!("Random selection from {}", format_candidates(&candidates))
+                        }
+                        SelectionStep::Fallback => "Fallback group".to_string(),
+                        SelectionStep::FileDiff => "Files modified in the PR".to_string(),
+                        SelectionStep::Expansion { from, to } => {
+                            format!(
+                                "{} expanded to {}",
+                                format_candidates(&from),
+                                format_candidates(&to)
+                            )
+                        }
+                    };
+                    explanation.push_str(&format!("- {msg}\n"));
+                }
+
+                use std::fmt::Write;
+
+                writeln!(
+                    welcome,
+                    r#"
+
+<details>
+<summary>Why was this reviewer chosen?</summary>
+
+The reviewer was selected based on:
+
+{explanation}
+
+</details>"#
+                )
+                .unwrap();
+            }
+
+            if let Err(e) = event.issue.post_comment(&ctx.github, &welcome).await {
+                log::warn!(
+                    "failed to post welcome comment to {}: {e}",
+                    event.issue.global_id()
+                );
+            }
         }
     }
 
@@ -833,7 +889,7 @@ enum SelectionStep {
     Fallback,
     /// The reviewer was selected based on the PR diff.
     FileDiff,
-    ///
+    /// A set of groups or teams were expanded into a list of reviewer usernames.
     Expansion { from: Vec<String>, to: Vec<String> },
 }
 
