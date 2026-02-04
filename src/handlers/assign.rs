@@ -374,7 +374,12 @@ async fn determine_assignee(
             )
             .await
             {
-                Ok(assignee) => return Ok((Some(assignee), false)),
+                Ok(assignee) => {
+                    return Ok((
+                        Some(assignee.prepend_selection_step(SelectionStep::FileDiff)),
+                        false,
+                    ));
+                }
                 Err(FindReviewerError::TeamNotFound(team)) => log::warn!(
                     "team {team} not found via diff from PR {}, \
                     is there maybe a misconfigured group?",
@@ -416,7 +421,12 @@ async fn determine_assignee(
         )
         .await
         {
-            Ok(assignee) => return Ok((Some(assignee), false)),
+            Ok(assignee) => {
+                return Ok((
+                    Some(assignee.prepend_selection_step(SelectionStep::Fallback)),
+                    false,
+                ));
+            }
             Err(e) => {
                 log::trace!(
                     "failed to select from fallback group for PR {}: {e}",
@@ -813,6 +823,20 @@ Please select a different reviewer.",
     }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+enum SelectionStep {
+    /// The user assigned themselves.
+    SelfAssign,
+    /// Random selection amongst N candidates.
+    RandomlySelectedFrom(Vec<String>),
+    /// The reviewer was selected as a last resort from the adhoc fallback group.
+    Fallback,
+    /// The reviewer was selected based on the PR diff.
+    FileDiff,
+    ///
+    Expansion { from: Vec<String>, to: Vec<String> },
+}
+
 /// Reviewer that was found to be eligible as a result of `r? <...>`.
 /// In some cases, a reviewer selection error might have been suppressed.
 /// We store it here to allow sending a comment with a warning about the suppressed error.
@@ -820,14 +844,36 @@ Please select a different reviewer.",
 struct ReviewerSelection {
     name: String,
     suppressed_error: Option<FindReviewerError>,
+    /// Records a set of steps that were taken to select a given reviewer,
+    /// so that we can explain the selection to users.
+    selection_steps: Vec<SelectionStep>,
 }
 
 impl ReviewerSelection {
-    fn from_name(name: String) -> Self {
+    fn new(name: String, selection_steps: Vec<SelectionStep>) -> Self {
         Self {
             name,
             suppressed_error: None,
+            selection_steps,
         }
+    }
+
+    fn from_self_assign(name: String) -> Self {
+        Self {
+            name,
+            suppressed_error: None,
+            selection_steps: vec![SelectionStep::SelfAssign],
+        }
+    }
+
+    fn add_selection_step(mut self, step: SelectionStep) -> Self {
+        self.selection_steps.push(step);
+        self
+    }
+
+    fn prepend_selection_step(mut self, step: SelectionStep) -> Self {
+        self.selection_steps.insert(0, step);
+        self
     }
 }
 
@@ -850,14 +896,16 @@ async fn find_reviewer_from_names(
     if let [name] = names
         && is_self_assign(name, requested_by)
     {
-        return Ok(ReviewerSelection::from_name(name.clone()));
+        return Ok(ReviewerSelection::from_self_assign(name.clone()));
     }
 
     // Allow `me` as an alias for self-assign, which is always allowed.
     if let [name] = names
         && name == "me"
     {
-        return Ok(ReviewerSelection::from_name(requested_by.to_string()));
+        return Ok(ReviewerSelection::from_self_assign(
+            requested_by.to_string(),
+        ));
     }
 
     let candidates =
@@ -890,11 +938,21 @@ async fn find_reviewer_from_names(
         candidates
     );
 
-    // Select a random reviewer from the filtered list
-    Ok(candidates
-        .into_iter()
-        .choose(&mut rand::thread_rng())
-        .expect("candidate_reviewers_from_names should return at least one entry"))
+    if candidates.len() == 1 {
+        Ok(candidates.into_iter().next().unwrap())
+    } else {
+        let possible_candidates = candidates
+            .iter()
+            .map(|c| c.name.clone())
+            .collect::<Vec<_>>();
+
+        // Select a random reviewer from the filtered list
+        let candidate = candidates
+            .into_iter()
+            .choose(&mut rand::thread_rng())
+            .expect("candidate_reviewers_from_names should return at least one entry");
+        Ok(candidate.add_selection_step(SelectionStep::RandomlySelectedFrom(possible_candidates)))
+    }
 }
 
 #[derive(Eq, PartialEq, Hash, Debug)]
@@ -1019,6 +1077,8 @@ async fn candidate_reviewers_from_names<'a>(
     issue: &Issue,
     names: &'a [String],
 ) -> Result<HashSet<ReviewerSelection>, FindReviewerError> {
+    let mut selection_steps = vec![];
+
     // Step 1: expand teams and groups into candidate names
     let expanded = expand_teams_and_groups(teams, issue, config, names)?;
     let expanded_count = expanded.len();
@@ -1029,6 +1089,12 @@ async fn candidate_reviewers_from_names<'a>(
             expanded.iter().next().map(|c| c.origin),
             Some(ReviewerCandidateOrigin::Direct)
         );
+    if !is_single_user {
+        selection_steps.push(SelectionStep::Expansion {
+            from: names.to_vec(),
+            to: expanded.iter().map(|c| c.name.clone()).collect(),
+        });
+    }
 
     // Set of candidate usernames to choose from.
     // We go through each expanded candidate and store either success or an error for them.
@@ -1161,6 +1227,7 @@ async fn candidate_reviewers_from_names<'a>(
             Ok(HashSet::from([ReviewerSelection {
                 name: username.to_string(),
                 suppressed_error: Some(error),
+                selection_steps: vec![],
             }]))
         } else {
             // If it was a request for a team or a group, and no one is available, simply
@@ -1178,7 +1245,7 @@ async fn candidate_reviewers_from_names<'a>(
     } else {
         Ok(valid_candidates
             .into_iter()
-            .map(|s| ReviewerSelection::from_name(s.to_string()))
+            .map(|s| ReviewerSelection::new(s.to_string(), vec![]))
             .collect())
     }
 }

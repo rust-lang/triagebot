@@ -136,7 +136,11 @@ impl From<AssignCtx> for TestContext {
 
 impl From<&str> for ReviewerSelection {
     fn from(value: &str) -> Self {
-        ReviewerSelection::from_name(value.to_string())
+        ReviewerSelection {
+            name: value.to_string(),
+            suppressed_error: None,
+            selection_steps: vec![],
+        }
     }
 }
 
@@ -192,6 +196,7 @@ async fn at_max_capacity() {
                     suppressed_error: Some(FindReviewerError::ReviewerAtMaxCapacity {
                         username: "martin".to_string(),
                     }),
+                    selection_steps: vec![],
                 }]),
             )
             .await?
@@ -232,6 +237,7 @@ async fn above_max_capacity() {
                     suppressed_error: Some(FindReviewerError::ReviewerAtMaxCapacity {
                         username: "martin".to_string(),
                     }),
+                    selection_steps: vec![],
                 }]),
             )
             .await?
@@ -258,6 +264,7 @@ async fn max_capacity_zero() {
                     suppressed_error: Some(FindReviewerError::ReviewerAtMaxCapacity {
                         username: "martin".to_string(),
                     }),
+                    selection_steps: vec![],
                 }]),
             )
             .await?
@@ -284,6 +291,7 @@ async fn ignore_username_case() {
                     suppressed_error: Some(FindReviewerError::ReviewerAtMaxCapacity {
                         username: "MARTIN".to_string(),
                     }),
+                    selection_steps: vec![],
                 }]),
             )
             .await?
@@ -323,6 +331,7 @@ async fn user_off_rotation() {
                     suppressed_error: Some(FindReviewerError::ReviewerOffRotation {
                         username: "martin".to_string(),
                     }),
+                    selection_steps: vec![],
                 }]),
             )
             .await?
@@ -563,6 +572,7 @@ async fn users_on_vacation() {
                     suppressed_error: Some(FindReviewerError::ReviewerOffRotation {
                         username: "jyn514".to_string(),
                     }),
+                    selection_steps: vec![],
                 }]),
             )
             .await?
