@@ -246,8 +246,13 @@ pub(super) async fn handle_input(
                         SelectionStep::RandomlySelectedFrom(candidates) => {
                             format!("Random selection from {}", format_candidates(&candidates))
                         }
-                        SelectionStep::Fallback => "Fallback group".to_string(),
-                        SelectionStep::FileDiff => "Files modified in the PR".to_string(),
+                        SelectionStep::Fallback(group) => {
+                            format!("Fallback group: {}", format_candidates(&group))
+                        }
+                        SelectionStep::FileDiff(candidates) => format!(
+                            "People who recently interacted with files modified in this PR: {}",
+                            format_candidates(&candidates)
+                        ),
                         SelectionStep::Expansion { from, to } => {
                             format!(
                                 "{} expanded to {}",
@@ -432,7 +437,7 @@ async fn determine_assignee(
             {
                 Ok(assignee) => {
                     return Ok((
-                        Some(assignee.prepend_selection_step(SelectionStep::FileDiff)),
+                        Some(assignee.prepend_selection_step(SelectionStep::FileDiff(candidates))),
                         false,
                     ));
                 }
@@ -479,7 +484,9 @@ async fn determine_assignee(
         {
             Ok(assignee) => {
                 return Ok((
-                    Some(assignee.prepend_selection_step(SelectionStep::Fallback)),
+                    Some(
+                        assignee.prepend_selection_step(SelectionStep::Fallback(fallback.to_vec())),
+                    ),
                     false,
                 ));
             }
@@ -879,16 +886,16 @@ Please select a different reviewer.",
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 enum SelectionStep {
     /// The user assigned themselves.
     SelfAssign,
     /// Random selection amongst N candidates.
     RandomlySelectedFrom(Vec<String>),
     /// The reviewer was selected as a last resort from the adhoc fallback group.
-    Fallback,
-    /// The reviewer was selected based on the PR diff.
-    FileDiff,
+    Fallback(Vec<String>),
+    /// The reviewer was selected based on the PR diff that produced a set of initial candidates.
+    FileDiff(Vec<String>),
     /// A set of groups or teams were expanded into a list of reviewer usernames.
     Expansion { from: Vec<String>, to: Vec<String> },
 }
@@ -1146,9 +1153,11 @@ async fn candidate_reviewers_from_names<'a>(
             Some(ReviewerCandidateOrigin::Direct)
         );
     if !is_single_user {
+        let mut to: Vec<String> = expanded.iter().map(|c| c.name.clone()).collect();
+        to.sort();
         selection_steps.push(SelectionStep::Expansion {
             from: names.to_vec(),
-            to: expanded.iter().map(|c| c.name.clone()).collect(),
+            to,
         });
     }
 
@@ -1283,7 +1292,7 @@ async fn candidate_reviewers_from_names<'a>(
             Ok(HashSet::from([ReviewerSelection {
                 name: username.to_string(),
                 suppressed_error: Some(error),
-                selection_steps: vec![],
+                selection_steps,
             }]))
         } else {
             // If it was a request for a team or a group, and no one is available, simply
@@ -1301,7 +1310,7 @@ async fn candidate_reviewers_from_names<'a>(
     } else {
         Ok(valid_candidates
             .into_iter()
-            .map(|s| ReviewerSelection::new(s.to_string(), vec![]))
+            .map(|s| ReviewerSelection::new(s.to_string(), selection_steps.clone()))
             .collect())
     }
 }

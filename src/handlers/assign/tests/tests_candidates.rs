@@ -134,13 +134,23 @@ impl From<AssignCtx> for TestContext {
     }
 }
 
-impl From<&str> for ReviewerSelection {
-    fn from(value: &str) -> Self {
-        ReviewerSelection {
-            name: value.to_string(),
-            suppressed_error: None,
-            selection_steps: vec![],
-        }
+/// Creates a ReviewerSelection for the given username.
+fn reviewer(name: &str) -> ReviewerSelection {
+    ReviewerSelection {
+        name: name.to_string(),
+        suppressed_error: None,
+        selection_steps: vec![],
+    }
+}
+
+impl ReviewerSelection {
+    /// Adds an Expansion selection step (test helper).
+    fn expanded(mut self, from: &[&str], to: &[&str]) -> Self {
+        self.selection_steps.push(SelectionStep::Expansion {
+            from: from.iter().map(|s| s.to_string()).collect(),
+            to: to.iter().map(|s| s.to_string()).collect(),
+        });
+        self
     }
 }
 
@@ -161,7 +171,7 @@ async fn no_assigned_prs() {
         review_prefs_test(ctx)
             .set_review_prefs(&user, Some(3), RotationMode::OnRotation)
             .await
-            .check(&["martin"], Ok(&["martin".into()]))
+            .check(&["martin"], Ok(&[reviewer("martin")]))
             .await
     })
     .await;
@@ -173,7 +183,7 @@ async fn no_review_prefs() {
         ctx.add_user("martin", 1).await;
         review_prefs_test(ctx)
             .assign_prs(1, 3)
-            .check(&["martin"], Ok(&["martin".into()]))
+            .check(&["martin"], Ok(&[reviewer("martin")]))
             .await
     })
     .await;
@@ -200,7 +210,10 @@ async fn at_max_capacity() {
                 }]),
             )
             .await?
-            .check(&["compiler"], Ok(&["diana".into()]))
+            .check(
+                &["compiler"],
+                Ok(&[reviewer("diana").expanded(&["compiler"], &["diana", "martin"])]),
+            )
             .await
     })
     .await;
@@ -214,7 +227,7 @@ async fn below_max_capacity() {
             .set_review_prefs(&user, Some(3), RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 2)
-            .check(&["martin"], Ok(&["martin".into()]))
+            .check(&["martin"], Ok(&[reviewer("martin")]))
             .await
     })
     .await;
@@ -241,7 +254,10 @@ async fn above_max_capacity() {
                 }]),
             )
             .await?
-            .check(&["compiler"], Ok(&["diana".into()]))
+            .check(
+                &["compiler"],
+                Ok(&[reviewer("diana").expanded(&["compiler"], &["diana", "martin"])]),
+            )
             .await
     })
     .await;
@@ -268,7 +284,10 @@ async fn max_capacity_zero() {
                 }]),
             )
             .await?
-            .check(&["compiler"], Ok(&["diana".into()]))
+            .check(
+                &["compiler"],
+                Ok(&[reviewer("diana").expanded(&["compiler"], &["diana", "martin"])]),
+            )
             .await
     })
     .await;
@@ -295,7 +314,10 @@ async fn ignore_username_case() {
                 }]),
             )
             .await?
-            .check(&["compiler"], Ok(&["diana".into()]))
+            .check(
+                &["compiler"],
+                Ok(&[reviewer("diana").expanded(&["compiler"], &["diana", "martin"])]),
+            )
             .await
     })
     .await;
@@ -309,7 +331,7 @@ async fn unlimited_capacity() {
             .set_review_prefs(&user, None, RotationMode::OnRotation)
             .await
             .assign_prs(user.id, 10)
-            .check(&["martin"], Ok(&["martin".into()]))
+            .check(&["martin"], Ok(&[reviewer("martin")]))
             .await
     })
     .await;
@@ -335,7 +357,10 @@ async fn user_off_rotation() {
                 }]),
             )
             .await?
-            .check(&["compiler"], Ok(&["diana".into()]))
+            .check(
+                &["compiler"],
+                Ok(&[reviewer("diana").expanded(&["compiler"], &["diana", "martin"])]),
+            )
             .await
     })
     .await;
@@ -357,7 +382,13 @@ async fn multiple_reviewers() {
             .assign_prs(users[0].id, 4)
             .assign_prs(users[1].id, 2)
             .assign_prs(users[2].id, 2)
-            .check(&["team"], Ok(&["diana".into(), "jana".into()]))
+            .check(
+                &["team"],
+                Ok(&[
+                    reviewer("diana").expanded(&["team"], &["diana", "jana", "mark", "martin"]),
+                    reviewer("jana").expanded(&["team"], &["diana", "jana", "mark", "martin"]),
+                ]),
+            )
             .await
     })
     .await;
@@ -397,7 +428,13 @@ async fn nested_groups() {
     );
     run_db_test(|ctx| async move {
         basic_test(ctx, config, issue().call())
-            .check(&["c"], Ok(&["nrc".into(), "pnkfelix".into()]))
+            .check(
+                &["c"],
+                Ok(&[
+                    reviewer("nrc").expanded(&["c"], &["nrc", "pnkfelix"]),
+                    reviewer("pnkfelix").expanded(&["c"], &["nrc", "pnkfelix"]),
+                ]),
+            )
             .await
     })
     .await;
@@ -436,7 +473,14 @@ async fn candidate_filtered_author() {
         basic_test(ctx, config, issue().author(user("user2", 1)).call())
             .check(
                 &["compiler"],
-                Ok(&["user1".into(), "user3".into(), "user4".into()]),
+                Ok(&[
+                    reviewer("user1")
+                        .expanded(&["compiler"], &["user1", "user2", "user3", "user4"]),
+                    reviewer("user3")
+                        .expanded(&["compiler"], &["user1", "user2", "user3", "user4"]),
+                    reviewer("user4")
+                        .expanded(&["compiler"], &["user1", "user2", "user3", "user4"]),
+                ]),
             )
             .await
     })
@@ -456,7 +500,11 @@ async fn candidate_filtered_assignee() {
         .call();
     run_db_test(|ctx| async move {
         basic_test(ctx, config, issue)
-            .check(&["compiler"], Ok(&["user4".into()]))
+            .check(
+                &["compiler"],
+                Ok(&[reviewer("user4")
+                    .expanded(&["compiler"], &["user1", "user2", "user3", "user4"])]),
+            )
             .await
     })
     .await;
@@ -479,10 +527,22 @@ async fn groups_teams_users() {
             .check(
                 &["team1", "group1", "user3"],
                 Ok(&[
-                    "t-user1".into(),
-                    "t-user2".into(),
-                    "user1".into(),
-                    "user3".into(),
+                    reviewer("t-user1").expanded(
+                        &["team1", "group1", "user3"],
+                        &["t-user1", "t-user2", "user1", "user3"],
+                    ),
+                    reviewer("t-user2").expanded(
+                        &["team1", "group1", "user3"],
+                        &["t-user1", "t-user2", "user1", "user3"],
+                    ),
+                    reviewer("user1").expanded(
+                        &["team1", "group1", "user3"],
+                        &["t-user1", "t-user2", "user1", "user3"],
+                    ),
+                    reviewer("user3").expanded(
+                        &["team1", "group1", "user3"],
+                        &["t-user1", "t-user2", "user1", "user3"],
+                    ),
                 ]),
             )
             .await
@@ -501,12 +561,18 @@ async fn group_team_user_precedence() {
     run_db_test(|ctx| async move {
         let ctx = basic_test(ctx, config.clone(), issue().call())
             .teams(&teams)
-            .check(&["compiler"], Ok(&["user2".into()]))
+            .check(
+                &["compiler"],
+                Ok(&[reviewer("user2").expanded(&["compiler"], &["user2"])]),
+            )
             .await?;
 
         basic_test(ctx.into(), config, issue().call())
             .teams(&teams)
-            .check(&["rust-lang/compiler"], Ok(&["user2".into()]))
+            .check(
+                &["rust-lang/compiler"],
+                Ok(&[reviewer("user2").expanded(&["rust-lang/compiler"], &["user2"])]),
+            )
             .await
     })
     .await;
@@ -527,9 +593,15 @@ async fn what_do_slashes_mean() {
         // Random slash names should work from groups.
         basic_test(ctx, config, issue())
             .teams(&teams)
-            .check(&["foo/bar"], Ok(&["foo-user".into()]))
+            .check(
+                &["foo/bar"],
+                Ok(&[reviewer("foo-user").expanded(&["foo/bar"], &["foo-user"])]),
+            )
             .await?
-            .check(&["rust-lang-nursery/compiler"], Ok(&["user2".into()]))
+            .check(
+                &["rust-lang-nursery/compiler"],
+                Ok(&[reviewer("user2").expanded(&["rust-lang-nursery/compiler"], &["user2"])]),
+            )
             .await
     })
     .await;
@@ -577,7 +649,11 @@ async fn users_on_vacation() {
             )
             .await?
             // But ignore the user when requesting a team
-            .check(&["bootstrap"], Ok(&["Mark-Simulacrum".into()]))
+            .check(
+                &["bootstrap"],
+                Ok(&[reviewer("Mark-Simulacrum")
+                    .expanded(&["bootstrap"], &["Mark-Simulacrum", "jyn514"])]),
+            )
             .await
     })
     .await;
@@ -593,7 +669,10 @@ async fn previous_reviewers_ignore_in_team_success() {
             .teams(&teams)
             .set_previous_reviewers(HashSet::from([&user]))
             .await
-            .check(&["compiler"], Ok(&["jyn514".into()]))
+            .check(
+                &["compiler"],
+                Ok(&[reviewer("jyn514").expanded(&["compiler"], &["jyn514", "martin"])]),
+            )
             .await
     })
     .await;
@@ -633,7 +712,7 @@ async fn previous_reviewers_direct_assignee() {
             .teams(&teams)
             .set_previous_reviewers(HashSet::from([&user1, &user2]))
             .await
-            .check(&["jyn514"], Ok(&["jyn514".into()]))
+            .check(&["jyn514"], Ok(&[reviewer("jyn514")]))
             .await
     })
     .await
