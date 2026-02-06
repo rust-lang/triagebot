@@ -634,8 +634,16 @@ async fn team_status_cmd(
             .as_ref()
             .map(|reviewers| reviewers.contains(&member.github))
             .unwrap_or(true);
-        let reason = if in_review_queue_for_repository {
-            "Review Preferences"
+        let is_team_rotation_mode_off = review_prefs
+            .get(member.github.as_str())
+            .and_then(|prefs| prefs.team_review_prefs.get(team_name))
+            .map(|prefs| prefs.rotation_mode)
+            .unwrap_or_default()
+            == RotationMode::OffRotation;
+        let reason = if is_team_rotation_mode_off {
+            "Team review prefs"
+        } else if in_review_queue_for_repository {
+            "User review prefs"
         } else {
             "`triagebot.toml` Configuration"
         };
@@ -649,11 +657,18 @@ async fn team_status_cmd(
                 .get(member.github.as_str())
                 .map(|prefs| prefs.rotation_mode)
                 .unwrap_or_default();
+            let team_rotation_mode = review_prefs
+                .get(member.github.as_str())
+                .and_then(|prefs| prefs.team_review_prefs.get(team_name))
+                .map(|prefs| prefs.rotation_mode)
+                .unwrap_or_default();
             let in_review_queue_for_repository = reviewers_for_repository
                 .as_ref()
                 .map(|reviewers| reviewers.contains(&member.github.to_lowercase()))
                 .unwrap_or(true);
-            matches!(rotation_mode, RotationMode::OnRotation) && in_review_queue_for_repository
+            matches!(rotation_mode, RotationMode::OnRotation)
+                && matches!(team_rotation_mode, RotationMode::OnRotation)
+                && in_review_queue_for_repository
         });
     on_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
     off_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
