@@ -91,6 +91,15 @@ pub enum WorkqueueCmd {
         /// Rotation mode
         rotation_mode: RotationModeCli,
     },
+    /// Set your rotation mode when assigned through a specific team.
+    /// For example, if you are a member of the `compiler` team, but you do not want to be assigned
+    /// through `r? compiler`, you can use `set-team-rotation-mode compiler off`
+    SetTeamRotationMode {
+        /// Name of the team
+        team: String,
+        /// Rotation mode
+        rotation_mode: RotationModeCli,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -347,6 +356,24 @@ mod tests {
             parse_chat(&["work", "set-pr-limit", "unlimited"]),
             ChatCommand::Work(WorkqueueCmd::SetPrLimit {
                 limit: WorkqueueLimit::Unlimited
+            })
+        );
+    }
+
+    #[test]
+    fn work_set_team_rotation_mode_command() {
+        assert_eq!(
+            parse_chat(&["work", "set-team-rotation-mode", "compiler", "off"]),
+            ChatCommand::Work(WorkqueueCmd::SetTeamRotationMode {
+                team: "compiler".to_string(),
+                rotation_mode: RotationModeCli(RotationMode::OffRotation),
+            })
+        );
+        assert_eq!(
+            parse_chat(&["work", "set-team-rotation-mode", "libs", "on"]),
+            ChatCommand::Work(WorkqueueCmd::SetTeamRotationMode {
+                team: "libs".to_string(),
+                rotation_mode: RotationModeCli(RotationMode::OnRotation),
             })
         );
     }

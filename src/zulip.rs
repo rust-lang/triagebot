@@ -5,7 +5,8 @@ mod commands;
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, Identifier, delete_ping, move_indices, record_ping};
 use crate::db::review_prefs::{
-    RotationMode, get_review_prefs, get_review_prefs_batch, upsert_user_review_prefs,
+    RotationMode, get_review_prefs, get_review_prefs_batch, upsert_team_review_prefs,
+    upsert_user_review_prefs,
 };
 use crate::github::{User, UserComment};
 use crate::handlers::Context;
@@ -722,7 +723,8 @@ fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
         ChatCommand::Whoami => ImpersonationMode::Silent,
         ChatCommand::Work(cmd) => match cmd {
             WorkqueueCmd::Show => ImpersonationMode::Silent,
-            WorkqueueCmd::SetPrLimit { .. } | WorkqueueCmd::SetRotationMode { .. } => {
+            WorkqueueCmd::SetPrLimit { .. } | WorkqueueCmd::SetRotationMode { .. } |
+            WorkqueueCmd::SetTeamRotationMode { .. } => {
                 ImpersonationMode::Notify
             }
         },
@@ -832,6 +834,32 @@ async fn workqueue_commands(
                 match rotation_mode {
                     RotationMode::OnRotation => "*on rotation*",
                     RotationMode::OffRotation => "*off rotation*.",
+                }
+            )
+        }
+        WorkqueueCmd::SetTeamRotationMode {
+            team,
+            rotation_mode,
+        } => {
+            let teams = ctx.team.teams().await?;
+            if teams.teams.get(team).is_none() {
+                return Err(anyhow::anyhow!(
+                    "Team `{team}` not found in the team database."
+                ));
+            }
+
+            let rotation_mode = rotation_mode.0;
+            upsert_team_review_prefs(&db_client, user, team, rotation_mode)
+                .await
+                .context("Error occurred while setting team review preferences.")?;
+            tracing::info!(
+                "Setting team rotation mode of `{gh_username}` for team `{team}` to {rotation_mode:?}"
+            );
+            format!(
+                "Rotation mode for team `{team}` set to {}",
+                match rotation_mode {
+                    RotationMode::OnRotation => "*on rotation*",
+                    RotationMode::OffRotation => "*off rotation*",
                 }
             )
         }
