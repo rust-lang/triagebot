@@ -250,7 +250,7 @@ pub(super) async fn handle_input(
                             format!("Fallback group: {}", format_candidates(&group))
                         }
                         SelectionStep::FileDiff(candidates) => format!(
-                            "People who recently interacted with files modified in this PR: {}",
+                            "Owners of files modified in this PR: {}",
                             format_candidates(&candidates)
                         ),
                         SelectionStep::Expansion { from, to } => {
