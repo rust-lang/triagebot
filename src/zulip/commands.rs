@@ -41,6 +41,16 @@ pub enum ChatCommand {
     PingGoals(PingGoalsArgs),
     /// Update docs
     DocsUpdate,
+    /// Show recent GitHub comments of a user in the rust-lang organization.
+    ///
+    /// **This command is only available to moderators.**
+    Comments {
+        /// GitHub username to look up.
+        username: String,
+        /// Organization where to find the comments.
+        #[arg(long = "org", default_value = "rust-lang")]
+        organization: String,
+    },
     /// Shows review queue statistics of members of the given Rust team.
     TeamStats {
         /// Name of the team to query.
@@ -366,6 +376,24 @@ mod tests {
                 verb: BackportVerbArgs::Decline,
                 pr_num: 123456
             })
+        );
+    }
+
+    #[test]
+    fn recent_comments_command() {
+        assert_eq!(
+            parse_chat(&["comments", "octocat"]),
+            ChatCommand::Comments {
+                username: "octocat".to_string(),
+                organization: "rust-lang".to_string()
+            }
+        );
+        assert_eq!(
+            parse_chat(&["comments", "foobar", "--org", "rust-lang-nursery"]),
+            ChatCommand::Comments {
+                username: "foobar".to_string(),
+                organization: "rust-lang-nursery".to_string()
+            }
         );
     }
 

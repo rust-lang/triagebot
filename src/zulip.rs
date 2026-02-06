@@ -7,7 +7,7 @@ use crate::db::notifications::{self, Identifier, delete_ping, move_indices, reco
 use crate::db::review_prefs::{
     RotationMode, get_review_prefs, get_review_prefs_batch, upsert_review_prefs,
 };
-use crate::github::User;
+use crate::github::{User, UserComment};
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
@@ -28,7 +28,7 @@ use axum::response::IntoResponse;
 use commands::BackportArgs;
 use itertools::Itertools;
 use octocrab::Octocrab;
-use rust_team_data::v1::{TeamKind, TeamMember};
+use rust_team_data::v1::{Team, TeamKind, TeamMember, Teams};
 use secrecy::{ExposeSecret, SecretString};
 use std::cmp::Reverse;
 use std::fmt::Write as _;
@@ -275,6 +275,12 @@ async fn handle_command<'a>(
                 ping_goals_cmd(ctx.clone(), gh_id, message_data, args).await
             }
             ChatCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
+            ChatCommand::Comments {
+                username,
+                organization,
+            } => recent_comments_cmd(&ctx, gh_id, username, &organization)
+                .await
+                .map(Some),
             ChatCommand::TeamStats { name, repo } => {
                 team_status_cmd(&ctx, name, repo.as_deref()).await
             }
@@ -472,6 +478,54 @@ async fn ping_goals_cmd(
     }
 }
 
+fn get_mod_teams(teams: &Teams) -> Vec<&Team> {
+    let mut mod_teams = vec![];
+    for name in ["mods", "mods-venue"] {
+        if let Some(team) = teams.teams.get(name) {
+            mod_teams.push(team);
+        }
+    }
+    mod_teams
+}
+
+/// Output recent GitHub comments made by a given user in a given organization.
+/// This command can only be used by mods.
+async fn recent_comments_cmd(
+    ctx: &Context,
+    gh_id: u64,
+    username: &str,
+    organization: &str,
+) -> anyhow::Result<String> {
+    const RECENT_COMMENTS_LIMIT: usize = 10;
+
+    let teams = ctx.team.teams().await?;
+    let mod_teams = get_mod_teams(&teams);
+    if !mod_teams
+        .iter()
+        .any(|team| team.members.iter().any(|member| member.github_id == gh_id))
+    {
+        return Ok("This command is only available to moderators.".to_string());
+    }
+
+    let comments = ctx
+        .github
+        .user_comments_in_org(username, organization, RECENT_COMMENTS_LIMIT)
+        .await
+        .context("Cannot load recent comments")?;
+
+    if comments.is_empty() {
+        return Ok(format!(
+            "No recent comments found for **{username}** in the `{organization}` organization."
+        ));
+    }
+
+    let mut message = format!("**Recent comments by {username} in `{organization}`:**\n");
+    for comment in &comments {
+        message.push_str(&format_user_comment(comment));
+    }
+    Ok(message)
+}
+
 async fn team_status_cmd(
     ctx: &Context,
     team_name: &str,
@@ -655,6 +709,7 @@ fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
         | ChatCommand::Meta { .. }
         | ChatCommand::DocsUpdate
         | ChatCommand::PingGoals(_)
+        | ChatCommand::Comments { .. }
         | ChatCommand::TeamStats { .. }
         | ChatCommand::Lookup(_) => ImpersonationMode::Disabled,
         ChatCommand::Whoami => ImpersonationMode::Silent,
@@ -1215,4 +1270,32 @@ fn trigger_docs_update(message: &Message, zulip: &ZulipClient) -> anyhow::Result
     Ok(Some(
         "Docs update in progress, I'll let you know when I'm finished.".to_string(),
     ))
+}
+
+/// Formats user's GitHub comment for display in the Zulip message.
+pub fn format_user_comment(comment: &UserComment) -> String {
+    // Limit the size of the comment to avoid running into Zulip max message size limits
+    let snippet = truncate_text(&comment.body, 300);
+    let date = comment
+        .created_at
+        .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
+        .unwrap_or_else(|| "unknown date".to_string());
+
+    format!(
+        "- [{title}]({comment_url}) ({date}):\n  > {snippet}\n",
+        title = truncate_text(&comment.issue_title, 60),
+        comment_url = comment.comment_url,
+    )
+}
+
+/// Truncates the given text to the specified length, adding ellipsis if needed.
+fn truncate_text(text: &str, max_len: usize) -> String {
+    let normalized: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    if normalized.len() <= max_len {
+        normalized
+    } else {
+        let truncated: String = normalized.chars().take(max_len - 3).collect();
+        format!("{truncated}...")
+    }
 }
