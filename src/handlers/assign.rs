@@ -25,7 +25,6 @@
 use crate::db::issue_data::IssueData;
 use crate::db::review_prefs::{RotationMode, get_review_prefs_batch};
 use crate::errors::{self, AssignmentError, user_error};
-use crate::github::UserId;
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::{
     config::AssignConfig,
@@ -1242,9 +1241,9 @@ async fn candidate_reviewers_from_names<'a>(
                     return Ok(candidate);
                 };
                 if let Some(capacity) = review_prefs.max_assigned_prs {
-                    let assigned_prs = workqueue.assigned_pr_count(review_prefs.user_id as UserId);
+                    let assigned_prs = workqueue.assigned_pr_count(review_prefs.user_id);
                     // Is the reviewer at max capacity?
-                    if (assigned_prs as i32) >= capacity {
+                    if assigned_prs >= capacity as u64 {
                         return Err(FindReviewerError::ReviewerAtMaxCapacity {
                             username: username.clone(),
                         });

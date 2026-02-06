@@ -2,7 +2,7 @@
 
 use super::super::*;
 use crate::db::review_prefs::{RotationMode, upsert_review_prefs};
-use crate::github::{PullRequestNumber, User};
+use crate::github::{PullRequestNumber, User, UserId};
 use crate::handlers::pr_tracking::{AssignedPullRequest, ReviewerWorkqueue};
 use crate::tests::github::{issue, user};
 use crate::tests::{TestContext, run_db_test};

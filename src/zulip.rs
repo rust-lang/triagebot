@@ -758,18 +758,11 @@ async fn workqueue_commands(
                 .collect::<Vec<_>>();
             assigned_prs.sort_by_key(|(pr_number, _)| *pr_number);
 
-            let review_prefs = get_review_prefs(&db_client, gh_id)
-                .await
-                .context("cannot get review preferences")?;
-            let capacity = match review_prefs.as_ref().and_then(|p| p.max_assigned_prs) {
+            let capacity = match review_prefs.max_assigned_prs {
                 Some(max) => max.to_string(),
                 None => String::from("Not set (i.e. unlimited)"),
             };
-            let rotation_mode = review_prefs
-                .as_ref()
-                .map(|p| p.rotation_mode)
-                .unwrap_or_default();
-            let rotation_mode = match rotation_mode {
+            let rotation_mode = match review_prefs.rotation_mode {
                 RotationMode::OnRotation => "on rotation",
                 RotationMode::OffRotation => "off rotation",
             };
@@ -810,7 +803,7 @@ async fn workqueue_commands(
                 &db_client,
                 user,
                 max_assigned_prs,
-                review_prefs.map(|p| p.rotation_mode).unwrap_or_default(),
+                review_prefs.rotation_mode,
             )
             .await
             .context("Error occurred while setting review preferences.")?;
@@ -828,7 +821,7 @@ async fn workqueue_commands(
             upsert_review_prefs(
                 &db_client,
                 user,
-                review_prefs.and_then(|p| p.max_assigned_prs.map(|v| v as u32)),
+                review_prefs.max_assigned_prs,
                 rotation_mode,
             )
             .await
