@@ -56,6 +56,12 @@ pub enum EventName {
     ///
     /// <https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#create>
     Create,
+    /// A user was banned/unbanned from an organization.
+    ///
+    /// This gets translated to [`github::Event::OrgBlock`] when sent to a handler.
+    ///
+    /// <https://docs.github.com/en/webhooks/webhook-events-and-payloads#org_block>
+    OrgBlock,
     /// All other unhandled webhooks.
     Other,
 }
@@ -71,6 +77,7 @@ impl std::str::FromStr for EventName {
             "issues" => EventName::Issue,
             "push" => EventName::Push,
             "create" => EventName::Create,
+            "org_block" => EventName::OrgBlock,
             _ => EventName::Other,
         })
     }
@@ -89,6 +96,7 @@ impl fmt::Display for EventName {
                 EventName::PullRequest => "pull_request",
                 EventName::Push => "push",
                 EventName::Create => "create",
+                EventName::OrgBlock => "org_block",
                 EventName::Other => "other",
             }
         )
@@ -250,6 +258,20 @@ async fn process_payload(
             log::info!("handling create event {payload:?}");
 
             Event::Create(payload)
+        }
+        EventName::OrgBlock => {
+            // OrgBlock events are organization-level and don't have a repository,
+            // so we handle them separately from other events.
+            let payload = deserialize_payload::<OrgBlockEvent>(payload)
+                .context("failed to deserialize to OrgBlockEvent")?;
+
+            log::info!("handling org_block event {payload:?}");
+
+            if let Err(err) = crate::handlers::report_user_bans::handle(ctx, &payload).await {
+                log::error!("user_block handler failed: {err:?}");
+                return Err(anyhow::anyhow!("handling failed, error logged"));
+            }
+            return Ok(true);
         }
         // Other events need not be handled
         EventName::Other => {

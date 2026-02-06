@@ -37,6 +37,7 @@ pub mod pull_requests_assignment_update;
 mod relabel;
 mod relnotes;
 mod rendered_link;
+pub mod report_user_bans;
 mod review_changes_since;
 mod review_reminder;
 mod review_requested;
