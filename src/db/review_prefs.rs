@@ -54,15 +54,16 @@ impl ToSql for RotationMode {
     to_sql_checked!();
 }
 
+/// Global review preferences of a single user/reviewer.
 #[derive(Debug)]
-pub struct ReviewPrefs {
+pub struct GlobalReviewPrefs {
     pub id: uuid::Uuid,
     pub user_id: i64,
     pub max_assigned_prs: Option<i32>,
     pub rotation_mode: RotationMode,
 }
 
-impl From<tokio_postgres::row::Row> for ReviewPrefs {
+impl From<tokio_postgres::row::Row> for GlobalReviewPrefs {
     fn from(row: tokio_postgres::row::Row) -> Self {
         Self {
             id: row.get("id"),
@@ -78,7 +79,7 @@ impl From<tokio_postgres::row::Row> for ReviewPrefs {
 pub async fn get_review_prefs(
     db: &tokio_postgres::Client,
     user_id: UserId,
-) -> anyhow::Result<Option<ReviewPrefs>> {
+) -> anyhow::Result<Option<GlobalReviewPrefs>> {
     let query = "
 SELECT id, user_id, max_assigned_prs, rotation_mode
 FROM review_prefs
@@ -98,7 +99,7 @@ WHERE review_prefs.user_id = $1;";
 pub async fn get_review_prefs_batch<'a>(
     db: &tokio_postgres::Client,
     users: &[&'a str],
-) -> anyhow::Result<HashMap<&'a str, ReviewPrefs>> {
+) -> anyhow::Result<HashMap<&'a str, GlobalReviewPrefs>> {
     // We need to make sure that we match users regardless of case, but at the
     // same time we need to return the originally-cased usernames in the final hashmap.
     // At the same time, we can't depend on the order of results returned by the DB.
@@ -133,7 +134,7 @@ WHERE lower(u.username) = ANY($1);";
             let username = lowercase_map
                 .get(username_lower)
                 .expect("Lowercase username not found");
-            let prefs: ReviewPrefs = row.into();
+            let prefs: GlobalReviewPrefs = row.into();
             (*username, prefs)
         })
         .collect())
