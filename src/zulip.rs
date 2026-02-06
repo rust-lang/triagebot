@@ -220,7 +220,7 @@ async fn handle_command<'a>(
     if message_data.stream_id.is_none() {
         let mut words: Vec<&str> = message.split_whitespace().collect();
 
-        // Handle impersonation
+        // Parse impersonation
         let mut impersonated = false;
         #[expect(clippy::get_first, reason = "for symmetry with `get(1)`")]
         if let Some(&"as") = words.get(0) {
@@ -248,6 +248,13 @@ async fn handle_command<'a>(
         }
 
         let cmd = parse_cli::<ChatCommand, _>(words.into_iter())?;
+        let impersonation_mode = get_cmd_impersonation_mode(&cmd);
+        if impersonated && matches!(impersonation_mode, ImpersonationMode::Disabled) {
+            return Err(anyhow::anyhow!(
+                "This command cannot be used with impersonation. Remove the `as <user>` prefix."
+            ));
+        }
+
         tracing::info!("command parsed to {cmd:?} (impersonated: {impersonated})");
 
         let output = match &cmd {
@@ -275,8 +282,8 @@ async fn handle_command<'a>(
 
         let output = output?;
 
-        // Let the impersonated person know about the impersonation if the command was sensitive
-        if impersonated && is_sensitive_command(&cmd) {
+        // Let the impersonated person know about the impersonation if we should notify
+        if impersonated && matches!(impersonation_mode, ImpersonationMode::Notify) {
             let impersonated_zulip_id =
                 ctx.team.github_to_zulip_id(gh_id).await?.ok_or_else(|| {
                     anyhow::anyhow!("Zulip user for GitHub ID {gh_id} was not found")
@@ -626,23 +633,36 @@ async fn team_status_cmd(
     Ok(Some(msg))
 }
 
-/// Returns true if we should notify user who was impersonated by someone who executed this command.
-/// More or less, the following holds: `sensitive` == `not read-only`.
-fn is_sensitive_command(cmd: &ChatCommand) -> bool {
+/// How does impersonation work for a given command.
+enum ImpersonationMode {
+    /// Impersonation is enabled, but the impersonated user will not be notified.
+    /// Should only be used for commands that are "read-only".
+    Silent,
+    /// Impersonation is enabled and the impersonated user will be notified.
+    Notify,
+    /// Impersonation is disabled.
+    /// Should be used for commands where impersonation doesn't make sense or if there are some
+    /// specific permissions required to run the command.
+    Disabled,
+}
+
+/// Returns the impersonation mode of the command.
+fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
     match cmd {
         ChatCommand::Acknowledge { .. }
         | ChatCommand::Add { .. }
         | ChatCommand::Move { .. }
-        | ChatCommand::Meta { .. } => true,
-        ChatCommand::Whoami
+        | ChatCommand::Meta { .. }
         | ChatCommand::DocsUpdate
         | ChatCommand::PingGoals(_)
         | ChatCommand::TeamStats { .. }
-        | ChatCommand::Lookup(_) => false,
+        | ChatCommand::Lookup(_) => ImpersonationMode::Disabled,
+        ChatCommand::Whoami => ImpersonationMode::Silent,
         ChatCommand::Work(cmd) => match cmd {
-            WorkqueueCmd::Show => false,
-            WorkqueueCmd::SetPrLimit { .. } => true,
-            WorkqueueCmd::SetRotationMode { .. } => true,
+            WorkqueueCmd::Show => ImpersonationMode::Silent,
+            WorkqueueCmd::SetPrLimit { .. } | WorkqueueCmd::SetRotationMode { .. } => {
+                ImpersonationMode::Notify
+            }
         },
     }
 }
