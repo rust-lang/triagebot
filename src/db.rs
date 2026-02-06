@@ -344,4 +344,13 @@ ALTER TABLE review_prefs ADD COLUMN IF NOT EXISTS max_assigned_prs INTEGER DEFAU
     "
 ALTER TABLE review_prefs ADD COLUMN IF NOT EXISTS rotation_mode TEXT NOT NULL DEFAULT 'on-rotation';
 ",
+    r#"
+CREATE TABLE IF NOT EXISTS team_review_prefs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id BIGINT REFERENCES users(user_id),
+    team TEXT NOT NULL,
+    rotation_mode TEXT NOT NULL,
+    UNIQUE(user_id, team)
+)
+"#,
 ];

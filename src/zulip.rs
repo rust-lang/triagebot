@@ -5,7 +5,7 @@ mod commands;
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, Identifier, delete_ping, move_indices, record_ping};
 use crate::db::review_prefs::{
-    RotationMode, get_review_prefs, get_review_prefs_batch, upsert_review_prefs,
+    RotationMode, get_review_prefs, get_review_prefs_batch, upsert_user_review_prefs,
 };
 use crate::github::{User, UserComment};
 use crate::handlers::Context;
@@ -799,7 +799,7 @@ async fn workqueue_commands(
                 WorkqueueLimit::Unlimited => None,
                 WorkqueueLimit::Limit(limit) => Some(*limit),
             };
-            upsert_review_prefs(
+            upsert_user_review_prefs(
                 &db_client,
                 user,
                 max_assigned_prs,
@@ -818,7 +818,7 @@ async fn workqueue_commands(
         }
         WorkqueueCmd::SetRotationMode { rotation_mode } => {
             let rotation_mode = rotation_mode.0;
-            upsert_review_prefs(
+            upsert_user_review_prefs(
                 &db_client,
                 user,
                 review_prefs.max_assigned_prs,

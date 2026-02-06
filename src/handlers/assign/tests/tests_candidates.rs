@@ -1,7 +1,7 @@
 //! Tests for `candidate_reviewers_from_names`
 
 use super::super::*;
-use crate::db::review_prefs::{RotationMode, upsert_review_prefs};
+use crate::db::review_prefs::{RotationMode, upsert_user_review_prefs};
 use crate::github::{PullRequestNumber, User, UserId};
 use crate::handlers::pr_tracking::{AssignedPullRequest, ReviewerWorkqueue};
 use crate::tests::github::{issue, user};
@@ -70,7 +70,7 @@ impl AssignCtx {
         capacity: Option<u32>,
         rotation_mode: RotationMode,
     ) -> Self {
-        upsert_review_prefs(
+        upsert_user_review_prefs(
             self.test_ctx.db_client(),
             user.clone(),
             capacity,
