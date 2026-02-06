@@ -74,7 +74,7 @@ impl<'a> From<&'a tokio_postgres::row::Row> for UserReviewPrefs {
 
 #[derive(Debug, PartialEq)]
 pub struct UserTeamReviewPreferences {
-    rotation_mode: RotationMode,
+    pub rotation_mode: RotationMode,
 }
 
 /// Review preferences of a single user.

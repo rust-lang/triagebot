@@ -790,6 +790,14 @@ async fn workqueue_commands(
 
             writeln!(response, "Review capacity: `{capacity}`\n")?;
             writeln!(response, "Rotation mode: *{rotation_mode}*\n")?;
+            for (team, team_prefs) in &review_prefs.team_review_prefs {
+                writeln!(
+                    response,
+                    "Team `{team}` rotation mode: *{:?}*\n",
+                    team_prefs.rotation_mode
+                )?;
+            }
+
             writeln!(
                 response,
                 "*Note that only certain PRs that are assigned to you are included in your review queue.*"
