@@ -1,7 +1,8 @@
 //! Handler that reports GitHub bans and unbans to a Zulip channel.
 
-use crate::github::{OrgBlockAction, OrgBlockEvent, UserComment};
+use crate::github::{OrgBlockAction, OrgBlockEvent};
 use crate::handlers::Context;
+use crate::zulip;
 use crate::zulip::MessageApiRequest;
 use crate::zulip::api::Recipient;
 use tracing as log;
@@ -11,9 +12,6 @@ const ZULIP_STREAM_ID: u64 = 464799;
 
 /// Maximum number of recent comments to include in ban reports.
 const MAX_RECENT_COMMENTS: usize = 10;
-
-/// Maximum length of a comment snippet in the report.
-const MAX_COMMENT_SNIPPET_LEN: usize = 200;
 
 pub async fn handle(ctx: &Context, event: &OrgBlockEvent) -> anyhow::Result<()> {
     let topic = format!("github user {}", event.blocked_user.login);
@@ -44,7 +42,7 @@ pub async fn handle(ctx: &Context, event: &OrgBlockEvent) -> anyhow::Result<()> 
             Ok(comments) if !comments.is_empty() => {
                 message.push_str("\n\n**Recent comments:**\n");
                 for comment in comments {
-                    message.push_str(&format_user_comment(&comment));
+                    message.push_str(&zulip::format_user_comment(&comment));
                 }
             }
             Ok(_) => {
@@ -84,31 +82,4 @@ pub async fn handle(ctx: &Context, event: &OrgBlockEvent) -> anyhow::Result<()> 
     );
 
     Ok(())
-}
-
-/// Formats user's comment for display in the Zulip message.
-fn format_user_comment(comment: &UserComment) -> String {
-    let snippet = truncate_comment(&comment.body, MAX_COMMENT_SNIPPET_LEN);
-    let date = comment
-        .created_at
-        .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
-        .unwrap_or_else(|| "unknown date".to_string());
-
-    format!(
-        "- [{title}]({comment_url}) ({date}):\n  > {snippet}\n",
-        title = truncate_comment(&comment.issue_title, 60),
-        comment_url = comment.comment_url,
-    )
-}
-
-/// Truncates a comment to the specified length, adding ellipsis if needed.
-fn truncate_comment(text: &str, max_len: usize) -> String {
-    let normalized: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
-
-    if normalized.len() <= max_len {
-        normalized
-    } else {
-        let truncated: String = normalized.chars().take(max_len - 3).collect();
-        format!("{truncated}...")
-    }
 }

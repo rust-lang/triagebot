@@ -7,7 +7,7 @@ use crate::db::notifications::{self, Identifier, delete_ping, move_indices, reco
 use crate::db::review_prefs::{
     RotationMode, get_review_prefs, get_review_prefs_batch, upsert_review_prefs,
 };
-use crate::github::User;
+use crate::github::{User, UserComment};
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::get_assigned_prs;
@@ -220,7 +220,7 @@ async fn handle_command<'a>(
     if message_data.stream_id.is_none() {
         let mut words: Vec<&str> = message.split_whitespace().collect();
 
-        // Handle impersonation
+        // Parse impersonation
         let mut impersonated = false;
         #[expect(clippy::get_first, reason = "for symmetry with `get(1)`")]
         if let Some(&"as") = words.get(0) {
@@ -248,6 +248,13 @@ async fn handle_command<'a>(
         }
 
         let cmd = parse_cli::<ChatCommand, _>(words.into_iter())?;
+        let impersonation_mode = get_cmd_impersonation_mode(&cmd);
+        if impersonated && matches!(impersonation_mode, ImpersonationMode::Disabled) {
+            return Err(anyhow::anyhow!(
+                "This command cannot be used with impersonation. Remove the `as <user>` prefix."
+            ));
+        }
+
         tracing::info!("command parsed to {cmd:?} (impersonated: {impersonated})");
 
         let output = match &cmd {
@@ -268,6 +275,12 @@ async fn handle_command<'a>(
                 ping_goals_cmd(ctx.clone(), gh_id, message_data, args).await
             }
             ChatCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
+            ChatCommand::Comments {
+                username,
+                organization,
+            } => recent_comments_cmd(&ctx, gh_id, username, &organization)
+                .await
+                .map(Some),
             ChatCommand::TeamStats { name, repo } => {
                 team_status_cmd(&ctx, name, repo.as_deref()).await
             }
@@ -275,8 +288,8 @@ async fn handle_command<'a>(
 
         let output = output?;
 
-        // Let the impersonated person know about the impersonation if the command was sensitive
-        if impersonated && is_sensitive_command(&cmd) {
+        // Let the impersonated person know about the impersonation if we should notify
+        if impersonated && matches!(impersonation_mode, ImpersonationMode::Notify) {
             let impersonated_zulip_id =
                 ctx.team.github_to_zulip_id(gh_id).await?.ok_or_else(|| {
                     anyhow::anyhow!("Zulip user for GitHub ID {gh_id} was not found")
@@ -356,6 +369,12 @@ async fn handle_command<'a>(
                 StreamCommand::Backport(args) => {
                     accept_decline_backport(message_data, &ctx.octocrab, &ctx.zulip, &args).await
                 }
+                StreamCommand::Comments {
+                    username,
+                    organization,
+                } => recent_comments_cmd(&ctx, gh_id, &username, &organization)
+                    .await
+                    .map(Some),
             };
         }
 
@@ -463,6 +482,55 @@ async fn ping_goals_cmd(
             "That command is only permitted for those running the project-goal program.",
         ))
     }
+}
+
+/// Output recent GitHub comments made by a given user in a given organization.
+/// This command can only be used by team members.
+async fn recent_comments_cmd(
+    ctx: &Context,
+    gh_id: u64,
+    username: &str,
+    organization: &str,
+) -> anyhow::Result<String> {
+    const RECENT_COMMENTS_LIMIT: usize = 10;
+
+    let user = User {
+        login: ctx
+            .team
+            .username_from_gh_id(gh_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Username for GitHub user {gh_id} not found"))?,
+        id: gh_id,
+    };
+    if !user.is_team_member(&ctx.team).await? {
+        return Err(anyhow::anyhow!(
+            "This command is only available to team members."
+        ));
+    }
+
+    if ctx.team.repos().await?.repos.get(organization).is_none() {
+        return Err(anyhow::anyhow!(
+            "Organization `{organization}` is not managed by the team database."
+        ));
+    }
+
+    let comments = ctx
+        .github
+        .user_comments_in_org(username, organization, RECENT_COMMENTS_LIMIT)
+        .await
+        .context("Cannot load recent comments")?;
+
+    if comments.is_empty() {
+        return Ok(format!(
+            "No recent comments found for **{username}** in the `{organization}` organization."
+        ));
+    }
+
+    let mut message = format!("**Recent comments by {username} in `{organization}`:**\n");
+    for comment in &comments {
+        message.push_str(&format_user_comment(comment));
+    }
+    Ok(message)
 }
 
 async fn team_status_cmd(
@@ -626,23 +694,37 @@ async fn team_status_cmd(
     Ok(Some(msg))
 }
 
-/// Returns true if we should notify user who was impersonated by someone who executed this command.
-/// More or less, the following holds: `sensitive` == `not read-only`.
-fn is_sensitive_command(cmd: &ChatCommand) -> bool {
+/// How does impersonation work for a given command.
+enum ImpersonationMode {
+    /// Impersonation is enabled, but the impersonated user will not be notified.
+    /// Should only be used for commands that are "read-only".
+    Silent,
+    /// Impersonation is enabled and the impersonated user will be notified.
+    Notify,
+    /// Impersonation is disabled.
+    /// Should be used for commands where impersonation doesn't make sense or if there are some
+    /// specific permissions required to run the command.
+    Disabled,
+}
+
+/// Returns the impersonation mode of the command.
+fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
     match cmd {
         ChatCommand::Acknowledge { .. }
         | ChatCommand::Add { .. }
         | ChatCommand::Move { .. }
-        | ChatCommand::Meta { .. } => true,
-        ChatCommand::Whoami
+        | ChatCommand::Meta { .. }
         | ChatCommand::DocsUpdate
         | ChatCommand::PingGoals(_)
+        | ChatCommand::Comments { .. }
         | ChatCommand::TeamStats { .. }
-        | ChatCommand::Lookup(_) => false,
+        | ChatCommand::Lookup(_) => ImpersonationMode::Disabled,
+        ChatCommand::Whoami => ImpersonationMode::Silent,
         ChatCommand::Work(cmd) => match cmd {
-            WorkqueueCmd::Show => false,
-            WorkqueueCmd::SetPrLimit { .. } => true,
-            WorkqueueCmd::SetRotationMode { .. } => true,
+            WorkqueueCmd::Show => ImpersonationMode::Silent,
+            WorkqueueCmd::SetPrLimit { .. } | WorkqueueCmd::SetRotationMode { .. } => {
+                ImpersonationMode::Notify
+            }
         },
     }
 }
@@ -1195,4 +1277,32 @@ fn trigger_docs_update(message: &Message, zulip: &ZulipClient) -> anyhow::Result
     Ok(Some(
         "Docs update in progress, I'll let you know when I'm finished.".to_string(),
     ))
+}
+
+/// Formats user's GitHub comment for display in the Zulip message.
+pub fn format_user_comment(comment: &UserComment) -> String {
+    // Limit the size of the comment to avoid running into Zulip max message size limits
+    let snippet = truncate_text(&comment.body, 300);
+    let date = comment
+        .created_at
+        .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
+        .unwrap_or_else(|| "unknown date".to_string());
+
+    format!(
+        "- [{title}]({comment_url}) ({date}):\n  > {snippet}\n",
+        title = truncate_text(&comment.issue_title, 60),
+        comment_url = comment.comment_url,
+    )
+}
+
+/// Truncates the given text to the specified length, adding ellipsis if needed.
+fn truncate_text(text: &str, max_len: usize) -> String {
+    let normalized: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    if normalized.len() <= max_len {
+        normalized
+    } else {
+        let truncated: String = normalized.chars().take(max_len - 3).collect();
+        format!("{truncated}...")
+    }
 }
