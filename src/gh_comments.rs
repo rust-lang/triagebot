@@ -30,6 +30,7 @@ use crate::{
 
 pub const STYLE_URL: &str = "/gh-comments/style@0.0.3.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
+pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.1.js";
 
 pub const GH_COMMENTS_CACHE_CAPACITY_BYTES: usize = 35 * 1024 * 1024; // 35 Mb
 
@@ -153,7 +154,9 @@ pub async fn gh_comments(
   <link rel="icon" sizes="32x32" type="image/png" href="https://rust-lang.org/static/images/favicon-32x32.png">
   <link rel="stylesheet" href="{MARKDOWN_URL}" />
   <link rel="stylesheet" href="{STYLE_URL}" />
+  <script src="{SELF_CONTAINED_URL}" data-to-remove-on-export></script>
   <script nonce="triagebot-gh-comments">
+    const ISSUE_ID = {issue_id};
     document.addEventListener('DOMContentLoaded', function() {{
       document.querySelectorAll('[data-utc-time]').forEach(element => {{
         const utcString = element.getAttribute('data-utc-time');
@@ -200,6 +203,10 @@ pub async fn gh_comments(
             r###"<p>{comment_count} comments loaded in {duration_secs:.2}s</p>"###,
         )?;
     }
+    writeln!(
+        html,
+        r#"<button id="gh-comments-export-btn" data-to-remove-on-export>Export</button>"#
+    )?;
     writeln!(html, "</div>")?;
 
     // Print shortcut links for PRs
@@ -354,7 +361,7 @@ pub async fn gh_comments(
     headers.insert(
         CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(
-            "default-src 'none'; script-src 'nonce-triagebot-gh-comments'; style-src 'self' 'unsafe-inline'; img-src *",
+            "default-src 'none'; script-src 'nonce-triagebot-gh-comments' 'self'; style-src 'self' 'unsafe-inline'; img-src *",
         ),
     );
 
@@ -371,6 +378,15 @@ pub async fn markdown_css() -> impl IntoResponse {
     const MARKDOWN_CSS: &str = include_str!("gh_comments/github-markdown@20260117.css");
 
     (immutable_headers("text/css; charset=utf-8"), MARKDOWN_CSS)
+}
+
+pub async fn self_contained_js() -> impl IntoResponse {
+    const SELF_CONTAINED_JS: &str = include_str!("gh_comments/self_contained.js");
+
+    (
+        immutable_headers("text/javascript; charset=utf-8"),
+        SELF_CONTAINED_JS,
+    )
 }
 
 fn write_comment_as_html(
