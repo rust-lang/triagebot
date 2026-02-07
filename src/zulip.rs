@@ -5,7 +5,8 @@ mod commands;
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, Identifier, delete_ping, move_indices, record_ping};
 use crate::db::review_prefs::{
-    RotationMode, get_review_prefs, get_review_prefs_batch, upsert_review_prefs,
+    RotationMode, get_review_prefs, get_review_prefs_batch, upsert_team_review_prefs,
+    upsert_user_review_prefs,
 };
 use crate::github::{User, UserComment};
 use crate::handlers::Context;
@@ -633,8 +634,16 @@ async fn team_status_cmd(
             .as_ref()
             .map(|reviewers| reviewers.contains(&member.github))
             .unwrap_or(true);
-        let reason = if in_review_queue_for_repository {
-            "Review Preferences"
+        let is_team_rotation_mode_off = review_prefs
+            .get(member.github.as_str())
+            .and_then(|prefs| prefs.team_review_prefs.get(team_name))
+            .map(|prefs| prefs.rotation_mode)
+            .unwrap_or_default()
+            == RotationMode::OffRotation;
+        let reason = if is_team_rotation_mode_off {
+            "Team review prefs"
+        } else if in_review_queue_for_repository {
+            "User review prefs"
         } else {
             "`triagebot.toml` Configuration"
         };
@@ -648,11 +657,18 @@ async fn team_status_cmd(
                 .get(member.github.as_str())
                 .map(|prefs| prefs.rotation_mode)
                 .unwrap_or_default();
+            let team_rotation_mode = review_prefs
+                .get(member.github.as_str())
+                .and_then(|prefs| prefs.team_review_prefs.get(team_name))
+                .map(|prefs| prefs.rotation_mode)
+                .unwrap_or_default();
             let in_review_queue_for_repository = reviewers_for_repository
                 .as_ref()
                 .map(|reviewers| reviewers.contains(&member.github.to_lowercase()))
                 .unwrap_or(true);
-            matches!(rotation_mode, RotationMode::OnRotation) && in_review_queue_for_repository
+            matches!(rotation_mode, RotationMode::OnRotation)
+                && matches!(team_rotation_mode, RotationMode::OnRotation)
+                && in_review_queue_for_repository
         });
     on_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
     off_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
@@ -722,7 +738,8 @@ fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
         ChatCommand::Whoami => ImpersonationMode::Silent,
         ChatCommand::Work(cmd) => match cmd {
             WorkqueueCmd::Show => ImpersonationMode::Silent,
-            WorkqueueCmd::SetPrLimit { .. } | WorkqueueCmd::SetRotationMode { .. } => {
+            WorkqueueCmd::SetPrLimit { .. } | WorkqueueCmd::SetRotationMode { .. } |
+            WorkqueueCmd::SetTeamRotationMode { .. } => {
                 ImpersonationMode::Notify
             }
         },
@@ -758,18 +775,11 @@ async fn workqueue_commands(
                 .collect::<Vec<_>>();
             assigned_prs.sort_by_key(|(pr_number, _)| *pr_number);
 
-            let review_prefs = get_review_prefs(&db_client, gh_id)
-                .await
-                .context("cannot get review preferences")?;
-            let capacity = match review_prefs.as_ref().and_then(|p| p.max_assigned_prs) {
+            let capacity = match review_prefs.max_assigned_prs {
                 Some(max) => max.to_string(),
                 None => String::from("Not set (i.e. unlimited)"),
             };
-            let rotation_mode = review_prefs
-                .as_ref()
-                .map(|p| p.rotation_mode)
-                .unwrap_or_default();
-            let rotation_mode = match rotation_mode {
+            let rotation_mode = match review_prefs.rotation_mode {
                 RotationMode::OnRotation => "on rotation",
                 RotationMode::OffRotation => "off rotation",
             };
@@ -795,6 +805,14 @@ async fn workqueue_commands(
 
             writeln!(response, "Review capacity: `{capacity}`\n")?;
             writeln!(response, "Rotation mode: *{rotation_mode}*\n")?;
+            for (team, team_prefs) in &review_prefs.team_review_prefs {
+                writeln!(
+                    response,
+                    "Team `{team}` rotation mode: *{:?}*\n",
+                    team_prefs.rotation_mode
+                )?;
+            }
+
             writeln!(
                 response,
                 "*Note that only certain PRs that are assigned to you are included in your review queue.*"
@@ -806,11 +824,11 @@ async fn workqueue_commands(
                 WorkqueueLimit::Unlimited => None,
                 WorkqueueLimit::Limit(limit) => Some(*limit),
             };
-            upsert_review_prefs(
+            upsert_user_review_prefs(
                 &db_client,
                 user,
                 max_assigned_prs,
-                review_prefs.map(|p| p.rotation_mode).unwrap_or_default(),
+                review_prefs.rotation_mode,
             )
             .await
             .context("Error occurred while setting review preferences.")?;
@@ -825,10 +843,10 @@ async fn workqueue_commands(
         }
         WorkqueueCmd::SetRotationMode { rotation_mode } => {
             let rotation_mode = rotation_mode.0;
-            upsert_review_prefs(
+            upsert_user_review_prefs(
                 &db_client,
                 user,
-                review_prefs.and_then(|p| p.max_assigned_prs.map(|v| v as u32)),
+                review_prefs.max_assigned_prs,
                 rotation_mode,
             )
             .await
@@ -839,6 +857,32 @@ async fn workqueue_commands(
                 match rotation_mode {
                     RotationMode::OnRotation => "*on rotation*",
                     RotationMode::OffRotation => "*off rotation*.",
+                }
+            )
+        }
+        WorkqueueCmd::SetTeamRotationMode {
+            team,
+            rotation_mode,
+        } => {
+            let teams = ctx.team.teams().await?;
+            if teams.teams.get(team).is_none() {
+                return Err(anyhow::anyhow!(
+                    "Team `{team}` not found in the team database."
+                ));
+            }
+
+            let rotation_mode = rotation_mode.0;
+            upsert_team_review_prefs(&db_client, user, team, rotation_mode)
+                .await
+                .context("Error occurred while setting team review preferences.")?;
+            tracing::info!(
+                "Setting team rotation mode of `{gh_username}` for team `{team}` to {rotation_mode:?}"
+            );
+            format!(
+                "Rotation mode for team `{team}` set to {}",
+                match rotation_mode {
+                    RotationMode::OnRotation => "*on rotation*",
+                    RotationMode::OffRotation => "*off rotation*",
                 }
             )
         }
