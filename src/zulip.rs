@@ -27,7 +27,7 @@ use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
 use commands::BackportArgs;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use octocrab::Octocrab;
 use rust_team_data::v1::{TeamKind, TeamMember};
 use secrecy::{ExposeSecret, SecretString};
@@ -561,7 +561,7 @@ async fn team_status_cmd(
     // If a repository name was provided then check for an adhoc group named after that team in
     // that repository's `triagebot.toml` and require that team members be in that list to be
     // considered on rotation.
-    let reviewers_for_repository: Option<Vec<String>> = if let Some(repo) = repo {
+    let adhoc_group: Option<Vec<String>> = if let Some(repo) = repo {
         let repo = ctx
             .github
             .repository(repo)
@@ -570,26 +570,30 @@ async fn team_status_cmd(
         let config = crate::config::get(&ctx.github, &repo)
             .await
             .context("failed to get triagebot configuration")?;
-        Some(
-            config
-                .assign
-                .as_ref()
-                .and_then(|a| a.adhoc_groups.get(team_name))
-                .context("team missing in `adhoc_groups`")?
-                .into_iter()
-                .map(|reviewer| {
-                    // Adhoc groups reviewers are by convention prefix with `@`, let's
-                    // strip it to avoid issues with un-prefixed GitHub handles.
-                    //
-                    // Also lowercase the reviewer, in case it's has a different
-                    // casing between our different sources.
-                    reviewer
-                        .strip_prefix('@')
-                        .unwrap_or(reviewer)
-                        .to_lowercase()
-                })
-                .collect(),
-        )
+        if let Some(adhoc_group) = config
+            .assign
+            .as_ref()
+            .and_then(|a| a.adhoc_groups.get(team_name))
+        {
+            Some(
+                adhoc_group
+                    .into_iter()
+                    .map(|reviewer| {
+                        // Adhoc groups reviewers are by convention prefixed with `@`, let's
+                        // strip it to avoid issues with unprefixed GitHub handles.
+                        //
+                        // Also lowercase the reviewer, in case it has a different
+                        // casing between our different sources.
+                        reviewer
+                            .strip_prefix('@')
+                            .unwrap_or(reviewer)
+                            .to_lowercase()
+                    })
+                    .collect(),
+            )
+        } else {
+            None
+        }
     } else {
         None
     };
@@ -629,49 +633,50 @@ async fn team_status_cmd(
             member.github, member.name
         )
     };
-    let format_off_rotation_member_row = |member: &TeamMember| {
-        let in_review_queue_for_repository = reviewers_for_repository
-            .as_ref()
-            .map(|reviewers| reviewers.contains(&member.github))
-            .unwrap_or(true);
-        let is_team_rotation_mode_off = review_prefs
-            .get(member.github.as_str())
-            .and_then(|prefs| prefs.team_review_prefs.get(team_name))
-            .map(|prefs| prefs.rotation_mode)
-            .unwrap_or_default()
-            == RotationMode::OffRotation;
-        let reason = if is_team_rotation_mode_off {
-            "Team review prefs"
-        } else if in_review_queue_for_repository {
-            "User review prefs"
-        } else {
-            "`triagebot.toml` Configuration"
+    let format_off_rotation_member_row = |(member, reason): (&TeamMember, OffRotationReason)| {
+        let reason = match reason {
+            OffRotationReason::NotInAdhocGroup => "Not in adhoc group",
+            OffRotationReason::OffRotationGlobally => "User review prefs",
+            OffRotationReason::OffRotationThroughTeam => "Team review prefs",
         };
         format!("{} {reason} |", format_on_rotation_member_row(member))
     };
 
-    let reviewers_for_repository = &reviewers_for_repository;
-    let (mut on_rotation, mut off_rotation): (Vec<&TeamMember>, Vec<&TeamMember>) =
-        members.iter().partition(|member| {
-            let rotation_mode = review_prefs
-                .get(member.github.as_str())
-                .map(|prefs| prefs.rotation_mode)
-                .unwrap_or_default();
-            let team_rotation_mode = review_prefs
-                .get(member.github.as_str())
-                .and_then(|prefs| prefs.team_review_prefs.get(team_name))
-                .map(|prefs| prefs.rotation_mode)
-                .unwrap_or_default();
-            let in_review_queue_for_repository = reviewers_for_repository
-                .as_ref()
-                .map(|reviewers| reviewers.contains(&member.github.to_lowercase()))
-                .unwrap_or(true);
-            matches!(rotation_mode, RotationMode::OnRotation)
-                && matches!(team_rotation_mode, RotationMode::OnRotation)
-                && in_review_queue_for_repository
-        });
+    enum OffRotationReason {
+        NotInAdhocGroup,
+        OffRotationGlobally,
+        OffRotationThroughTeam,
+    }
+
+    let (mut on_rotation, mut off_rotation): (
+        Vec<&TeamMember>,
+        Vec<(&TeamMember, OffRotationReason)>,
+    ) = members.iter().partition_map(|member| {
+        let rotation_mode = review_prefs
+            .get(member.github.as_str())
+            .map(|prefs| prefs.rotation_mode)
+            .unwrap_or_default();
+        let team_rotation_mode = review_prefs
+            .get(member.github.as_str())
+            .and_then(|prefs| prefs.team_review_prefs.get(team_name))
+            .map(|prefs| prefs.rotation_mode)
+            .unwrap_or_default();
+        let in_adhoc_group = adhoc_group
+            .as_ref()
+            .map(|reviewers| reviewers.contains(&member.github.to_lowercase()))
+            .unwrap_or(true);
+        if !in_adhoc_group {
+            Either::Right((member, OffRotationReason::NotInAdhocGroup))
+        } else if !matches!(team_rotation_mode, RotationMode::OnRotation) {
+            Either::Right((member, OffRotationReason::OffRotationThroughTeam))
+        } else if !matches!(rotation_mode, RotationMode::OnRotation) {
+            Either::Right((member, OffRotationReason::OffRotationGlobally))
+        } else {
+            Either::Left(member)
+        }
+    });
     on_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
-    off_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
+    off_rotation.sort_by_key(|(member, _)| Reverse(workqueue.assigned_pr_count(member.github_id)));
 
     let on_rotation = on_rotation
         .into_iter()
