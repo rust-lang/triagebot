@@ -42,8 +42,6 @@ pub enum ChatCommand {
     /// Update docs
     DocsUpdate,
     /// Show recent GitHub comments of a user in the rust-lang organization.
-    ///
-    /// **This command is only available to moderators.**
     Comments {
         /// GitHub username to look up.
         username: String,

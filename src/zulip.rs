@@ -478,18 +478,8 @@ async fn ping_goals_cmd(
     }
 }
 
-fn get_mod_teams(teams: &Teams) -> Vec<&Team> {
-    let mut mod_teams = vec![];
-    for name in ["mods", "mods-venue"] {
-        if let Some(team) = teams.teams.get(name) {
-            mod_teams.push(team);
-        }
-    }
-    mod_teams
-}
-
 /// Output recent GitHub comments made by a given user in a given organization.
-/// This command can only be used by mods.
+/// This command can only be used by team members.
 async fn recent_comments_cmd(
     ctx: &Context,
     gh_id: u64,
@@ -498,13 +488,24 @@ async fn recent_comments_cmd(
 ) -> anyhow::Result<String> {
     const RECENT_COMMENTS_LIMIT: usize = 10;
 
-    let teams = ctx.team.teams().await?;
-    let mod_teams = get_mod_teams(&teams);
-    if !mod_teams
-        .iter()
-        .any(|team| team.members.iter().any(|member| member.github_id == gh_id))
-    {
-        return Ok("This command is only available to moderators.".to_string());
+    let user = User {
+        login: ctx
+            .team
+            .username_from_gh_id(gh_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Username for GitHub user {gh_id} not found"))?,
+        id: gh_id,
+    };
+    if !user.is_team_member(&ctx.team).await? {
+        return Err(anyhow::anyhow!(
+            "This command is only available to team members."
+        ));
+    }
+
+    if ctx.team.repos().await?.repos.get(organization).is_none() {
+        return Err(anyhow::anyhow!(
+            "Organization `{organization}` is not managed by the team database."
+        ));
     }
 
     let comments = ctx
