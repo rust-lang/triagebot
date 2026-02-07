@@ -52,6 +52,14 @@ Please choose another assignee."
     )
 }
 
+pub fn reviewer_off_rotation_through_team_message(username: &str, team: &str) -> String {
+    format!(
+        r"`{username}` is not available for reviewing through the `{team}` team.
+
+Please choose another assignee or assign the reviewer explicitly by using `r? @{username}`."
+    )
+}
+
 pub fn reviewer_assigned_before(username: &str) -> String {
     format!(
         "Requested reviewer @{username} was already assigned before.

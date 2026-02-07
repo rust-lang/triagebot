@@ -25,7 +25,6 @@
 use crate::db::issue_data::IssueData;
 use crate::db::review_prefs::{RotationMode, get_review_prefs_batch};
 use crate::errors::{self, AssignmentError, user_error};
-use crate::github::UserId;
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::{
     config::AssignConfig,
@@ -452,6 +451,7 @@ async fn determine_assignee(
                     | FindReviewerError::ReviewerAlreadyAssigned { .. }
                     | FindReviewerError::ReviewerPreviouslyAssigned { .. }
                     | FindReviewerError::ReviewerOffRotation { .. }
+                    | FindReviewerError::ReviewerOffRotationThroughTeam { .. }
                     | FindReviewerError::DatabaseError(_)
                     | FindReviewerError::ReviewerAtMaxCapacity { .. }),
                 ) => log::trace!(
@@ -821,6 +821,8 @@ enum FindReviewerError {
     /// Either the username is in [users_on_vacation] in `triagebot.toml` or the user has
     /// configured [`RotationMode::OffRotation`] in their reviewer preferences.
     ReviewerOffRotation { username: String },
+    /// Requested reviewer is off the review rotation for the specified team.
+    ReviewerOffRotationThroughTeam { username: String, team: String },
     /// Requested reviewer is PR author
     ReviewerIsPrAuthor { username: String },
     /// Requested reviewer is already assigned to that PR
@@ -861,6 +863,13 @@ impl fmt::Display for FindReviewerError {
             }
             FindReviewerError::ReviewerOffRotation { username } => {
                 write!(f, "{}", messages::reviewer_off_rotation_message(username))
+            }
+            FindReviewerError::ReviewerOffRotationThroughTeam { username, team } => {
+                write!(
+                    f,
+                    "{}",
+                    messages::reviewer_off_rotation_through_team_message(username, team)
+                )
             }
             FindReviewerError::ReviewerIsPrAuthor { .. } => {
                 write!(f, "{}", messages::REVIEWER_IS_PR_AUTHOR)
@@ -1024,12 +1033,12 @@ struct ReviewerCandidate {
     origin: ReviewerCandidateOrigin,
 }
 
-#[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]
+#[derive(Eq, PartialEq, Hash, Clone, Debug)]
 enum ReviewerCandidateOrigin {
     /// This reviewer was directly requested for a review.
     Direct,
-    /// This reviewer was expanded from a team or an assign group.
-    Expanded,
+    /// This reviewer was expanded from a team or an adhoc group.
+    Expanded { team: Option<String> },
 }
 
 /// Recursively expand all teams and adhoc groups found within `names`.
@@ -1064,6 +1073,7 @@ fn expand_teams_and_groups(
     // A username can be both directly requested and expanded from a group/team, the former
     // should have priority.
     let mut directly_requested: HashSet<&str> = HashSet::new();
+    let mut team_expansions: HashMap<&str, &str> = HashMap::default();
 
     // Loop over names to recursively expand them.
     while let Some(candidate) = to_be_expanded.pop() {
@@ -1096,7 +1106,10 @@ fn expand_teams_and_groups(
         //
         // This ignores subteam relationships (it only uses direct members).
         if let Some(team) = maybe_team.and_then(|t| teams.teams.get(t)) {
-            selected_candidates.extend(team.members.iter().map(|member| member.github.clone()));
+            for member in &team.members {
+                team_expansions.insert(&member.github, &team.name);
+                selected_candidates.insert(member.github.clone());
+            }
             continue;
         }
 
@@ -1120,10 +1133,13 @@ fn expand_teams_and_groups(
     Ok(selected_candidates
         .into_iter()
         .map(|name| {
+            let expanded_from_team = team_expansions.get(name.as_str()).map(|&t| t.to_owned());
             let origin = if directly_requested.contains(name.as_str()) {
                 ReviewerCandidateOrigin::Direct
             } else {
-                ReviewerCandidateOrigin::Expanded
+                ReviewerCandidateOrigin::Expanded {
+                    team: expanded_from_team,
+                }
             };
             ReviewerCandidate { name, origin }
         })
@@ -1149,7 +1165,7 @@ async fn candidate_reviewers_from_names<'a>(
     // Was it a request for a single user, i.e. `r? @username`?
     let is_single_user = expanded_count == 1
         && matches!(
-            expanded.iter().next().map(|c| c.origin),
+            expanded.iter().next().map(|c| &c.origin),
             Some(ReviewerCandidateOrigin::Direct)
         );
     if !is_single_user {
@@ -1193,8 +1209,10 @@ async fn candidate_reviewers_from_names<'a>(
                 Some(FindReviewerError::ReviewerAlreadyAssigned {
                     username: candidate.clone(),
                 })
-            } else if reviewer_candidate.origin == ReviewerCandidateOrigin::Expanded
-                && is_previously_assigned
+            } else if matches!(
+                reviewer_candidate.origin,
+                ReviewerCandidateOrigin::Expanded { .. }
+            ) && is_previously_assigned
             {
                 // **Only** when r? group is expanded, we consider the reviewer previously assigned
                 // `r? @reviewer` will not consider the reviewer previously assigned
@@ -1242,9 +1260,9 @@ async fn candidate_reviewers_from_names<'a>(
                     return Ok(candidate);
                 };
                 if let Some(capacity) = review_prefs.max_assigned_prs {
-                    let assigned_prs = workqueue.assigned_pr_count(review_prefs.user_id as UserId);
+                    let assigned_prs = workqueue.assigned_pr_count(review_prefs.user_id);
                     // Is the reviewer at max capacity?
-                    if (assigned_prs as i32) >= capacity {
+                    if assigned_prs >= capacity as u64 {
                         return Err(FindReviewerError::ReviewerAtMaxCapacity {
                             username: username.clone(),
                         });
@@ -1253,6 +1271,15 @@ async fn candidate_reviewers_from_names<'a>(
                 if review_prefs.rotation_mode == RotationMode::OffRotation {
                     return Err(FindReviewerError::ReviewerOffRotation {
                         username: username.clone(),
+                    });
+                }
+                if let ReviewerCandidateOrigin::Expanded { team: Some(team) } = &candidate.origin
+                    && let Some(team_prefs) = review_prefs.team_review_prefs.get(team.as_str())
+                    && team_prefs.rotation_mode == RotationMode::OffRotation
+                {
+                    return Err(FindReviewerError::ReviewerOffRotationThroughTeam {
+                        username: username.clone(),
+                        team: team.to_owned(),
                     });
                 }
 
