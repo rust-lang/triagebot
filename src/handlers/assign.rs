@@ -451,6 +451,7 @@ async fn determine_assignee(
                     | FindReviewerError::ReviewerAlreadyAssigned { .. }
                     | FindReviewerError::ReviewerPreviouslyAssigned { .. }
                     | FindReviewerError::ReviewerOffRotation { .. }
+                    | FindReviewerError::ReviewerOffRotationThroughTeam { .. }
                     | FindReviewerError::DatabaseError(_)
                     | FindReviewerError::ReviewerAtMaxCapacity { .. }),
                 ) => log::trace!(
@@ -820,6 +821,8 @@ enum FindReviewerError {
     /// Either the username is in [users_on_vacation] in `triagebot.toml` or the user has
     /// configured [`RotationMode::OffRotation`] in their reviewer preferences.
     ReviewerOffRotation { username: String },
+    /// Requested reviewer is off the review rotation for the specified team.
+    ReviewerOffRotationThroughTeam { username: String, team: String },
     /// Requested reviewer is PR author
     ReviewerIsPrAuthor { username: String },
     /// Requested reviewer is already assigned to that PR
@@ -860,6 +863,13 @@ impl fmt::Display for FindReviewerError {
             }
             FindReviewerError::ReviewerOffRotation { username } => {
                 write!(f, "{}", messages::reviewer_off_rotation_message(username))
+            }
+            FindReviewerError::ReviewerOffRotationThroughTeam { username, team } => {
+                write!(
+                    f,
+                    "{}",
+                    messages::reviewer_off_rotation_through_team_message(username, team)
+                )
             }
             FindReviewerError::ReviewerIsPrAuthor { .. } => {
                 write!(f, "{}", messages::REVIEWER_IS_PR_AUTHOR)
@@ -1267,8 +1277,9 @@ async fn candidate_reviewers_from_names<'a>(
                     && let Some(team_prefs) = review_prefs.team_review_prefs.get(team.as_str())
                     && team_prefs.rotation_mode == RotationMode::OffRotation
                 {
-                    return Err(FindReviewerError::ReviewerOffRotation {
+                    return Err(FindReviewerError::ReviewerOffRotationThroughTeam {
                         username: username.clone(),
+                        team: team.to_owned(),
                     });
                 }
 
