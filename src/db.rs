@@ -351,6 +351,6 @@ CREATE TABLE IF NOT EXISTS team_review_prefs (
     team TEXT NOT NULL,
     rotation_mode TEXT NOT NULL,
     UNIQUE(user_id, team)
-)
+);
 "#,
 ];
