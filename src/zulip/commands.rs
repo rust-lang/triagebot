@@ -179,6 +179,14 @@ pub enum StreamCommand {
     DocsUpdate,
     /// Accept or decline a backport.
     Backport(BackportArgs),
+    /// Show recent GitHub comments of a user in the rust-lang organization.
+    Comments {
+        /// GitHub username to look up.
+        username: String,
+        /// Organization where to find the comments.
+        #[arg(long = "org", default_value = "rust-lang")]
+        organization: String,
+    },
 }
 
 #[derive(clap::Parser, Debug, PartialEq, Clone)]

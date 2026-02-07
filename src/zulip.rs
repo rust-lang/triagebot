@@ -28,7 +28,7 @@ use axum::response::IntoResponse;
 use commands::BackportArgs;
 use itertools::Itertools;
 use octocrab::Octocrab;
-use rust_team_data::v1::{Team, TeamKind, TeamMember, Teams};
+use rust_team_data::v1::{TeamKind, TeamMember};
 use secrecy::{ExposeSecret, SecretString};
 use std::cmp::Reverse;
 use std::fmt::Write as _;
@@ -369,6 +369,12 @@ async fn handle_command<'a>(
                 StreamCommand::Backport(args) => {
                     accept_decline_backport(message_data, &ctx.octocrab, &ctx.zulip, &args).await
                 }
+                StreamCommand::Comments {
+                    username,
+                    organization,
+                } => recent_comments_cmd(&ctx, gh_id, &username, &organization)
+                    .await
+                    .map(Some),
             };
         }
 
