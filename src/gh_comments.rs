@@ -14,6 +14,7 @@ use hyper::{
     header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE},
 };
 
+use crate::github::GitHubIssueStateReason;
 use crate::{
     cache,
     github::{
@@ -28,7 +29,7 @@ use crate::{
     utils::{immutable_headers, is_repo_autorized},
 };
 
-pub const STYLE_URL: &str = "/gh-comments/style@0.0.3.css";
+pub const STYLE_URL: &str = "/gh-comments/style@0.0.4.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
 pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.1.js";
 
@@ -175,18 +176,20 @@ pub async fn gh_comments(
     // Print the state
     writeln!(html, r##"<div class="meta-header">"##)?;
 
-    {
-        let state = issue_with_comments.state;
-        let badge_color = match state {
-            GitHubIssueState::Open => "badge-success",
-            GitHubIssueState::Closed => "badge-danger",
-            GitHubIssueState::Merged => "badge-done",
-        };
-        writeln!(
-            html,
-            r##"<div class="state-badge {badge_color}">{state:?}</div>"##
-        )?;
-    }
+    let (state_class, state_text) = match issue_with_comments.state {
+        GitHubIssueState::Open => ("badge-success", "Open"),
+        GitHubIssueState::Closed => match issue_with_comments.state_reason {
+            Some(GitHubIssueStateReason::Completed) => ("badge-done", "Closed"),
+            Some(GitHubIssueStateReason::Duplicate) => ("badge-neutral", "Closed as duplicate"),
+            Some(GitHubIssueStateReason::NotPlanned) => ("badge-neutral", "Closed as not planned"),
+            None => ("badge-danger", "Closed"),
+        },
+        GitHubIssueState::Merged => ("badge-done", "Merged"),
+    };
+    writeln!(
+        html,
+        r##"<div class="state-badge {state_class}">{state_text}</div>"##
+    )?;
 
     // Print time and number of comments (+ reviews) loaded
     if let Some(reviews) = issue_with_comments.reviews.as_ref() {
