@@ -738,10 +738,9 @@ fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
         ChatCommand::Whoami => ImpersonationMode::Silent,
         ChatCommand::Work(cmd) => match cmd {
             WorkqueueCmd::Show => ImpersonationMode::Silent,
-            WorkqueueCmd::SetPrLimit { .. } | WorkqueueCmd::SetRotationMode { .. } |
-            WorkqueueCmd::SetTeamRotationMode { .. } => {
-                ImpersonationMode::Notify
-            }
+            WorkqueueCmd::SetPrLimit { .. }
+            | WorkqueueCmd::SetRotationMode { .. }
+            | WorkqueueCmd::SetTeamRotationMode { .. } => ImpersonationMode::Notify,
         },
     }
 }
@@ -767,6 +766,13 @@ async fn workqueue_commands(
         .await
         .context("Unable to retrieve your review preferences.")?;
 
+    fn format_rotation_mode(mode: RotationMode) -> &'static str {
+        match mode {
+            RotationMode::OnRotation => "on rotation",
+            RotationMode::OffRotation => "off rotation",
+        }
+    }
+
     let response = match cmd {
         WorkqueueCmd::Show => {
             let mut assigned_prs = get_assigned_prs(ctx, gh_id)
@@ -779,10 +785,7 @@ async fn workqueue_commands(
                 Some(max) => max.to_string(),
                 None => String::from("Not set (i.e. unlimited)"),
             };
-            let rotation_mode = match review_prefs.rotation_mode {
-                RotationMode::OnRotation => "on rotation",
-                RotationMode::OffRotation => "off rotation",
-            };
+            let rotation_mode = format_rotation_mode(review_prefs.rotation_mode);
 
             let mut response = if assigned_prs.is_empty() {
                 "There are no PRs in your `rust-lang/rust` review queue\n".to_string()
@@ -808,8 +811,8 @@ async fn workqueue_commands(
             for (team, team_prefs) in &review_prefs.team_review_prefs {
                 writeln!(
                     response,
-                    "Team `{team}` rotation mode: *{:?}*\n",
-                    team_prefs.rotation_mode
+                    "Team `{team}` rotation mode: *{}*\n",
+                    format_rotation_mode(team_prefs.rotation_mode)
                 )?;
             }
 
@@ -853,11 +856,8 @@ async fn workqueue_commands(
             .context("Error occurred while setting review preferences.")?;
             tracing::info!("Setting rotation mode `{gh_username}` to {rotation_mode:?}");
             format!(
-                "Rotation mode set to {}",
-                match rotation_mode {
-                    RotationMode::OnRotation => "*on rotation*",
-                    RotationMode::OffRotation => "*off rotation*.",
-                }
+                "Rotation mode set to *{}*.",
+                format_rotation_mode(rotation_mode)
             )
         }
         WorkqueueCmd::SetTeamRotationMode {
@@ -879,11 +879,8 @@ async fn workqueue_commands(
                 "Setting team rotation mode of `{gh_username}` for team `{team}` to {rotation_mode:?}"
             );
             format!(
-                "Rotation mode for team `{team}` set to {}",
-                match rotation_mode {
-                    RotationMode::OnRotation => "*on rotation*",
-                    RotationMode::OffRotation => "*off rotation*",
-                }
+                "Rotation mode for team `{team}` set to *{}*.",
+                format_rotation_mode(rotation_mode)
             )
         }
     };
