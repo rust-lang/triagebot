@@ -13,6 +13,7 @@
     --bg-success: #1f883d;
     --bg-danger: #cf222e;
     --bg-done: #8250df;
+    --bg-neutral: #59636e;
     --fg-default: #24292f;
     --fg-muted: #57606a;
     --fg-accent: #0969da;
@@ -23,6 +24,7 @@
     :root {
         --bg-default: #0d1117;
         --bg-muted: #161b22;
+        --bg-neutral: #656c76;
         --fg-default: #e6edf3;
         --fg-muted: #8b949e;
         --fg-accent: #58a6ff;
@@ -212,6 +214,11 @@ details:not([open]) > .review-thread-header {
 .badge-danger {
     color: white;
     background-color: var(--bg-danger);
+}
+
+.badge-neutral {
+    color: white;
+    background-color: var(--bg-neutral);
 }
 
 .octicon {
