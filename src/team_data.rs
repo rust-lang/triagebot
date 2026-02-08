@@ -47,16 +47,15 @@ impl TeamClient {
             .next())
     }
 
-    // Returns the ID of the given user, if the user is in the `all` team.
+    // Returns the ID of the given user, if they are in the `team` database.
     pub async fn get_gh_id_from_username(&self, login: &str) -> anyhow::Result<Option<u64>> {
-        let permission = self.teams().await?;
-        let map = permission.teams;
+        let people = self.people().await?;
         let login = login.to_lowercase();
-        Ok(map["all"]
-            .members
+        Ok(people
+            .people
             .iter()
-            .find(|g| g.github.to_lowercase() == login)
-            .map(|u| u.github_id))
+            .find(|(github_login, _)| github_login.to_lowercase() == login)
+            .map(|(_, person)| person.github_id))
     }
 
     pub async fn github_to_zulip_id(&self, github_id: u64) -> anyhow::Result<Option<u64>> {
