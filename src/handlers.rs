@@ -46,6 +46,7 @@ pub mod rustc_commits;
 mod shortcut;
 mod transfer;
 pub mod types_planning_updates;
+mod view_all_comments_link;
 
 pub struct Context {
     pub github: GithubClient,
@@ -143,6 +144,20 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         }
     };
 
+    let view_all_comments_link = async {
+        if let Some(view_all_comments_config) = config
+            .as_ref()
+            .ok()
+            .and_then(|c| c.view_all_comments.as_ref())
+        {
+            view_all_comments_link::handle(ctx, event, host, view_all_comments_config)
+                .await
+                .map_err(|e| HandlerError::Other(e.context("view_all_comments handler failed")))
+        } else {
+            Ok(())
+        }
+    };
+
     let relnotes = async {
         relnotes::handle(ctx, event)
             .await
@@ -228,6 +243,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         rustc_commits,
         milestone_prs,
         rendered_link,
+        view_all_comments,
         relnotes,
         bot_pull_requests,
         review_submitted,
@@ -242,6 +258,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         rustc_commits,
         milestone_prs,
         rendered_link,
+        view_all_comments_link,
         relnotes,
         bot_pull_requests,
         review_submitted,
@@ -258,6 +275,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         rustc_commits,
         milestone_prs,
         rendered_link,
+        view_all_comments,
         relnotes,
         bot_pull_requests,
         review_submitted,

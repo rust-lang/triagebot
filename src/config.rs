@@ -51,6 +51,7 @@ pub(crate) struct Config {
     pub(crate) backport: Option<BackportConfig>,
     pub(crate) range_diff: Option<RangeDiffConfig>,
     pub(crate) review_changes_since: Option<ReviewChangesSinceConfig>,
+    pub(crate) view_all_comments: Option<ViewAllCommentsConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -684,6 +685,22 @@ pub(crate) struct RangeDiffConfig {}
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReviewChangesSinceConfig {}
 
+/// Configuration for "View all comments" link feature
+#[derive(Default, PartialEq, Eq, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ViewAllCommentsConfig {
+    /// Threshold at which to add the link
+    #[serde(default)]
+    pub(crate) threshold: Option<u32>,
+    /// If issues should be prevented from having the link
+    #[serde(default)]
+    pub(crate) exclude_issues: bool,
+    /// If PRs should be prevented from having the link
+    #[serde(default)]
+    pub(crate) exclude_prs: bool,
+}
+
 fn get_cached_config(repo: &str) -> Option<MaybeConfig> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -950,6 +967,7 @@ mod tests {
                 backport: Some(backport_team_config),
                 range_diff: Some(RangeDiffConfig {}),
                 review_changes_since: Some(ReviewChangesSinceConfig {}),
+                view_all_comments: None,
             }
         );
     }
@@ -1039,6 +1057,7 @@ mod tests {
                 backport: None,
                 range_diff: None,
                 review_changes_since: None,
+                view_all_comments: None,
             }
         );
     }
@@ -1277,6 +1296,40 @@ Multi text body with ${mcp_issue} and ${mcp_title}
                     );
                     hm
                 }
+            })
+        );
+    }
+
+    #[test]
+    fn view_all_comments() {
+        let config = r#"
+            [view-all-comments]
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        assert_eq!(
+            config.view_all_comments,
+            Some(ViewAllCommentsConfig {
+                threshold: None,
+                exclude_issues: false,
+                exclude_prs: false,
+            })
+        );
+    }
+
+    #[test]
+    fn view_all_comments_custom() {
+        let config = r#"
+            [view-all-comments]
+            threshold = 25
+            exclude-prs = true
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        assert_eq!(
+            config.view_all_comments,
+            Some(ViewAllCommentsConfig {
+                threshold: Some(25),
+                exclude_issues: false,
+                exclude_prs: true,
             })
         );
     }
