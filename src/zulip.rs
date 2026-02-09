@@ -883,10 +883,20 @@ async fn workqueue_commands(
             tracing::info!(
                 "Setting team rotation mode of `{gh_username}` for team `{team}` to {rotation_mode:?}"
             );
-            format!(
+            let mut response = format!(
                 "Rotation mode for team `{team}` set to *{}*.",
                 format_rotation_mode(rotation_mode)
-            )
+            );
+            if rotation_mode == RotationMode::OnRotation
+                && review_prefs.rotation_mode == RotationMode::OffRotation
+            {
+                writeln!(
+                    response,
+                    "\n\n**Warning**: your global rotation mode is still off, so no PRs will currently be assigned to you automatically.\nSend `work set-rotation-mode on` to resume the review rotation."
+                )?;
+            }
+
+            response
         }
     };
 
