@@ -429,7 +429,7 @@ pub struct Issue {
     pub draft: bool,
 
     /// Number of comments
-    pub comments: Option<i32>,
+    pub comments: Option<u32>,
 
     /// The API URL for discussion comments.
     ///
