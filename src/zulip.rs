@@ -5,13 +5,13 @@ mod commands;
 use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, Identifier, delete_ping, move_indices, record_ping};
 use crate::db::review_prefs::{
-    RotationMode, get_review_prefs, get_review_prefs_batch, upsert_team_review_prefs,
-    upsert_user_review_prefs,
+    ReviewPreferences, RotationMode, get_review_prefs, get_review_prefs_batch,
+    upsert_team_review_prefs, upsert_user_review_prefs,
 };
 use crate::github::{User, UserComment};
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
-use crate::handlers::pr_tracking::get_assigned_prs;
+use crate::handlers::pr_tracking::{ReviewerWorkqueue, get_assigned_prs};
 use crate::handlers::project_goals::{self, ping_project_goals_owners};
 use crate::interactions::ErrorComment;
 use crate::utils::pluralize;
@@ -31,7 +31,8 @@ use itertools::Itertools;
 use octocrab::Octocrab;
 use rust_team_data::v1::{TeamKind, TeamMember};
 use secrecy::{ExposeSecret, SecretString};
-use std::cmp::Reverse;
+use std::cmp::{Ordering, Reverse};
+use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::sync::Arc;
 use subtle::ConstantTimeEq;
@@ -604,53 +605,44 @@ async fn team_status_cmd(
         .map(|member| workqueue.assigned_pr_count(member.github_id))
         .sum();
 
-    enum ReviewerStatus {
-        Available,
-        FullCapacity,
-        NotInAdhocGroup,
-        OffRotationGlobally,
-        OffRotationThroughTeam,
-    }
-
     let mut available = vec![];
     let mut full_capacity = vec![];
     let mut off_rotation = vec![];
     for member in &members {
-        let prefs = review_prefs.get(member.github.as_str());
-        let rotation_mode = prefs.map(|prefs| prefs.rotation_mode).unwrap_or_default();
-        let team_rotation_mode = prefs
-            .and_then(|prefs| prefs.team_review_prefs.get(team_name))
-            .map(|prefs| prefs.rotation_mode)
-            .unwrap_or_default();
-        let in_adhoc_group = adhoc_group
-            .as_ref()
-            .map(|reviewers| reviewers.contains(&member.github.to_lowercase()))
-            .unwrap_or(true);
-        let capacity_is_full = if let Some(capacity) =
-            prefs.and_then(|prefs| prefs.max_assigned_prs)
-            && capacity <= workqueue.assigned_pr_count(member.github_id) as u32
-        {
-            true
-        } else {
-            false
-        };
+        let status = get_reviewer_status(
+            member,
+            &review_prefs,
+            team_name,
+            adhoc_group.as_ref(),
+            &workqueue,
+        );
 
-        let (target, status) = if !in_adhoc_group {
-            (&mut off_rotation, ReviewerStatus::NotInAdhocGroup)
-        } else if !matches!(team_rotation_mode, RotationMode::OnRotation) {
-            (&mut off_rotation, ReviewerStatus::OffRotationThroughTeam)
-        } else if !matches!(rotation_mode, RotationMode::OnRotation) {
-            (&mut off_rotation, ReviewerStatus::OffRotationGlobally)
-        } else if capacity_is_full {
-            (&mut full_capacity, ReviewerStatus::FullCapacity)
-        } else {
-            (&mut available, ReviewerStatus::Available)
-        };
-        target.push((member, status));
+        match status {
+            ReviewerStatus::Available => available.push((member, status)),
+            ReviewerStatus::FullCapacity => full_capacity.push((member, status)),
+            status => off_rotation.push((member, status)),
+        }
     }
-    for reviewers in [&mut available, &mut full_capacity, &mut off_rotation] {
-        reviewers.sort_by_key(|(member, _)| Reverse(workqueue.assigned_pr_count(member.github_id)));
-    }
+    available.sort_by_key(|(member, _)| Reverse(workqueue.assigned_pr_count(member.github_id)));
+    full_capacity.sort_by_key(|(member, _)| Reverse(workqueue.assigned_pr_count(member.github_id)));
+    off_rotation.sort_by(|(member_a, status_a), (member_b, status_b)| {
+        // Order by off rotation reason first
+        match (status_a, status_b) {
+            (ReviewerStatus::OffRotationGlobally, ReviewerStatus::OffRotationThroughTeam) => {
+                return Ordering::Less;
+            }
+            (ReviewerStatus::OffRotationThroughTeam, ReviewerStatus::OffRotationGlobally) => {
+                return Ordering::Greater;
+            }
+            _ => {}
+        }
+
+        // Then by assigned PR count
+        workqueue
+            .assigned_pr_count(member_a.github_id)
+            .cmp(&workqueue.assigned_pr_count(member_b.github_id))
+            .reverse()
+    });
 
     let format_row = |(member, status): (&TeamMember, ReviewerStatus)| {
         let review_prefs = review_prefs.get(member.github.as_str());
@@ -706,6 +698,51 @@ async fn team_status_cmd(
     write_table(&mut msg, off_rotation, "Off rotation", true);
 
     Ok(Some(msg))
+}
+
+enum ReviewerStatus {
+    Available,
+    FullCapacity,
+    NotInAdhocGroup,
+    OffRotationGlobally,
+    OffRotationThroughTeam,
+}
+
+fn get_reviewer_status(
+    member: &TeamMember,
+    review_prefs: &HashMap<&str, ReviewPreferences>,
+    team_name: &str,
+    adhoc_group: Option<&Vec<String>>,
+    workqueue: &ReviewerWorkqueue,
+) -> ReviewerStatus {
+    let prefs = review_prefs.get(member.github.as_str());
+    let rotation_mode = prefs.map(|prefs| prefs.rotation_mode).unwrap_or_default();
+    let team_rotation_mode = prefs
+        .and_then(|prefs| prefs.team_review_prefs.get(team_name))
+        .map(|prefs| prefs.rotation_mode)
+        .unwrap_or_default();
+    let in_adhoc_group = adhoc_group
+        .as_ref()
+        .map(|reviewers| reviewers.contains(&member.github.to_lowercase()))
+        .unwrap_or(true);
+    let capacity_is_full = if let Some(capacity) = prefs.and_then(|prefs| prefs.max_assigned_prs)
+        && capacity <= workqueue.assigned_pr_count(member.github_id) as u32
+    {
+        true
+    } else {
+        false
+    };
+    if !in_adhoc_group {
+        ReviewerStatus::NotInAdhocGroup
+    } else if !matches!(team_rotation_mode, RotationMode::OnRotation) {
+        ReviewerStatus::OffRotationThroughTeam
+    } else if !matches!(rotation_mode, RotationMode::OnRotation) {
+        ReviewerStatus::OffRotationGlobally
+    } else if capacity_is_full {
+        ReviewerStatus::FullCapacity
+    } else {
+        ReviewerStatus::Available
+    }
 }
 
 /// How does impersonation work for a given command.
