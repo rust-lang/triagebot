@@ -27,7 +27,7 @@ use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
 use commands::BackportArgs;
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use octocrab::Octocrab;
 use rust_team_data::v1::{TeamKind, TeamMember};
 use secrecy::{ExposeSecret, SecretString};
@@ -604,60 +604,21 @@ async fn team_status_cmd(
         .map(|member| workqueue.assigned_pr_count(member.github_id))
         .sum();
 
-    let on_rotation_table_header = |title: &str| {
-        format!(
-            r"### {title}
-| Username | Name | Assigned PRs | Review capacity |
-|----------|------|-------------:|----------------:|"
-        )
-    };
-    let off_rotation_table_header = |title: &str| {
-        format!(
-            r"### {title}
-| Username | Name | Assigned PRs | Review capacity | Reason for Off Rotation |
-|----------|------|-------------:|----------------:|-------------------------|"
-        )
-    };
-
-    let format_on_rotation_member_row = |member: &TeamMember| {
-        let review_prefs = review_prefs.get(member.github.as_str());
-        let max_capacity = review_prefs
-            .as_ref()
-            .and_then(|prefs| prefs.max_assigned_prs)
-            .map(|c| c.to_string());
-        let max_capacity = max_capacity.as_deref().unwrap_or("unlimited");
-        let assigned_prs = workqueue.assigned_pr_count(member.github_id);
-
-        format!(
-            "| `{}` | {} | `{assigned_prs}` | `{max_capacity}` |",
-            member.github, member.name
-        )
-    };
-    let format_off_rotation_member_row = |(member, reason): (&TeamMember, OffRotationReason)| {
-        let reason = match reason {
-            OffRotationReason::NotInAdhocGroup => "Not in adhoc group",
-            OffRotationReason::OffRotationGlobally => "User review prefs",
-            OffRotationReason::OffRotationThroughTeam => "Team review prefs",
-        };
-        format!("{} {reason} |", format_on_rotation_member_row(member))
-    };
-
-    enum OffRotationReason {
+    enum ReviewerStatus {
+        Available,
+        FullCapacity,
         NotInAdhocGroup,
         OffRotationGlobally,
         OffRotationThroughTeam,
     }
 
-    let (mut on_rotation, mut off_rotation): (
-        Vec<&TeamMember>,
-        Vec<(&TeamMember, OffRotationReason)>,
-    ) = members.iter().partition_map(|member| {
-        let rotation_mode = review_prefs
-            .get(member.github.as_str())
-            .map(|prefs| prefs.rotation_mode)
-            .unwrap_or_default();
-        let team_rotation_mode = review_prefs
-            .get(member.github.as_str())
+    let mut available = vec![];
+    let mut full_capacity = vec![];
+    let mut off_rotation = vec![];
+    for member in &members {
+        let prefs = review_prefs.get(member.github.as_str());
+        let rotation_mode = prefs.map(|prefs| prefs.rotation_mode).unwrap_or_default();
+        let team_rotation_mode = prefs
             .and_then(|prefs| prefs.team_review_prefs.get(team_name))
             .map(|prefs| prefs.rotation_mode)
             .unwrap_or_default();
@@ -665,27 +626,72 @@ async fn team_status_cmd(
             .as_ref()
             .map(|reviewers| reviewers.contains(&member.github.to_lowercase()))
             .unwrap_or(true);
-        if !in_adhoc_group {
-            Either::Right((member, OffRotationReason::NotInAdhocGroup))
-        } else if !matches!(team_rotation_mode, RotationMode::OnRotation) {
-            Either::Right((member, OffRotationReason::OffRotationThroughTeam))
-        } else if !matches!(rotation_mode, RotationMode::OnRotation) {
-            Either::Right((member, OffRotationReason::OffRotationGlobally))
+        let capacity_is_full = if let Some(capacity) =
+            prefs.and_then(|prefs| prefs.max_assigned_prs)
+            && capacity <= workqueue.assigned_pr_count(member.github_id) as u32
+        {
+            true
         } else {
-            Either::Left(member)
-        }
-    });
-    on_rotation.sort_by_key(|member| Reverse(workqueue.assigned_pr_count(member.github_id)));
-    off_rotation.sort_by_key(|(member, _)| Reverse(workqueue.assigned_pr_count(member.github_id)));
+            false
+        };
 
-    let on_rotation = on_rotation
-        .into_iter()
-        .map(format_on_rotation_member_row)
-        .collect::<Vec<_>>();
-    let off_rotation = off_rotation
-        .into_iter()
-        .map(format_off_rotation_member_row)
-        .collect::<Vec<_>>();
+        let (target, status) = if !in_adhoc_group {
+            (&mut off_rotation, ReviewerStatus::NotInAdhocGroup)
+        } else if !matches!(team_rotation_mode, RotationMode::OnRotation) {
+            (&mut off_rotation, ReviewerStatus::OffRotationThroughTeam)
+        } else if !matches!(rotation_mode, RotationMode::OnRotation) {
+            (&mut off_rotation, ReviewerStatus::OffRotationGlobally)
+        } else if capacity_is_full {
+            (&mut full_capacity, ReviewerStatus::FullCapacity)
+        } else {
+            (&mut available, ReviewerStatus::Available)
+        };
+        target.push((member, status));
+    }
+    for reviewers in [&mut available, &mut full_capacity, &mut off_rotation] {
+        reviewers.sort_by_key(|(member, _)| Reverse(workqueue.assigned_pr_count(member.github_id)));
+    }
+
+    let format_row = |(member, status): (&TeamMember, ReviewerStatus)| {
+        let review_prefs = review_prefs.get(member.github.as_str());
+        let max_capacity = review_prefs
+            .as_ref()
+            .and_then(|prefs| prefs.max_assigned_prs)
+            .map(|c| c.to_string());
+        let max_capacity = max_capacity.as_deref().unwrap_or("unlimited");
+        let assigned_prs = workqueue.assigned_pr_count(member.github_id);
+        let status = match status {
+            ReviewerStatus::Available => ":check:",
+            ReviewerStatus::FullCapacity => ":stop_sign:",
+            ReviewerStatus::NotInAdhocGroup => "Not in adhoc group",
+            ReviewerStatus::OffRotationGlobally => "Off (global)",
+            ReviewerStatus::OffRotationThroughTeam => "Off (team)",
+        };
+
+        format!(
+            "| `{}` | {} | `{assigned_prs}` | `{max_capacity}` | {status} |",
+            member.github, member.name
+        )
+    };
+    let write_table = |msg: &mut String,
+                       members: Vec<(&TeamMember, ReviewerStatus)>,
+                       title: &str,
+                       align_left: bool| {
+        if members.is_empty() {
+            return;
+        }
+        let rows = members.into_iter().map(format_row).collect::<Vec<_>>();
+        writeln!(
+            msg,
+            r"### {title} ({})
+| Username | Name | Assigned PRs | Review capacity | Status |
+|----------|------|-------------:|----------------:|:--------{}|",
+            rows.len(),
+            if align_left { "" } else { ":" }
+        )
+        .unwrap();
+        writeln!(msg, "{}\n", rows.join("\n")).unwrap();
+    };
 
     // e.g. 2 members, 5 PRs assigned
     let mut msg = format!(
@@ -695,22 +701,9 @@ async fn team_status_cmd(
         total_assigned,
         pluralize("PR", total_assigned as usize)
     );
-    if !on_rotation.is_empty() {
-        writeln!(
-            msg,
-            "{}",
-            on_rotation_table_header(&format!("ON rotation ({})", on_rotation.len()))
-        )?;
-        writeln!(msg, "{}\n", on_rotation.join("\n"))?;
-    }
-    if !off_rotation.is_empty() {
-        writeln!(
-            msg,
-            "{}",
-            off_rotation_table_header(&format!("OFF rotation ({})", off_rotation.len()))
-        )?;
-        writeln!(msg, "{}\n", off_rotation.join("\n"))?;
-    }
+    write_table(&mut msg, available, "Available", false);
+    write_table(&mut msg, full_capacity, "Full capacity", false);
+    write_table(&mut msg, off_rotation, "Off rotation", true);
 
     Ok(Some(msg))
 }
