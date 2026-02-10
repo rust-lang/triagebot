@@ -148,7 +148,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         if let Some(view_all_comments_config) = config
             .as_ref()
             .ok()
-            .and_then(|c| c.view_all_comments.as_ref())
+            .and_then(|c| c.view_all_comments_link.as_ref())
         {
             view_all_comments_link::handle(ctx, event, host, view_all_comments_config)
                 .await

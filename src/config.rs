@@ -51,7 +51,7 @@ pub(crate) struct Config {
     pub(crate) backport: Option<BackportConfig>,
     pub(crate) range_diff: Option<RangeDiffConfig>,
     pub(crate) review_changes_since: Option<ReviewChangesSinceConfig>,
-    pub(crate) view_all_comments: Option<ViewAllCommentsConfig>,
+    pub(crate) view_all_comments_link: Option<ViewAllCommentsLinkConfig>,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -689,7 +689,7 @@ pub(crate) struct ReviewChangesSinceConfig {}
 #[derive(Default, PartialEq, Eq, Debug, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
-pub(crate) struct ViewAllCommentsConfig {
+pub(crate) struct ViewAllCommentsLinkConfig {
     /// Threshold at which to add the link
     #[serde(default)]
     pub(crate) threshold: Option<u32>,
@@ -967,7 +967,7 @@ mod tests {
                 backport: Some(backport_team_config),
                 range_diff: Some(RangeDiffConfig {}),
                 review_changes_since: Some(ReviewChangesSinceConfig {}),
-                view_all_comments: None,
+                view_all_comments_link: None,
             }
         );
     }
@@ -1057,7 +1057,7 @@ mod tests {
                 backport: None,
                 range_diff: None,
                 review_changes_since: None,
-                view_all_comments: None,
+                view_all_comments_link: None,
             }
         );
     }
@@ -1303,12 +1303,12 @@ Multi text body with ${mcp_issue} and ${mcp_title}
     #[test]
     fn view_all_comments() {
         let config = r#"
-            [view-all-comments]
+            [view-all-comments-link]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         assert_eq!(
-            config.view_all_comments,
-            Some(ViewAllCommentsConfig {
+            config.view_all_comments_link,
+            Some(ViewAllCommentsLinkConfig {
                 threshold: None,
                 exclude_issues: false,
                 exclude_prs: false,
@@ -1319,14 +1319,14 @@ Multi text body with ${mcp_issue} and ${mcp_title}
     #[test]
     fn view_all_comments_custom() {
         let config = r#"
-            [view-all-comments]
+            [view-all-comments-link]
             threshold = 25
             exclude-prs = true
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         assert_eq!(
-            config.view_all_comments,
-            Some(ViewAllCommentsConfig {
+            config.view_all_comments_link,
+            Some(ViewAllCommentsLinkConfig {
                 threshold: Some(25),
                 exclude_issues: false,
                 exclude_prs: true,

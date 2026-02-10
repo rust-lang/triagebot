@@ -1,7 +1,7 @@
 use anyhow::Context as _;
 
 use crate::{
-    config::ViewAllCommentsConfig,
+    config::ViewAllCommentsLinkConfig,
     github::{Event, Issue},
     handlers::Context,
 };
@@ -19,7 +19,7 @@ pub(super) async fn handle(
     ctx: &Context,
     event: &Event,
     host: &str,
-    config: &ViewAllCommentsConfig,
+    config: &ViewAllCommentsLinkConfig,
 ) -> anyhow::Result<()> {
     let Some(issue) = event.issue() else {
         return Ok(());
