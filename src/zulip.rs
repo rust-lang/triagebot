@@ -653,11 +653,11 @@ async fn team_status_cmd(
         let max_capacity = max_capacity.as_deref().unwrap_or("unlimited");
         let assigned_prs = workqueue.assigned_pr_count(member.github_id);
         let status = match status {
-            ReviewerStatus::Available => ":check:",
-            ReviewerStatus::FullCapacity => ":stop_sign:",
-            ReviewerStatus::NotInAdhocGroup => "Not in adhoc group",
-            ReviewerStatus::OffRotationGlobally => "Off (global)",
-            ReviewerStatus::OffRotationThroughTeam => "Off (team)",
+            ReviewerStatus::Available => format_args!(":check:"),
+            ReviewerStatus::FullCapacity => format_args!(":stop_sign:"),
+            ReviewerStatus::NotInAdhocGroup => format_args!("Not in adhoc group"),
+            ReviewerStatus::OffRotationGlobally => format_args!("Off (global)"),
+            ReviewerStatus::OffRotationThroughTeam => format_args!("Off ({team_name})"),
         };
 
         format!(
