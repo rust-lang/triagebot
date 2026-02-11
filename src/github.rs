@@ -3504,6 +3504,7 @@ pub enum GitHubIssueStateReason {
     Completed,
     Duplicate,
     NotPlanned,
+    Reopened,
 }
 
 #[derive(Debug, serde::Deserialize)]
