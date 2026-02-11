@@ -3,9 +3,11 @@ use crate::db::users::record_username;
 use crate::db::{ClientPool, PooledClient, make_client};
 use crate::github::GithubClient;
 use crate::handlers::Context;
+use crate::handlers::pr_tracking::RepositoryWorkqueueMap;
 use crate::team_data::TeamClient;
 use crate::zulip::client::ZulipClient;
 use octocrab::Octocrab;
+use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -81,7 +83,14 @@ impl TestContext {
             db: pool,
             username: "triagebot-test".to_string(),
             octocrab,
-            workqueue: Arc::new(RwLock::new(Default::default())),
+            workqueue_map: RepositoryWorkqueueMap::new({
+                let mut queues = HashMap::new();
+                queues.insert(
+                    "rust-lang-test/triagebot-test".to_string(),
+                    Arc::new(RwLock::new(Default::default())),
+                );
+                queues
+            }),
             gha_logs: Arc::new(RwLock::new(Default::default())),
             gh_comments: Arc::new(RwLock::new(Default::default())),
         };

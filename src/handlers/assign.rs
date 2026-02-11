@@ -72,6 +72,14 @@ struct AssignData {
     user: Option<String>,
 }
 
+/// Returns the workqueue for the given repository, or an empty default workqueue
+/// if the repository is not tracked.
+fn get_repo_workqueue(ctx: &Context, repo: &str) -> Arc<RwLock<ReviewerWorkqueue>> {
+    ctx.workqueue_map
+        .get(repo)
+        .unwrap_or_else(|| Arc::new(RwLock::new(ReviewerWorkqueue::default())))
+}
+
 /// Input for auto-assignment when a PR is created or converted from draft.
 #[derive(Debug)]
 pub(super) enum AssignInput {
@@ -399,12 +407,13 @@ async fn determine_assignee(
     diff: &[FileDiff],
 ) -> anyhow::Result<(Option<ReviewerSelection>, bool)> {
     let mut db_client = ctx.db.get().await;
+    let workqueue = get_repo_workqueue(ctx, &issue.repository().full_repo_name());
     let teams = &ctx.team.teams().await?;
     if let Some(name) = assign_command {
         // User included `r?` in the opening PR body.
         match find_reviewer_from_names(
             &mut db_client,
-            ctx.workqueue.clone(),
+            workqueue.clone(),
             teams,
             config,
             issue,
@@ -425,7 +434,7 @@ async fn determine_assignee(
         Ok(candidates) if !candidates.is_empty() => {
             match find_reviewer_from_names(
                 &mut db_client,
-                ctx.workqueue.clone(),
+                workqueue.clone(),
                 teams,
                 config,
                 issue,
@@ -473,7 +482,7 @@ async fn determine_assignee(
     if let Some(fallback) = config.fallback_review_group() {
         match find_reviewer_from_names(
             &mut db_client,
-            ctx.workqueue.clone(),
+            workqueue.clone(),
             teams,
             config,
             issue,
@@ -687,9 +696,10 @@ pub(super) async fn handle_command(
             return Ok(());
         }
         let mut db_client = ctx.db.get().await;
+        let repo_workqueue = get_repo_workqueue(ctx, &event.repo().full_name);
         let assignee = match find_reviewer_from_names(
             &mut db_client,
-            ctx.workqueue.clone(),
+            repo_workqueue,
             &teams,
             config,
             issue,

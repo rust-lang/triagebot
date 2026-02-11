@@ -2,7 +2,7 @@ use crate::config::{self, Config, ConfigurationError};
 use crate::gh_comments::GitHubCommentsCache;
 use crate::gha_logs::GitHubActionLogsCache;
 use crate::github::{Event, GithubClient, IssueCommentAction, IssuesAction, IssuesEvent};
-use crate::handlers::pr_tracking::ReviewerWorkqueue;
+use crate::handlers::pr_tracking::RepositoryWorkqueueMap;
 use crate::team_data::TeamClient;
 use crate::zulip::client::ZulipClient;
 use octocrab::Octocrab;
@@ -55,9 +55,8 @@ pub struct Context {
     pub db: crate::db::ClientPool,
     pub username: String,
     pub octocrab: Octocrab,
-    /// Represents the workqueue (assigned open PRs) of individual reviewers.
-    /// tokio's `RwLock` is used to avoid deadlocks, since we run on a single-threaded tokio runtime.
-    pub workqueue: Arc<tokio::sync::RwLock<ReviewerWorkqueue>>,
+    /// Represents the workqueue (assigned open PRs) of individual reviewers, per repository.
+    pub workqueue_map: RepositoryWorkqueueMap,
     pub gha_logs: Arc<tokio::sync::RwLock<GitHubActionLogsCache>>,
     pub gh_comments: Arc<tokio::sync::RwLock<GitHubCommentsCache>>,
 }

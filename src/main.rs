@@ -26,8 +26,9 @@ use tracing::{self as log, info_span};
 use triagebot::gh_comments::{GH_COMMENTS_CACHE_CAPACITY_BYTES, GitHubCommentsCache};
 use triagebot::gha_logs::{GHA_LOGS_CACHE_CAPACITY_BYTES, GitHubActionLogsCache};
 use triagebot::handlers::Context;
-use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
-use triagebot::handlers::pr_tracking::load_workqueue;
+use triagebot::handlers::pr_tracking::{
+    REVIEW_WORKQUEUE_REPOS, RepositoryWorkqueueMap, ReviewerWorkqueue, load_workqueue,
+};
 use triagebot::jobs::{
     JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS, default_jobs,
 };
@@ -44,34 +45,46 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .build()
         .expect("Failed to build octocrab.");
 
-    // Loading the workqueue takes ~10-15s, and it's annoying for local rebuilds.
+    // Loading the workqueue takes ~10-15s on large repos, and it's annoying for local rebuilds.
     // Allow users to opt out of it.
     let skip_loading_workqueue = env::var("SKIP_WORKQUEUE").is_ok_and(|v| v == "1");
 
-    // Load the initial workqueue state from GitHub
+    // Load the initial workqueue state from GitHub for each tracked repository.
     // In case this fails, we do not want to block triagebot, instead
     // we use an empty workqueue and let it be updated later through
     // webhooks and the `PullRequestAssignmentUpdate` cron job.
-    let workqueue = if skip_loading_workqueue {
-        tracing::warn!("Skipping workqueue loading");
-        ReviewerWorkqueue::default()
-    } else {
-        tracing::info!("Loading reviewer workqueue for rust-lang/rust");
-        let workqueue =
-            match tokio::time::timeout(Duration::from_secs(60), load_workqueue(&oc)).await {
-                Ok(Ok(workqueue)) => workqueue,
+    let mut workqueues = std::collections::HashMap::new();
+    if !skip_loading_workqueue {
+        for (owner, repo) in REVIEW_WORKQUEUE_REPOS {
+            let repo_name = format!("{owner}/{repo}");
+            tracing::info!("Loading reviewer workqueue for {repo_name}");
+            let wq = match tokio::time::timeout(
+                Duration::from_secs(60),
+                load_workqueue(&oc, owner, repo),
+            )
+            .await
+            {
+                Ok(Ok(workqueue)) => {
+                    tracing::info!("Workqueue loaded for {repo_name}");
+                    workqueue
+                }
                 Ok(Err(error)) => {
-                    tracing::error!("Cannot load initial workqueue: {error:?}");
+                    tracing::error!("Cannot load initial workqueue for {repo_name}: {error:?}");
                     ReviewerWorkqueue::default()
                 }
                 Err(_) => {
-                    tracing::error!("Cannot load initial workqueue, timeouted after a minute");
+                    tracing::error!(
+                        "Cannot load initial workqueue for {repo_name}, timeouted after a minute"
+                    );
                     ReviewerWorkqueue::default()
                 }
             };
-        tracing::info!("Workqueue loaded");
-        workqueue
-    };
+            workqueues.insert(repo_name, Arc::new(RwLock::new(wq)));
+        }
+    } else {
+        tracing::warn!("Skipping initial workqueue loading");
+    }
+    let workqueue_map = RepositoryWorkqueueMap::new(workqueues);
 
     // Only run the migrations after the workqueue has been loaded, immediately
     // before starting the HTTP server.
@@ -95,7 +108,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         github: gh,
         team: team_api,
         octocrab: oc,
-        workqueue: Arc::new(RwLock::new(workqueue)),
+        workqueue_map,
         gha_logs: Arc::new(RwLock::new(GitHubActionLogsCache::new(
             GHA_LOGS_CACHE_CAPACITY_BYTES,
         ))),
