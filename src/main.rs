@@ -55,28 +55,35 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     // webhooks and the `PullRequestAssignmentUpdate` cron job.
     let mut workqueues = std::collections::HashMap::new();
     if !skip_loading_workqueue {
-        for repo in get_review_tracked_repositories() {
-            let full_name = repo.full_name();
-            tracing::info!("Loading reviewer workqueue for {full_name}");
-            let wq = match tokio::time::timeout(Duration::from_secs(60), load_workqueue(&oc, &repo))
-                .await
-            {
-                Ok(Ok(workqueue)) => {
-                    tracing::info!("Workqueue loaded for {full_name}");
-                    workqueue
-                }
-                Ok(Err(error)) => {
-                    tracing::error!("Cannot load initial workqueue for {full_name}: {error:?}");
-                    ReviewerWorkqueue::default()
-                }
-                Err(_) => {
-                    tracing::error!(
+        let futures: Vec<_> = get_review_tracked_repositories()
+            .into_iter()
+            .map(|repo| async {
+                let full_name = repo.full_name();
+                tracing::info!("Loading reviewer workqueue for {full_name}");
+                let workqueue = match tokio::time::timeout(Duration::from_secs(60), load_workqueue(&oc, &repo))
+                    .await
+                {
+                    Ok(Ok(workqueue)) => {
+                        tracing::info!("Workqueue loaded for {full_name}");
+                        workqueue
+                    }
+                    Ok(Err(error)) => {
+                        tracing::error!("Cannot load initial workqueue for {full_name}: {error:?}");
+                        ReviewerWorkqueue::default()
+                    }
+                    Err(_) => {
+                        tracing::error!(
                         "Cannot load initial workqueue for {full_name}, timeouted after a minute"
                     );
-                    ReviewerWorkqueue::default()
-                }
-            };
-            workqueues.insert(repo, Arc::new(RwLock::new(wq)));
+                        ReviewerWorkqueue::default()
+                    }
+                };
+                (repo, workqueue)
+            })
+            .collect();
+        // Load the workqueues concurrently, to make the bot's startup faster
+        for (repo, workqueue) in futures::future::join_all(futures).await {
+            workqueues.insert(repo, Arc::new(RwLock::new(workqueue)));
         }
     } else {
         tracing::warn!("Skipping initial workqueue loading");
