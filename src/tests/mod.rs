@@ -86,7 +86,7 @@ impl TestContext {
             workqueue_map: RepositoryWorkqueueMap::new({
                 let mut queues = HashMap::new();
                 queues.insert(
-                    TrackedRepository::new("rust-lang", "triagebot-test"),
+                    TrackedRepository::new("rust-lang-test", "triagebot-test"),
                     Arc::new(RwLock::new(Default::default())),
                 );
                 queues
