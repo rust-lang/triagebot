@@ -51,7 +51,7 @@ async fn add_comments_link(ctx: &Context, issue: &Issue, host: &str) -> anyhow::
     let issue_number = issue.number;
 
     let comments_link = format!(
-        "[View all comments](https://{host}/gh-comments/{repo_name}/{type_}/{issue_number})"
+        "*[View all comments](https://{host}/gh-comments/{repo_name}/{type_}/{issue_number})*"
     );
 
     if !issue.body.contains("[View all comments](") {
