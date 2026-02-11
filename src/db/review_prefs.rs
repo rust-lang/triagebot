@@ -355,12 +355,8 @@ mod tests {
     async fn insert_prefs_create_user() {
         run_db_test(|ctx| async {
             let user = user("Martin", 1);
-            upsert_user_review_prefs(
-                &ctx.db_client(),
-                user.clone(),
-                RotationMode::OnRotation,
-            )
-            .await?;
+            upsert_user_review_prefs(&ctx.db_client(), user.clone(), RotationMode::OnRotation)
+                .await?;
             assert_eq!(get_user(&ctx.db_client(), user.id).await?.unwrap(), user);
 
             Ok(ctx)

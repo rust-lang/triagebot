@@ -284,7 +284,7 @@ async fn handle_command<'a>(
                 .await
                 .map(Some),
             ChatCommand::TeamStats { name, repo } => {
-                let repo = normalize_repo(repo);
+                let repo = normalize_repo(&ctx, repo).await?;
                 team_status_cmd(&ctx, name, &repo).await
             }
         };
@@ -818,7 +818,7 @@ async fn workqueue_commands(
 
     let response = match cmd {
         WorkqueueCmd::Show { repo } => {
-            let repo = normalize_repo(repo);
+            let repo = normalize_repo(ctx, repo).await?;
             // Currently hardcoded to rust-lang/rust workqueue
             let mut assigned_prs = get_assigned_prs(ctx, &repo, gh_id)
                 .await
@@ -873,7 +873,7 @@ async fn workqueue_commands(
             response
         }
         WorkqueueCmd::SetPrLimit { limit, repo } => {
-            let repo = normalize_repo(repo);
+            let repo = normalize_repo(&ctx, repo).await?;
             let max_assigned_prs = match limit {
                 WorkqueueLimit::Unlimited => None,
                 WorkqueueLimit::Limit(limit) => Some(*limit),
@@ -941,13 +941,31 @@ async fn workqueue_commands(
     Ok(Some(response))
 }
 
-/// Add `rust-lang` prefix to repository name if it does not contain a slash.
-fn normalize_repo(repo: &str) -> String {
-    if repo.contains('/') {
-        repo.to_owned()
+/// Checks if the given repository exists in the team database.
+/// Also adds `rust-lang` prefix to the repo name if it does not contain a slash.
+async fn normalize_repo(ctx: &Context, repo_name: &str) -> anyhow::Result<String> {
+    let repos = ctx.team.repos().await?;
+    let repo = if let Some((org, name)) = repo_name.split_once('/') {
+        let Some(repos) = repos.repos.get(org) else {
+            return Err(anyhow::anyhow!("Repository {repo_name} not found"));
+        };
+        let Some(repo) = repos.iter().find(|repo| repo.name == name) else {
+            return Err(anyhow::anyhow!("Repository {repo_name} not found"));
+        };
+        repo
     } else {
-        format!("rust-lang/{repo}")
-    }
+        // No org found, try to lookup by values
+        let Some(repo) = repos
+            .repos
+            .values()
+            .flatten()
+            .find(|repo| repo.name == repo_name)
+        else {
+            return Err(anyhow::anyhow!("Repository {repo_name} not found"));
+        };
+        repo
+    };
+    Ok(format!("{}/{}", repo.org, repo.name))
 }
 
 /// The `whoami` command displays the user's membership in Rust teams.
