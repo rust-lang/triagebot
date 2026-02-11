@@ -31,10 +31,10 @@ Run `cargo build` to compile the triagebot.
 
 For local development/debugging for the log pages, do the following steps:
 
- 1. Run `cp .env.sample .env`
- 2. Change value of `SKIP_DB_MIGRATIONS` to `1`.
- 3. Run `cargo run --bin triagebot`
- 4. Go to this URL: <http://localhost:8000/gha-logs/rust-lang/rust/46814678314>
+1. Run `cp .env.sample .env`
+2. Change value of `SKIP_DB_MIGRATIONS` to `1`.
+3. Run `cargo run --bin triagebot`
+4. Go to this URL: <http://localhost:8000/gha-logs/rust-lang/rust/46814678314>
 
 ## Running triagebot
 
@@ -48,12 +48,13 @@ The general overview of what you will need to do:
 3. [Configure webhook forwarding](#configure-webhook-forwarding)
 4. Configure the `.env` file:
 
-    1. Copy `.env.sample` to `.env`
-    2. `GITHUB_TOKEN`: This is a token needed for Triagebot to send requests to GitHub. Go to GitHub Settings > Developer Settings > Personal Access Token, and create a new token. The `repo` permission should be sufficient.
-       If this is not set, Triagebot will also look in `~/.gitconfig` in the `github.oauth-token` setting.
-    3. `DATABASE_URL`: This is the URL to the database. See [Configuring a database](#configuring-a-database).
-    4. `GITHUB_WEBHOOK_SECRET`: Enter the secret you entered in the webhook above.
-    5. `RUST_LOG`: Set this to `debug`.
+1. Copy `.env.sample` to `.env`
+2. `GITHUB_TOKEN`: This is a token needed for Triagebot to send requests to GitHub. Go to GitHub Settings > Developer Settings > Personal Access Token, and create a new token. The `repo` permission should be sufficient.
+   - If this is not set, Triagebot will also look in `~/.gitconfig` in the `github.oauth-token` setting.
+   - For production deployment, a GitHub App should be used instead. In that case, configure `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` and `GITHUB_APP_INSTALLATION_ID` instead.
+3. `DATABASE_URL`: This is the URL to the database. See [Configuring a database](#configuring-a-database).
+4. `GITHUB_WEBHOOK_SECRET`: Enter the secret you entered in the webhook above.
+5. `RUST_LOG`: Set this to `debug`.
 
 5. Run `cargo run --bin triagebot`. This starts the http server listening for webhooks on port 8000.
 6. Add a `triagebot.toml` file to the main branch of your GitHub repo with whichever services you want to try out.
@@ -118,15 +119,15 @@ You need to sign up for a free account, and also deal with configuring the GitHu
 3. Configure GitHub webhooks in the test repo you created.
    In short:
 
-    1. Go to the settings page for your GitHub repo.
-    2. Go to the webhook section.
-    3. Click "Add webhook"
-    4. Include the settings:
+1. Go to the settings page for your GitHub repo.
+2. Go to the webhook section.
+3. Click "Add webhook"
+4. Include the settings:
 
-        * Payload URL: This is the URL to your Triagebot server, for example http://7e9ea9dc.ngrok.io/github-hook. This URL is displayed when you ran the `ngrok` command above.
-        * Content type: application/json
-        * Secret: Enter a shared secret (some longish random text)
-        * Events: "Send me everything"
+* Payload URL: This is the URL to your Triagebot server, for example http://7e9ea9dc.ngrok.io/github-hook. This URL is displayed when you ran the `ngrok` command above.
+* Content type: application/json
+* Secret: Enter a shared secret (some longish random text)
+* Events: "Send me everything"
 
 ### Zulip testing
 

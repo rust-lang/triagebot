@@ -1,7 +1,7 @@
 use crate::db;
 use crate::db::users::record_username;
 use crate::db::{ClientPool, PooledClient, make_client};
-use crate::github::GithubClient;
+use crate::github::{GithubAuth, GithubClient};
 use crate::handlers::Context;
 use crate::team_data::TeamClient;
 use crate::zulip::client::ZulipClient;
@@ -64,7 +64,7 @@ impl TestContext {
 
         let octocrab = Octocrab::builder().build().unwrap();
         let github = GithubClient::new(
-            "gh-test-fake-token".into(),
+            GithubAuth::Pat { token: "gh-test-fake-token".into() },
             "https://api.github.com".to_string(),
             "https://api.github.com/graphql".to_string(),
             "https://raw.githubusercontent.com".to_string(),

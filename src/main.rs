@@ -25,6 +25,7 @@ use tower_http::trace::TraceLayer;
 use tracing::{self as log, info_span};
 use triagebot::gh_comments::{GH_COMMENTS_CACHE_CAPACITY_BYTES, GitHubCommentsCache};
 use triagebot::gha_logs::{GHA_LOGS_CACHE_CAPACITY_BYTES, GitHubActionLogsCache};
+use triagebot::github::GithubAuth;
 use triagebot::handlers::Context;
 use triagebot::handlers::pr_tracking::ReviewerWorkqueue;
 use triagebot::handlers::pr_tracking::load_workqueue;
@@ -39,10 +40,26 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     let gh = github::GithubClient::new_from_env();
     let zulip = ZulipClient::new_from_env();
     let team_api = TeamClient::new_from_env();
-    let oc = octocrab::OctocrabBuilder::new()
-        .personal_token(github::default_token_from_env())
-        .build()
-        .expect("Failed to build octocrab.");
+
+    let oc = match gh.auth() {
+        GithubAuth::Pat { token } => octocrab::OctocrabBuilder::new()
+            .personal_token(token.clone())
+            .build()
+            .expect("Failed to build octocrab."),
+        GithubAuth::App {
+            app_auth,
+            installation_id,
+            ..
+        } => {
+            // We want a client scoped to a specific app installation
+            octocrab::OctocrabBuilder::new()
+                .app(app_auth.app_id, app_auth.key.clone())
+                .build()
+                .expect("Failed to build GitHub app octocrab client")
+                .installation(*installation_id)
+                .expect("Failed to build GitHub app installation octocrab client")
+        }
+    };
 
     // Loading the workqueue takes ~10-15s, and it's annoying for local rebuilds.
     // Allow users to opt out of it.
