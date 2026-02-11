@@ -54,59 +54,32 @@ impl ToSql for RotationMode {
     to_sql_checked!();
 }
 
-/// Global user review preferences of a single user/reviewer.
-#[derive(Debug)]
-struct UserReviewPrefs {
-    user_id: i64,
-    max_assigned_prs: Option<i32>,
-    rotation_mode: RotationMode,
-}
-
-impl<'a> From<&'a tokio_postgres::row::Row> for UserReviewPrefs {
-    fn from(row: &tokio_postgres::row::Row) -> Self {
-        Self {
-            user_id: row.get("user_id"),
-            max_assigned_prs: row.get("max_assigned_prs"),
-            rotation_mode: row.get("rotation_mode"),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
 pub struct UserTeamReviewPreferences {
     pub rotation_mode: RotationMode,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct UserRepoReviewPreferences {
+    pub max_assigned_prs: Option<u32>,
 }
 
 /// Review preferences of a single user.
 #[derive(Debug)]
 pub struct ReviewPreferences {
     pub user_id: UserId,
-    pub max_assigned_prs: Option<u32>,
     pub rotation_mode: RotationMode,
     pub team_review_prefs: HashMap<String, UserTeamReviewPreferences>,
+    pub repo_review_prefs: HashMap<String, UserRepoReviewPreferences>,
 }
 
 impl ReviewPreferences {
-    fn from_user_prefs(prefs: UserReviewPrefs) -> Self {
-        let UserReviewPrefs {
-            user_id,
-            max_assigned_prs,
-            rotation_mode,
-        } = prefs;
-        Self {
-            user_id: user_id as UserId,
-            max_assigned_prs: max_assigned_prs.map(|v| v as u32),
-            rotation_mode,
-            team_review_prefs: HashMap::default(),
-        }
-    }
-
     fn default_for_user(user_id: UserId) -> Self {
         Self {
             user_id,
-            max_assigned_prs: None,
             rotation_mode: RotationMode::OnRotation,
             team_review_prefs: HashMap::default(),
+            repo_review_prefs: HashMap::default(),
         }
     }
 }
@@ -117,11 +90,11 @@ pub async fn get_review_prefs(
     db: &tokio_postgres::Client,
     user_id: UserId,
 ) -> anyhow::Result<ReviewPreferences> {
-    // We want to find global preference (if any), and also all team preferences.
-    // Hence the FULL OUTER JOIN.
+    // We want to load data from three different tables that have different data shapes.
+    // The global review preferences and team review preferences are currently relatively similar,
+    // so we load them together. The repository preferences are loaded separately.
     let query = r#"
 SELECT prefs.user_id AS user_id,
-       max_assigned_prs,
        prefs.rotation_mode AS rotation_mode,
        team,
        team_prefs.rotation_mode AS team_rotation_mode
@@ -132,14 +105,14 @@ WHERE prefs.user_id = $1 OR team_prefs.user_id = $1;
     let rows = db
         .query(query, &[&(user_id as i64)])
         .await
-        .context("Error retrieving review preferences")?;
-    let mut user_prefs: Option<UserReviewPrefs> = None;
+        .context("Error retrieving global and team review preferences")?;
+    let mut on_rotation: Option<RotationMode> = None;
     let mut team_prefs: HashMap<String, UserTeamReviewPreferences> = HashMap::default();
 
     for row in rows {
         // We have global preference data in the row
         if row.get::<_, Option<i64>>("user_id").is_some() {
-            user_prefs = Some((&row).into());
+            on_rotation = Some(row.get("rotation_mode"));
         }
         // We have team preference data in the row
         if let Some(team) = row.get::<_, Option<String>>("team") {
@@ -148,13 +121,31 @@ WHERE prefs.user_id = $1 OR team_prefs.user_id = $1;
         }
     }
 
-    let mut prefs = if let Some(prefs) = user_prefs {
-        ReviewPreferences::from_user_prefs(prefs)
-    } else {
-        ReviewPreferences::default_for_user(user_id)
-    };
-    prefs.team_review_prefs = team_prefs;
-    Ok(prefs)
+    let query = r#"
+SELECT repo, max_assigned_prs
+FROM repo_review_prefs
+WHERE user_id = $1
+"#;
+    let rows = db
+        .query(query, &[&(user_id as i64)])
+        .await
+        .context("Error retrieving repo review preferences")?;
+
+    let mut repo_prefs: HashMap<String, UserRepoReviewPreferences> = HashMap::default();
+    for row in rows {
+        let repo: String = row.get("repo");
+        let max_assigned_prs: Option<u32> = row
+            .get::<_, Option<i32>>("max_assigned_prs")
+            .map(|v| v as u32);
+        repo_prefs.insert(repo, UserRepoReviewPreferences { max_assigned_prs });
+    }
+
+    Ok(ReviewPreferences {
+        user_id,
+        rotation_mode: on_rotation.unwrap_or_default(),
+        team_review_prefs: team_prefs,
+        repo_review_prefs: repo_prefs,
+    })
 }
 
 /// Returns a set of review preferences for all passed usernames.
@@ -182,7 +173,6 @@ pub async fn get_review_prefs_batch<'a>(
 SELECT
     lower(u.username) AS username,
     r.user_id AS user_id,
-    r.max_assigned_prs AS max_assigned_prs,
     r.rotation_mode AS rotation_mode
 FROM review_prefs AS r
 JOIN users AS u ON u.user_id = r.user_id
@@ -199,13 +189,15 @@ WHERE lower(u.username) = ANY($1);";
         let username = lowercase_map
             .get(username_lower)
             .expect("Lowercase username not found");
-        let prefs: UserReviewPrefs = (&row).into();
-        let review_prefs = ReviewPreferences::from_user_prefs(prefs);
+        let user_id: UserId = row.get::<_, i64>("user_id") as u64;
+        let rotation_mode = row.get("rotation_mode");
+        let mut review_prefs = ReviewPreferences::default_for_user(user_id);
+        review_prefs.rotation_mode = rotation_mode;
         user_prefs.insert(username, review_prefs);
     }
 
-    // We could gather both user and team preferences in a single query, but it would get too
-    // complicated. So we split it into two queries.
+    // We could gather all preferences in a single query, but it would get too
+    // complicated. So we split it into multiple queries, batched per table.
     let team_query = "
 SELECT
     lower(u.username) AS username,
@@ -237,6 +229,39 @@ WHERE lower(u.username) = ANY($1);";
             .insert(team, UserTeamReviewPreferences { rotation_mode });
     }
 
+    let repo_query = "
+SELECT
+    lower(u.username) AS username,
+    r.user_id AS user_id,
+    r.repo AS repo,
+    r.max_assigned_prs AS max_assigned_prs
+FROM repo_review_prefs AS r
+JOIN users AS u ON u.user_id = r.user_id
+WHERE lower(u.username) = ANY($1);";
+    let rows = db
+        .query(repo_query, &[&lowercase_users])
+        .await
+        .context("Error retrieving repo review preferences from usernames")?;
+    for row in rows {
+        let user_id = row.get::<_, i64>("user_id") as u64;
+        // Map back from the lowercase username to the original username.
+        let username_lower: &str = row.get("username");
+        let username = lowercase_map
+            .get(username_lower)
+            .expect("Lowercase username not found");
+
+        let repo: String = row.get("repo");
+        let max_assigned_prs = row
+            .get::<_, Option<i32>>("max_assigned_prs")
+            .map(|v| v as u32);
+        let prefs = user_prefs
+            .entry(username)
+            .or_insert_with(|| ReviewPreferences::default_for_user(user_id));
+        prefs
+            .repo_review_prefs
+            .insert(repo, UserRepoReviewPreferences { max_assigned_prs });
+    }
+
     Ok(user_prefs)
 }
 
@@ -245,26 +270,20 @@ WHERE lower(u.username) = ANY($1);";
 pub async fn upsert_user_review_prefs(
     db: &tokio_postgres::Client,
     user: User,
-    max_assigned_prs: Option<u32>,
     rotation_mode: RotationMode,
 ) -> anyhow::Result<u64, anyhow::Error> {
     // We need to have the user stored in the DB to have a valid FK link in review_prefs
     record_username(db, user.id, &user.login).await?;
 
-    let max_assigned_prs = max_assigned_prs.map(|v| v as i32);
     let query = "
-INSERT INTO review_prefs(user_id, max_assigned_prs, rotation_mode)
-VALUES ($1, $2, $3)
+INSERT INTO review_prefs(user_id, rotation_mode)
+VALUES ($1, $2)
 ON CONFLICT (user_id)
 DO UPDATE
-SET max_assigned_prs = excluded.max_assigned_prs,
-    rotation_mode = excluded.rotation_mode";
+SET rotation_mode = excluded.rotation_mode";
 
     let res = db
-        .execute(
-            query,
-            &[&(user.id as i64), &max_assigned_prs, &rotation_mode],
-        )
+        .execute(query, &[&(user.id as i64), &rotation_mode])
         .await
         .context("Error upserting user review preferences")?;
     Ok(res)
@@ -295,11 +314,38 @@ SET rotation_mode = excluded.rotation_mode"#;
     Ok(res)
 }
 
+/// Updates repo review preferences of the specified user, or creates them
+/// if they do not exist yet.
+pub async fn upsert_repo_review_prefs(
+    db: &tokio_postgres::Client,
+    user: User,
+    repo: &str,
+    max_assigned_prs: Option<u32>,
+) -> anyhow::Result<u64, anyhow::Error> {
+    // We need to have the user stored in the DB to have a valid FK link in [team_]review_prefs
+    record_username(db, user.id, &user.login).await?;
+
+    let max_assigned_prs = max_assigned_prs.map(|v| v as i32);
+    let query = r#"
+INSERT INTO repo_review_prefs(user_id, repo, max_assigned_prs)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, repo)
+DO UPDATE
+SET max_assigned_prs = excluded.max_assigned_prs"#;
+
+    let res = db
+        .execute(query, &[&(user.id as i64), &repo, &max_assigned_prs])
+        .await
+        .context("Error upserting repo review preferences")?;
+    Ok(res)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::db::review_prefs::{
-        RotationMode, UserTeamReviewPreferences, get_review_prefs, get_review_prefs_batch,
-        upsert_team_review_prefs, upsert_user_review_prefs,
+        RotationMode, UserRepoReviewPreferences, UserTeamReviewPreferences, get_review_prefs,
+        get_review_prefs_batch, upsert_repo_review_prefs, upsert_team_review_prefs,
+        upsert_user_review_prefs,
     };
     use crate::db::users::get_user;
     use crate::tests::github::user;
@@ -312,54 +358,10 @@ mod tests {
             upsert_user_review_prefs(
                 &ctx.db_client(),
                 user.clone(),
-                Some(1),
                 RotationMode::OnRotation,
             )
             .await?;
             assert_eq!(get_user(&ctx.db_client(), user.id).await?.unwrap(), user);
-
-            Ok(ctx)
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn insert_max_assigned_prs() {
-        run_db_test(|ctx| async {
-            upsert_user_review_prefs(
-                &ctx.db_client(),
-                user("Martin", 1),
-                Some(5),
-                RotationMode::OnRotation,
-            )
-            .await?;
-            assert_eq!(
-                get_review_prefs(&ctx.db_client(), 1)
-                    .await?
-                    .max_assigned_prs,
-                Some(5)
-            );
-
-            Ok(ctx)
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn update_max_assigned_prs() {
-        run_db_test(|ctx| async {
-            let db = ctx.db_client();
-
-            upsert_user_review_prefs(&db, user("Martin", 1), Some(5), RotationMode::OnRotation)
-                .await?;
-            assert_eq!(get_review_prefs(&db, 1).await?.max_assigned_prs, Some(5));
-            upsert_user_review_prefs(&db, user("Martin", 1), Some(10), RotationMode::OnRotation)
-                .await?;
-            assert_eq!(get_review_prefs(&db, 1).await?.max_assigned_prs, Some(10));
-
-            upsert_user_review_prefs(&db, user("Martin", 1), None, RotationMode::OnRotation)
-                .await?;
-            assert_eq!(get_review_prefs(&db, 1).await?.max_assigned_prs, None);
 
             Ok(ctx)
         })
@@ -372,13 +374,12 @@ mod tests {
             let db = ctx.db_client();
             let user = user("Martin", 1);
 
-            upsert_user_review_prefs(&db, user.clone(), Some(5), RotationMode::OnRotation).await?;
+            upsert_user_review_prefs(&db, user.clone(), RotationMode::OnRotation).await?;
             assert_eq!(
                 get_review_prefs(&db, 1).await?.rotation_mode,
                 RotationMode::OnRotation
             );
-            upsert_user_review_prefs(&db, user.clone(), Some(10), RotationMode::OffRotation)
-                .await?;
+            upsert_user_review_prefs(&db, user.clone(), RotationMode::OffRotation).await?;
             assert_eq!(
                 get_review_prefs(&db, 1).await?.rotation_mode,
                 RotationMode::OffRotation
@@ -395,10 +396,9 @@ mod tests {
             let db = ctx.db_client();
             let user = || user("Martin", 1);
 
-            upsert_team_review_prefs(db, user(), "compiler", RotationMode::OffRotation).await?;
+            upsert_team_review_prefs(&db, user(), "compiler", RotationMode::OffRotation).await?;
 
             let prefs = get_review_prefs(&db, 1).await?;
-            assert_eq!(prefs.max_assigned_prs, None);
             assert_eq!(prefs.rotation_mode, RotationMode::OnRotation);
             assert_eq!(
                 prefs.team_review_prefs.get("compiler"),
@@ -418,12 +418,11 @@ mod tests {
             let db = ctx.db_client();
             let user = || user("Martin", 1);
 
-            upsert_team_review_prefs(db, user(), "compiler", RotationMode::OffRotation).await?;
-            upsert_team_review_prefs(db, user(), "libs", RotationMode::OnRotation).await?;
-            upsert_user_review_prefs(db, user(), Some(5), RotationMode::OffRotation).await?;
+            upsert_team_review_prefs(&db, user(), "compiler", RotationMode::OffRotation).await?;
+            upsert_team_review_prefs(&db, user(), "libs", RotationMode::OnRotation).await?;
+            upsert_user_review_prefs(&db, user(), RotationMode::OffRotation).await?;
 
             let prefs = get_review_prefs(&db, 1).await?;
-            assert_eq!(prefs.max_assigned_prs, Some(5));
             assert_eq!(prefs.rotation_mode, RotationMode::OffRotation);
             assert_eq!(
                 prefs.team_review_prefs.get("compiler"),
@@ -449,14 +448,95 @@ mod tests {
             let db = ctx.db_client();
             let user = || user("Martin", 1);
 
-            upsert_team_review_prefs(db, user(), "compiler", RotationMode::OffRotation).await?;
-            upsert_team_review_prefs(db, user(), "compiler", RotationMode::OnRotation).await?;
+            upsert_team_review_prefs(&db, user(), "compiler", RotationMode::OffRotation).await?;
+            upsert_team_review_prefs(&db, user(), "compiler", RotationMode::OnRotation).await?;
 
             let prefs = get_review_prefs(&db, 1).await?;
             assert_eq!(
                 prefs.team_review_prefs.get("compiler"),
                 Some(&UserTeamReviewPreferences {
                     rotation_mode: RotationMode::OnRotation,
+                })
+            );
+
+            Ok(ctx)
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn insert_repo_prefs() {
+        run_db_test(|ctx| async {
+            let db = ctx.db_client();
+
+            upsert_repo_review_prefs(&db, user("Martin", 1), "rust-lang/rust", Some(5)).await?;
+
+            let prefs = get_review_prefs(&db, 1).await?;
+            assert_eq!(
+                prefs.repo_review_prefs.get("rust-lang/rust"),
+                Some(&UserRepoReviewPreferences {
+                    max_assigned_prs: Some(5),
+                })
+            );
+
+            Ok(ctx)
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn update_repo_prefs() {
+        run_db_test(|ctx| async {
+            let db = ctx.db_client();
+
+            upsert_repo_review_prefs(&db, user("Martin", 1), "rust-lang/rust", Some(5)).await?;
+            upsert_repo_review_prefs(&db, user("Martin", 1), "rust-lang/rust", Some(10)).await?;
+            assert_eq!(
+                get_review_prefs(&db, 1)
+                    .await?
+                    .repo_review_prefs
+                    .get("rust-lang/rust")
+                    .unwrap()
+                    .max_assigned_prs,
+                Some(10)
+            );
+
+            upsert_repo_review_prefs(&db, user("Martin", 1), "rust-lang/rust", None).await?;
+            assert_eq!(
+                get_review_prefs(&db, 1)
+                    .await?
+                    .repo_review_prefs
+                    .get("rust-lang/rust")
+                    .unwrap()
+                    .max_assigned_prs,
+                None
+            );
+
+            Ok(ctx)
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn repo_prefs_multiple_repos() {
+        run_db_test(|ctx| async {
+            let db = ctx.db_client();
+
+            upsert_repo_review_prefs(&db, user("Martin", 1), "rust-lang/rust", Some(5)).await?;
+            upsert_repo_review_prefs(&db, user("Martin", 1), "rust-lang/cargo", Some(3)).await?;
+
+            let prefs = get_review_prefs(&db, 1).await?;
+            assert_eq!(prefs.repo_review_prefs.len(), 2);
+            assert_eq!(
+                prefs.repo_review_prefs.get("rust-lang/rust"),
+                Some(&UserRepoReviewPreferences {
+                    max_assigned_prs: Some(5),
+                })
+            );
+            assert_eq!(
+                prefs.repo_review_prefs.get("rust-lang/cargo"),
+                Some(&UserRepoReviewPreferences {
+                    max_assigned_prs: Some(3),
                 })
             );
 
@@ -481,23 +561,33 @@ mod tests {
         run_db_test(|ctx| async {
             let db = ctx.db_client();
 
-            upsert_user_review_prefs(&db, user("Alice", 1), Some(3), RotationMode::OnRotation)
-                .await?;
-            upsert_user_review_prefs(&db, user("Bob", 2), Some(5), RotationMode::OffRotation)
-                .await?;
+            upsert_user_review_prefs(&db, user("Alice", 1), RotationMode::OnRotation).await?;
+            upsert_repo_review_prefs(&db, user("Alice", 1), "rust-lang/rust", Some(3)).await?;
+            upsert_user_review_prefs(&db, user("Bob", 2), RotationMode::OffRotation).await?;
+            upsert_repo_review_prefs(&db, user("Bob", 2), "rust-lang/rust", Some(5)).await?;
 
             let result = get_review_prefs_batch(&db, &["Alice", "Bob"]).await?;
             assert_eq!(result.len(), 2);
 
             let alice = result.get("Alice").expect("Alice should be present");
             assert_eq!(alice.user_id, 1);
-            assert_eq!(alice.max_assigned_prs, Some(3));
             assert_eq!(alice.rotation_mode, RotationMode::OnRotation);
+            assert_eq!(
+                alice.repo_review_prefs.get("rust-lang/rust"),
+                Some(&UserRepoReviewPreferences {
+                    max_assigned_prs: Some(3),
+                })
+            );
 
             let bob = result.get("Bob").expect("Bob should be present");
             assert_eq!(bob.user_id, 2);
-            assert_eq!(bob.max_assigned_prs, Some(5));
             assert_eq!(bob.rotation_mode, RotationMode::OffRotation);
+            assert_eq!(
+                bob.repo_review_prefs.get("rust-lang/rust"),
+                Some(&UserRepoReviewPreferences {
+                    max_assigned_prs: Some(5),
+                })
+            );
 
             Ok(ctx)
         })
@@ -509,8 +599,7 @@ mod tests {
         run_db_test(|ctx| async {
             let db = ctx.db_client();
 
-            upsert_user_review_prefs(&db, user("Alice", 1), Some(3), RotationMode::OnRotation)
-                .await?;
+            upsert_user_review_prefs(&db, user("Alice", 1), RotationMode::OnRotation).await?;
 
             let result = get_review_prefs_batch(&db, &["Alice", "Unknown"]).await?;
             assert_eq!(result.len(), 1);
@@ -527,8 +616,7 @@ mod tests {
         run_db_test(|ctx| async {
             let db = ctx.db_client();
 
-            upsert_user_review_prefs(&db, user("Alice", 1), Some(3), RotationMode::OnRotation)
-                .await?;
+            upsert_user_review_prefs(&db, user("Alice", 1), RotationMode::OnRotation).await?;
 
             // Query with different casing than what was inserted
             let result = get_review_prefs_batch(&db, &["ALICE"]).await?;
@@ -536,7 +624,6 @@ mod tests {
             // The key should be the originally-passed casing, not the DB casing
             let prefs = result.get("ALICE").expect("ALICE should be present");
             assert_eq!(prefs.user_id, 1);
-            assert_eq!(prefs.max_assigned_prs, Some(3));
 
             Ok(ctx)
         })
@@ -548,8 +635,8 @@ mod tests {
         run_db_test(|ctx| async {
             let db = ctx.db_client();
 
-            upsert_user_review_prefs(&db, user("Alice", 1), Some(3), RotationMode::OnRotation)
-                .await?;
+            upsert_user_review_prefs(&db, user("Alice", 1), RotationMode::OnRotation).await?;
+            upsert_repo_review_prefs(&db, user("Alice", 1), "rust-lang/rust", Some(3)).await?;
             upsert_team_review_prefs(&db, user("Alice", 1), "compiler", RotationMode::OffRotation)
                 .await?;
             upsert_team_review_prefs(&db, user("Alice", 1), "libs", RotationMode::OnRotation)
@@ -557,8 +644,13 @@ mod tests {
 
             let result = get_review_prefs_batch(&db, &["Alice"]).await?;
             let alice = result.get("Alice").expect("Alice should be present");
-            assert_eq!(alice.max_assigned_prs, Some(3));
             assert_eq!(alice.rotation_mode, RotationMode::OnRotation);
+            assert_eq!(
+                alice.repo_review_prefs.get("rust-lang/rust"),
+                Some(&UserRepoReviewPreferences {
+                    max_assigned_prs: Some(3),
+                })
+            );
             assert_eq!(
                 alice.team_review_prefs.get("compiler"),
                 Some(&UserTeamReviewPreferences {
@@ -587,12 +679,40 @@ mod tests {
 
             let result = get_review_prefs_batch(&db, &["Bob"]).await?;
             let bob = result.get("Bob").expect("Bob should be present");
-            assert_eq!(bob.max_assigned_prs, None);
             assert_eq!(bob.rotation_mode, RotationMode::OnRotation);
             assert_eq!(
                 bob.team_review_prefs.get("compiler"),
                 Some(&UserTeamReviewPreferences {
                     rotation_mode: RotationMode::OffRotation,
+                })
+            );
+
+            Ok(ctx)
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn batch_prefs_with_repo_prefs() {
+        run_db_test(|ctx| async {
+            let db = ctx.db_client();
+
+            upsert_repo_review_prefs(&db, user("Alice", 1), "rust-lang/rust", Some(3)).await?;
+            upsert_repo_review_prefs(&db, user("Alice", 1), "rust-lang/cargo", Some(7)).await?;
+
+            let result = get_review_prefs_batch(&db, &["Alice"]).await?;
+            let alice = result.get("Alice").expect("Alice should be present");
+            assert_eq!(alice.repo_review_prefs.len(), 2);
+            assert_eq!(
+                alice.repo_review_prefs.get("rust-lang/rust"),
+                Some(&UserRepoReviewPreferences {
+                    max_assigned_prs: Some(3),
+                })
+            );
+            assert_eq!(
+                alice.repo_review_prefs.get("rust-lang/cargo"),
+                Some(&UserRepoReviewPreferences {
+                    max_assigned_prs: Some(7),
                 })
             );
 
