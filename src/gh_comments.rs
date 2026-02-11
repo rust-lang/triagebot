@@ -182,7 +182,7 @@ pub async fn gh_comments(
             Some(GitHubIssueStateReason::Completed) => ("badge-done", "Closed"),
             Some(GitHubIssueStateReason::Duplicate) => ("badge-neutral", "Closed as duplicate"),
             Some(GitHubIssueStateReason::NotPlanned) => ("badge-neutral", "Closed as not planned"),
-            None => ("badge-danger", "Closed"),
+            Some(GitHubIssueStateReason::Reopened) | None => ("badge-danger", "Closed"),
         },
         GitHubIssueState::Merged => ("badge-done", "Merged"),
     };
