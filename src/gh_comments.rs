@@ -532,6 +532,13 @@ fn write_review_as_html(
         }
     };
 
+    let state_message = match state {
+        GitHubReviewState::Commented => "commented",
+        GitHubReviewState::Approved => "approved",
+        GitHubReviewState::ChangesRequested => "requested changes",
+        GitHubReviewState::Dismissed => "dismissed review",
+    };
+
     writeln!(
         buffer,
         r###"
@@ -544,7 +551,7 @@ fn write_review_as_html(
         <div class="review-badge {badge_color}">{badge_svg}</div>
         <div class="author-info">
           <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
-          <span>{state:?} on <span data-utc-time="{submitted_at_rfc3339}">{submitted_at}</span></span>
+          <span>{state_message} on <span data-utc-time="{submitted_at_rfc3339}">{submitted_at}</span></span>
         </div>
       </div>
     </div>
