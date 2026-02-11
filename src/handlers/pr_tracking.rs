@@ -24,11 +24,44 @@ use tokio::sync::{RwLock, RwLockWriteGuard};
 use tracing as log;
 
 /// Repositories for which we track the reviewer workqueue.
-pub const REVIEW_WORKQUEUE_REPOS: &[(&str, &str)] = &[("rust-lang", "rust")];
+pub fn get_review_tracked_repositories() -> Vec<TrackedRepository> {
+    vec![TrackedRepository::new("rust-lang", "rust")]
+}
 
 #[derive(Clone, Debug)]
 pub struct AssignedPullRequest {
     pub title: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct TrackedRepository {
+    owner: String,
+    name: String,
+}
+
+impl TrackedRepository {
+    pub fn new(owner: &str, name: &str) -> Self {
+        Self {
+            owner: owner.to_owned(),
+            name: name.to_owned(),
+        }
+    }
+    fn from_full_name(name: &str) -> Option<Self> {
+        let (owner, name) = name.split_once('/')?;
+        Some(Self::new(owner, name))
+    }
+
+    pub fn owner(&self) -> &str {
+        &self.owner
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn full_name(&self) -> String {
+        format!("{}/{}", self.owner, self.name)
+    }
 }
 
 /// Maps users to a set of currently assigned open non-draft pull requests.
@@ -59,23 +92,24 @@ impl ReviewerWorkqueue {
 /// Stores per-repository reviewer workqueues.
 /// Each workqueue is behind its own `Arc<RwLock<...>>` so repos can be locked independently.
 pub struct RepositoryWorkqueueMap {
-    repos: HashMap<String, Arc<RwLock<ReviewerWorkqueue>>>,
+    repos: HashMap<TrackedRepository, Arc<RwLock<ReviewerWorkqueue>>>,
 }
 
 impl RepositoryWorkqueueMap {
-    pub fn new(repos: HashMap<String, Arc<RwLock<ReviewerWorkqueue>>>) -> Self {
+    pub fn new(repos: HashMap<TrackedRepository, Arc<RwLock<ReviewerWorkqueue>>>) -> Self {
         Self { repos }
     }
 
-    pub fn get(&self, repo: &str) -> Option<Arc<RwLock<ReviewerWorkqueue>>> {
-        self.repos.get(repo).cloned()
+    pub fn get(&self, full_name: &str) -> Option<Arc<RwLock<ReviewerWorkqueue>>> {
+        let repo = TrackedRepository::from_full_name(full_name)?;
+        self.repos.get(&repo).cloned()
     }
 
     /// Returns an iterator over all repositories that are being tracked.
     pub fn tracked_repositories(
         &self,
-    ) -> impl Iterator<Item = (&str, &Arc<RwLock<ReviewerWorkqueue>>)> {
-        self.repos.iter().map(|(k, v)| (k.as_str(), v))
+    ) -> impl Iterator<Item = (&TrackedRepository, &Arc<RwLock<ReviewerWorkqueue>>)> {
+        self.repos.iter()
     }
 }
 
@@ -200,11 +234,10 @@ pub(super) async fn handle_input(
 /// Loads the workqueue (mapping of open PRs assigned to users) from GitHub
 pub async fn load_workqueue(
     client: &Octocrab,
-    owner: &str,
-    repo: &str,
+    repo: &TrackedRepository,
 ) -> anyhow::Result<ReviewerWorkqueue> {
-    tracing::debug!("Loading workqueue for {owner}/{repo}");
-    let prs = retrieve_pull_request_assignments(owner, repo, client).await?;
+    tracing::debug!("Loading workqueue for {}/{}", repo.owner, repo.name);
+    let prs = retrieve_pull_request_assignments(&repo.owner, &repo.name, client).await?;
 
     // Aggregate PRs by user
     let aggregated: HashMap<UserId, HashMap<PullRequestNumber, AssignedPullRequest>> = prs

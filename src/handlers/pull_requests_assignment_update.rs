@@ -12,16 +12,16 @@ impl Job for PullRequestAssignmentUpdate {
 
     async fn run(&self, ctx: &super::Context, _metadata: &serde_json::Value) -> anyhow::Result<()> {
         tracing::trace!("starting pull_request_assignment_update");
-        for (repo_name, workqueue_arc) in ctx.workqueue_map.tracked_repositories() {
-            let (owner, repo) = repo_name
-                .split_once('/')
-                .expect("repo name should be in owner/repo format");
-            match load_workqueue(&ctx.octocrab, owner, repo).await {
+        for (repo, workqueue_arc) in ctx.workqueue_map.tracked_repositories() {
+            match load_workqueue(&ctx.octocrab, repo).await {
                 Ok(workqueue) => {
                     *workqueue_arc.write().await = workqueue;
                 }
                 Err(error) => {
-                    tracing::error!("Cannot reload workqueue for {repo_name}: {error:?}");
+                    tracing::error!(
+                        "Cannot reload workqueue for {}: {error:?}",
+                        repo.full_name()
+                    );
                 }
             }
         }

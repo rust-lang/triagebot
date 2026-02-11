@@ -3,7 +3,7 @@ use crate::db::users::record_username;
 use crate::db::{ClientPool, PooledClient, make_client};
 use crate::github::GithubClient;
 use crate::handlers::Context;
-use crate::handlers::pr_tracking::RepositoryWorkqueueMap;
+use crate::handlers::pr_tracking::{RepositoryWorkqueueMap, TrackedRepository};
 use crate::team_data::TeamClient;
 use crate::zulip::client::ZulipClient;
 use octocrab::Octocrab;
@@ -86,7 +86,7 @@ impl TestContext {
             workqueue_map: RepositoryWorkqueueMap::new({
                 let mut queues = HashMap::new();
                 queues.insert(
-                    "rust-lang-test/triagebot-test".to_string(),
+                    TrackedRepository::new("rust-lang", "triagebot-test"),
                     Arc::new(RwLock::new(Default::default())),
                 );
                 queues

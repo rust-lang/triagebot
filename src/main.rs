@@ -27,7 +27,7 @@ use triagebot::gh_comments::{GH_COMMENTS_CACHE_CAPACITY_BYTES, GitHubCommentsCac
 use triagebot::gha_logs::{GHA_LOGS_CACHE_CAPACITY_BYTES, GitHubActionLogsCache};
 use triagebot::handlers::Context;
 use triagebot::handlers::pr_tracking::{
-    REVIEW_WORKQUEUE_REPOS, RepositoryWorkqueueMap, ReviewerWorkqueue, load_workqueue,
+    RepositoryWorkqueueMap, ReviewerWorkqueue, get_review_tracked_repositories, load_workqueue,
 };
 use triagebot::jobs::{
     JOB_PROCESSING_CADENCE_IN_SECS, JOB_SCHEDULING_CADENCE_IN_SECS, default_jobs,
@@ -55,31 +55,28 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     // webhooks and the `PullRequestAssignmentUpdate` cron job.
     let mut workqueues = std::collections::HashMap::new();
     if !skip_loading_workqueue {
-        for (owner, repo) in REVIEW_WORKQUEUE_REPOS {
-            let repo_name = format!("{owner}/{repo}");
-            tracing::info!("Loading reviewer workqueue for {repo_name}");
-            let wq = match tokio::time::timeout(
-                Duration::from_secs(60),
-                load_workqueue(&oc, owner, repo),
-            )
-            .await
+        for repo in get_review_tracked_repositories() {
+            let full_name = repo.full_name();
+            tracing::info!("Loading reviewer workqueue for {full_name}");
+            let wq = match tokio::time::timeout(Duration::from_secs(60), load_workqueue(&oc, &repo))
+                .await
             {
                 Ok(Ok(workqueue)) => {
-                    tracing::info!("Workqueue loaded for {repo_name}");
+                    tracing::info!("Workqueue loaded for {full_name}");
                     workqueue
                 }
                 Ok(Err(error)) => {
-                    tracing::error!("Cannot load initial workqueue for {repo_name}: {error:?}");
+                    tracing::error!("Cannot load initial workqueue for {full_name}: {error:?}");
                     ReviewerWorkqueue::default()
                 }
                 Err(_) => {
                     tracing::error!(
-                        "Cannot load initial workqueue for {repo_name}, timeouted after a minute"
+                        "Cannot load initial workqueue for {full_name}, timeouted after a minute"
                     );
                     ReviewerWorkqueue::default()
                 }
             };
-            workqueues.insert(repo_name, Arc::new(RwLock::new(wq)));
+            workqueues.insert(repo, Arc::new(RwLock::new(wq)));
         }
     } else {
         tracing::warn!("Skipping initial workqueue loading");
