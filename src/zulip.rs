@@ -599,7 +599,12 @@ async fn team_status_cmd(
         None
     };
 
-    let workqueue = ctx.workqueue.read().await;
+    // Currently hardcoded to rust-lang/rust
+    let workqueue_arc = ctx
+        .workqueue_map
+        .get("rust-lang/rust")
+        .unwrap_or_else(|| Arc::new(tokio::sync::RwLock::new(ReviewerWorkqueue::default())));
+    let workqueue = workqueue_arc.read().await;
     let total_assigned: u64 = members
         .iter()
         .map(|member| workqueue.assigned_pr_count(member.github_id))
@@ -810,7 +815,8 @@ async fn workqueue_commands(
 
     let response = match cmd {
         WorkqueueCmd::Show => {
-            let mut assigned_prs = get_assigned_prs(ctx, gh_id)
+            // Currently hardcoded to rust-lang/rust workqueue
+            let mut assigned_prs = get_assigned_prs(ctx, "rust-lang/rust", gh_id)
                 .await
                 .into_iter()
                 .collect::<Vec<_>>();

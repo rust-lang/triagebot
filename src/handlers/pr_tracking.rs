@@ -19,12 +19,49 @@ use octocrab::models::IssueState;
 use octocrab::params::pulls::Sort;
 use octocrab::params::{Direction, State};
 use std::collections::HashMap;
-use tokio::sync::RwLockWriteGuard;
+use std::sync::Arc;
+use tokio::sync::{RwLock, RwLockWriteGuard};
 use tracing as log;
+
+/// Repositories for which we track the reviewer workqueue.
+pub fn get_review_tracked_repositories() -> Vec<TrackedRepository> {
+    vec![TrackedRepository::new("rust-lang", "rust")]
+}
 
 #[derive(Clone, Debug)]
 pub struct AssignedPullRequest {
     pub title: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct TrackedRepository {
+    owner: String,
+    name: String,
+}
+
+impl TrackedRepository {
+    pub fn new(owner: &str, name: &str) -> Self {
+        Self {
+            owner: owner.to_owned(),
+            name: name.to_owned(),
+        }
+    }
+    fn from_full_name(name: &str) -> Option<Self> {
+        let (owner, name) = name.split_once('/')?;
+        Some(Self::new(owner, name))
+    }
+
+    pub fn owner(&self) -> &str {
+        &self.owner
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn full_name(&self) -> String {
+        format!("{}/{}", self.owner, self.name)
+    }
 }
 
 /// Maps users to a set of currently assigned open non-draft pull requests.
@@ -49,6 +86,30 @@ impl ReviewerWorkqueue {
             .get(&user_id)
             .map(|prs| prs.len() as u64)
             .unwrap_or(0)
+    }
+}
+
+/// Stores per-repository reviewer workqueues.
+/// Each workqueue is behind its own `Arc<RwLock<...>>` so repos can be locked independently.
+pub struct RepositoryWorkqueueMap {
+    repos: HashMap<TrackedRepository, Arc<RwLock<ReviewerWorkqueue>>>,
+}
+
+impl RepositoryWorkqueueMap {
+    pub fn new(repos: HashMap<TrackedRepository, Arc<RwLock<ReviewerWorkqueue>>>) -> Self {
+        Self { repos }
+    }
+
+    pub fn get(&self, full_name: &str) -> Option<Arc<RwLock<ReviewerWorkqueue>>> {
+        let repo = TrackedRepository::from_full_name(full_name)?;
+        self.repos.get(&repo).cloned()
+    }
+
+    /// Returns an iterator over all repositories that are being tracked.
+    pub fn tracked_repositories(
+        &self,
+    ) -> impl Iterator<Item = (&TrackedRepository, &Arc<RwLock<ReviewerWorkqueue>>)> {
+        self.repos.iter()
     }
 }
 
@@ -106,7 +167,12 @@ pub(super) async fn handle_input(
     let pr = &event.issue;
     let pr_number = event.issue.number;
 
-    let mut workqueue = ctx.workqueue.write().await;
+    let repo_name = &event.repository.full_name;
+    let Some(workqueue_arc) = ctx.workqueue_map.get(repo_name) else {
+        log::debug!("Repository {repo_name} does not have a tracked workqueue, skipping");
+        return Ok(());
+    };
+    let mut workqueue = workqueue_arc.write().await;
 
     // If the PR doesn't wait for a review, remove it from the workqueue completely.
     // This handles situations such as labels being modified, which make the PR no longer to be
@@ -166,9 +232,12 @@ pub(super) async fn handle_input(
 }
 
 /// Loads the workqueue (mapping of open PRs assigned to users) from GitHub
-pub async fn load_workqueue(client: &Octocrab) -> anyhow::Result<ReviewerWorkqueue> {
-    tracing::debug!("Loading workqueue for rust-lang/rust");
-    let prs = retrieve_pull_request_assignments("rust-lang", "rust", client).await?;
+pub async fn load_workqueue(
+    client: &Octocrab,
+    repo: &TrackedRepository,
+) -> anyhow::Result<ReviewerWorkqueue> {
+    tracing::debug!("Loading workqueue for {}/{}", repo.owner, repo.name);
+    let prs = retrieve_pull_request_assignments(&repo.owner, &repo.name, client).await?;
 
     // Aggregate PRs by user
     let aggregated: HashMap<UserId, HashMap<PullRequestNumber, AssignedPullRequest>> = prs
@@ -253,12 +322,16 @@ pub async fn retrieve_pull_request_assignments(
     Ok(assignments)
 }
 
-/// Get pull request assignments for a team member
+/// Get pull request assignments for a team member in a specific repo.
 pub async fn get_assigned_prs(
     ctx: &Context,
+    repo: &str,
     user_id: UserId,
 ) -> HashMap<PullRequestNumber, AssignedPullRequest> {
-    ctx.workqueue
+    let Some(workqueue) = ctx.workqueue_map.get(repo) else {
+        return Default::default();
+    };
+    workqueue
         .read()
         .await
         .reviewers
@@ -526,14 +599,19 @@ mod tests {
         .await;
     }
 
+    const TEST_REPO: &str = "rust-lang-test/triagebot-test";
+
     async fn check_assigned_prs(
         ctx: &TestContext,
         user: &User,
         expected_prs: &[PullRequestNumber],
     ) {
-        let mut assigned = ctx
+        let workqueue_arc = ctx
             .handler_ctx()
-            .workqueue
+            .workqueue_map
+            .get(TEST_REPO)
+            .expect("test repo workqueue should exist");
+        let mut assigned = workqueue_arc
             .read()
             .await
             .reviewers
@@ -548,7 +626,12 @@ mod tests {
 
     async fn set_assigned_prs(ctx: &TestContext, user: &User, prs: &[PullRequestNumber]) {
         {
-            let mut workqueue = ctx.handler_ctx().workqueue.write().await;
+            let workqueue_arc = ctx
+                .handler_ctx()
+                .workqueue_map
+                .get(TEST_REPO)
+                .expect("test repo workqueue should exist");
+            let mut workqueue = workqueue_arc.write().await;
             for &pr in prs {
                 upsert_pr_into_user_queue(
                     &mut workqueue,
