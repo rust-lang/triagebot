@@ -6,7 +6,7 @@ use crate::db::notifications::add_metadata;
 use crate::db::notifications::{self, Identifier, delete_ping, move_indices, record_ping};
 use crate::db::review_prefs::{
     ReviewPreferences, RotationMode, get_review_prefs, get_review_prefs_batch,
-    upsert_team_review_prefs, upsert_user_review_prefs,
+    upsert_repo_review_prefs, upsert_team_review_prefs, upsert_user_review_prefs,
 };
 use crate::github::{User, UserComment};
 use crate::handlers::Context;
@@ -284,7 +284,8 @@ async fn handle_command<'a>(
                 .await
                 .map(Some),
             ChatCommand::TeamStats { name, repo } => {
-                team_status_cmd(&ctx, name, repo.as_deref()).await
+                let repo = normalize_repo(repo);
+                team_status_cmd(&ctx, name, &repo).await
             }
         };
 
@@ -538,7 +539,7 @@ async fn recent_comments_cmd(
 async fn team_status_cmd(
     ctx: &Context,
     team_name: &str,
-    repo: Option<&str>,
+    repo: &str,
 ) -> anyhow::Result<Option<String>> {
     use std::fmt::Write;
 
@@ -562,7 +563,7 @@ async fn team_status_cmd(
     // If a repository name was provided then check for an adhoc group named after that team in
     // that repository's `triagebot.toml` and require that team members be in that list to be
     // considered on rotation.
-    let adhoc_group: Option<Vec<String>> = if let Some(repo) = repo {
+    let adhoc_group: Option<Vec<String>> = {
         let repo = ctx
             .github
             .repository(repo)
@@ -595,14 +596,11 @@ async fn team_status_cmd(
         } else {
             None
         }
-    } else {
-        None
     };
 
-    // Currently hardcoded to rust-lang/rust
     let workqueue_arc = ctx
         .workqueue_map
-        .get("rust-lang/rust")
+        .get(repo)
         .unwrap_or_else(|| Arc::new(tokio::sync::RwLock::new(ReviewerWorkqueue::default())));
     let workqueue = workqueue_arc.read().await;
     let total_assigned: u64 = members
@@ -617,6 +615,7 @@ async fn team_status_cmd(
         let status = get_reviewer_status(
             member,
             &review_prefs,
+            repo,
             team_name,
             adhoc_group.as_ref(),
             &workqueue,
@@ -653,6 +652,7 @@ async fn team_status_cmd(
         let review_prefs = review_prefs.get(member.github.as_str());
         let max_capacity = review_prefs
             .as_ref()
+            .and_then(|prefs| prefs.repo_review_prefs.get(repo))
             .and_then(|prefs| prefs.max_assigned_prs)
             .map(|c| c.to_string());
         let max_capacity = max_capacity.as_deref().unwrap_or("unlimited");
@@ -716,6 +716,7 @@ enum ReviewerStatus {
 fn get_reviewer_status(
     member: &TeamMember,
     review_prefs: &HashMap<&str, ReviewPreferences>,
+    repo: &str,
     team_name: &str,
     adhoc_group: Option<&Vec<String>>,
     workqueue: &ReviewerWorkqueue,
@@ -730,7 +731,9 @@ fn get_reviewer_status(
         .as_ref()
         .map(|reviewers| reviewers.contains(&member.github.to_lowercase()))
         .unwrap_or(true);
-    let capacity_is_full = if let Some(capacity) = prefs.and_then(|prefs| prefs.max_assigned_prs)
+    let capacity_is_full = if let Some(capacity) = prefs
+        .and_then(|prefs| prefs.repo_review_prefs.get(repo))
+        .and_then(|prefs| prefs.max_assigned_prs)
         && capacity <= workqueue.assigned_pr_count(member.github_id) as u32
     {
         true
@@ -777,7 +780,7 @@ fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
         | ChatCommand::Lookup(_) => ImpersonationMode::Disabled,
         ChatCommand::Whoami => ImpersonationMode::Silent,
         ChatCommand::Work(cmd) => match cmd {
-            WorkqueueCmd::Show => ImpersonationMode::Silent,
+            WorkqueueCmd::Show { .. } => ImpersonationMode::Silent,
             WorkqueueCmd::SetPrLimit { .. }
             | WorkqueueCmd::SetRotationMode { .. }
             | WorkqueueCmd::SetTeamRotationMode { .. } => ImpersonationMode::Notify,
@@ -814,34 +817,40 @@ async fn workqueue_commands(
     }
 
     let response = match cmd {
-        WorkqueueCmd::Show => {
+        WorkqueueCmd::Show { repo } => {
+            let repo = normalize_repo(repo);
             // Currently hardcoded to rust-lang/rust workqueue
-            let mut assigned_prs = get_assigned_prs(ctx, "rust-lang/rust", gh_id)
+            let mut assigned_prs = get_assigned_prs(ctx, &repo, gh_id)
                 .await
                 .into_iter()
                 .collect::<Vec<_>>();
             assigned_prs.sort_by_key(|(pr_number, _)| *pr_number);
 
-            let capacity = match review_prefs.max_assigned_prs {
+            let capacity = match review_prefs
+                .repo_review_prefs
+                .get(&repo)
+                .map(|p| p.max_assigned_prs)
+                .unwrap_or_default()
+            {
                 Some(max) => max.to_string(),
                 None => String::from("Not set (i.e. unlimited)"),
             };
             let rotation_mode = format_rotation_mode(review_prefs.rotation_mode);
 
             let mut response = if assigned_prs.is_empty() {
-                "There are no PRs in your `rust-lang/rust` review queue\n".to_string()
+                format!("There are no PRs in your `{repo}` review queue\n")
             } else {
                 let prs = assigned_prs
                     .iter()
                     .map(|(pr_number, pr)| {
                         format!(
-                            "- [#{pr_number}](https://github.com/rust-lang/rust/pull/{pr_number}) {}",
+                            "- [#{pr_number}](https://github.com/{repo}/pull/{pr_number}) {}",
                             pr.title
                         )
                     })
                     .format("\n");
                 format!(
-                    "`rust-lang/rust` PRs in your review queue ({} {}):\n{prs}\n\n",
+                    "`{repo}` PRs in your review queue ({} {}):\n{prs}\n\n",
                     assigned_prs.len(),
                     pluralize("PR", assigned_prs.len())
                 )
@@ -863,22 +872,20 @@ async fn workqueue_commands(
             )?;
             response
         }
-        WorkqueueCmd::SetPrLimit { limit } => {
+        WorkqueueCmd::SetPrLimit { limit, repo } => {
+            let repo = normalize_repo(repo);
             let max_assigned_prs = match limit {
                 WorkqueueLimit::Unlimited => None,
                 WorkqueueLimit::Limit(limit) => Some(*limit),
             };
-            upsert_user_review_prefs(
-                &db_client,
-                user,
-                max_assigned_prs,
-                review_prefs.rotation_mode,
-            )
-            .await
-            .context("Error occurred while setting review preferences.")?;
-            tracing::info!("Setting max assignment PRs of `{gh_username}` to {max_assigned_prs:?}");
+            upsert_repo_review_prefs(&db_client, user, &repo, max_assigned_prs)
+                .await
+                .context("Error occurred while setting review preferences.")?;
+            tracing::info!(
+                "Setting max assigned PRs of `{gh_username}` in `{repo}` to {max_assigned_prs:?}"
+            );
             format!(
-                "Review capacity set to {}",
+                "Review capacity in `{repo}` set to {}",
                 match max_assigned_prs {
                     Some(v) => v.to_string(),
                     None => "unlimited".to_string(),
@@ -887,14 +894,9 @@ async fn workqueue_commands(
         }
         WorkqueueCmd::SetRotationMode { rotation_mode } => {
             let rotation_mode = rotation_mode.0;
-            upsert_user_review_prefs(
-                &db_client,
-                user,
-                review_prefs.max_assigned_prs,
-                rotation_mode,
-            )
-            .await
-            .context("Error occurred while setting review preferences.")?;
+            upsert_user_review_prefs(&db_client, user, rotation_mode)
+                .await
+                .context("Error occurred while setting review preferences.")?;
             tracing::info!("Setting rotation mode `{gh_username}` to {rotation_mode:?}");
             format!(
                 "Rotation mode set to *{}*.",
@@ -937,6 +939,15 @@ async fn workqueue_commands(
     };
 
     Ok(Some(response))
+}
+
+/// Add `rust-lang` prefix to repository name if it does not contain a slash.
+fn normalize_repo(repo: &str) -> String {
+    if repo.contains('/') {
+        repo.to_owned()
+    } else {
+        format!("rust-lang/{repo}")
+    }
 }
 
 /// The `whoami` command displays the user's membership in Rust teams.

@@ -70,13 +70,9 @@ impl AssignCtx {
         capacity: Option<u32>,
         rotation_mode: RotationMode,
     ) -> Self {
-        upsert_user_review_prefs(
-            self.test_ctx.db_client(),
-            user.clone(),
-            rotation_mode,
-        )
-        .await
-        .unwrap();
+        upsert_user_review_prefs(self.test_ctx.db_client(), user.clone(), rotation_mode)
+            .await
+            .unwrap();
         if let Some(capacity) = capacity {
             upsert_repo_review_prefs(
                 self.test_ctx.db_client(),

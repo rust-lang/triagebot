@@ -1243,6 +1243,8 @@ async fn candidate_reviewers_from_names<'a>(
     assert_eq!(candidates.len(), expanded_count);
 
     if config.review_prefs.is_some() {
+        let repo = issue.repository().full_repo_name();
+
         // Step 3: gather potential usernames to form a DB query for review preferences
         let usernames: Vec<String> = candidates
             .iter()
@@ -1269,7 +1271,11 @@ async fn candidate_reviewers_from_names<'a>(
                 let Some(review_prefs) = review_prefs.get(username.as_str()) else {
                     return Ok(candidate);
                 };
-                if let Some(capacity) = review_prefs.max_assigned_prs {
+                if let Some(capacity) = review_prefs
+                    .repo_review_prefs
+                    .get(&repo)
+                    .and_then(|p| p.max_assigned_prs)
+                {
                     let assigned_prs = workqueue.assigned_pr_count(review_prefs.user_id);
                     // Is the reviewer at max capacity?
                     if assigned_prs >= capacity as u64 {
