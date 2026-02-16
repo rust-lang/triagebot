@@ -692,7 +692,10 @@ async fn team_status_cmd(
 
     // e.g. 2 members, 5 PRs assigned
     let mut msg = format!(
-        "{} {}, {} {} assigned\n\n",
+        r#"`{team_name}` team stats for the `{repo}` repository:
+{} {}, {} {} assigned
+
+"#,
         members.len(),
         pluralize("member", members.len()),
         total_assigned,
