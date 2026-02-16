@@ -53,11 +53,10 @@ pub enum ChatCommand {
     TeamStats {
         /// Name of the team to query.
         name: String,
-        /// Name of the repository that is specifically being queried (e.g. `rust-lang/rust`)
-        ///
-        /// Someone might be on the review queue in the triagebot database but not listed in
-        /// `triagebot.toml` so in practice isn't getting reviews.
-        repo: Option<String>,
+        /// Repository that is specifically being queried.
+        /// Defaults to `rust` (if you do not specify an org, it will be filled to `rust-lang/`).
+        #[arg(long, default_value = "rust-lang/rust")]
+        repo: String,
     },
 }
 
@@ -80,11 +79,20 @@ pub enum LookupCmd {
 #[derive(clap::Parser, Debug, PartialEq)]
 pub enum WorkqueueCmd {
     /// Show the current state of your workqueue
-    Show,
-    /// Set the maximum capacity limit of your workqueue.
+    Show {
+        /// Repository for which to show the statistics.
+        /// Defaults to `rust` (if you do not specify an org, it will be filled to `rust-lang/`).
+        #[arg(long, default_value = "rust-lang/rust")]
+        repo: String,
+    },
+    /// Set the maximum capacity limit of your workqueue for a specific repository.
     SetPrLimit {
         /// Workqueue capacity
         limit: WorkqueueLimit,
+        /// Repository on which to set the limit.
+        /// Defaults to `rust` (if you do not specify an org, it will be filled to `rust-lang/`).
+        #[arg(long, default_value = "rust-lang/rust")]
+        repo: String,
     },
     /// Set your rotation mode (`on` rotation or `off` rotation).
     SetRotationMode {
@@ -349,13 +357,24 @@ mod tests {
     fn work_command() {
         assert_eq!(
             parse_chat(&["work", "show"]),
-            ChatCommand::Work(WorkqueueCmd::Show)
+            ChatCommand::Work(WorkqueueCmd::Show {
+                repo: "rust-lang/rust".to_string()
+            })
         );
 
         assert_eq!(
             parse_chat(&["work", "set-pr-limit", "unlimited"]),
             ChatCommand::Work(WorkqueueCmd::SetPrLimit {
-                limit: WorkqueueLimit::Unlimited
+                limit: WorkqueueLimit::Unlimited,
+                repo: "rust-lang/rust".to_string(),
+            })
+        );
+
+        assert_eq!(
+            parse_chat(&["work", "set-pr-limit", "5", "--repo", "foo"]),
+            ChatCommand::Work(WorkqueueCmd::SetPrLimit {
+                limit: WorkqueueLimit::Limit(5),
+                repo: "foo".to_string(),
             })
         );
     }
@@ -382,7 +401,19 @@ mod tests {
     fn work_uppercased_command() {
         assert_eq!(
             parse_chat(&["Work", "Show"]),
-            ChatCommand::Work(WorkqueueCmd::Show)
+            ChatCommand::Work(WorkqueueCmd::Show {
+                repo: "rust-lang/rust".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn work_repo() {
+        assert_eq!(
+            parse_chat(&["work", "show", "--repo", "foo/bar"]),
+            ChatCommand::Work(WorkqueueCmd::Show {
+                repo: "foo/bar".to_string()
+            })
         );
     }
 

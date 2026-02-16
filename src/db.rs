@@ -353,4 +353,21 @@ CREATE TABLE IF NOT EXISTS team_review_prefs (
     UNIQUE(user_id, team)
 );
 "#,
+    r#"
+CREATE TABLE IF NOT EXISTS repo_review_prefs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id BIGINT REFERENCES users(user_id),
+    repo TEXT NOT NULL,
+    max_assigned_prs INTEGER DEFAULT NULL,
+    UNIQUE(user_id, repo)
+);
+"#,
+    // Backfill existing repository preferences - the global ones were treated as being for
+    // rust-lang/rust
+    r#"
+INSERT INTO repo_review_prefs(user_id, repo, max_assigned_prs)
+SELECT user_id, 'rust-lang/rust', max_assigned_prs
+FROM review_prefs
+WHERE max_assigned_prs IS NOT NULL
+    "#,
 ];

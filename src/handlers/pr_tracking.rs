@@ -64,7 +64,7 @@ impl TrackedRepository {
     }
 }
 
-/// Maps users to a set of currently assigned open non-draft pull requests.
+/// Maps users to a set of currently assigned open non-draft pull requests in a single repository.
 /// We store this map in memory, rather than in the DB, because it can get desynced when webhooks
 /// are missed.
 /// It is thus reloaded when triagebot starts and also periodically, so it is not needed to store it
