@@ -954,16 +954,23 @@ async fn normalize_repo(ctx: &Context, repo_name: &str) -> anyhow::Result<String
         };
         repo
     } else {
-        // No org found, try to lookup by values
-        let Some(repo) = repos
+        let mut matched_repos = repos
             .repos
             .values()
             .flatten()
-            .find(|repo| repo.name == repo_name)
-        else {
+            .filter(|repo| repo.name == repo_name);
+        // No org found, try to look up by repo name
+        if let Some(repo) = matched_repos.next() {
+            if matched_repos.next().is_some() {
+                return Err(anyhow::anyhow!(
+                    "Name {repo_name} matched multiple repositories, please provide fully qualified name"
+                ));
+            } else {
+                repo
+            }
+        } else {
             return Err(anyhow::anyhow!("Repository {repo_name} not found"));
-        };
-        repo
+        }
     };
     Ok(format!("{}/{}", repo.org, repo.name))
 }
