@@ -25,7 +25,11 @@ use tracing as log;
 
 /// Repositories for which we track the reviewer workqueue.
 pub fn get_review_tracked_repositories() -> Vec<TrackedRepository> {
-    vec![TrackedRepository::new("rust-lang", "rust")]
+    vec![
+        TrackedRepository::new("rust-lang", "rust"),
+        TrackedRepository::new("rust-lang", "cargo"),
+        TrackedRepository::new("rust-lang", "rust-clippy"),
+    ]
 }
 
 #[derive(Clone, Debug)]
@@ -247,7 +251,7 @@ pub async fn load_workqueue(
             prs.insert(pr_number, pr);
             acc
         });
-    tracing::debug!("PR assignments\n{aggregated:?}");
+    tracing::debug!("PR assignments for `{}`:\n{aggregated:?}", repo.full_name());
     Ok(ReviewerWorkqueue::new(aggregated))
 }
 
