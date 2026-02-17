@@ -164,6 +164,16 @@ pub async fn gh_comments(
         const utcDate = new Date(utcString);
         element.textContent = utcDate.toLocaleString();
       }});
+      document.querySelectorAll('.markdown-body a').forEach(link => {{
+        const linkUrl = new URL(link.href, window.location.origin);
+        const anchor = linkUrl.hash.slice(1);
+        if (link.host === "github.com" && anchor) {{
+          const target = document.getElementById(anchor);
+          if (target) {{
+            link.href = `#${{anchor}}`;
+          }}
+        }}
+      }});
     }});
   </script>
 </head>
