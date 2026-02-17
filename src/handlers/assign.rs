@@ -328,7 +328,7 @@ async fn set_assignee(
         IssueData::load(&mut db, issue, PREVIOUS_REVIEWERS_KEY).await?;
 
     // Don't re-assign if already assigned, e.g. on comment edit
-    if issue.contain_assignee(&reviewer.name) {
+    if issue.contain_assignee(&reviewer.name) && issue.assignees.len() == 1 {
         log::trace!(
             "ignoring assign PR {} to {}, already assigned",
             issue.global_id(),
@@ -709,6 +709,13 @@ pub(super) async fn handle_command(
         .await
         {
             Ok(assignee) => assignee,
+            Err(FindReviewerError::ReviewerAlreadyAssigned { username })
+                if issue.contain_assignee(&event.user().login) =>
+            {
+                // If one of the assignee tries to assign another already assigned user,
+                // let it pass, as it means they wanted to be removed from the assignee list.
+                ReviewerSelection::new(username, Vec::new())
+            }
             Err(e) => {
                 issue.post_comment(&ctx.github, &e.to_string()).await?;
                 return Ok(());
