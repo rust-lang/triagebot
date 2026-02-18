@@ -1,3 +1,8 @@
+//! Handles sending messages to the Zulip chat instance.
+//!
+//! Configured in [notify-zulip.*] sections
+//!
+
 use crate::github::User;
 use crate::zulip::api::Recipient;
 use crate::zulip::render_zulip_username;

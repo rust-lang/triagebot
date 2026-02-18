@@ -1,3 +1,5 @@
+//! Handles commands sent to triagebot Zulip user.
+
 use crate::db::notifications::Identifier;
 use crate::db::review_prefs::RotationMode;
 use crate::github::PullRequestNumber;
