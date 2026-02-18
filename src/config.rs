@@ -15,53 +15,93 @@ type MaybeConfig = Result<Arc<Config>, ConfigurationError>;
 static CONFIG_CACHE: LazyLock<RwLock<HashMap<String, (MaybeConfig, Instant)>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
+static ORG_CONFIGS: LazyLock<HashMap<&str, OrgConfig>> = LazyLock::new(|| {
+    let mut configs = HashMap::new();
+    configs.insert(
+        "rust-lang",
+        toml::from_str(include_str!("../rust-lang.triagebot.toml")).unwrap(),
+    );
+    configs
+});
+
+macro_rules! define_config {
+    ($(
+        $(#[$field_attr:meta])* $field:ident: $ty:ty
+    ),* $(,)?) => {
+        #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+        #[serde(rename_all = "kebab-case")]
+        #[serde(deny_unknown_fields)]
+        pub(crate) struct Config {
+            $(
+                $(#[$field_attr])*
+                pub(crate) $field: Option<$ty>,
+            )*
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        #[serde(rename_all = "kebab-case")]
+        #[serde(deny_unknown_fields)]
+        struct OrgConfig {
+            $(
+                $(#[$field_attr])*
+                $field: Option<WithExcludedRepos<$ty>>,
+            )*
+        }
+
+        macro_rules! merge_org_config {
+            ($config:expr, $org_config:expr, $repo:expr) => {
+                $(
+                crate::config::merge_individual_config(&mut $config.$field, &$org_config.$field, $repo);
+                )*
+            };
+        }
+    };
+}
+
 // This struct maps each possible option of the triagebot.toml.
 // See documentation of options at: https://forge.rust-lang.org/triagebot/pr-assignment.html#configuration
 // When adding a new config option to the triagebot.toml, it must be also mapped here
 // Will be used by the `issue_handlers!()` or `command_handlers!()` macros.
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
-#[serde(rename_all = "kebab-case")]
-#[serde(deny_unknown_fields)]
-pub(crate) struct Config {
-    pub(crate) relabel: Option<RelabelConfig>,
-    pub(crate) assign: Option<AssignConfig>,
-    pub(crate) ping: Option<PingConfig>,
-    pub(crate) nominate: Option<NominateConfig>,
-    pub(crate) prioritize: Option<PrioritizeConfig>,
-    pub(crate) major_change: Option<MajorChangeConfig>,
-    pub(crate) close: Option<CloseConfig>,
-    pub(crate) autolabel: Option<AutolabelConfig>,
-    pub(crate) notify_zulip: Option<NotifyZulipConfig>,
-    pub(crate) github_releases: Option<GitHubReleasesConfig>,
-    pub(crate) review_submitted: Option<ReviewSubmittedConfig>,
-    pub(crate) review_requested: Option<ReviewRequestedConfig>,
-    pub(crate) shortcut: Option<ShortcutConfig>,
-    pub(crate) note: Option<NoteConfig>,
-    pub(crate) concern: Option<ConcernConfig>,
-    pub(crate) mentions: Option<MentionsConfig>,
-    pub(crate) no_merges: Option<NoMergesConfig>,
-    pub(crate) pr_tracking: Option<ReviewPrefsConfig>,
-    pub(crate) transfer: Option<TransferConfig>,
-    pub(crate) merge_conflicts: Option<MergeConflictConfig>,
-    pub(crate) bot_pull_requests: Option<BotPullRequests>,
-    pub(crate) rendered_link: Option<RenderedLinkConfig>,
+define_config! {
+    relabel: RelabelConfig,
+    assign: AssignConfig,
+    ping: PingConfig,
+    nominate: NominateConfig,
+    prioritize: PrioritizeConfig,
+    major_change: MajorChangeConfig,
+    close: CloseConfig,
+    autolabel: AutolabelConfig,
+    notify_zulip: NotifyZulipConfig,
+    github_releases: GitHubReleasesConfig,
+    review_submitted: ReviewSubmittedConfig,
+    review_requested: ReviewRequestedConfig,
+    shortcut: ShortcutConfig,
+    note: NoteConfig,
+    concern: ConcernConfig,
+    mentions: MentionsConfig,
+    no_merges: NoMergesConfig,
+    pr_tracking: ReviewPrefsConfig,
+    transfer: TransferConfig,
+    merge_conflicts: MergeConflictConfig,
+    bot_pull_requests: BotPullRequests,
+    rendered_link: RenderedLinkConfig,
     #[serde(alias = "canonicalize-issue-links")]
-    pub(crate) issue_links: Option<IssueLinksConfig>,
-    pub(crate) behind_upstream: Option<BehindUpstreamConfig>,
-    pub(crate) backport: Option<BackportConfig>,
-    pub(crate) range_diff: Option<RangeDiffConfig>,
-    pub(crate) review_changes_since: Option<ReviewChangesSinceConfig>,
-    pub(crate) view_all_comments_link: Option<ViewAllCommentsLinkConfig>,
+    issue_links: IssueLinksConfig,
+    behind_upstream: BehindUpstreamConfig,
+    backport: BackportConfig,
+    range_diff: RangeDiffConfig,
+    review_changes_since: ReviewChangesSinceConfig,
+    view_all_comments_link: ViewAllCommentsLinkConfig,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NominateConfig {
     // team name -> label
     pub(crate) teams: HashMap<String, String>,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 pub(crate) struct PingConfig {
     // team name -> message
     // message will have the cc string appended
@@ -85,7 +125,7 @@ impl PingConfig {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PingTeamConfig {
     pub(crate) message: String,
@@ -94,11 +134,11 @@ pub(crate) struct PingTeamConfig {
     pub(crate) label: Option<String>,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AssignReviewPrefsConfig {}
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AssignCustomMessages {
@@ -110,7 +150,7 @@ pub(crate) struct AssignCustomMessages {
     pub(crate) auto_assign_no_one: String,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AssignConfig {
     /// If enabled, then posts a warning comment if the PR is opened against a
@@ -153,7 +193,7 @@ impl AssignConfig {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(untagged)]
 pub(crate) enum WarnNonDefaultBranchConfig {
@@ -166,7 +206,7 @@ pub(crate) enum WarnNonDefaultBranchConfig {
     },
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct WarnNonDefaultBranchException {
     /// Substring in the title that match this exception
@@ -192,7 +232,7 @@ impl WarnNonDefaultBranchConfig {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NoMergesConfig {
     /// No action will be taken on PRs with these substrings in the title.
@@ -209,14 +249,14 @@ pub(crate) struct NoMergesConfig {
     pub(crate) message: Option<String>,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NoteConfig {
     #[serde(default)]
     _empty: (),
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ConcernConfig {
     /// Set the labels on the PR when concerns are active.
@@ -224,13 +264,13 @@ pub(crate) struct ConcernConfig {
     pub(crate) labels: Vec<String>,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 pub(crate) struct MentionsConfig {
     #[serde(flatten)]
     pub(crate) entries: HashMap<String, MentionsEntryConfig>,
 }
 
-#[derive(PartialEq, Eq, Debug, Default, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Default, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum MentionsEntryType {
     #[default]
@@ -238,7 +278,7 @@ pub(crate) enum MentionsEntryType {
     Content,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct MentionsEntryConfig {
     #[serde(alias = "type")]
@@ -249,7 +289,7 @@ pub(crate) struct MentionsEntryConfig {
     pub(crate) cc: Vec<String>,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct RelabelConfig {
     #[serde(default)]
@@ -277,7 +317,7 @@ impl RelabelConfig {
     }
 }
 
-#[derive(Default, PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(Default, PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RelabelAliasConfig {
@@ -309,20 +349,20 @@ impl RelabelAliasConfig {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ShortcutConfig {
     #[serde(default)]
     _empty: (),
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PrioritizeConfig {
     pub(crate) label: String,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 pub(crate) struct AutolabelConfig {
     #[serde(flatten)]
     pub(crate) labels: HashMap<String, AutolabelLabelConfig>,
@@ -340,7 +380,7 @@ impl AutolabelConfig {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AutolabelLabelConfig {
     #[serde(default)]
@@ -359,13 +399,13 @@ pub(crate) struct AutolabelLabelConfig {
     pub(crate) pr_merged: bool,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 pub(crate) struct NotifyZulipConfig {
     #[serde(flatten)]
     pub(crate) labels: HashMap<String, NotifyZulipTablesConfig>,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub(crate) struct NotifyZulipTablesConfig {
     pub(crate) subtables: HashMap<String, NotifyZulipLabelConfig>,
 }
@@ -409,7 +449,7 @@ impl<'de> serde::Deserialize<'de> for NotifyZulipTablesConfig {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) zulip_stream: u64,
@@ -438,7 +478,7 @@ pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) required_labels: Vec<String>,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct MajorChangeConfig {
     /// A username (typically a group, e.g. T-lang) to ping on Zulip for newly
@@ -491,7 +531,7 @@ impl MajorChangeConfig {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct MajorChangeTrackingIssueTemplateConfig {
@@ -505,40 +545,25 @@ pub(crate) struct MajorChangeTrackingIssueTemplateConfig {
     pub(crate) body: String,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct CloseConfig {}
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReviewSubmittedConfig {
     pub(crate) review_labels: Vec<String>,
     pub(crate) reviewed_label: String,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReviewRequestedConfig {
     pub(crate) remove_labels: Vec<String>,
     pub(crate) add_labels: Vec<String>,
 }
 
-pub(crate) async fn get(gh: &GithubClient, repo: &Repository) -> MaybeConfig {
-    if let Some(config) = get_cached_config(&repo.full_name) {
-        log::trace!("returning config for {} from cache", repo.full_name);
-        config
-    } else {
-        log::trace!("fetching fresh config for {}", repo.full_name);
-        let res = get_fresh_config(gh, repo).await;
-        CONFIG_CACHE
-            .write()
-            .unwrap()
-            .insert(repo.full_name.to_string(), (res.clone(), Instant::now()));
-        res
-    }
-}
-
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GitHubReleasesConfig {
@@ -548,18 +573,18 @@ pub(crate) struct GitHubReleasesConfig {
     pub(crate) changelog_branch: String,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 pub(crate) struct ReviewPrefsConfig {
     #[serde(default)]
     _empty: (),
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TransferConfig {}
 
-#[derive(Clone, PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct MergeConflictConfig {
@@ -571,12 +596,12 @@ pub(crate) struct MergeConflictConfig {
     pub unless: HashSet<String>,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct BotPullRequests {}
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RenderedLinkConfig {
@@ -587,7 +612,7 @@ pub(crate) struct RenderedLinkConfig {
     pub(crate) exclude_files: Vec<String>,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct IssueLinksConfig {
@@ -595,7 +620,7 @@ pub(crate) struct IssueLinksConfig {
     pub(crate) check_commits: IssueLinksCheckCommitsConfig,
 }
 
-#[derive(PartialEq, Eq, Debug, Default)]
+#[derive(PartialEq, Eq, Debug, Clone, Default)]
 pub(crate) enum IssueLinksCheckCommitsConfig {
     /// No checking of commits
     Off,
@@ -645,7 +670,7 @@ impl<'de> serde::Deserialize<'de> for IssueLinksCheckCommitsConfig {
 }
 
 /// Configuration for PR behind commits checks
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct BehindUpstreamConfig {
@@ -654,14 +679,14 @@ pub(crate) struct BehindUpstreamConfig {
     pub(crate) days_threshold: Option<usize>,
 }
 
-#[derive(PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 pub(crate) struct BackportConfig {
     // Config identifier -> labels
     #[serde(flatten)]
     pub(crate) configs: HashMap<String, BackportRuleConfig>,
 }
 
-#[derive(Default, PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(Default, PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct BackportRuleConfig {
@@ -674,19 +699,19 @@ pub(crate) struct BackportRuleConfig {
 }
 
 /// Configuration for rebase range-diff comment
-#[derive(Default, PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(Default, PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RangeDiffConfig {}
 
 /// Configuration for the changes since link on review body
-#[derive(Default, PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(Default, PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReviewChangesSinceConfig {}
 
 /// Configuration for "View all comments" link feature
-#[derive(Default, PartialEq, Eq, Debug, serde::Deserialize)]
+#[derive(Default, PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ViewAllCommentsLinkConfig {
@@ -701,6 +726,30 @@ pub(crate) struct ViewAllCommentsLinkConfig {
     pub(crate) exclude_prs: bool,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct WithExcludedRepos<T> {
+    #[serde(flatten)]
+    config: T,
+    #[serde(default)]
+    excluded_repos: Vec<String>,
+}
+
+pub(crate) async fn get(gh: &GithubClient, repo: &Repository) -> MaybeConfig {
+    if let Some(config) = get_cached_config(&repo.full_name) {
+        log::trace!("returning config for {} from cache", repo.full_name);
+        config
+    } else {
+        log::trace!("fetching fresh config for {}", repo.full_name);
+        let res = get_fresh_config(gh, repo).await;
+        CONFIG_CACHE
+            .write()
+            .unwrap()
+            .insert(repo.full_name.to_string(), (res.clone(), Instant::now()));
+        res
+    }
+}
+
 fn get_cached_config(repo: &str) -> Option<MaybeConfig> {
     let cache = CONFIG_CACHE.read().unwrap();
     cache.get(repo).and_then(|(config, fetch_time)| {
@@ -712,16 +761,38 @@ fn get_cached_config(repo: &str) -> Option<MaybeConfig> {
     })
 }
 
+fn merge_individual_config<T: Clone>(
+    current_config: &mut Option<T>,
+    org_config: &Option<WithExcludedRepos<T>>,
+    repo: &Repository,
+) {
+    // We want to merge the organization config into the repo config
+    // if the repo config is not set and the org config does not exclude
+    // the current repository.
+    if current_config.is_none()
+        && let Some(from) = org_config
+        && !from.excluded_repos.iter().any(|r| r == &repo.full_name)
+    {
+        *current_config = Some(from.config.clone());
+    }
+}
+
 async fn get_fresh_config(gh: &GithubClient, repo: &Repository) -> MaybeConfig {
     let contents = gh
         .raw_file(&repo.full_name, &repo.default_branch, CONFIG_FILE_NAME)
         .await
         .map_err(|e| ConfigurationError::Http(Arc::new(e)))?
         .ok_or(ConfigurationError::Missing)?;
+
     let contents = String::from_utf8_lossy(&contents);
-    let config = Arc::new(toml::from_str::<Config>(&contents).map_err(ConfigurationError::Toml)?);
+    let mut config = toml::from_str::<Config>(&contents).map_err(ConfigurationError::Toml)?;
     log::debug!("fresh configuration for {}: {:?}", repo.full_name, config);
-    Ok(config)
+
+    if let Some(org_config) = ORG_CONFIGS.get(repo.owner()) {
+        merge_org_config!(&mut config, org_config, repo);
+    }
+
+    Ok(Arc::new(config))
 }
 
 #[derive(Clone, Debug)]
@@ -1332,5 +1403,185 @@ Multi text body with ${mcp_issue} and ${mcp_title}
                 exclude_prs: true,
             })
         );
+    }
+
+    #[test]
+    fn static_org_configs_validation() {
+        let _configs = &*super::ORG_CONFIGS;
+    }
+
+    #[test]
+    fn merge_org_config_repo_only() {
+        let config = r#"
+            [view-all-comments-link]
+            threshold = 25
+            exclude-prs = true
+        "#;
+        let mut config = toml::from_str::<Config>(&config).unwrap();
+
+        assert_eq!(
+            config.view_all_comments_link,
+            Some(ViewAllCommentsLinkConfig {
+                threshold: Some(25),
+                exclude_issues: false,
+                exclude_prs: true,
+            })
+        );
+
+        let org_config = "";
+        let org_config = toml::from_str::<OrgConfig>(&org_config).unwrap();
+
+        assert_eq!(org_config.view_all_comments_link, None);
+
+        let repo = Repository {
+            full_name: "rust-lang/foo".to_string(),
+            ..Default::default()
+        };
+
+        merge_org_config!(&mut config, org_config, &repo);
+
+        assert_eq!(
+            config.view_all_comments_link,
+            Some(ViewAllCommentsLinkConfig {
+                threshold: Some(25),
+                exclude_issues: false,
+                exclude_prs: true,
+            })
+        );
+    }
+
+    #[test]
+    fn merge_org_config_no_override() {
+        let config = r#"
+            [view-all-comments-link]
+            threshold = 999
+        "#;
+        let mut config = toml::from_str::<Config>(&config).unwrap();
+
+        assert_eq!(
+            config.view_all_comments_link,
+            Some(ViewAllCommentsLinkConfig {
+                threshold: Some(999),
+                exclude_issues: false,
+                exclude_prs: false,
+            })
+        );
+
+        let org_config = r#"
+            [view-all-comments-link]
+            exclude-prs = true
+        "#;
+        let org_config = toml::from_str::<OrgConfig>(&org_config).unwrap();
+
+        assert_eq!(
+            org_config.view_all_comments_link,
+            Some(WithExcludedRepos {
+                config: ViewAllCommentsLinkConfig {
+                    threshold: None,
+                    exclude_issues: false,
+                    exclude_prs: true,
+                },
+                excluded_repos: Vec::new(),
+            })
+        );
+
+        let repo = Repository {
+            full_name: "rust-lang/foo".to_string(),
+            ..Default::default()
+        };
+
+        merge_org_config!(&mut config, org_config, &repo);
+
+        // Config stays the same os the repo config
+        assert_eq!(
+            config.view_all_comments_link,
+            Some(ViewAllCommentsLinkConfig {
+                threshold: Some(999),
+                exclude_issues: false,
+                exclude_prs: false,
+            })
+        );
+    }
+
+    #[test]
+    fn merge_org_config_append_org() {
+        let config = "";
+        let mut config = toml::from_str::<Config>(&config).unwrap();
+
+        assert_eq!(config.view_all_comments_link, None);
+
+        let org_config = r#"
+            [view-all-comments-link]
+            threshold = 25
+            exclude-prs = true
+        "#;
+        let org_config = toml::from_str::<OrgConfig>(&org_config).unwrap();
+
+        assert_eq!(
+            org_config.view_all_comments_link,
+            Some(WithExcludedRepos {
+                config: ViewAllCommentsLinkConfig {
+                    threshold: Some(25),
+                    exclude_issues: false,
+                    exclude_prs: true,
+                },
+                excluded_repos: Vec::new(),
+            })
+        );
+
+        let repo = Repository {
+            full_name: "rust-lang/foo".to_string(),
+            ..Default::default()
+        };
+
+        merge_org_config!(&mut config, org_config, &repo);
+
+        // Merged from a
+        assert_eq!(
+            config.view_all_comments_link,
+            Some(ViewAllCommentsLinkConfig {
+                threshold: Some(25),
+                exclude_issues: false,
+                exclude_prs: true,
+            })
+        );
+    }
+
+    #[test]
+    fn merge_org_config_excluded_org() {
+        let config = "";
+        let mut config = toml::from_str::<Config>(&config).unwrap();
+
+        assert_eq!(config.view_all_comments_link, None);
+
+        let org_config = r#"
+            [view-all-comments-link]
+            threshold = 25
+            exclude-prs = true
+            excluded-repos = ["rust-lang/foo"]
+        "#;
+        let org_config = toml::from_str::<OrgConfig>(&org_config).unwrap();
+
+        assert_eq!(
+            org_config.view_all_comments_link,
+            Some(WithExcludedRepos {
+                config: ViewAllCommentsLinkConfig {
+                    threshold: Some(25),
+                    exclude_issues: false,
+                    exclude_prs: true,
+                },
+                excluded_repos: vec!["rust-lang/foo".to_string()],
+            })
+        );
+
+        let repo = Repository {
+            full_name: "rust-lang/foo".to_string(),
+            ..Default::default()
+        };
+
+        merge_org_config!(&mut config, org_config, &repo);
+
+        // Stay empty as it's in an excluded repo
+        assert_eq!(config.view_all_comments_link, None);
     }
 }
