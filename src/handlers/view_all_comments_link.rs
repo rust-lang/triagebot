@@ -10,7 +10,7 @@ use crate::{
 // starts being lazy and shows it's "Load more" button.
 //
 // Unfortunately the webhook don't give us the number of timeline events
-// but we get do the get number of comments (without doing any API calls!).
+// but we get the number of comments (without doing any API calls!).
 //
 // So we approximate to 20 comments (+5 events) the minimum threashold.
 const DEFAULT_THRESHOLD: u32 = 20;
