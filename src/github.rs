@@ -1363,6 +1363,7 @@ pub struct IssueSearchResult {
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
+#[cfg_attr(test, derive(Default))]
 pub struct Repository {
     pub full_name: String,
     pub default_branch: String,

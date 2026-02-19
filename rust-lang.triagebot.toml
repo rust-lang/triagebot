@@ -1,0 +1,4 @@
+# This file defines the default configuration for the entire `rust-lang` organization.
+#
+# The available configuration options and features are the same as those in the `triagebot.toml` repository,
+# except that each configuration entry can include an `excluded-repos = ["rust-lang/foo"]` option.
