@@ -8,7 +8,7 @@ use crate::db::review_prefs::{
     ReviewPreferences, RotationMode, get_review_prefs, get_review_prefs_batch,
     upsert_repo_review_prefs, upsert_team_review_prefs, upsert_user_review_prefs,
 };
-use crate::github::{User, UserComment};
+use crate::github::{self, User, UserComment};
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::{ReviewerWorkqueue, get_assigned_prs};
@@ -28,7 +28,6 @@ use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
 use commands::BackportArgs;
 use itertools::Itertools;
-use octocrab::Octocrab;
 use rust_team_data::v1::{TeamKind, TeamMember};
 use secrecy::{ExposeSecret, SecretString};
 use std::cmp::{Ordering, Reverse};
@@ -43,10 +42,9 @@ fn get_text_backport_approved(
     verb: &BackportVerbArgs,
     zulip_link: &str,
 ) -> String {
-    format!("
-{channel} backport {verb} as per compiler team [on Zulip]({zulip_link}). A backport PR will be authored by the release team at the end of the current development cycle. Backport labels are handled by them.
-
-@rustbot label +{channel}-accepted")
+    format!(
+        "{channel} backport {verb} as per compiler team [on Zulip]({zulip_link}). A backport PR will be authored by the release team at the end of the current development cycle. Backport labels are handled by them."
+    )
 }
 
 fn get_text_backport_declined(
@@ -54,12 +52,7 @@ fn get_text_backport_declined(
     verb: &BackportVerbArgs,
     zulip_link: &str,
 ) -> String {
-    format!(
-        "
-{channel} backport {verb} as per compiler team [on Zulip]({zulip_link}).
-
-@rustbot label -{channel}-nominated -{channel}-accepted"
-    )
+    format!("{channel} backport {verb} as per compiler team [on Zulip]({zulip_link}).")
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -370,7 +363,7 @@ async fn handle_command<'a>(
                 }
                 StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
                 StreamCommand::Backport(args) => {
-                    accept_decline_backport(message_data, &ctx.octocrab, &ctx.zulip, &args).await
+                    accept_decline_backport(ctx, message_data, &args).await
                 }
                 StreamCommand::Comments {
                     username,
@@ -388,15 +381,15 @@ async fn handle_command<'a>(
 
 // TODO: shorter variant of this command (f.e. `backport accept` or even `accept`) that infers everything from the Message payload
 async fn accept_decline_backport(
+    ctx: Arc<Context>,
     message_data: &Message,
-    octo_client: &Octocrab,
-    zulip_client: &ZulipClient,
     args_data: &BackportArgs,
 ) -> anyhow::Result<Option<String>> {
     let message = message_data.clone();
     let args = args_data.clone();
     let stream_id = message.stream_id.unwrap();
     let subject = message.subject.unwrap();
+    let zulip_client = &ctx.zulip;
 
     // Repository owner and name are hardcoded
     // This command is only used in this repository
@@ -416,23 +409,64 @@ async fn accept_decline_backport(
     // See: https://rust-lang.zulipchat.com/#narrow/channel/122653-zulip/topic/.22near.22.20parameter.20in.20payload.20of.20send.20message.20API
     let zulip_link = zulip_send_req.url(zulip_client);
 
-    let message_body = match args.verb {
+    let (message_body, approve_backport) = match args.verb {
         BackportVerbArgs::Accept
         | BackportVerbArgs::Accepted
         | BackportVerbArgs::Approve
-        | BackportVerbArgs::Approved => {
-            get_text_backport_approved(&args.channel, &args.verb, &zulip_link)
-        }
-        BackportVerbArgs::Decline | BackportVerbArgs::Declined => {
-            get_text_backport_declined(&args.channel, &args.verb, &zulip_link)
-        }
+        | BackportVerbArgs::Approved => (
+            get_text_backport_approved(&args.channel, &args.verb, &zulip_link),
+            true,
+        ),
+        BackportVerbArgs::Decline | BackportVerbArgs::Declined => (
+            get_text_backport_declined(&args.channel, &args.verb, &zulip_link),
+            false,
+        ),
     };
 
-    let _ = octo_client
-        .issues(repo_owner, repo_name)
-        .create_comment(args.pr_num, &message_body)
+    let issue_repo = github::IssueRepository {
+        organization: repo_owner.clone(),
+        repository: repo_name.clone(),
+    };
+
+    let issue = ctx
+        .github
+        .pull_request(&issue_repo, args.pr_num)
+        .await
+        .context("could not get the pull request details")?;
+
+    // post a comment on GitHub
+    issue
+        .post_comment(&ctx.github, &message_body)
         .await
         .with_context(|| anyhow::anyhow!("unable to post comment on #{}", args.pr_num))?;
+
+    // Add or remove backport labels
+    if approve_backport {
+        issue
+            .add_labels(
+                &ctx.github,
+                vec![github::Label {
+                    name: format!("{}-accepted", args.channel),
+                }],
+            )
+            .await
+            .context("failed to add labels to the issue")?;
+    } else {
+        issue
+            .remove_labels(
+                &ctx.github,
+                vec![
+                    github::Label {
+                        name: format!("{}-nominated", args.channel),
+                    },
+                    github::Label {
+                        name: format!("{}-accepted", args.channel),
+                    },
+                ],
+            )
+            .await
+            .context("failed to remove labels from the issue")?;
+    }
 
     Ok(None)
 }
