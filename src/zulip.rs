@@ -396,6 +396,28 @@ async fn accept_decline_backport(
     let repo_owner = std::env::var("MAIN_GH_REPO_OWNER").unwrap_or("rust-lang".to_string());
     let repo_name = std::env::var("MAIN_GH_REPO_NAME").unwrap_or("rust".to_string());
 
+    let issue_repo = github::IssueRepository {
+        organization: repo_owner.clone(),
+        repository: repo_name.clone(),
+    };
+
+    let issue = ctx
+        .github
+        .pull_request(&issue_repo, args.pr_num)
+        .await
+        .context(format!(
+            "Could not get #{} details (hint: maybe not a PR?)",
+            args.pr_num
+        ))?;
+
+    let nominated = issue.labels.iter().any(|l| l.name.contains("-nominated"));
+    if !nominated {
+        return Ok(Some(format!(
+            "Can't approve backport: #{} was not {} nominated",
+            &args.pr_num, args.channel,
+        )));
+    }
+
     // TODO: factor out the Zulip "URL encoder" to make it practical to use
     let zulip_send_req = crate::zulip::MessageApiRequest {
         recipient: Recipient::Stream {
@@ -422,17 +444,6 @@ async fn accept_decline_backport(
             false,
         ),
     };
-
-    let issue_repo = github::IssueRepository {
-        organization: repo_owner.clone(),
-        repository: repo_name.clone(),
-    };
-
-    let issue = ctx
-        .github
-        .pull_request(&issue_repo, args.pr_num)
-        .await
-        .context("could not get the pull request details")?;
 
     // post a comment on GitHub
     issue
