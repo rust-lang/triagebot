@@ -186,8 +186,6 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 
     let agenda = Router::new()
         .route("/", get(|| async { Html(triagebot::agenda::INDEX) }))
-        .route("/lang/triage", get(triagebot::agenda::lang_http))
-        .route("/lang/planning", get(triagebot::agenda::lang_planning_http))
         .route(
             "/types/planning",
             get(triagebot::agenda::types_planning_http),

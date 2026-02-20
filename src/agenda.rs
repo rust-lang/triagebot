@@ -1,17 +1,7 @@
-use axum::response::Html;
-
 use crate::actions::{Action, Query, QueryKind, QueryMap, Step};
 use crate::errors::AppError;
 use crate::github;
 use std::sync::Arc;
-
-pub async fn lang_http() -> axum::response::Result<Html<String>, AppError> {
-    Ok(Html(lang().call().await?))
-}
-
-pub async fn lang_planning_http() -> axum::response::Result<Html<String>, AppError> {
-    Ok(Html(lang_planning().call().await?))
-}
 
 pub async fn types_planning_http() -> axum::response::Result<String, AppError> {
     Ok(types_planning().call().await?)
@@ -474,175 +464,6 @@ pub fn prioritization() -> Box<dyn Action> {
     })
 }
 
-pub fn lang() -> Box<dyn Action + Send + Sync> {
-    Box::new(Step {
-        name: "lang_agenda",
-        actions: vec![
-            Query {
-                repos: vec![("rust-lang", "lang-team")],
-                queries: vec![
-                    QueryMap {
-                        name: "pending_project_proposals",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open"), ("is", "issue")],
-                            include_labels: vec!["major-change"],
-                            exclude_labels: vec!["charter-needed", "proposed-final-comment-period"],
-                        }),
-                    },
-                    QueryMap {
-                        name: "pending_lang_team_prs",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open"), ("is", "pull-request")],
-                            include_labels: vec![],
-                            exclude_labels: vec![],
-                        }),
-                    },
-                    QueryMap {
-                        name: "scheduled_meetings",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::DesignMeetings {
-                            with_status: github::DesignMeetingStatus::Scheduled,
-                        }),
-                    },
-                ],
-            },
-            Query {
-                repos: vec![("rust-lang", "rfcs")],
-                queries: vec![QueryMap {
-                    name: "rfcs_waiting_to_be_merged",
-                    kind: QueryKind::List,
-                    query: Arc::new(github::Query {
-                        filters: vec![("state", "open"), ("is", "pr")],
-                        include_labels: vec![
-                            "disposition-merge",
-                            "finished-final-comment-period",
-                            "T-lang",
-                        ],
-                        exclude_labels: vec![],
-                    }),
-                }],
-            },
-            Query {
-                repos: vec![
-                    ("rust-lang", "rfcs"),
-                    ("rust-lang", "rust"),
-                    ("rust-lang", "reference"),
-                    ("rust-lang", "lang-team"),
-                    ("rust-lang", "compiler-team"),
-                ],
-                queries: vec![
-                    QueryMap {
-                        name: "p_critical",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open")],
-                            include_labels: vec!["T-lang", "P-critical"],
-                            exclude_labels: vec![],
-                        }),
-                    },
-                    QueryMap {
-                        name: "nominated",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open")],
-                            include_labels: vec!["I-lang-nominated"],
-                            exclude_labels: vec![],
-                        }),
-                    },
-                    QueryMap {
-                        name: "waiting_on_lang_team",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open")],
-                            include_labels: vec!["S-waiting-on-t-lang"],
-                            exclude_labels: vec![],
-                        }),
-                    },
-                    QueryMap {
-                        name: "proposed_fcp",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open")],
-                            include_labels: vec!["T-lang", "proposed-final-comment-period"],
-                            exclude_labels: vec!["finished-final-comment-period"],
-                        }),
-                    },
-                    QueryMap {
-                        name: "in_fcp",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open")],
-                            include_labels: vec!["T-lang", "final-comment-period"],
-                            exclude_labels: vec!["finished-final-comment-period"],
-                        }),
-                    },
-                    QueryMap {
-                        name: "finished_fcp",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open")],
-                            include_labels: vec!["T-lang", "finished-final-comment-period"],
-                            exclude_labels: vec![],
-                        }),
-                    },
-                ],
-            },
-        ],
-    })
-}
-
-pub fn lang_planning() -> Box<dyn Action + Send + Sync> {
-    Box::new(Step {
-        name: "lang_planning_agenda",
-        actions: vec![
-            Query {
-                repos: vec![("rust-lang", "lang-team")],
-                queries: vec![
-                    QueryMap {
-                        name: "pending_project_proposals",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open"), ("is", "issue")],
-                            include_labels: vec!["major-change"],
-                            exclude_labels: vec!["charter-needed"],
-                        }),
-                    },
-                    QueryMap {
-                        name: "pending_lang_team_prs",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::Query {
-                            filters: vec![("state", "open"), ("is", "pr")],
-                            include_labels: vec![],
-                            exclude_labels: vec![],
-                        }),
-                    },
-                    QueryMap {
-                        name: "proposed_meetings",
-                        kind: QueryKind::List,
-                        query: Arc::new(github::DesignMeetings {
-                            with_status: github::DesignMeetingStatus::Proposed,
-                        }),
-                    },
-                ],
-            },
-            Query {
-                repos: vec![("rust-lang", "lang-team")],
-                queries: vec![QueryMap {
-                    name: "active_initiatives",
-                    kind: QueryKind::List,
-                    query: Arc::new(github::Query {
-                        filters: vec![("state", "open"), ("is", "issue")],
-                        include_labels: vec!["lang-initiative"],
-                        exclude_labels: vec![],
-                    }),
-                }],
-            },
-        ],
-    })
-}
-
 pub fn types_planning() -> Box<dyn Action + Send + Sync> {
     Box::new(Step {
         name: "types_planning_agenda",
@@ -732,8 +553,6 @@ pub static INDEX: &str = r#"
 <html>
 <body>
 <ul>
-    <li><a href="/agenda/lang/triage">T-lang triage agenda</a></li>
-    <li><a href="/agenda/lang/planning">T-lang planning agenda</a></li>
     <li><a href="/agenda/types/planning">T-types planning agenda</a></li>
 </ul>
 </body>
