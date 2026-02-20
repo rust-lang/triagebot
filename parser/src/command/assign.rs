@@ -95,8 +95,13 @@ impl AssignCommand {
 
     /// Parses the input for `r?` command.
     pub fn parse_review<'a>(input: &mut Tokenizer<'a>) -> Result<Option<Self>, Error<'a>> {
+        fn strip_circumfix<'a>(input: &'a str, prefix: char, suffix: char) -> Option<&'a str> {
+            input.strip_prefix(prefix)?.strip_suffix(suffix)
+        }
+
         match input.next_token() {
             Ok(Some(Token::Word(name))) => {
+                let name = strip_circumfix(name, '`', '`').unwrap_or(name);
                 let name = name.strip_prefix('@').unwrap_or(name).to_string();
                 if name.is_empty() {
                     return Err(input.error(ParseError::NoUser));
@@ -160,6 +165,8 @@ mod tests {
         for (input, name) in [
             ("octocat", "octocat"),
             ("@octocat", "octocat"),
+            ("`octocat`", "octocat"),
+            ("`@octocat`", "octocat"),
             ("rust-lang/compiler", "rust-lang/compiler"),
             ("@rust-lang/cargo", "rust-lang/cargo"),
             ("abc xyz", "abc"),
@@ -180,7 +187,7 @@ mod tests {
     #[test]
     fn review_names_errs() {
         use std::error::Error;
-        for input in ["", "@", "@ user"] {
+        for input in ["", "@", "@ user", "``", "`@`"] {
             assert_eq!(
                 parse_review(input)
                     .unwrap_err()
