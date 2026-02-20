@@ -1,3 +1,11 @@
+//! Handles stable, beta backports for PRs fixing P-high/critical regressions
+//!
+//! Add proper labels, opens a poll on Zulip to gauge interest about a backport.
+//! Posts a closing messages on Zulip when the PR has been backport accepted.
+//!
+//! Configuration is done with the `[backport]` table.
+//!
+
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
