@@ -3457,6 +3457,7 @@ dependencies = [
  "ignore",
  "imara-diff",
  "itertools",
+ "jsonwebtoken",
  "native-tls",
  "octocrab",
  "parser",
