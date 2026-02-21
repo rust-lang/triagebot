@@ -1,10 +1,22 @@
+use crate::github::GithubClient;
+use crate::github::{
+    GithubCommit, GithubCompare, Issue, IssueRepository, PullRequestDetails, Repository,
+};
+use crate::team_data::TeamClient;
+
+use super::UserId;
+
+use anyhow::Context;
+use bytes::Bytes;
+use itertools::Itertools;
+use octocrab::models::Author;
+use reqwest::StatusCode;
+use tracing as log;
 
 pub(crate) mod issue_with_comments;
 pub(crate) mod user_comments_in_org;
 
 // User
-
-pub type UserId = u64;
 
 #[derive(Debug, PartialEq, Eq, Hash, serde::Deserialize, Clone)]
 pub struct User {
@@ -225,7 +237,7 @@ impl GithubClient {
         let req = req
             .build()
             .with_context(|| format!("failed to build request {req_dbg:?}"))?;
-        let resp = self.client.execute(req).await.context(req_dbg.clone())?;
+        let resp = self.raw().execute(req).await.context(req_dbg.clone())?;
         let status = resp.status();
         let body = resp
             .bytes()
@@ -396,7 +408,7 @@ impl GithubClient {
     }
 
     /// Returns the GraphQL ID of the given repository.
-    async fn graphql_repo_id(&self, owner: &str, repo: &str) -> anyhow::Result<String> {
+    pub async fn graphql_repo_id(&self, owner: &str, repo: &str) -> anyhow::Result<String> {
         let mut repo_id = self
             .graphql_query(
                 "query($owner:String!, $repo:String!) {
@@ -443,7 +455,7 @@ impl GithubClient {
         } else {
             anyhow::bail!("expected issue count, got {data}");
         }
-    }    
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -456,7 +468,7 @@ impl GithubClient {
     /// Get or create a [`Milestone`].
     ///
     /// This will not change the state if it already exists.
-    async fn get_or_create_milestone(
+    pub(crate) async fn get_or_create_milestone(
         &self,
         full_repo_name: &str,
         title: &str,
@@ -509,7 +521,7 @@ impl GithubClient {
     }
 
     /// Set the milestone of an issue or PR.
-    pub async fn set_milestone(
+    pub(crate) async fn set_milestone(
         &self,
         full_repo_name: &str,
         milestone: &Milestone,

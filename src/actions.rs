@@ -34,7 +34,7 @@ pub enum QueryKind {
 pub struct QueryMap<'a> {
     pub name: &'a str,
     pub kind: QueryKind,
-    pub query: Arc<dyn github::IssuesQuery + Send + Sync>,
+    pub query: Arc<dyn github::issue_query::IssuesQuery + Send + Sync>,
 }
 
 #[derive(Debug, serde::Serialize)]

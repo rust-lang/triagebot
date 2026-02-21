@@ -1,3 +1,8 @@
+use anyhow::Context;
+use chrono::{DateTime, Utc};
+
+use crate::github::GithubClient;
+
 /// A comment made by a user on an issue or PR.
 #[derive(Debug, Clone)]
 pub struct UserComment {

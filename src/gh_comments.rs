@@ -14,17 +14,16 @@ use hyper::{
     header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE},
 };
 
-use crate::github::GitHubIssueStateReason;
 use crate::{
     cache,
-    github::{
+    github::issue_with_comments::{
         GitHubGraphQlComment, GitHubGraphQlReactionGroup, GitHubGraphQlReviewThreadComment,
-        GitHubIssueState, GitHubIssueWithComments, GitHubReviewState,
+        GitHubIssueState, GitHubIssueStateReason, GitHubIssueWithComments, GitHubReviewState,
+        GitHubSimplifiedAuthor,
     },
 };
 use crate::{
     errors::AppError,
-    github::GitHubSimplifiedAuthor,
     handlers::Context,
     utils::{immutable_headers, is_repo_autorized},
 };
@@ -727,7 +726,7 @@ fn write_reaction_groups_as_html(
                 continue;
             }
 
-            use crate::github::GitHubGraphQlReactionContent::*;
+            use crate::github::issue_with_comments::GitHubGraphQlReactionContent::*;
             let emoji = match reaction_group.content {
                 ThumbsUp => "👍",
                 ThumbsDown => "👎",

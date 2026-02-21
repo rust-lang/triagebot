@@ -1,3 +1,14 @@
+use anyhow::Context;
+use futures::{FutureExt, future::BoxFuture};
+use itertools::Itertools;
+use reqwest::header::{AUTHORIZATION, USER_AGENT};
+use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
+use secrecy::{ExposeSecret, SecretString};
+use std::time::{Duration, SystemTime};
+use tracing as log;
+
+use bytes::Bytes;
+
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
 pub fn default_token_from_env() -> SecretString {
@@ -26,9 +37,9 @@ fn get_token_from_git_config() -> anyhow::Result<String> {
 pub struct GithubClient {
     token: SecretString,
     client: Client,
-    api_url: String,
-    graphql_url: String,
-    raw_url: String,
+    pub(in crate::github) api_url: String,
+    pub(in crate::github) graphql_url: String,
+    pub(in crate::github) raw_url: String,
     /// If `true`, requests will sleep if it hits GitHub's rate limit.
     retry_rate_limit: bool,
 }
@@ -69,7 +80,7 @@ impl GithubClient {
         &self.client
     }
 
-    async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<(Bytes, String)> {
+    pub async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<(Bytes, String)> {
         const MAX_ATTEMPTS: u32 = 2;
         log::debug!("send_req with {:?}", req);
         let req_dbg = format!("{req:?}");
@@ -213,28 +224,27 @@ impl GithubClient {
         Ok(serde_json::from_slice(&body)?)
     }
 
-    fn get(&self, url: &str) -> RequestBuilder {
+    pub fn get(&self, url: &str) -> RequestBuilder {
         log::trace!("get {:?}", url);
         self.client.get(url).configure(self)
     }
 
-    fn patch(&self, url: &str) -> RequestBuilder {
+    pub fn patch(&self, url: &str) -> RequestBuilder {
         log::trace!("patch {:?}", url);
         self.client.patch(url).configure(self)
     }
 
-    fn delete(&self, url: &str) -> RequestBuilder {
+    pub fn delete(&self, url: &str) -> RequestBuilder {
         log::trace!("delete {:?}", url);
         self.client.delete(url).configure(self)
     }
 
-    fn post(&self, url: &str) -> RequestBuilder {
+    pub fn post(&self, url: &str) -> RequestBuilder {
         log::trace!("post {:?}", url);
         self.client.post(url).configure(self)
     }
 
-    #[allow(unused)]
-    fn put(&self, url: &str) -> RequestBuilder {
+    pub fn put(&self, url: &str) -> RequestBuilder {
         log::trace!("put {:?}", url);
         self.client.put(url).configure(self)
     }

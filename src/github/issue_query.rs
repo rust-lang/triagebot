@@ -1,3 +1,13 @@
+use anyhow::Context;
+use async_trait::async_trait;
+use std::collections::HashMap;
+
+use super::GithubClient;
+use super::Repository;
+use super::utils::find_open_concerns;
+use super::utils::quote_reply;
+use crate::team_data::TeamClient;
+
 #[async_trait]
 pub trait IssuesQuery {
     async fn query<'a>(

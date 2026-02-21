@@ -1,3 +1,8 @@
+use crate::github::GithubClient;
+use std::fmt;
+
+use reqwest::StatusCode;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IssueRepository {
     pub organization: String,
@@ -11,7 +16,7 @@ impl fmt::Display for IssueRepository {
 }
 
 impl IssueRepository {
-    fn url(&self, client: &GithubClient) -> String {
+    pub(crate) fn url(&self, client: &GithubClient) -> String {
         format!(
             "{}/repos/{}/{}",
             client.api_url, self.organization, self.repository
@@ -22,7 +27,11 @@ impl IssueRepository {
         format!("{}/{}", self.organization, self.repository)
     }
 
-    async fn has_label(&self, client: &GithubClient, label: &str) -> anyhow::Result<bool> {
+    pub(crate) async fn has_label(
+        &self,
+        client: &GithubClient,
+        label: &str,
+    ) -> anyhow::Result<bool> {
         #[allow(clippy::redundant_pattern_matching)]
         let url = format!("{}/labels/{}", self.url(client), label);
         match client.send_req(client.get(&url)).await {

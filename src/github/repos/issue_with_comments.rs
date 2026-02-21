@@ -1,3 +1,7 @@
+use anyhow::Context;
+
+use crate::github::GithubClient;
+
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubIssueWithComments {
     pub title: String,
@@ -153,6 +157,15 @@ pub enum GitHubGraphQlReactionContent {
     Heart,
     Rocket,
     Eyes,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum GitHubReviewState {
+    Commented,
+    Approved,
+    ChangesRequested,
+    Dismissed,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy, PartialEq, Eq)]

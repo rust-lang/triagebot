@@ -1,3 +1,17 @@
+use anyhow::Context;
+use chrono::Utc;
+use octocrab::models::AuthorAssociation;
+use std::sync::OnceLock;
+use tracing as log;
+
+use super::client::GithubClient;
+use super::issue_repository::IssueRepository;
+use super::repos::{Milestone, User};
+use super::repository::Repository;
+use super::utils::{Selection, opt_string};
+use crate::errors::{AssignmentError, UserError};
+use crate::github::GithubCommit;
+
 /// An issue or pull request.
 ///
 /// For convenience, since issues and pull requests share most of their

@@ -1,3 +1,11 @@
+use chrono::FixedOffset;
+
+use super::Comment;
+use super::Issue;
+use super::Label;
+use super::Repository;
+use super::User;
+
 /// An event triggered by a webhook.
 #[derive(Debug)]
 pub enum Event {

@@ -1,3 +1,8 @@
+use regex::Regex;
+use std::collections::HashMap;
+
+use crate::github::Comment;
+
 #[derive(Debug)]
 pub enum Selection<'a, T: ?Sized> {
     All,
@@ -6,7 +11,7 @@ pub enum Selection<'a, T: ?Sized> {
 }
 
 /// Deserialize as an optional string
-fn opt_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+pub(crate) fn opt_string<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {
@@ -18,7 +23,7 @@ where
 }
 
 /// Quote a markdown input as a reply
-fn quote_reply(markdown: &str) -> String {
+pub(crate) fn quote_reply(markdown: &str) -> String {
     if markdown.is_empty() {
         String::from("*No content*")
     } else {
@@ -28,7 +33,7 @@ fn quote_reply(markdown: &str) -> String {
 
 /// Return open concerns filed in an issue under MCP/RFC process
 /// Concerns are marked by `@rustbot concern` and `@rustbot resolve`
-fn find_open_concerns(comments: Vec<Comment>) -> Option<Vec<(String, String)>> {
+pub(crate) fn find_open_concerns(comments: Vec<Comment>) -> Option<Vec<(String, String)>> {
     let re_concern_raise =
         Regex::new(r"@rustbot concern (?P<concern_title>.*)").expect("Invalid regexp");
     let re_concern_solve =

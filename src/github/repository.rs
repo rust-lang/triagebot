@@ -1,3 +1,13 @@
+use anyhow::Context;
+use chrono::{DateTime, FixedOffset, Utc};
+use itertools::Itertools;
+use reqwest::StatusCode;
+use std::collections::HashSet;
+use tracing as log;
+
+use super::issue_query::Query;
+use super::{GitTreeEntry, GithubClient, Issue, IssueRepository, Milestone, PullRequestDetails};
+
 #[derive(Clone, Debug, serde::Deserialize)]
 #[cfg_attr(test, derive(Default))]
 pub struct Repository {
@@ -30,14 +40,6 @@ impl Repository {
         struct IssueSearchResult {
             total_count: u64,
             items: Vec<Issue>,
-        }
-
-        #[derive(Copy, Clone)]
-        struct Ordering<'a> {
-            sort: &'a str,
-            direction: &'a str,
-            per_page: &'a str,
-            page: u64,
         }
 
         let Query {
@@ -868,4 +870,14 @@ impl Repository {
             )
         })
     }
+}
+
+// Ordering
+
+#[derive(Copy, Clone)]
+struct Ordering<'a> {
+    sort: &'a str,
+    direction: &'a str,
+    per_page: &'a str,
+    page: u64,
 }
