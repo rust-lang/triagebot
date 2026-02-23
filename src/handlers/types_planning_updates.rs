@@ -92,7 +92,7 @@ pub async fn request_updates(
     let gh = &ctx.github;
     let types_repo = gh.repository(TYPES_REPO).await?;
 
-    let tracking_issues_query = github::Query {
+    let tracking_issues_query = github::issue_query::Query {
         filters: vec![("state", "open"), ("is", "issue")],
         include_labels: vec!["roadmap-tracking-issue"],
         exclude_labels: vec![],

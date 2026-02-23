@@ -1,19 +1,26 @@
 use std::{fmt, sync::Arc};
 
+use anyhow::Context;
 use axum::{extract::State, response::IntoResponse};
 use axum_extra::extract::Host;
+use bytes::Bytes;
 use hmac::{Hmac, Mac};
 use hyper::HeaderMap;
+use hyper::StatusCode;
 use sha2::Sha256;
+use tracing as log;
 use tracing::debug;
 
-use crate::{handlers::HandlerError, interactions::ErrorComment};
+pub(crate) mod event;
 
-use super::*;
+use crate::github::PullRequestDetails;
+use crate::handlers::HandlerError;
+use crate::interactions::ErrorComment;
+use event::*;
 
 /// The name of a webhook event.
 #[derive(Debug)]
-pub enum EventName {
+enum EventName {
     /// Pull request activity.
     ///
     /// This gets translated to [`github::Event::Issue`] when sent to a handler.
@@ -103,7 +110,7 @@ impl fmt::Display for EventName {
     }
 }
 
-pub fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::Result<T> {
+fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::Result<T> {
     let mut deserializer = serde_json::Deserializer::from_str(v);
     let res: Result<T, _> = serde_path_to_error::deserialize(&mut deserializer);
     match res {
@@ -310,7 +317,7 @@ async fn process_payload(
 }
 
 #[derive(Debug)]
-pub struct SignedPayloadError;
+struct SignedPayloadError;
 
 impl fmt::Display for SignedPayloadError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -320,7 +327,7 @@ impl fmt::Display for SignedPayloadError {
 
 impl std::error::Error for SignedPayloadError {}
 
-pub fn check_payload_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPayloadError> {
+fn check_payload_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPayloadError> {
     let signature = signature
         .strip_prefix("sha256=")
         .ok_or(SignedPayloadError)?;

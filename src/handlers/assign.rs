@@ -28,7 +28,7 @@ use crate::errors::{self, AssignmentError, user_error};
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::{
     config::AssignConfig,
-    github::{self, Event, FileDiff, Issue, IssuesAction, Selection},
+    github::{self, Event, FileDiff, Issue, IssuesAction, utils::Selection},
     handlers::{Context, GithubClient, IssuesEvent},
     interactions::EditIssueBody,
 };

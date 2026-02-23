@@ -8,7 +8,8 @@ use crate::db::review_prefs::{
     ReviewPreferences, RotationMode, get_review_prefs, get_review_prefs_batch,
     upsert_repo_review_prefs, upsert_team_review_prefs, upsert_user_review_prefs,
 };
-use crate::github::{self, User, UserComment};
+use crate::github::user_comments_in_org::UserComment;
+use crate::github::{self, User};
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::{ReviewerWorkqueue, get_assigned_prs};

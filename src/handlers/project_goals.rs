@@ -127,7 +127,7 @@ pub async fn ping_project_goals_owners(
 ) -> anyhow::Result<()> {
     let goals_repo = gh.repository(RUST_PROJECT_GOALS_REPO).await?;
 
-    let tracking_issues_query = github::Query {
+    let tracking_issues_query = github::issue_query::Query {
         filters: vec![("state", "open"), ("is", "issue")],
         include_labels: vec!["C-tracking-issue"],
         exclude_labels: vec![],
