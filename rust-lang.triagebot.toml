@@ -2,3 +2,8 @@
 #
 # The available configuration options and features are the same as those in the `triagebot.toml` repository,
 # except that each configuration entry can include an `excluded-repos = ["rust-lang/foo"]` option.
+
+# Adds a "View changes since this review" link at the end of a review body to view
+# the changes that happened since the review
+# Documentation at: https://forge.rust-lang.org/triagebot/review-changes-since.html
+[review-changes-since]
