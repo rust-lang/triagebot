@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
 
 use crate::github::{self, GithubClient, Repository};
+use crate::http_client::get_compiler_perf_triage_logs;
 use crate::team_data::TeamClient;
 
 #[async_trait]
@@ -109,6 +110,18 @@ impl Action for Step<'_> {
         gh.set_retry_rate_limit(true);
         let team_api = TeamClient::new_from_env();
 
+        // Try retrieving triage logs for this week
+        let today = chrono::Utc::now().date_naive();
+        let triage_logs = match get_compiler_perf_triage_logs(&gh, today).await {
+            Ok(logs) => logs,
+            Err(err) => {
+                tracing::log::debug!("Compiler triage logs failed because: {:?}", err);
+                format!(
+                    "TODO: failed to retrieve triage logs for this week ({today}), get them manually."
+                )
+            }
+        };
+
         let mut context = Context::new();
         let mut results = HashMap::new();
 
@@ -183,8 +196,10 @@ impl Action for Step<'_> {
             context.insert(name, issues);
         }
 
-        let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let date = chrono::Utc::now().date_naive();
         context.insert("CURRENT_DATE", &date);
+
+        context.insert("triage_logs", &triage_logs);
 
         Ok(TEMPLATES
             .render(&format!("{}.tt", self.name), &context)

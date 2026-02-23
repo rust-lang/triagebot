@@ -282,6 +282,16 @@ impl GithubClient {
         pr.pull_request = Some(PullRequestDetails::new());
         Ok(pr)
     }
+
+    pub async fn get_contents(
+        &self,
+        repo: &IssueRepository,
+        path: String,
+    ) -> anyhow::Result<Vec<RepoContent>> {
+        let content_url = format!("{}/contents/{}", repo.url(self), path);
+        let contents = self.json(self.get(&content_url)).await?;
+        Ok(contents)
+    }
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -537,6 +547,13 @@ pub enum PullRequestReviewState {
     Commented,
     Dismissed,
     Pending,
+}
+
+// https://docs.github.com/en/rest/repos/contents?apiVersion=2022-11-28#get-repository-content
+#[derive(serde::Deserialize, serde::Serialize)]
+pub struct RepoContent {
+    pub name: String,
+    pub download_url: String,
 }
 
 fn opt_string<'de, D>(deserializer: D) -> Result<String, D::Error>
