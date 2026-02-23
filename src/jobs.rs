@@ -62,7 +62,7 @@ use crate::{
 
 /// How often new cron-based jobs will be placed in the queue.
 /// This is the minimum period *between* a single cron task's executions.
-pub const JOB_SCHEDULING_CADENCE_IN_SECS: u64 = 1800;
+pub const JOB_SCHEDULING_CADENCE_IN_SECS: u64 = 900;
 
 /// How often the database is inspected for jobs which need to execute.
 /// This is the granularity at which events will occur.
