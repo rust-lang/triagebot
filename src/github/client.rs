@@ -44,6 +44,22 @@ pub struct GithubClient {
     retry_rate_limit: bool,
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct RateLimitResources {
+    pub core: RateLimit,
+    pub search: RateLimit,
+    #[allow(unused)]
+    pub graphql: RateLimit,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct RateLimit {
+    #[allow(unused)]
+    pub limit: u64,
+    pub remaining: u64,
+    pub reset: u64,
+}
+
 impl GithubClient {
     pub fn new(token: SecretString, api_url: String, graphql_url: String, raw_url: String) -> Self {
         GithubClient {
@@ -139,26 +155,8 @@ impl GithubClient {
         remaining_attempts: u32,
     ) -> BoxFuture<'_, Result<Response, reqwest::Error>> {
         #[derive(Debug, serde::Deserialize)]
-        struct RateLimit {
-            #[allow(unused)]
-            pub limit: u64,
-            pub remaining: u64,
-            pub reset: u64,
-        }
-
-        #[derive(Debug, serde::Deserialize)]
         struct RateLimitResponse {
-            pub resources: Resources,
-        }
-
-        #[derive(Debug, serde::Deserialize)]
-        struct Resources {
-            pub core: RateLimit,
-            pub search: RateLimit,
-            #[allow(unused)]
-            pub graphql: RateLimit,
-            #[allow(unused)]
-            pub source_import: RateLimit,
+            resources: RateLimitResources,
         }
 
         log::warn!(
@@ -247,6 +245,22 @@ impl GithubClient {
     pub fn put(&self, url: &str) -> RequestBuilder {
         log::trace!("put {:?}", url);
         self.client.put(url).configure(self)
+    }
+
+    /// Fetch current rate limit, remaining and used
+    pub async fn rate_limit(&self) -> anyhow::Result<RateLimitResources> {
+        #[derive(Debug, serde::Deserialize)]
+        struct RateLimitResponse {
+            resources: RateLimitResources,
+        }
+
+        let url = format!("{}/rate_limit", self.api_url);
+        let response = self
+            .json::<RateLimitResponse>(self.get(&url))
+            .await
+            .context("failed to fetch GitHub /rate_limit endpoint")?;
+
+        Ok(response.resources)
     }
 
     /// Issues an ad-hoc GraphQL query.
