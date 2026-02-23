@@ -6,13 +6,13 @@ use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::{FutureExt, future::BoxFuture};
 use itertools::Itertools;
-use octocrab::models::{Author, AuthorAssociation};
+use octocrab::models::{Author, AuthorAssociation, InstallationId};
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
 use secrecy::{ExposeSecret, SecretString};
 use std::collections::{HashMap, HashSet};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::{
     fmt,
     time::{Duration, SystemTime},
@@ -43,6 +43,13 @@ impl From<&Author> for User {
 
 impl GithubClient {
     async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<(Bytes, String)> {
+        // We need to make sure that we have an up-to-date token, if we're using GH app auth
+        let token = self
+            .auth
+            .ensure_app_token(&self.client, &self.api_url)
+            .await?;
+        let req = req.configure(token);
+
         const MAX_ATTEMPTS: u32 = 2;
         log::debug!("send_req with {:?}", req);
         let req_dbg = format!("{req:?}");
@@ -99,7 +106,7 @@ impl GithubClient {
         req: Request,
         sleep: Duration,
         remaining_attempts: u32,
-    ) -> BoxFuture<'_, Result<Response, reqwest::Error>> {
+    ) -> BoxFuture<'_, Result<Response, anyhow::Error>> {
         #[derive(Debug, serde::Deserialize)]
         struct RateLimit {
             #[allow(unused)]
@@ -132,13 +139,17 @@ impl GithubClient {
         async move {
             tokio::time::sleep(sleep).await;
 
+            let token = self
+                .auth
+                .ensure_app_token(&self.client, &self.api_url)
+                .await?;
             // check rate limit
             let rate_resp = self
                 .client
                 .execute(
                     self.client
                         .get(format!("{}/rate_limit", self.api_url))
-                        .configure(self)
+                        .configure(token)
                         .build()
                         .unwrap(),
                 )
@@ -2487,31 +2498,56 @@ impl Event {
 }
 
 trait RequestSend: Sized {
-    fn configure(self, g: &GithubClient) -> Self;
+    fn configure(self, token: RequestToken) -> Self;
 }
 
 impl RequestSend for RequestBuilder {
-    fn configure(self, g: &GithubClient) -> RequestBuilder {
-        let mut auth = reqwest::header::HeaderValue::from_maybe_shared(format!(
-            "token {}",
-            g.token.expose_secret()
-        ))
-        .unwrap();
-        auth.set_sensitive(true);
+    fn configure(self, token: RequestToken) -> RequestBuilder {
         self.header(USER_AGENT, "rust-lang-triagebot")
-            .header(AUTHORIZATION, &auth)
+            .header(AUTHORIZATION, &token.auth_header())
     }
 }
 
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
-pub fn default_token_from_env() -> SecretString {
-    std::env::var("GITHUB_TOKEN")
-        // kept for retrocompatibility but usage is discouraged and will be deprecated
-        .or_else(|_| std::env::var("GITHUB_API_TOKEN"))
-        .or_else(|_| get_token_from_git_config())
-        .expect("could not find token in GITHUB_TOKEN, GITHUB_API_TOKEN or .gitconfig/github.oath-token")
-        .into()
+pub fn default_auth_from_env() -> GithubAuth {
+    match (
+        std::env::var("GITHUB_APP_ID"),
+        std::env::var("GITHUB_APP_PRIVATE_KEY"),
+        std::env::var("GITHUB_APP_INSTALLATION_ID"),
+    ) {
+        (Ok(app_id), Ok(private_key), Ok(installation_id)) => {
+            let app_id: u64 = app_id.parse().expect("GITHUB_APP_ID must be a number");
+            let installation_id: u64 = installation_id
+                .parse()
+                .expect("GITHUB_APP_INSTALLATION_ID must be a number");
+            let key = jsonwebtoken::EncodingKey::from_rsa_pem(private_key.as_bytes())
+                .expect("GITHUB_APP_PRIVATE_KEY must be a valid RSA PEM key");
+            tracing::info!(
+                "Using GitHub App (app={app_id}, installation={installation_id}) for GitHub authentication"
+            );
+
+            GithubAuth::App {
+                app_auth: octocrab::auth::AppAuth {
+                    app_id: octocrab::models::AppId(app_id),
+                    key,
+                },
+                installation_id: InstallationId::from(installation_id),
+                token_cache: Arc::new(std::sync::RwLock::new(None)),
+            }
+        }
+        x => {
+            eprintln!("{x:?}");
+            let pat_token = std::env::var("GITHUB_TOKEN")
+                // kept for retrocompatibility but usage is discouraged and will be deprecated
+                .or_else(|_| std::env::var("GITHUB_API_TOKEN"))
+                .or_else(|_| get_token_from_git_config())
+                .expect("could not find token in GITHUB_TOKEN, GITHUB_API_TOKEN or .gitconfig/github.oath-token")
+                .into();
+            tracing::info!("Using PAT token for GitHub authentication");
+            GithubAuth::Pat { token: pat_token }
+        }
+    }
 }
 
 fn get_token_from_git_config() -> anyhow::Result<String> {
@@ -2527,9 +2563,112 @@ fn get_token_from_git_config() -> anyhow::Result<String> {
     Ok(git_token)
 }
 
+/// Cached GitHub App installation access token with its expiry time.
+#[derive(Clone)]
+pub struct CachedInstallationToken {
+    token: SecretString,
+    expires_at: DateTime<Utc>,
+}
+
+/// Authentication mechanism for the GitHub API.
+#[derive(Clone)]
+pub enum GithubAuth {
+    /// Classic Personal Access Token (PAT) authentication.
+    /// Useful for local testing.
+    Pat { token: SecretString },
+    /// GitHub App authentication using app ID and private key.
+    /// Generates JWTs to obtain short-lived installation access tokens.
+    App {
+        app_auth: octocrab::auth::AppAuth,
+        installation_id: InstallationId,
+        token_cache: Arc<std::sync::RwLock<Option<CachedInstallationToken>>>,
+    },
+}
+
+struct RequestToken(SecretString);
+
+impl RequestToken {
+    fn auth_header(&self) -> reqwest::header::HeaderValue {
+        let mut header =
+            reqwest::header::HeaderValue::from_str(&format!("token {}", self.0.expose_secret()))
+                .unwrap();
+        header.set_sensitive(true);
+        header
+    }
+}
+
+impl GithubAuth {
+    /// Ensures that a valid installation token is present for App auth.
+    /// No-op for PAT auth.
+    ///
+    /// Fetches a new installation token if the cache is empty or the token
+    /// is about to expire (within 5 minutes).
+    async fn ensure_app_token(
+        &self,
+        client: &Client,
+        api_url: &str,
+    ) -> anyhow::Result<RequestToken> {
+        match self {
+            GithubAuth::Pat { token } => Ok(RequestToken(token.clone())),
+            GithubAuth::App {
+                app_auth,
+                token_cache,
+                installation_id,
+            } => {
+                // Cached token is still valid at least for 5+ minutes
+                if let Some(existing_token) = token_cache
+                    .read()
+                    .expect("token cache lock poisoned")
+                    .as_ref()
+                    .filter(|cached| cached.expires_at - Utc::now() >= chrono::Duration::minutes(5))
+                {
+                    return Ok(RequestToken(existing_token.token.clone()));
+                }
+
+                // Cached token is not valid, we need to get a new one
+                let jwt = app_auth
+                    .generate_bearer_token()
+                    .context("failed to generate GitHub App JWT")?;
+                let url = format!("{api_url}/app/installations/{installation_id}/access_tokens");
+                let resp = client
+                    .post(&url)
+                    .header(USER_AGENT, "rust-lang-triagebot")
+                    .header(AUTHORIZATION, format!("Bearer {jwt}"))
+                    .header("Accept", "application/vnd.github+json")
+                    .send()
+                    .await
+                    .context("failed to request installation token")?
+                    .error_for_status()
+                    .context("GitHub rejected installation token request")?;
+
+                #[derive(serde::Deserialize)]
+                struct InstallationTokenResponse {
+                    token: String,
+                    expires_at: DateTime<Utc>,
+                }
+                let body: InstallationTokenResponse = resp
+                    .json()
+                    .await
+                    .context("failed to parse installation token response")?;
+
+                let mut cache = token_cache.write().expect("token cache lock poisoned");
+                *cache = Some(CachedInstallationToken {
+                    token: SecretString::from(body.token.clone()),
+                    expires_at: body.expires_at,
+                });
+                log::info!(
+                    "Refreshed GitHub App installation token, expires at {}",
+                    body.expires_at
+                );
+                Ok(RequestToken(SecretString::from(body.token)))
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct GithubClient {
-    token: SecretString,
+    auth: GithubAuth,
     client: Client,
     api_url: String,
     graphql_url: String,
@@ -2539,10 +2678,10 @@ pub struct GithubClient {
 }
 
 impl GithubClient {
-    pub fn new(token: SecretString, api_url: String, graphql_url: String, raw_url: String) -> Self {
+    pub fn new(auth: GithubAuth, api_url: String, graphql_url: String, raw_url: String) -> Self {
         GithubClient {
             client: Client::new(),
-            token,
+            auth,
             api_url,
             graphql_url,
             raw_url,
@@ -2551,8 +2690,9 @@ impl GithubClient {
     }
 
     pub fn new_from_env() -> Self {
+        let auth = default_auth_from_env();
         Self::new(
-            default_token_from_env(),
+            auth,
             std::env::var("GITHUB_API_URL")
                 .unwrap_or_else(|_| "https://api.github.com".to_string()),
             std::env::var("GITHUB_GRAPHQL_API_URL")
@@ -2560,6 +2700,11 @@ impl GithubClient {
             std::env::var("GITHUB_RAW_URL")
                 .unwrap_or_else(|_| "https://raw.githubusercontent.com".to_string()),
         )
+    }
+
+    /// Returns a reference to the authentication mechanism.
+    pub fn auth(&self) -> &GithubAuth {
+        &self.auth
     }
 
     /// Sets whether or not this client will retry when it hits GitHub's rate limit.
@@ -2583,9 +2728,16 @@ impl GithubClient {
         let url = format!("{}/{repo}/{branch}/{path}", self.raw_url);
         let req = self.get(&url);
         let req_dbg = format!("{req:?}");
+
+        let token = self
+            .auth
+            .ensure_app_token(&self.client, &self.api_url)
+            .await?;
         let req = req
+            .configure(token)
             .build()
             .with_context(|| format!("failed to build request {req_dbg:?}"))?;
+
         let resp = self.client.execute(req).await.context(req_dbg.clone())?;
         let status = resp.status();
         let body = resp
@@ -2616,28 +2768,27 @@ impl GithubClient {
 
     fn get(&self, url: &str) -> RequestBuilder {
         log::trace!("get {:?}", url);
-        self.client.get(url).configure(self)
+        self.client.get(url)
     }
 
     fn patch(&self, url: &str) -> RequestBuilder {
         log::trace!("patch {:?}", url);
-        self.client.patch(url).configure(self)
+        self.client.patch(url)
     }
 
     fn delete(&self, url: &str) -> RequestBuilder {
         log::trace!("delete {:?}", url);
-        self.client.delete(url).configure(self)
+        self.client.delete(url)
     }
 
     fn post(&self, url: &str) -> RequestBuilder {
         log::trace!("post {:?}", url);
-        self.client.post(url).configure(self)
+        self.client.post(url)
     }
 
-    #[allow(unused)]
     fn put(&self, url: &str) -> RequestBuilder {
         log::trace!("put {:?}", url);
-        self.client.put(url).configure(self)
+        self.client.put(url)
     }
 
     pub async fn rust_commit(&self, sha: &str) -> Option<GithubCommit> {
