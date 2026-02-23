@@ -53,6 +53,7 @@ use cron::Schedule;
 use crate::handlers::pull_requests_assignment_update::PullRequestAssignmentUpdate;
 use crate::{
     db::jobs::JobSchedule,
+    github::client::GithubRateLimitLoggingJob,
     handlers::{
         Context, docs_update::DocsUpdateJob, major_change::MajorChangeAcceptenceJob,
         rustc_commits::RustcCommitsJob,
@@ -74,6 +75,7 @@ pub fn jobs() -> Vec<Box<dyn Job + Send + Sync>> {
         Box::new(RustcCommitsJob),
         Box::new(PullRequestAssignmentUpdate),
         Box::new(MajorChangeAcceptenceJob),
+        Box::new(GithubRateLimitLoggingJob),
     ]
 }
 
@@ -96,6 +98,12 @@ pub fn default_jobs() -> Vec<JobSchedule> {
             name: PullRequestAssignmentUpdate.name(),
             // Every 30 minutes
             schedule: Schedule::from_str("* 0,30 * * * * *").unwrap(),
+            metadata: serde_json::Value::Null,
+        },
+        JobSchedule {
+            name: GithubRateLimitLoggingJob.name(),
+            // Every 15 minutes
+            schedule: Schedule::from_str("* */15 * * * * *").unwrap(),
             metadata: serde_json::Value::Null,
         },
     ]

@@ -1,4 +1,5 @@
 use anyhow::Context;
+use async_trait::async_trait;
 use futures::{FutureExt, future::BoxFuture};
 use itertools::Itertools;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
@@ -8,6 +9,8 @@ use std::time::{Duration, SystemTime};
 use tracing as log;
 
 use bytes::Bytes;
+
+use crate::jobs::Job;
 
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
@@ -48,13 +51,11 @@ pub struct GithubClient {
 pub struct RateLimitResources {
     pub core: RateLimit,
     pub search: RateLimit,
-    #[allow(unused)]
     pub graphql: RateLimit,
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct RateLimit {
-    #[allow(unused)]
     pub limit: u64,
     pub remaining: u64,
     pub reset: u64,
@@ -317,5 +318,42 @@ impl RequestSend for RequestBuilder {
         auth.set_sensitive(true);
         self.header(USER_AGENT, "rust-lang-triagebot")
             .header(AUTHORIZATION, &auth)
+    }
+}
+
+// Rate limit logging job
+
+pub struct GithubRateLimitLoggingJob;
+
+#[async_trait]
+impl Job for GithubRateLimitLoggingJob {
+    fn name(&self) -> &'static str {
+        "rate_limit_logging_job"
+    }
+
+    async fn run(
+        &self,
+        ctx: &crate::handlers::Context,
+        _metadata: &serde_json::Value,
+    ) -> anyhow::Result<()> {
+        let rates = match ctx.github.rate_limit().await {
+            Ok(rates) => rates,
+            Err(err) => {
+                tracing::error!("failed to fetch the current rate limits for Github: {err:?}");
+                return Ok(());
+            }
+        };
+
+        tracing::info!(
+            "Github rate_limit: core={}/{} search={}/{} graphql={}/{}",
+            rates.core.remaining,
+            rates.core.limit,
+            rates.search.remaining,
+            rates.search.limit,
+            rates.graphql.remaining,
+            rates.graphql.limit
+        );
+
+        Ok(())
     }
 }
