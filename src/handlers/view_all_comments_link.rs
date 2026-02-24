@@ -50,9 +50,20 @@ async fn add_comments_link(ctx: &Context, issue: &Issue, host: &str) -> anyhow::
     let type_ = if issue.is_pr() { "pull" } else { "issues" };
     let issue_number = issue.number;
 
-    let comments_link = format!(
+    let mut comments_link = format!(
         "*[View all comments](https://{host}/gh-comments/{repo_name}/{type_}/{issue_number})*"
     );
+
+    // This repository has bors which inlines the PR body by default into merge commits, and we
+    // want to hide this from the resulting merge commit. Wrapping it in this section will avoid
+    // bors including it in the resulting "Auto merge..." commit.
+    //
+    // Implementation in bors:
+    // https://github.com/rust-lang/bors/blob/b89a1d15c6c68d08964971dab4f4117ae9edb533/src/bors/mod.rs#L307
+    if repo_name == "rust-lang/rust" {
+        comments_link =
+            format!("<!-- homu-ignore:start -->\n{comments_link}\n<!-- homu-ignore:end -->");
+    }
 
     if !issue.body.contains("[View all comments](") {
         // add comments link to the start of the body
