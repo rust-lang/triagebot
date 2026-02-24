@@ -17,7 +17,9 @@ pub fn pluralize(text: &str, count: usize) -> Cow<'_, str> {
     }
 }
 
-pub(crate) async fn is_repo_autorized(
+/// Can triagebot provide extended GitHub features (such as comments, logs, etc.)
+/// for this repository for unauthorized users?
+pub(crate) async fn is_known_and_public_repo(
     ctx: &Context,
     owner: &str,
     repo: &str,
@@ -33,8 +35,14 @@ pub(crate) async fn is_repo_autorized(
         return Ok(false);
     };
 
+    let repo = repos.iter().find(|r| r.name == repo);
     // Verify that the request repo is part of the Rust project
-    if !repos.iter().any(|r| r.name == repo) {
+    let Some(repo) = repo else {
+        return Ok(false);
+    };
+
+    // Only allow public repositories
+    if repo.private {
         return Ok(false);
     }
 

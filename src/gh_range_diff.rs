@@ -22,7 +22,7 @@ use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::github::GithubCompare;
-use crate::utils::is_repo_autorized;
+use crate::utils::is_known_and_public_repo;
 use crate::{errors::AppError, github, handlers::Context};
 
 static MARKER_RE: LazyLock<Regex> =
@@ -43,7 +43,7 @@ pub async fn gh_range_diff(
         ));
     };
 
-    if !is_repo_autorized(&ctx, &owner, &repo).await? {
+    if !is_known_and_public_repo(&ctx, &owner, &repo).await? {
         return Ok((
             StatusCode::UNAUTHORIZED,
             HeaderMap::new(),
@@ -151,7 +151,7 @@ pub async fn gh_ranges_diff(
         ));
     };
 
-    if !is_repo_autorized(&ctx, &owner, &repo).await? {
+    if !is_known_and_public_repo(&ctx, &owner, &repo).await? {
         return Ok((
             StatusCode::UNAUTHORIZED,
             HeaderMap::new(),
