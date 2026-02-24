@@ -7,7 +7,7 @@ use axum::{
 };
 use hyper::StatusCode;
 
-use crate::{errors::AppError, github, handlers::Context, utils::is_repo_autorized};
+use crate::{errors::AppError, github, handlers::Context, utils::is_known_and_public_repo};
 
 /// Redirects to either `/gh-range-diff` (when the base changed) or to GitHub's compare
 /// page (when the base is the same).
@@ -25,7 +25,7 @@ pub async fn gh_changes_since(
             .into_response());
     };
 
-    if !is_repo_autorized(&ctx, &owner, &repo).await? {
+    if !is_known_and_public_repo(&ctx, &owner, &repo).await? {
         return Ok((
             StatusCode::UNAUTHORIZED,
             format!("repository `{owner}/{repo}` is not part of the Rust Project team repos"),

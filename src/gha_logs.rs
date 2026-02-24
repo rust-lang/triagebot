@@ -3,7 +3,7 @@ use crate::errors::AppError;
 use crate::github::{self, WorkflowRunJob};
 use crate::handlers::Context;
 use crate::interactions::REPORT_TO;
-use crate::utils::{immutable_headers, is_repo_autorized};
+use crate::utils::{immutable_headers, is_known_and_public_repo};
 use anyhow::Context as _;
 use axum::extract::{Path, State};
 use axum::http::HeaderValue;
@@ -38,7 +38,7 @@ pub async fn gha_logs(
     Path((owner, repo, log_id)): Path<(String, String, u128)>,
     State(ctx): State<Arc<Context>>,
 ) -> axum::response::Result<impl IntoResponse, AppError> {
-    if !is_repo_autorized(&ctx, &owner, &repo).await? {
+    if !is_known_and_public_repo(&ctx, &owner, &repo).await? {
         return Ok((
             StatusCode::UNAUTHORIZED,
             HeaderMap::new(),

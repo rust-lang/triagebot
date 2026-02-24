@@ -25,7 +25,7 @@ use crate::{
 use crate::{
     errors::AppError,
     handlers::Context,
-    utils::{immutable_headers, is_repo_autorized},
+    utils::{immutable_headers, is_known_and_public_repo},
 };
 
 pub const STYLE_URL: &str = "/gh-comments/style@0.0.4.css";
@@ -55,7 +55,7 @@ pub async fn gh_comments(
     Path(ref key @ (ref owner, ref repo, issue_id)): Path<(String, String, u64)>,
     State(ctx): State<Arc<Context>>,
 ) -> axum::response::Result<Response, AppError> {
-    if !is_repo_autorized(&ctx, &owner, &repo).await? {
+    if !is_known_and_public_repo(&ctx, &owner, &repo).await? {
         return Ok((
             StatusCode::UNAUTHORIZED,
             format!("repository `{owner}/{repo}` is not part of the Rust Project team repos"),
