@@ -7,3 +7,12 @@
 # the changes that happened since the review
 # Documentation at: https://forge.rust-lang.org/triagebot/review-changes-since.html
 [review-changes-since]
+
+# Adds a comment linking to triagebot range-diff viewer when a PR is rebased
+# onto a different base commit
+# Documentation at: https://forge.rust-lang.org/triagebot/range-diff.html
+[range-diff]
+
+# Enable issue transfers within the org
+# Documentation at: https://forge.rust-lang.org/triagebot/transfer.html
+[transfer]
