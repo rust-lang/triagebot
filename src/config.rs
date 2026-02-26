@@ -702,7 +702,11 @@ pub(crate) struct BackportRuleConfig {
 #[derive(Default, PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
-pub(crate) struct RangeDiffConfig {}
+pub(crate) struct RangeDiffConfig {
+    /// Should we consider force-push from bots (like dependabot)
+    #[serde(default)]
+    pub(crate) consider_push_from_bots: bool,
+}
 
 /// Configuration for the changes since link on review body
 #[derive(Default, PartialEq, Eq, Debug, Clone, serde::Deserialize)]
@@ -1036,7 +1040,9 @@ mod tests {
                     labels: vec!["has-concerns".to_string()],
                 }),
                 backport: Some(backport_team_config),
-                range_diff: Some(RangeDiffConfig {}),
+                range_diff: Some(RangeDiffConfig {
+                    consider_push_from_bots: false
+                }),
                 review_changes_since: Some(ReviewChangesSinceConfig {}),
                 view_all_comments_link: None,
             }
@@ -1384,6 +1390,21 @@ Multi text body with ${mcp_issue} and ${mcp_title}
                 exclude_issues: false,
                 exclude_prs: false,
             })
+        );
+    }
+
+    #[test]
+    fn range_diff() {
+        let config = r#"
+            [range-diff]
+            consider-push-from-bots = true
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        assert_eq!(
+            config.range_diff,
+            Some(RangeDiffConfig {
+                consider_push_from_bots: true
+            }),
         );
     }
 
