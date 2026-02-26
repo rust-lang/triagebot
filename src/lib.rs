@@ -14,6 +14,7 @@ pub mod gh_range_diff;
 pub mod gha_logs;
 pub mod github;
 pub mod handlers;
+pub mod http_client;
 mod interactions;
 pub mod jobs;
 pub mod notification_listing;
