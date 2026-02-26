@@ -422,7 +422,7 @@ mod tests {
     use crate::handlers::pr_tracking::{
         AssignedPullRequest, handle_input, parse_input, upsert_pr_into_user_queue,
     };
-    use crate::tests::github::{default_test_user, issue, pull_request, user};
+    use crate::tests::github::{default_test_sender, issue, pull_request, user};
     use crate::tests::{TestContext, run_db_test};
 
     #[tokio::test]
@@ -666,7 +666,7 @@ mod tests {
                 fork: false,
                 parent: None,
             },
-            sender: default_test_user(),
+            sender: default_test_sender(),
         };
 
         let input = parse_input(&handler_ctx, &event, config.as_ref())

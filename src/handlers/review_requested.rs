@@ -22,7 +22,7 @@ pub(crate) async fn parse_input(
         return Ok(None);
     };
 
-    if event.sender != event.issue.user {
+    if event.sender.id != event.issue.user.id {
         return Ok(None);
     }
 

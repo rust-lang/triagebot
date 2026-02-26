@@ -427,9 +427,12 @@ r#":warning: **Warning** :warning:
                 fork: false,
                 parent: None,
             },
-            sender: crate::github::User {
-                login: "rustbot".to_string(),
-                id: 987654,
+            sender: crate::github::Sender {
+                user: crate::github::User {
+                    login: "rustbot".to_string(),
+                    id: 987654,
+                },
+                r#type: "Bot".to_string(),
             },
         }
     }
