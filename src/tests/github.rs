@@ -1,4 +1,4 @@
-use crate::github::{Issue, IssueState, Label, PullRequestDetails, User};
+use crate::github::{Issue, IssueState, Label, PullRequestDetails, Sender, User};
 use bon::builder;
 use chrono::Utc;
 
@@ -6,6 +6,16 @@ pub fn default_test_user() -> User {
     User {
         login: "triagebot-tester".to_string(),
         id: 1,
+    }
+}
+
+pub fn default_test_sender() -> Sender {
+    Sender {
+        user: User {
+            login: "triagebot-tester".to_string(),
+            id: 1,
+        },
+        r#type: "User".to_string(),
     }
 }
 

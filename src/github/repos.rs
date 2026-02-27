@@ -1,5 +1,5 @@
 use super::issue_query::Query;
-use super::{GithubClient, GithubCompare, Issue, IssueRepository, PullRequestDetails};
+use super::{GithubClient, GithubCompare, Issue, IssueRepository, PullRequestDetails, Sender};
 use crate::team_data::TeamClient;
 
 use super::UserId;
@@ -22,6 +22,15 @@ pub(crate) mod user_comments_in_org;
 pub struct User {
     pub login: String,
     pub id: UserId,
+}
+
+impl From<&Sender> for User {
+    fn from(sender: &Sender) -> Self {
+        Self {
+            id: sender.id,
+            login: sender.login.clone(),
+        }
+    }
 }
 
 impl From<&Author> for User {

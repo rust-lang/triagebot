@@ -22,11 +22,15 @@ struct RangeDiffLinkState {
 pub(super) async fn handle_event(
     ctx: &Context,
     host: &str,
-    _config: &RangeDiffConfig,
+    config: &RangeDiffConfig,
     event: &IssuesEvent,
     compare_after: &GithubCompare,
 ) -> anyhow::Result<()> {
     if !matches!(event.action, crate::github::IssuesAction::Synchronize) {
+        return Ok(());
+    }
+
+    if !config.consider_push_from_bots && event.sender.r#type == "Bot" {
         return Ok(());
     }
 
