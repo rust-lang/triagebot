@@ -33,6 +33,13 @@ impl From<&Author> for User {
     }
 }
 
+// https://docs.github.com/en/rest/repos/contents?apiVersion=2022-11-28#get-repository-content
+#[derive(serde::Deserialize, serde::Serialize)]
+pub struct RepoContent {
+    pub name: String,
+    pub download_url: String,
+}
+
 impl User {
     pub async fn current(client: &GithubClient) -> anyhow::Result<Self> {
         client
@@ -223,6 +230,16 @@ impl GithubClient {
             .with_context(|| format!("{repo} failed to get pr {pr_num}"))?;
         pr.pull_request = Some(PullRequestDetails::new());
         Ok(pr)
+    }
+
+    pub async fn get_contents(
+        &self,
+        repo: &IssueRepository,
+        path: String,
+    ) -> anyhow::Result<Vec<RepoContent>> {
+        let content_url = format!("{}/contents/{}", repo.url(self), path);
+        let contents = self.json(self.get(&content_url)).await?;
+        Ok(contents)
     }
 
     pub async fn raw_file(
