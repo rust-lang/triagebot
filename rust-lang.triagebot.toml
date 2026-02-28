@@ -7,6 +7,9 @@
 # the changes that happened since the review
 # Documentation at: https://forge.rust-lang.org/triagebot/review-changes-since.html
 [review-changes-since]
+excluded-repos = [
+  "rust-lang/team", # no write permissions
+]
 
 # Adds a comment linking to triagebot range-diff viewer when a PR is rebased
 # onto a different base commit
@@ -16,8 +19,14 @@
 # Enable issue transfers within the org
 # Documentation at: https://forge.rust-lang.org/triagebot/transfer.html
 [transfer]
+excluded-repos = [
+  "rust-lang/team", # no write permissions
+]
 
 # Enable manual assignments in PRs using `r? name`
 # Documentation at: https://forge.rust-lang.org/triagebot/pr-assignment.html
 [assign]
 warn_non_default_branch = true
+excluded-repos = [
+  "rust-lang/team", # no write permissions
+]
