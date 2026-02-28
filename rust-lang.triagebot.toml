@@ -21,3 +21,11 @@
 # Documentation at: https://forge.rust-lang.org/triagebot/pr-assignment.html
 [assign]
 warn_non_default_branch = true
+
+# Enable merge conflicts notifications in PRs
+# Documentation at: https://forge.rust-lang.org/triagebot/merge-conflicts.html
+[merge-conflicts]
+excluded-repos = [
+  "rust-lang/team", # no write permissions 
+  "rust-lang/rust", # handled by bors
+]
