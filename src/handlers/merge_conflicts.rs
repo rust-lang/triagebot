@@ -245,7 +245,7 @@ async fn scan_unknowns(
     for unknown in unknowns {
         let pr = repo.get_pr(gh, unknown.number).await?;
         match pr.mergeable {
-            Some(true) => {}
+            Some(true) => maybe_hide_comment(gh, &mut db, &pr).await?,
             Some(false) => maybe_add_comment(gh, &mut db, config, &pr, possibly.as_deref()).await?,
             // Ignore None, we don't want to repeatedly hammer GitHub asking for the answer.
             None => log::info!("unable to determine mergeable after delay for {unknown:?}"),
