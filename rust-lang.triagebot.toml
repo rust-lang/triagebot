@@ -28,4 +28,5 @@ warn_non_default_branch = true
 excluded-repos = [
   "rust-lang/team", # no write permissions 
   "rust-lang/rust", # handled by bors
+  "rust-lang/crates.io", # dependabot PRs
 ]
