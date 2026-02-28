@@ -44,3 +44,11 @@ excluded-repos = [
 excluded-repos = [
   "rust-lang/team", # no write permissions
 ]
+
+# Enable merge conflicts notifications in PRs
+# Documentation at: https://forge.rust-lang.org/triagebot/merge-conflicts.html
+[merge-conflicts]
+excluded-repos = [
+  "rust-lang/rust", # handled by bors
+  "rust-lang/bors-kindergarten", # handled by bors
+]
