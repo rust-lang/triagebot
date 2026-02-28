@@ -171,6 +171,8 @@ pub enum IssueCommentAction {
     Created,
     Edited,
     Deleted,
+    Pinned,
+    Unpinned,
 }
 
 #[derive(Debug, serde::Deserialize)]

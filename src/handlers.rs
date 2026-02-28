@@ -400,8 +400,10 @@ macro_rules! command_handlers {
                                 return;
                             }
                         }
-                        IssueCommentAction::Deleted => {
-                            // don't execute commands again when comment is deleted
+                        IssueCommentAction::Deleted
+                        | IssueCommentAction::Pinned
+                        | IssueCommentAction::Unpinned => {
+                            // don't execute commands again when comment is deleted, pinned or unpinned
                             log::debug!("skipping event, comment was {:?}", e.action);
                             return;
                         }

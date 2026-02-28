@@ -325,7 +325,9 @@ pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
                     zulip_req.send(&ctx.zulip).await?;
                 }
 
-                IssueCommentAction::Deleted => {
+                IssueCommentAction::Deleted
+                | IssueCommentAction::Pinned
+                | IssueCommentAction::Unpinned => {
                     // Do we really care?
                 }
             }
