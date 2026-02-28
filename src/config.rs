@@ -732,6 +732,7 @@ pub(crate) struct ViewAllCommentsLinkConfig {
 
 #[derive(Debug, PartialEq, Eq, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 struct WithExcludedRepos<T> {
     #[serde(flatten)]
     config: T,
