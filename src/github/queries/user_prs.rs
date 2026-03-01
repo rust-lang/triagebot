@@ -62,7 +62,7 @@ impl GithubClient {
     ///
     /// Returns up to `limit` PRs, sorted by creation date (most recent first).
     /// Uses cursor-based pagination to retrieve multiple pages if needed.
-    pub async fn user_prs(
+    pub async fn recent_user_prs(
         &self,
         username: &str,
         limit: usize,
@@ -140,7 +140,7 @@ query($username: String!, $pageSize: Int!, $cursor: String) {
     /// Fetches recent pull requests created by a user in a GitHub organization.
     ///
     /// Returns up to `limit` PRs, sorted by creation date (most recent first).
-    pub async fn user_prs_in_org(
+    pub async fn recent_user_prs_in_org(
         &self,
         username: &str,
         org: &str,

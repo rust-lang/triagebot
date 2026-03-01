@@ -564,30 +564,32 @@ async fn user_info_cmd(
         ));
     }
 
-    let pr_limit = 300;
-    let org_pr_limit = 50;
-    let recent_pr_days = 7;
+    let pr_limit = 100;
+    let recent_days = 7;
 
     // Load data concurrently to make the command faster
-    let (user, user_prs, org_user_prs) = futures::future::join3(
+    let (user, user_prs, org_user_prs, user_repos) = futures::future::join4(
         ctx.github.user_info(username),
-        ctx.github.user_prs(username, pr_limit),
+        ctx.github.recent_user_prs(username, pr_limit),
         ctx.github
-            .user_prs_in_org(username, organization, org_pr_limit),
+            .recent_user_prs_in_org(username, organization, pr_limit),
+        ctx.github.recent_user_repositories(username, 100),
     )
     .await;
-    let (user, user_prs, org_user_prs) = (user?, user_prs?, org_user_prs?);
+    let (user, user_prs, org_user_prs, user_repos) = (user?, user_prs?, org_user_prs?, user_repos?);
 
-    let all_prs_stats = analyze_pr_stats(&user_prs, recent_pr_days);
-    let org_prs_stats = analyze_pr_stats(&org_user_prs, recent_pr_days);
+    let recent_date_cutoff = Utc::now() - Duration::days(recent_days as i64);
 
-    let pr_limit_msg = |stats: &PullRequestStats, pr_limit: u64, org: Option<&str>| {
+    let all_prs_stats = analyze_pr_stats(&user_prs, recent_days);
+    let org_prs_stats = analyze_pr_stats(&org_user_prs, recent_days);
+
+    let pr_bandwidth_msg = |stats: &PullRequestStats, org: Option<&str>| {
         stats
             .oldest_pr_created_at
             .map(|date| {
                 format!(
-                    "Last {} {}PRs created in {} day(s)",
-                    pr_limit.min(stats.pr_count),
+                    "Last {} {}PRs created in the past {} day(s)",
+                    pr_limit.min(stats.pr_count as usize),
                     match org {
                         Some(org) => format!("`{org}` "),
                         None => String::new(),
@@ -609,12 +611,18 @@ async fn user_info_cmd(
         .map(|pr| format!("{}/{}", pr.repo_owner, pr.repo_name))
         .collect::<HashSet<_>>()
         .len();
-    let opened_orgs = if pr_orgs.len() < 10 {
+    let org_pr_count = pr_orgs.len();
+    let opened_orgs = if org_pr_count > 0 {
         let mut orgs = pr_orgs.into_iter().collect::<Vec<_>>();
         orgs.sort();
-        orgs.join(", ")
+        let orgs = orgs
+            .into_iter()
+            .take(10)
+            .map(|org| format!("`{org}`"))
+            .join(", ");
+        format!(" ({orgs})")
     } else {
-        pr_orgs.len().to_string()
+        String::new()
     };
     let mut open_prs = 0;
     let mut closed_prs = 0;
@@ -626,19 +634,29 @@ async fn user_info_cmd(
             PullRequestState::Merged => merged_prs += 1,
         }
     }
+    let recently_opened_repos = user_repos
+        .iter()
+        .filter(|repo| repo.created_at >= recent_date_cutoff)
+        .collect::<Vec<_>>();
+    let recent_forks = recently_opened_repos
+        .iter()
+        .filter(|repo| repo.fork)
+        .count();
 
     let mut message = format!(
         r#"User `{username}` activity
 
 - Account created at: {date} ({ago})
 - Public repository count: {repos}
-- PRs created in past {recent_pr_days} days: {recent_pr_count}{more_prs}
+- PRs created in past {recent_days} days: {recent_pr_count}{more_prs}
   - {open_prs} open, {closed_prs} closed, {merged_prs} merged
   - {pr_oldest_msg}
   - PRs opened in {pr_repo_count} repo(s)
-  - PRs opened in {opened_orgs} organization(s)
-- `{organization}` PRs created in past {recent_pr_days} days: {org_recent_pr_count}{org_more_prs}
+  - PRs opened in {org_pr_count} organization(s){opened_orgs}
+- `{organization}` PRs created in past {recent_days} days: {org_recent_pr_count}{org_more_prs}
   - {org_pr_oldest_msg}
+- Repos created in past {recent_days} days: {recent_repo_count}
+  - Out of that, {recent_forks} are forks
 "#,
         date = format_date(Some(user.created_at)),
         ago = format!("`{}` days ago", (Utc::now() - user.created_at).num_days()),
@@ -655,13 +673,14 @@ async fn user_info_cmd(
         } else {
             ""
         },
-        pr_oldest_msg = pr_limit_msg(&all_prs_stats, pr_limit as u64, None),
-        org_pr_oldest_msg = pr_limit_msg(&org_prs_stats, org_pr_limit as u64, Some(organization)),
+        pr_oldest_msg = pr_bandwidth_msg(&all_prs_stats, None),
+        org_pr_oldest_msg = pr_bandwidth_msg(&org_prs_stats, Some(organization)),
+        recent_repo_count = recently_opened_repos.len()
     );
 
     let comments = ctx
         .github
-        .user_comments_in_org(username, organization, RECENT_COMMENTS_LIMIT)
+        .recent_user_comments_in_org(username, organization, RECENT_COMMENTS_LIMIT)
         .await
         .context("Cannot load recent comments")?;
 
