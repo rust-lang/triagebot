@@ -1,6 +1,5 @@
 use anyhow::Context;
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
 
 use crate::github::GithubClient;
 

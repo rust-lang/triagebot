@@ -2,8 +2,9 @@ pub mod api;
 pub mod client;
 mod commands;
 
-use crate::db::notifications::add_metadata;
-use crate::db::notifications::{self, Identifier, delete_ping, move_indices, record_ping};
+use crate::db::notifications::{
+    self, Identifier, add_metadata, delete_ping, move_indices, record_ping,
+};
 use crate::db::review_prefs::{
     ReviewPreferences, RotationMode, get_review_prefs, get_review_prefs_batch,
     upsert_repo_review_prefs, upsert_team_review_prefs, upsert_user_review_prefs,
@@ -11,7 +12,8 @@ use crate::db::review_prefs::{
 use crate::db::users::DbUser;
 use crate::github;
 use crate::github::queries::user_comments_in_org::UserComment;
-use crate::github::queries::user_prs_in_org::{PullRequestState, UserPullRequest};
+use crate::github::queries::user_prs::PullRequestState;
+use crate::github::queries::user_prs::UserPullRequest;
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::{ReviewerWorkqueue, get_assigned_prs};
@@ -29,13 +31,13 @@ use axum::Json;
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use commands::BackportArgs;
 use itertools::Itertools;
 use rust_team_data::v1::{TeamKind, TeamMember};
 use secrecy::{ExposeSecret, SecretString};
 use std::cmp::{Ordering, Reverse};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::sync::Arc;
 use subtle::ConstantTimeEq;
@@ -277,7 +279,7 @@ async fn handle_command<'a>(
             ChatCommand::UserInfo {
                 username,
                 organization,
-            } => user_info_cmd(&ctx, gh_id, username, organization.as_deref())
+            } => user_info_cmd(&ctx, gh_id, username, &organization)
                 .await
                 .map(Some),
             ChatCommand::TeamStats { name, repo } => {
@@ -372,7 +374,7 @@ async fn handle_command<'a>(
                 StreamCommand::UserInfo {
                     username,
                     organization,
-                } => user_info_cmd(&ctx, gh_id, &username, organization.as_deref())
+                } => user_info_cmd(&ctx, gh_id, &username, &organization)
                     .await
                     .map(Some),
             };
@@ -536,13 +538,13 @@ async fn ping_goals_cmd(
     }
 }
 
-/// Output recent GitHub activity made by a given user (optionally in a given organization).
+/// Output recent GitHub activity made by a given user (both globally and in a given organization).
 /// This command can only be used by team members.
 async fn user_info_cmd(
     ctx: &Context,
     gh_id: u64,
     username: &str,
-    organization: Option<&str>,
+    organization: &str,
 ) -> anyhow::Result<String> {
     const RECENT_COMMENTS_LIMIT: usize = 10;
 
@@ -556,55 +558,162 @@ async fn user_info_cmd(
             "This command is only available to team members."
         ));
     }
+    if ctx.team.repos().await?.repos.get(organization).is_none() {
+        return Err(anyhow::anyhow!(
+            "Organization `{organization}` is not managed by the team database."
+        ));
+    }
 
-    let user = ctx.github.user_info(username).await?;
+    let pr_limit = 300;
+    let org_pr_limit = 50;
+    let recent_pr_days = 7;
 
-    let scope = match organization {
-        Some(org) => format!(" (in `{org}`)"),
-        None => String::new(),
+    // Load data concurrently to make the command faster
+    let (user, user_prs, org_user_prs) = futures::future::join3(
+        ctx.github.user_info(username),
+        ctx.github.user_prs(username, pr_limit),
+        ctx.github
+            .user_prs_in_org(username, organization, org_pr_limit),
+    )
+    .await;
+    let (user, user_prs, org_user_prs) = (user?, user_prs?, org_user_prs?);
+
+    let all_prs_stats = analyze_pr_stats(&user_prs, recent_pr_days);
+    let org_prs_stats = analyze_pr_stats(&org_user_prs, recent_pr_days);
+
+    let pr_limit_msg = |stats: &PullRequestStats, pr_limit: u64, org: Option<&str>| {
+        stats
+            .oldest_pr_created_at
+            .map(|date| {
+                format!(
+                    "Last {} {}PRs created in {} day(s)",
+                    pr_limit.min(stats.pr_count),
+                    match org {
+                        Some(org) => format!("`{org}` "),
+                        None => String::new(),
+                    },
+                    (Utc::now() - date).num_days()
+                )
+            })
+            .unwrap_or_else(|| "N/A".to_string())
     };
-    let mut message = format!(
-        r#"User `{username}` activity{scope}
 
-Created at: {date} ({ago})
-Public repositories: {repos}
+    let pr_orgs = all_prs_stats
+        .recent_prs
+        .iter()
+        .map(|pr| pr.repo_owner.clone())
+        .collect::<HashSet<_>>();
+    let pr_repo_count = all_prs_stats
+        .recent_prs
+        .iter()
+        .map(|pr| format!("{}/{}", pr.repo_owner, pr.repo_name))
+        .collect::<HashSet<_>>()
+        .len();
+    let opened_orgs = if pr_orgs.len() < 10 {
+        let mut orgs = pr_orgs.into_iter().collect::<Vec<_>>();
+        orgs.sort();
+        orgs.join(", ")
+    } else {
+        pr_orgs.len().to_string()
+    };
+    let mut open_prs = 0;
+    let mut closed_prs = 0;
+    let mut merged_prs = 0;
+    for pr in &all_prs_stats.recent_prs {
+        match pr.state {
+            PullRequestState::Open => open_prs += 1,
+            PullRequestState::Closed => closed_prs += 1,
+            PullRequestState::Merged => merged_prs += 1,
+        }
+    }
+
+    let mut message = format!(
+        r#"User `{username}` activity
+
+- Account created at: {date} ({ago})
+- Public repository count: {repos}
+- PRs created in past {recent_pr_days} days: {recent_pr_count}{more_prs}
+  - {open_prs} open, {closed_prs} closed, {merged_prs} merged
+  - {pr_oldest_msg}
+  - PRs opened in {pr_repo_count} repo(s)
+  - PRs opened in {opened_orgs} organization(s)
+- `{organization}` PRs created in past {recent_pr_days} days: {org_recent_pr_count}{org_more_prs}
+  - {org_pr_oldest_msg}
 "#,
         date = format_date(Some(user.created_at)),
         ago = format!("`{}` days ago", (Utc::now() - user.created_at).num_days()),
-        repos = user.public_repos
+        repos = user.public_repos,
+        recent_pr_count = all_prs_stats.recent_pr_count,
+        org_recent_pr_count = org_prs_stats.recent_pr_count,
+        more_prs = if all_prs_stats.maybe_has_more {
+            "+"
+        } else {
+            ""
+        },
+        org_more_prs = if org_prs_stats.maybe_has_more {
+            "+"
+        } else {
+            ""
+        },
+        pr_oldest_msg = pr_limit_msg(&all_prs_stats, pr_limit as u64, None),
+        org_pr_oldest_msg = pr_limit_msg(&org_prs_stats, org_pr_limit as u64, Some(organization)),
     );
 
-    let comments = match organization {
-        Some(organization) => {
-            if ctx.team.repos().await?.repos.get(organization).is_none() {
-                return Err(anyhow::anyhow!(
-                    "Organization `{organization}` is not managed by the team database."
-                ));
-            }
+    let comments = ctx
+        .github
+        .user_comments_in_org(username, organization, RECENT_COMMENTS_LIMIT)
+        .await
+        .context("Cannot load recent comments")?;
 
-            let comments = ctx
-                .github
-                .user_comments_in_org(username, organization, RECENT_COMMENTS_LIMIT)
-                .await
-                .context("Cannot load recent comments")?;
+    if comments.is_empty() {
+        return Ok(format!(
+            "No recent comments found for **{username}** in the `{organization}` organization."
+        ));
+    }
 
-            if comments.is_empty() {
-                return Ok(format!(
-                    "No recent comments found for **{username}** in the `{organization}` organization."
-                ));
-            }
-
-            let mut message = format!("\n\n**Recent comments in `{organization}`:**\n");
-            for comment in &comments {
-                message.push_str(&format_user_comment(comment));
-            }
-            message
-        }
-        None => String::new(),
-    };
-    message.push_str(&comments);
+    message.push_str(&format!("\n\n**Recent comments in `{organization}`:**\n"));
+    for comment in &comments {
+        message.push_str(&format_user_comment(comment));
+    }
 
     Ok(message)
+}
+
+struct PullRequestStats<'a> {
+    pr_count: u64,
+    recent_prs: Vec<&'a UserPullRequest>,
+    recent_pr_count: u64,
+    // Does the user possibly have more recent PRs than `recent_count`?
+    // This can happen when we do not fetch enough PRs from GitHub.
+    maybe_has_more: bool,
+    // At what time was the oldest PR that we know of created?
+    // None if there are no PRs.
+    oldest_pr_created_at: Option<DateTime<Utc>>,
+}
+
+fn analyze_pr_stats(prs: &[UserPullRequest], recent_days: u32) -> PullRequestStats<'_> {
+    let recent_pr_cutoff = Utc::now() - Duration::days(recent_days as i64);
+    let recent_prs: Vec<&UserPullRequest> = prs
+        .iter()
+        .filter(|pr| {
+            let Some(date) = pr.created_at else {
+                return false;
+            };
+            date >= recent_pr_cutoff
+        })
+        .collect();
+    let oldest_pr_created_at = prs.last().and_then(|pr| pr.created_at);
+    let maybe_has_more = oldest_pr_created_at
+        .map(|date| date > recent_pr_cutoff)
+        .unwrap_or(false);
+
+    PullRequestStats {
+        pr_count: prs.len() as u64,
+        recent_pr_count: recent_prs.len() as u64,
+        recent_prs,
+        maybe_has_more,
+        oldest_pr_created_at,
+    }
 }
 
 async fn team_status_cmd(

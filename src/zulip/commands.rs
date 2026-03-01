@@ -45,14 +45,13 @@ pub enum ChatCommand {
     DocsUpdate,
     /// Show recent GitHub activity of a user.
     ///
-    /// If an organization is selected, it will be scoped to that organization.
-    /// Otherwise, it will show global GitHub activity.
+    /// It also shows scoped information in a selected organization.
     UserInfo {
         /// GitHub username to look up.
         username: String,
         /// Organization where to find the user's activity.
-        #[arg(long = "org")]
-        organization: Option<String>,
+        #[arg(long = "org", default_value = "rust-lang")]
+        organization: String,
     },
     /// Shows review queue statistics of members of the given Rust team.
     TeamStats {
@@ -60,7 +59,7 @@ pub enum ChatCommand {
         name: String,
         /// Repository that is specifically being queried.
         /// Defaults to `rust` (if you do not specify an org, it will be filled to `rust-lang/`).
-        #[arg(long, default_value = "rust-lang/rust")]
+        #[arg(long, default_value = "rust-lang")]
         repo: String,
     },
 }
@@ -206,8 +205,8 @@ pub enum StreamCommand {
         /// GitHub username to look up.
         username: String,
         /// Organization where to find the activity.
-        #[arg(long = "org")]
-        organization: Option<String>,
+        #[arg(long = "org", default_value = "rust-lang/rust")]
+        organization: String,
     },
 }
 
@@ -454,14 +453,14 @@ mod tests {
             parse_chat(&["comments", "octocat"]),
             ChatCommand::UserInfo {
                 username: "octocat".to_string(),
-                organization: None
+                organization: "rust-lang".to_string()
             }
         );
         assert_eq!(
             parse_chat(&["comments", "foobar", "--org", "rust-lang-nursery"]),
             ChatCommand::UserInfo {
                 username: "foobar".to_string(),
-                organization: Some("rust-lang-nursery".to_string())
+                organization: "rust-lang-nursery".to_string()
             }
         );
     }
