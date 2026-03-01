@@ -59,7 +59,7 @@ pub enum ChatCommand {
         name: String,
         /// Repository that is specifically being queried.
         /// Defaults to `rust` (if you do not specify an org, it will be filled to `rust-lang/`).
-        #[arg(long, default_value = "rust-lang")]
+        #[arg(long, default_value = "rust-lang/rust")]
         repo: String,
     },
 }
@@ -205,7 +205,7 @@ pub enum StreamCommand {
         /// GitHub username to look up.
         username: String,
         /// Organization where to find the activity.
-        #[arg(long = "org", default_value = "rust-lang/rust")]
+        #[arg(long = "org", default_value = "rust-lang")]
         organization: String,
     },
 }
