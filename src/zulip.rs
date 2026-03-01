@@ -29,6 +29,7 @@ use axum::Json;
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
+use chrono::{DateTime, Utc};
 use commands::BackportArgs;
 use itertools::Itertools;
 use rust_team_data::v1::{TeamKind, TeamMember};
@@ -556,7 +557,24 @@ async fn user_info_cmd(
         ));
     }
 
-    let message = match organization {
+    let user = ctx.github.user_info(username).await?;
+
+    let scope = match organization {
+        Some(org) => format!(" (in `{org}`)"),
+        None => String::new(),
+    };
+    let mut message = format!(
+        r#"User `{username}` activity{scope}
+
+Created at: {date} ({ago})
+Public repositories: {repos}
+"#,
+        date = format_date(Some(user.created_at)),
+        ago = format!("`{}` days ago", (Utc::now() - user.created_at).num_days()),
+        repos = user.public_repos
+    );
+
+    let comments = match organization {
         Some(organization) => {
             if ctx.team.repos().await?.repos.get(organization).is_none() {
                 return Err(anyhow::anyhow!(
@@ -576,7 +594,7 @@ async fn user_info_cmd(
                 ));
             }
 
-            let mut message = format!("**Recent comments by {username} in `{organization}`:**\n");
+            let mut message = format!("\n\n**Recent comments in `{organization}`:**\n");
             for comment in &comments {
                 message.push_str(&format_user_comment(comment));
             }
@@ -584,6 +602,8 @@ async fn user_info_cmd(
         }
         None => String::new(),
     };
+    message.push_str(&comments);
+
     Ok(message)
 }
 
@@ -1464,10 +1484,7 @@ fn trigger_docs_update(message: &Message, zulip: &ZulipClient) -> anyhow::Result
 pub fn format_user_comment(comment: &UserComment) -> String {
     // Limit the size of the comment to avoid running into Zulip max message size limits
     let snippet = truncate_and_normalize(&comment.body, 300);
-    let date = comment
-        .created_at
-        .map(|dt| format!("<time:{}>", dt.to_rfc3339()))
-        .unwrap_or_else(|| "unknown date".to_string());
+    let date = format_date(comment.created_at);
 
     format!(
         "- {title} ([{repo}#{number}]({comment_url}), {date}):\n  > {snippet}\n",
@@ -1481,10 +1498,7 @@ pub fn format_user_comment(comment: &UserComment) -> String {
 /// Formats user's GitHub PR for display in the Zulip message.
 pub fn format_user_pr(pr: &UserPullRequest) -> String {
     let snippet = truncate_and_normalize(&pr.body, 300);
-    let date = pr
-        .created_at
-        .map(|dt| format!("<time:{}>", dt.to_rfc3339()))
-        .unwrap_or_else(|| "unknown date".to_string());
+    let date = format_date(pr.created_at);
     let pre_snippet = if snippet.is_empty() {
         // Using empty > without text would break following lines
         ""
@@ -1504,6 +1518,11 @@ pub fn format_user_pr(pr: &UserPullRequest) -> String {
             PullRequestState::Merged => ":purple_circle:",
         }
     )
+}
+
+fn format_date(date: Option<DateTime<Utc>>) -> String {
+    date.map(|dt| format!("<time:{}>", dt.to_rfc3339()))
+        .unwrap_or_else(|| "unknown date".to_string())
 }
 
 /// Truncates the given text to the specified length, adding ellipsis if needed.
