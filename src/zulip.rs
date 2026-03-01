@@ -1467,7 +1467,7 @@ pub fn format_user_comment(comment: &UserComment) -> String {
         .unwrap_or_else(|| "unknown date".to_string());
 
     format!(
-        "- [{title}]({comment_url}) (`{repo}#{number}`, {date}):\n  > {snippet}\n",
+        "- {title} ([{repo}#{number}]({comment_url}), {date}):\n  > {snippet}\n",
         title = truncate_and_normalize(&comment.issue_title, 60),
         comment_url = comment.comment_url,
         repo = comment.repo_name,
@@ -1490,7 +1490,7 @@ pub fn format_user_pr(pr: &UserPullRequest) -> String {
     };
 
     format!(
-        "- [{title}]({pr_url}) (`{repo}#{number}`, {date}) {state}{pre_snippet}{snippet}\n",
+        "- {title} ([{repo}#{number}]({pr_url}), {date}) {state}{pre_snippet}{snippet}\n",
         title = truncate_and_normalize(&pr.title, 60),
         repo = pr.repo_name,
         number = pr.number,
