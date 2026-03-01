@@ -40,12 +40,6 @@ pub struct RepoContent {
 }
 
 impl GitHubUser {
-    pub async fn current(client: &GithubClient) -> anyhow::Result<Self> {
-        client
-            .json(client.get(&format!("{}/user", client.api_url)))
-            .await
-    }
-
     pub async fn is_team_member<'a>(&'a self, client: &'a TeamClient) -> anyhow::Result<bool> {
         log::trace!("Getting team membership for {:?}", self.login);
         let permission = client.teams().await?;
