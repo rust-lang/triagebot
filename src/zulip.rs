@@ -273,10 +273,10 @@ async fn handle_command<'a>(
                 ping_goals_cmd(ctx.clone(), gh_id, message_data, args).await
             }
             ChatCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
-            ChatCommand::Comments {
+            ChatCommand::UserInfo {
                 username,
                 organization,
-            } => recent_comments_cmd(&ctx, gh_id, username, &organization)
+            } => user_info_cmd(&ctx, gh_id, username, organization.as_deref())
                 .await
                 .map(Some),
             ChatCommand::TeamStats { name, repo } => {
@@ -368,10 +368,10 @@ async fn handle_command<'a>(
                 StreamCommand::Backport(args) => {
                     accept_decline_backport(ctx, message_data, &args).await
                 }
-                StreamCommand::Comments {
+                StreamCommand::UserInfo {
                     username,
                     organization,
-                } => recent_comments_cmd(&ctx, gh_id, &username, &organization)
+                } => user_info_cmd(&ctx, gh_id, &username, organization.as_deref())
                     .await
                     .map(Some),
             };
@@ -535,13 +535,13 @@ async fn ping_goals_cmd(
     }
 }
 
-/// Output recent GitHub comments made by a given user in a given organization.
+/// Output recent GitHub activity made by a given user (optionally in a given organization).
 /// This command can only be used by team members.
-async fn recent_comments_cmd(
+async fn user_info_cmd(
     ctx: &Context,
     gh_id: u64,
     username: &str,
-    organization: &str,
+    organization: Option<&str>,
 ) -> anyhow::Result<String> {
     const RECENT_COMMENTS_LIMIT: usize = 10;
 
@@ -556,28 +556,34 @@ async fn recent_comments_cmd(
         ));
     }
 
-    if ctx.team.repos().await?.repos.get(organization).is_none() {
-        return Err(anyhow::anyhow!(
-            "Organization `{organization}` is not managed by the team database."
-        ));
-    }
+    let message = match organization {
+        Some(organization) => {
+            if ctx.team.repos().await?.repos.get(organization).is_none() {
+                return Err(anyhow::anyhow!(
+                    "Organization `{organization}` is not managed by the team database."
+                ));
+            }
 
-    let comments = ctx
-        .github
-        .user_comments_in_org(username, organization, RECENT_COMMENTS_LIMIT)
-        .await
-        .context("Cannot load recent comments")?;
+            let comments = ctx
+                .github
+                .user_comments_in_org(username, organization, RECENT_COMMENTS_LIMIT)
+                .await
+                .context("Cannot load recent comments")?;
 
-    if comments.is_empty() {
-        return Ok(format!(
-            "No recent comments found for **{username}** in the `{organization}` organization."
-        ));
-    }
+            if comments.is_empty() {
+                return Ok(format!(
+                    "No recent comments found for **{username}** in the `{organization}` organization."
+                ));
+            }
 
-    let mut message = format!("**Recent comments by {username} in `{organization}`:**\n");
-    for comment in &comments {
-        message.push_str(&format_user_comment(comment));
-    }
+            let mut message = format!("**Recent comments by {username} in `{organization}`:**\n");
+            for comment in &comments {
+                message.push_str(&format_user_comment(comment));
+            }
+            message
+        }
+        None => String::new(),
+    };
     Ok(message)
 }
 
@@ -823,7 +829,7 @@ fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
         | ChatCommand::Meta { .. }
         | ChatCommand::DocsUpdate
         | ChatCommand::PingGoals(_)
-        | ChatCommand::Comments { .. }
+        | ChatCommand::UserInfo { .. }
         | ChatCommand::TeamStats { .. }
         | ChatCommand::Lookup(_) => ImpersonationMode::Disabled,
         ChatCommand::Whoami => ImpersonationMode::Silent,

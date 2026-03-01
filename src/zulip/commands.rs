@@ -43,13 +43,16 @@ pub enum ChatCommand {
     PingGoals(PingGoalsArgs),
     /// Update docs
     DocsUpdate,
-    /// Show recent GitHub comments of a user in the rust-lang organization.
-    Comments {
+    /// Show recent GitHub activity of a user.
+    ///
+    /// If an organization is selected, it will be scoped to that organization.
+    /// Otherwise, it will show global GitHub activity.
+    UserInfo {
         /// GitHub username to look up.
         username: String,
-        /// Organization where to find the comments.
-        #[arg(long = "org", default_value = "rust-lang")]
-        organization: String,
+        /// Organization where to find the user's activity.
+        #[arg(long = "org")]
+        organization: Option<String>,
     },
     /// Shows review queue statistics of members of the given Rust team.
     TeamStats {
@@ -198,13 +201,13 @@ pub enum StreamCommand {
     DocsUpdate,
     /// Accept or decline a backport.
     Backport(BackportArgs),
-    /// Show recent GitHub comments of a user in the rust-lang organization.
-    Comments {
+    /// Show recent GitHub activity of a user.
+    UserInfo {
         /// GitHub username to look up.
         username: String,
-        /// Organization where to find the comments.
-        #[arg(long = "org", default_value = "rust-lang")]
-        organization: String,
+        /// Organization where to find the activity.
+        #[arg(long = "org")]
+        organization: Option<String>,
     },
 }
 
@@ -449,16 +452,16 @@ mod tests {
     fn recent_comments_command() {
         assert_eq!(
             parse_chat(&["comments", "octocat"]),
-            ChatCommand::Comments {
+            ChatCommand::UserInfo {
                 username: "octocat".to_string(),
-                organization: "rust-lang".to_string()
+                organization: None
             }
         );
         assert_eq!(
             parse_chat(&["comments", "foobar", "--org", "rust-lang-nursery"]),
-            ChatCommand::Comments {
+            ChatCommand::UserInfo {
                 username: "foobar".to_string(),
-                organization: "rust-lang-nursery".to_string()
+                organization: Some("rust-lang-nursery".to_string())
             }
         );
     }
