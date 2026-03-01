@@ -13,6 +13,9 @@ const ZULIP_STREAM_ID: u64 = 464799;
 /// Maximum number of recent comments to include in ban reports.
 const MAX_RECENT_COMMENTS: usize = 10;
 
+/// Maximum number of recent PRs to include in ban reports.
+const MAX_RECENT_PRS: usize = 10;
+
 pub async fn handle(ctx: &Context, event: &OrgBlockEvent) -> anyhow::Result<()> {
     let topic = format!("github user {}", event.blocked_user.login);
 
@@ -54,6 +57,29 @@ pub async fn handle(ctx: &Context, event: &OrgBlockEvent) -> anyhow::Result<()> 
                     event.blocked_user.login
                 );
                 message.push_str("\n\n*Could not fetch recent comments.*");
+            }
+        }
+
+        match ctx
+            .github
+            .user_prs_in_org(username, org, MAX_RECENT_PRS)
+            .await
+        {
+            Ok(prs) if !prs.is_empty() => {
+                message.push_str("\n\n**Recent PRs:**\n");
+                for pr in prs {
+                    message.push_str(&zulip::format_user_pr(&pr));
+                }
+            }
+            Ok(_) => {
+                message.push_str("\n\n*No recent PRs found in this organization.*");
+            }
+            Err(err) => {
+                log::warn!(
+                    "Failed to fetch recent prs for {}: {err:?}",
+                    event.blocked_user.login
+                );
+                message.push_str("\n\n*Could not fetch recent PRs.*");
             }
         }
     }
