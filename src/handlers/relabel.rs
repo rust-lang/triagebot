@@ -83,7 +83,7 @@ enum TeamMembership {
     Unknown,
 }
 
-async fn is_member(user: &github::User, client: &TeamClient) -> TeamMembership {
+async fn is_member(user: &github::GitHubUser, client: &TeamClient) -> TeamMembership {
     match user.is_team_member(client).await {
         Ok(true) => TeamMembership::Member,
         Ok(false) => TeamMembership::Outsider,

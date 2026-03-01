@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
-use crate::github::User;
+use crate::github::GitHubUser;
 
 #[derive(Clone)]
 pub struct TeamClient {
@@ -49,10 +49,10 @@ impl TeamClient {
             .next())
     }
 
-    pub async fn get_user_from_gh_id(&self, github_id: u64) -> anyhow::Result<Option<User>> {
+    pub async fn get_user_from_gh_id(&self, github_id: u64) -> anyhow::Result<Option<GitHubUser>> {
         let login = self.username_from_gh_id(github_id).await?;
 
-        Ok(login.map(|login| User {
+        Ok(login.map(|login| GitHubUser {
             id: github_id,
             login: login,
             r#type: "User".to_string(),
@@ -70,10 +70,10 @@ impl TeamClient {
             .map(|(_, person)| person.github_id))
     }
 
-    pub async fn get_user_from_username(&self, login: &str) -> anyhow::Result<Option<User>> {
+    pub async fn get_user_from_username(&self, login: &str) -> anyhow::Result<Option<GitHubUser>> {
         let id = self.get_gh_id_from_username(login).await?;
 
-        Ok(id.map(|id| User {
+        Ok(id.map(|id| GitHubUser {
             id,
             login: login.to_string(),
             r#type: "User".to_string(),

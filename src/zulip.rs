@@ -925,7 +925,7 @@ async fn workqueue_commands(
             tracing::info!(
                 "Setting max assigned PRs of `{gh_username}` in `{repo}` to {max_assigned_prs:?}"
             );
-            upsert_repo_review_prefs(&db_client, user, &repo, max_assigned_prs)
+            upsert_repo_review_prefs(&db_client, user.into(), &repo, max_assigned_prs)
                 .await
                 .context("Error occurred while setting review preferences.")?;
             format!(
@@ -939,7 +939,7 @@ async fn workqueue_commands(
         WorkqueueCmd::SetRotationMode { rotation_mode } => {
             let rotation_mode = rotation_mode.0;
             tracing::info!("Setting rotation mode `{gh_username}` to {rotation_mode:?}");
-            upsert_user_review_prefs(&db_client, user, rotation_mode)
+            upsert_user_review_prefs(&db_client, user.into(), rotation_mode)
                 .await
                 .context("Error occurred while setting review preferences.")?;
             format!(
@@ -961,7 +961,7 @@ async fn workqueue_commands(
                 "Setting team rotation mode of `{gh_username}` for team `{team}` to {rotation_mode:?}"
             );
             let rotation_mode = rotation_mode.0;
-            upsert_team_review_prefs(&db_client, user, team, rotation_mode)
+            upsert_team_review_prefs(&db_client, user.into(), team, rotation_mode)
                 .await
                 .context("Error occurred while setting team review preferences.")?;
 

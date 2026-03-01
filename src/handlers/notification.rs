@@ -121,7 +121,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
 async fn id_from_user(
     ctx: &Context,
     login: &str,
-) -> anyhow::Result<Option<(Vec<github::User>, Option<String>)>> {
+) -> anyhow::Result<Option<(Vec<github::GitHubUser>, Option<String>)>> {
     if let Some((org, team)) = login.split_once('/') {
         // This is a team ping. For now, just add it to everyone's agenda on
         // that team, but also mark it as such (i.e., a team ping) for
@@ -155,12 +155,12 @@ async fn id_from_user(
         Ok(Some((
             team.members
                 .into_iter()
-                .map(|member| github::User {
+                .map(|member| github::GitHubUser {
                     id: member.github_id,
                     login: member.github,
                     r#type: "User".to_string(),
                 })
-                .collect::<Vec<github::User>>(),
+                .collect::<Vec<github::GitHubUser>>(),
             Some(team.name),
         )))
     } else {

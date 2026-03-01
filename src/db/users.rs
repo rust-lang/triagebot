@@ -1,6 +1,22 @@
-use crate::github::User;
 use anyhow::Context;
 use tokio_postgres::Client as DbClient;
+
+use crate::github::GitHubUser;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct DbUser {
+    pub login: String,
+    pub id: u64,
+}
+
+impl From<GitHubUser> for DbUser {
+    fn from(value: GitHubUser) -> Self {
+        DbUser {
+            login: value.login,
+            id: value.id,
+        }
+    }
+}
 
 /// Add a new user.
 /// If an user already exists, updates their username.
@@ -18,7 +34,7 @@ DO UPDATE SET username = $2",
 }
 
 /// Return a user from the DB.
-pub async fn get_user(db: &DbClient, user_id: u64) -> anyhow::Result<Option<User>> {
+pub async fn get_user(db: &DbClient, user_id: u64) -> anyhow::Result<Option<DbUser>> {
     let row = db
         .query_opt(
             r"
@@ -31,10 +47,9 @@ WHERE user_id = $1;",
         .context("cannot load user from DB")?;
     Ok(row.map(|row| {
         let username: &str = row.get(0);
-        User {
+        DbUser {
             id: user_id,
             login: username.to_string(),
-            r#type: "User".to_string(), // is this right?
         }
     }))
 }

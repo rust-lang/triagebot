@@ -16,13 +16,13 @@ use tracing as log;
 // User
 
 #[derive(Debug, PartialEq, Eq, Hash, serde::Deserialize, Clone)]
-pub struct User {
+pub struct GitHubUser {
     pub login: String,
     pub id: UserId,
     pub r#type: String,
 }
 
-impl From<&Author> for User {
+impl From<&Author> for GitHubUser {
     fn from(author: &Author) -> Self {
         Self {
             id: author.id.0,
@@ -39,7 +39,7 @@ pub struct RepoContent {
     pub download_url: String,
 }
 
-impl User {
+impl GitHubUser {
     pub async fn current(client: &GithubClient) -> anyhow::Result<Self> {
         client
             .json(client.get(&format!("{}/user", client.api_url)))

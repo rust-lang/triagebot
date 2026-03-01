@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use tracing as log;
 
 use super::client::GithubClient;
-use super::repos::{Milestone, Repository, User};
+use super::repos::{GitHubUser, Milestone, Repository};
 use super::utils::{Selection, opt_string};
 use crate::errors::{AssignmentError, UserError};
 use crate::github::GithubCommit;
@@ -38,12 +38,12 @@ pub struct Issue {
     /// Example: `https://github.com/octocat/Hello-World/pull/1347`
     pub html_url: String,
     // User performing an `action` (or PR/issue author)
-    pub user: User,
+    pub user: GitHubUser,
     pub labels: Vec<Label>,
     // Users assigned to the issue/pr after `action` has been performed issue
     // (PR reviewers or issue assignees)
     // These are NOT the same as `IssueEvent.assignee`
-    pub assignees: Vec<User>,
+    pub assignees: Vec<GitHubUser>,
     /// Indicator if this is a pull request.
     ///
     /// This is `Some` if this is a PR (as opposed to an issue). Note that
@@ -600,7 +600,7 @@ pub struct Comment {
     #[serde(deserialize_with = "opt_string")]
     pub body: String,
     pub html_url: String,
-    pub user: User,
+    pub user: GitHubUser,
     #[serde(default, alias = "submitted_at")] // for pull-request review comments
     pub created_at: Option<chrono::DateTime<Utc>>,
     #[serde(default)]
