@@ -5,6 +5,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
+use crate::github::User;
+
 #[derive(Clone)]
 pub struct TeamClient {
     base_url: String,
@@ -47,6 +49,16 @@ impl TeamClient {
             .next())
     }
 
+    pub async fn get_user_from_gh_id(&self, github_id: u64) -> anyhow::Result<Option<User>> {
+        let login = self.username_from_gh_id(github_id).await?;
+
+        Ok(login.map(|login| User {
+            id: github_id,
+            login: login,
+            r#type: "User".to_string(),
+        }))
+    }
+
     // Returns the ID of the given user, if they are in the `team` database.
     pub async fn get_gh_id_from_username(&self, login: &str) -> anyhow::Result<Option<u64>> {
         let people = self.people().await?;
@@ -56,6 +68,16 @@ impl TeamClient {
             .iter()
             .find(|(github_login, _)| github_login.to_lowercase() == login)
             .map(|(_, person)| person.github_id))
+    }
+
+    pub async fn get_user_from_username(&self, login: &str) -> anyhow::Result<Option<User>> {
+        let id = self.get_gh_id_from_username(login).await?;
+
+        Ok(id.map(|id| User {
+            id,
+            login: login.to_string(),
+            r#type: "User".to_string(),
+        }))
     }
 
     pub async fn github_to_zulip_id(&self, github_id: u64) -> anyhow::Result<Option<u64>> {

@@ -299,6 +299,7 @@ pub async fn retrieve_pull_request_assignments(
             .unwrap_or_else(|| User {
                 login: "ghost".to_string(),
                 id: 0,
+                r#type: "User".to_string(),
             });
         if waits_for_a_review(
             &labels,
@@ -309,10 +310,7 @@ pub async fn retrieve_pull_request_assignments(
         ) {
             for user in pr.assignees.unwrap_or_default() {
                 assignments.push((
-                    User {
-                        login: user.login,
-                        id: *user.id,
-                    },
+                    Into::<User>::into(&user),
                     pr.number,
                     AssignedPullRequest {
                         title: pr.title.clone().unwrap_or_default(),
@@ -422,7 +420,7 @@ mod tests {
     use crate::handlers::pr_tracking::{
         AssignedPullRequest, handle_input, parse_input, upsert_pr_into_user_queue,
     };
-    use crate::tests::github::{default_test_sender, issue, pull_request, user};
+    use crate::tests::github::{default_test_user, issue, pull_request, user};
     use crate::tests::{TestContext, run_db_test};
 
     #[tokio::test]
@@ -666,7 +664,7 @@ mod tests {
                 fork: false,
                 parent: None,
             },
-            sender: default_test_sender(),
+            sender: default_test_user(),
         };
 
         let input = parse_input(&handler_ctx, &event, config.as_ref())

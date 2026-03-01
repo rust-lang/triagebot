@@ -1,5 +1,5 @@
 use super::issue_query::Query;
-use super::{GithubClient, GithubCompare, Issue, IssueRepository, PullRequestDetails, Sender};
+use super::{GithubClient, GithubCompare, Issue, IssueRepository, PullRequestDetails};
 use crate::team_data::TeamClient;
 
 use super::UserId;
@@ -19,15 +19,7 @@ use tracing as log;
 pub struct User {
     pub login: String,
     pub id: UserId,
-}
-
-impl From<&Sender> for User {
-    fn from(sender: &Sender) -> Self {
-        Self {
-            id: sender.id,
-            login: sender.login.clone(),
-        }
-    }
+    pub r#type: String,
 }
 
 impl From<&Author> for User {
@@ -35,6 +27,7 @@ impl From<&Author> for User {
         Self {
             id: author.id.0,
             login: author.login.clone(),
+            r#type: author.r#type.clone(),
         }
     }
 }

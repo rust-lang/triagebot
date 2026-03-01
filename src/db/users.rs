@@ -34,6 +34,7 @@ WHERE user_id = $1;",
         User {
             id: user_id,
             login: username.to_string(),
+            r#type: "User".to_string(), // is this right?
         }
     }))
 }

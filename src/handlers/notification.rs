@@ -158,27 +158,22 @@ async fn id_from_user(
                 .map(|member| github::User {
                     id: member.github_id,
                     login: member.github,
+                    r#type: "User".to_string(),
                 })
                 .collect::<Vec<github::User>>(),
             Some(team.name),
         )))
     } else {
-        let id = ctx
+        let user = ctx
             .team
-            .get_gh_id_from_username(login)
+            .get_user_from_username(login)
             .await
-            .with_context(|| format!("failed to get user {login} ID"))?;
-        let Some(id) = id else {
+            .with_context(|| format!("failed to get user {login}"))?;
+        let Some(user) = user else {
             // If the user was not in the team(s) then just don't record it.
             log::trace!("Skipping {login} because no id found");
             return Ok(None);
         };
-        Ok(Some((
-            vec![github::User {
-                login: login.to_string(),
-                id,
-            }],
-            None,
-        )))
+        Ok(Some((vec![user], None)))
     }
 }

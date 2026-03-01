@@ -1,7 +1,5 @@
 use chrono::FixedOffset;
 
-use std::ops::Deref;
-
 use crate::github::{Comment, Issue, Label, Repository, User};
 
 /// An event triggered by a webhook.
@@ -75,10 +73,10 @@ impl Event {
 
     pub fn user(&self) -> &User {
         match self {
-            Event::Create(e) => &e.sender.user,
+            Event::Create(e) => &e.sender,
             Event::Issue(e) => &e.issue.user,
             Event::IssueComment(e) => &e.comment.user,
-            Event::Push(e) => &e.sender.user,
+            Event::Push(e) => &e.sender,
         }
     }
 
@@ -100,7 +98,7 @@ impl Event {
 pub struct CreateEvent {
     pub ref_type: CreateKind,
     repository: Repository,
-    sender: Sender,
+    sender: User,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -120,7 +118,7 @@ pub struct PushEvent {
     #[serde(rename = "ref")]
     pub git_ref: String,
     pub repository: Repository,
-    sender: Sender,
+    sender: User,
 }
 
 /// The action that occurred in an org_block event.
@@ -131,22 +129,6 @@ pub enum OrgBlockAction {
     Blocked,
     /// User was unbannded
     Unblocked,
-}
-
-/// Organization information from an org_block event.
-#[derive(Debug, serde::Deserialize)]
-pub struct Sender {
-    #[serde(flatten)]
-    pub user: User,
-    pub r#type: String,
-}
-
-impl Deref for Sender {
-    type Target = User;
-
-    fn deref(&self) -> &User {
-        &self.user
-    }
 }
 
 /// Organization information from an org_block event.
@@ -162,7 +144,7 @@ pub struct OrgBlockEvent {
     pub action: OrgBlockAction,
     pub blocked_user: User,
     pub organization: Organization,
-    pub sender: Sender,
+    pub sender: User,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -195,7 +177,7 @@ pub struct IssuesEvent {
     pub after: Option<String>,
     pub repository: Repository,
     /// The GitHub user that triggered the event.
-    pub sender: Sender,
+    pub sender: User,
 }
 
 impl IssuesEvent {

@@ -394,6 +394,7 @@ r#":warning: **Warning** :warning:
                 user: crate::github::User {
                     login: "user".to_string(),
                     id: 654123,
+                    r#type: "User".to_string(),
                 },
                 labels: Default::default(),
                 assignees: Default::default(),
@@ -427,11 +428,9 @@ r#":warning: **Warning** :warning:
                 fork: false,
                 parent: None,
             },
-            sender: crate::github::Sender {
-                user: crate::github::User {
-                    login: "rustbot".to_string(),
-                    id: 987654,
-                },
+            sender: crate::github::User {
+                login: "rustbot".to_string(),
+                id: 987654,
                 r#type: "Bot".to_string(),
             },
         }
