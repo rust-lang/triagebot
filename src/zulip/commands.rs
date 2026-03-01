@@ -448,16 +448,16 @@ mod tests {
     }
 
     #[test]
-    fn recent_comments_command() {
+    fn recent_activity_command() {
         assert_eq!(
-            parse_chat(&["comments", "octocat"]),
+            parse_chat(&["user-info", "octocat"]),
             ChatCommand::UserInfo {
                 username: "octocat".to_string(),
                 organization: "rust-lang".to_string()
             }
         );
         assert_eq!(
-            parse_chat(&["comments", "foobar", "--org", "rust-lang-nursery"]),
+            parse_chat(&["user-info", "foobar", "--org", "rust-lang-nursery"]),
             ChatCommand::UserInfo {
                 username: "foobar".to_string(),
                 organization: "rust-lang-nursery".to_string()
