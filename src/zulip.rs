@@ -1467,9 +1467,11 @@ pub fn format_user_comment(comment: &UserComment) -> String {
         .unwrap_or_else(|| "unknown date".to_string());
 
     format!(
-        "- [{title}]({comment_url}) ({date}):\n  > {snippet}\n",
+        "- [{title}]({comment_url}) (`{repo}#{number}`, {date}):\n  > {snippet}\n",
         title = truncate_and_normalize(&comment.issue_title, 60),
         comment_url = comment.comment_url,
+        repo = comment.repo_name,
+        number = comment.issue_number
     )
 }
 
