@@ -6,6 +6,9 @@ use crate::github::GithubClient;
 /// A comment made by a user on an issue or PR.
 #[derive(Debug, Clone)]
 pub struct UserComment {
+    pub repo_owner: String,
+    pub repo_name: String,
+    pub issue_number: u64,
     pub issue_title: String,
     pub issue_url: String,
     pub comment_url: String,
@@ -46,8 +49,13 @@ query($query: String!, $issueLimit: Int!, $commentLimit: Int!) {
   search(query: $query, type: ISSUE, first: $issueLimit) {
     nodes {
       ... on Issue {
+        number
         url
         title
+        repository {
+          name
+          owner { login }
+        }
         comments(first: $commentLimit, orderBy: {field: UPDATED_AT, direction: DESC}) {
           nodes {
             author { login }
@@ -58,8 +66,13 @@ query($query: String!, $issueLimit: Int!, $commentLimit: Int!) {
         }
       }
       ... on PullRequest {
+        number
         url
         title
+        repository {
+          name
+          owner { login }
+        }
         comments(first: $commentLimit, orderBy: {field: UPDATED_AT, direction: DESC}) {
           nodes {
             author { login }
@@ -86,6 +99,15 @@ query($query: String!, $issueLimit: Int!, $commentLimit: Int!) {
 
         if let Some(nodes) = data["data"]["search"]["nodes"].as_array() {
             for node in nodes {
+                let repo_owner = node["repository"]["owner"]["login"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                let repo_name = node["repository"]["name"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                let issue_number = node["number"].as_u64().unwrap_or(0);
                 let issue_title = node["title"].as_str().unwrap_or("Unknown");
                 let issue_url = node["url"].as_str().unwrap_or("");
 
@@ -105,6 +127,9 @@ query($query: String!, $issueLimit: Int!, $commentLimit: Int!) {
                             .map(|dt| dt.with_timezone(&chrono::Utc));
 
                         all_comments.push(UserComment {
+                            repo_owner: repo_owner.clone(),
+                            repo_name: repo_name.clone(),
+                            issue_number,
                             issue_title: issue_title.to_string(),
                             issue_url: issue_url.to_string(),
                             comment_url: url.to_string(),

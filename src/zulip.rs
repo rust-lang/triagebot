@@ -8,7 +8,8 @@ use crate::db::review_prefs::{
     ReviewPreferences, RotationMode, get_review_prefs, get_review_prefs_batch,
     upsert_repo_review_prefs, upsert_team_review_prefs, upsert_user_review_prefs,
 };
-use crate::github::user_comments_in_org::UserComment;
+use crate::github::queries::user_comments_in_org::UserComment;
+use crate::github::queries::user_prs_in_org::{PullRequestState, UserPullRequest};
 use crate::github::{self, User};
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
@@ -1459,22 +1460,57 @@ fn trigger_docs_update(message: &Message, zulip: &ZulipClient) -> anyhow::Result
 /// Formats user's GitHub comment for display in the Zulip message.
 pub fn format_user_comment(comment: &UserComment) -> String {
     // Limit the size of the comment to avoid running into Zulip max message size limits
-    let snippet = truncate_text(&comment.body, 300);
+    let snippet = truncate_and_normalize(&comment.body, 300);
     let date = comment
         .created_at
-        .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
+        .map(|dt| format!("<time:{}>", dt.to_rfc3339()))
         .unwrap_or_else(|| "unknown date".to_string());
 
     format!(
-        "- [{title}]({comment_url}) ({date}):\n  > {snippet}\n",
-        title = truncate_text(&comment.issue_title, 60),
+        "- [{title}]({comment_url}) (`{repo}#{number}`, {date}):\n  > {snippet}\n",
+        title = truncate_and_normalize(&comment.issue_title, 60),
         comment_url = comment.comment_url,
+        repo = comment.repo_name,
+        number = comment.issue_number
+    )
+}
+
+/// Formats user's GitHub PR for display in the Zulip message.
+pub fn format_user_pr(pr: &UserPullRequest) -> String {
+    let snippet = truncate_and_normalize(&pr.body, 300);
+    let date = pr
+        .created_at
+        .map(|dt| format!("<time:{}>", dt.to_rfc3339()))
+        .unwrap_or_else(|| "unknown date".to_string());
+    let pre_snippet = if snippet.is_empty() {
+        // Using empty > without text would break following lines
+        ""
+    } else {
+        "\n  >"
+    };
+
+    format!(
+        "- [{title}]({pr_url}) (`{repo}#{number}`, {date}) {state}{pre_snippet}{snippet}\n",
+        title = truncate_and_normalize(&pr.title, 60),
+        repo = pr.repo_name,
+        number = pr.number,
+        pr_url = pr.url,
+        state = match pr.state {
+            PullRequestState::Open => ":green_circle:",
+            PullRequestState::Closed => ":red_circle:",
+            PullRequestState::Merged => ":purple_circle:",
+        }
     )
 }
 
 /// Truncates the given text to the specified length, adding ellipsis if needed.
-fn truncate_text(text: &str, max_len: usize) -> String {
-    let normalized: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
+/// Also removes backticks from it.
+fn truncate_and_normalize(text: &str, max_len: usize) -> String {
+    let normalized: String = text
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .replace("`", "");
 
     if normalized.len() <= max_len {
         normalized

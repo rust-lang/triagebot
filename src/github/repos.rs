@@ -13,9 +13,6 @@ use reqwest::StatusCode;
 use std::collections::HashSet;
 use tracing as log;
 
-pub(crate) mod issue_with_comments;
-pub(crate) mod user_comments_in_org;
-
 // User
 
 #[derive(Debug, PartialEq, Eq, Hash, serde::Deserialize, Clone)]

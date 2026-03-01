@@ -16,7 +16,7 @@ use hyper::{
 
 use crate::{
     cache,
-    github::issue_with_comments::{
+    github::queries::issue_with_comments::{
         GitHubGraphQlComment, GitHubGraphQlReactionGroup, GitHubGraphQlReviewThreadComment,
         GitHubIssueState, GitHubIssueStateReason, GitHubIssueWithComments, GitHubReviewState,
         GitHubSimplifiedAuthor,
@@ -726,7 +726,7 @@ fn write_reaction_groups_as_html(
                 continue;
             }
 
-            use crate::github::issue_with_comments::GitHubGraphQlReactionContent::*;
+            use crate::github::queries::issue_with_comments::GitHubGraphQlReactionContent::*;
             let emoji = match reaction_group.content {
                 ThumbsUp => "👍",
                 ThumbsDown => "👎",
