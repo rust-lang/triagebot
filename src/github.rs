@@ -1,6 +1,7 @@
 pub(crate) mod client;
 pub(crate) mod issue;
 pub(crate) mod issue_query;
+pub(crate) mod queries;
 pub(crate) mod repos;
 pub(crate) mod utils;
 mod webhook;
