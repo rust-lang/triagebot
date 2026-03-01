@@ -1463,7 +1463,7 @@ pub fn format_user_comment(comment: &UserComment) -> String {
     let snippet = truncate_and_normalize(&comment.body, 300);
     let date = comment
         .created_at
-        .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
+        .map(|dt| format!("<time:{}>", dt.to_rfc3339()))
         .unwrap_or_else(|| "unknown date".to_string());
 
     format!(
@@ -1480,7 +1480,7 @@ pub fn format_user_pr(pr: &UserPullRequest) -> String {
     let snippet = truncate_and_normalize(&pr.body, 300);
     let date = pr
         .created_at
-        .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
+        .map(|dt| format!("<time:{}>", dt.to_rfc3339()))
         .unwrap_or_else(|| "unknown date".to_string());
     let pre_snippet = if snippet.is_empty() {
         // Using empty > without text would break following lines
