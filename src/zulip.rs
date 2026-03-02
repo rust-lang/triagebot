@@ -580,8 +580,8 @@ async fn user_info_cmd(
 
     let recent_date_cutoff = Utc::now() - Duration::days(recent_days as i64);
 
-    let all_prs_stats = analyze_pr_stats(&user_prs, recent_days);
-    let org_prs_stats = analyze_pr_stats(&org_user_prs, recent_days);
+    let all_prs_stats = analyze_pr_stats(&user_prs, pr_limit, recent_days);
+    let org_prs_stats = analyze_pr_stats(&org_user_prs, pr_limit, recent_days);
 
     let pr_bandwidth_msg = |stats: &PullRequestStats, org: Option<&str>| {
         stats
@@ -720,7 +720,11 @@ struct PullRequestStats<'a> {
     oldest_pr_created_at: Option<DateTime<Utc>>,
 }
 
-fn analyze_pr_stats(prs: &[UserPullRequest], recent_days: u32) -> PullRequestStats<'_> {
+fn analyze_pr_stats(
+    prs: &[UserPullRequest],
+    pr_limit: usize,
+    recent_days: u32,
+) -> PullRequestStats<'_> {
     let recent_pr_cutoff = Utc::now() - Duration::days(recent_days as i64);
     let recent_prs: Vec<&UserPullRequest> = prs
         .iter()
@@ -734,7 +738,8 @@ fn analyze_pr_stats(prs: &[UserPullRequest], recent_days: u32) -> PullRequestSta
     let oldest_pr_created_at = prs.last().and_then(|pr| pr.created_at);
     let maybe_has_more = oldest_pr_created_at
         .map(|date| date > recent_pr_cutoff)
-        .unwrap_or(false);
+        .unwrap_or(false)
+        && prs.len() == pr_limit;
 
     PullRequestStats {
         pr_count: prs.len() as u64,
