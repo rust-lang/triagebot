@@ -118,7 +118,7 @@ async fn add_rendered_link(
                 .into()
         } else {
             bail!(
-                "found `[Rendered]` but not it's associated link, can't replace it or remove it, bailing out"
+                "found `[Rendered]` but not its associated link, can't replace it or remove it, bailing out"
             )
         };
 
