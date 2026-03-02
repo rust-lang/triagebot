@@ -113,7 +113,7 @@ async fn handle_pr(
     repo: Repository,
     issue: &Issue,
 ) -> anyhow::Result<()> {
-    if issue.user.r#type == GitHubUserType::Bot && !config.consider_push_from_bots {
+    if issue.user.r#type == GitHubUserType::Bot && !config.consider_prs_from_bots {
         log::trace!("ignoring issue {}", issue.number);
         return Ok(());
     }
@@ -196,7 +196,7 @@ async fn scan_prs(
     // notifications happening on closed PRs, then we'll need to add something
     // to prevent that race (like a delay or some other verification).
     let mut prs = repo.get_merge_conflict_prs(gh).await?;
-    if !config.consider_push_from_bots {
+    if !config.consider_prs_from_bots {
         prs.retain(|pr| pr.author.r#type != GitHubUserType::Bot);
     }
     let (conflicting, unknowns): (Vec<_>, Vec<_>) = prs
