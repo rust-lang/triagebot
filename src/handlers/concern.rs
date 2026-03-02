@@ -54,10 +54,9 @@ pub(super) async fn handle_command(
     }
 
     // Verify that the comment author is a team member in our team repo
-    if !issue_comment
-        .comment
-        .user
-        .is_team_member(&ctx.team)
+    if !ctx
+        .team
+        .is_team_member(&issue_comment.comment.user.login)
         .await
         .context("failed to verify that the user is a team member")?
     {

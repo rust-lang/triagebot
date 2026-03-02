@@ -1,6 +1,5 @@
 use super::issue_query::Query;
 use super::{GithubClient, GithubCompare, Issue, IssueRepository, PullRequestDetails};
-use crate::team_data::TeamClient;
 
 use super::UserId;
 
@@ -37,29 +36,6 @@ impl From<&Author> for GitHubUser {
 pub struct RepoContent {
     pub name: String,
     pub download_url: String,
-}
-
-impl GitHubUser {
-    pub async fn is_team_member<'a>(&'a self, client: &'a TeamClient) -> anyhow::Result<bool> {
-        log::trace!("Getting team membership for {:?}", self.login);
-        let permission = client.teams().await?;
-        let map = permission.teams;
-        let is_triager = map
-            .get("wg-triage")
-            .is_some_and(|w| w.members.iter().any(|g| g.github == self.login));
-        let is_async_member = map
-            .get("wg-async")
-            .is_some_and(|w| w.members.iter().any(|g| g.github == self.login));
-        let in_all = map["all"].members.iter().any(|g| g.github == self.login);
-        log::trace!(
-            "{:?} is all?={:?}, triager?={:?}, async?={:?}",
-            self.login,
-            in_all,
-            is_triager,
-            is_async_member,
-        );
-        Ok(in_all || is_triager || is_async_member)
-    }
 }
 
 // New issue

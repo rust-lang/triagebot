@@ -597,7 +597,7 @@ pub(super) async fn handle_command(
     event: &Event,
     cmd: AssignCommand,
 ) -> anyhow::Result<()> {
-    let is_team_member = matches!(event.user().is_team_member(&ctx.team).await, Ok(true));
+    let is_team_member = matches!(ctx.team.is_team_member(&event.user().login).await, Ok(true));
 
     // Don't handle commands in comments from the bot. Some of the comments it
     // posts contain commands to instruct the user, not things that the bot

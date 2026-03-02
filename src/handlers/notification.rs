@@ -4,6 +4,7 @@
 //!
 //! Parsing is done in the `parser::command::ping` module.
 
+use crate::db::users::DbUser;
 use crate::db::{notifications, users};
 use crate::{
     github::{self, Event},
@@ -121,7 +122,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
 async fn id_from_user(
     ctx: &Context,
     login: &str,
-) -> anyhow::Result<Option<(Vec<github::GitHubUser>, Option<String>)>> {
+) -> anyhow::Result<Option<(Vec<DbUser>, Option<String>)>> {
     if let Some((org, team)) = login.split_once('/') {
         // This is a team ping. For now, just add it to everyone's agenda on
         // that team, but also mark it as such (i.e., a team ping) for
@@ -155,25 +156,30 @@ async fn id_from_user(
         Ok(Some((
             team.members
                 .into_iter()
-                .map(|member| github::GitHubUser {
+                .map(|member| DbUser {
                     id: member.github_id,
                     login: member.github,
-                    r#type: "User".to_string(),
                 })
-                .collect::<Vec<github::GitHubUser>>(),
+                .collect::<Vec<_>>(),
             Some(team.name),
         )))
     } else {
-        let user = ctx
+        let id = ctx
             .team
-            .get_user_from_username(login)
+            .get_gh_id_from_username(login)
             .await
-            .with_context(|| format!("failed to get user {login}"))?;
-        let Some(user) = user else {
+            .with_context(|| format!("failed to get user {login} ID"))?;
+        let Some(id) = id else {
             // If the user was not in the team(s) then just don't record it.
             log::trace!("Skipping {login} because no id found");
             return Ok(None);
         };
-        Ok(Some((vec![user], None)))
+        Ok(Some((
+            vec![DbUser {
+                login: login.to_string(),
+                id,
+            }],
+            None,
+        )))
     }
 }

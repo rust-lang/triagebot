@@ -253,9 +253,9 @@ pub(super) async fn handle_command(
         ));
     }
 
-    let is_team_member = event
-        .user()
-        .is_team_member(&ctx.team)
+    let is_team_member = ctx
+        .team
+        .is_team_member(&event.user().login)
         .await
         .ok()
         .unwrap_or(false);
