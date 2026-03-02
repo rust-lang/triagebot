@@ -85,6 +85,10 @@ async fn handle_branch_push(
         log::trace!("ignoring push to {git_ref}");
         return Ok(());
     };
+    if branch_name.starts_with("gh-readonly-queue/") {
+        log::trace!("ignoring push to {git_ref}");
+        return Ok(());
+    }
     let branch_name = branch_name.to_string();
     let push_sha = push.after.to_string();
     let config = config.clone();
