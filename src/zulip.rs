@@ -656,9 +656,10 @@ In past {recent_days} days, the user opened `{recent_pr_count}{more_prs}` PRs ({
 The PRs were opened in `{pr_repo_count}` repo(s) and `{org_pr_count}` organization(s){opened_orgs}.
 
 Total contributions in the past {contributions_since} days:
-- {contribution_prs} PRs
-- {contribution_issues} issues
-- {contribution_commits} commits
+- Created `{contribution_prs}` PRs
+- Created `{contribution_issues}` issues
+- Created `{contribution_commits}` commits
+- Created `{contribution_repos}` repositories
 
 ## `{organization}` activity
 In past {recent_days} days, the user opened `{org_recent_pr_count}{org_more_prs}` PRs ({org_open_prs} open, {org_merged_prs} merged, {org_closed_prs} closed).
@@ -683,6 +684,7 @@ In past {recent_days} days, the user opened `{org_recent_pr_count}{org_more_prs}
         contribution_prs = contributions.total_created_prs,
         contribution_commits = contributions.total_created_commits,
         contribution_issues = contributions.total_created_issues,
+        contribution_repos = contributions.total_created_repos,
     );
 
     let comments = ctx
