@@ -1668,13 +1668,16 @@ fn format_date(date: Option<DateTime<Utc>>) -> String {
 }
 
 /// Truncates the given text to the specified length, adding ellipsis if needed.
-/// Also removes backticks from it.
+/// Also removes various special Markdown symbols from it.
 fn truncate_and_normalize(text: &str, max_len: usize) -> String {
     let normalized: String = text
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
-        .replace("`", "");
+        // Avoid things that could interact with the rest of the Markdown message.
+        // And avoid and @ pings (in case the text is outputted in a public Zulip stream).
+        .replace("`", "")
+        .replace("@", "");
 
     if normalized.len() <= max_len {
         normalized
