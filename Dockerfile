@@ -1,11 +1,13 @@
-# This Dockerfile is composed of two steps: the first one builds the release
-# binary, and then the binary is copied inside another, empty image.
+# This Dockerfile is composed of several steps, to make cargo chef work.
+# The final step copies the triagebot binary inside another, empty image.
 
 #################
 #  Build image  #
 #################
 
-FROM ubuntu:22.04 as build
+FROM rust:1.93 AS base
+
+RUN cargo install --locked cargo-chef
 
 RUN apt-get update -y && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -20,25 +22,35 @@ RUN apt-get update -y && \
       cmake \
       zlib1g-dev
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- \
-    --default-toolchain stable --profile minimal -y
+FROM base AS planner
 
 COPY . .
-RUN bash -c 'source $HOME/.cargo/env && cargo test --release --all'
-RUN bash -c 'source $HOME/.cargo/env && cargo build --release'
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM base AS builder
+
+# Copy build recipe
+COPY --from=planner /recipe.json recipe.json
+
+# Build dependencies - this is the caching Docker layer!
+RUN cargo chef cook --release --recipe-path recipe.json
+
+# And now build the rest
+COPY . .
+RUN cargo build --release
 
 ##################
 #  Output image  #
 ##################
 
-FROM ubuntu:22.04 AS binary
+FROM ubuntu:24.04 AS binary
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ca-certificates
 
 RUN mkdir -p /opt/triagebot
 
-COPY --from=build /target/release/triagebot /usr/local/bin/
+COPY --from=builder /target/release/triagebot /usr/local/bin/
 COPY templates /opt/triagebot/templates
 WORKDIR /opt/triagebot
 ENV PORT=80
