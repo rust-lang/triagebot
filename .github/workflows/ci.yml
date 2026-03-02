@@ -37,6 +37,9 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
     needs: [ test ]
     # We want to build the Docker image on the default branch to prime CI cache
     if: ${{ github.event_name == 'merge_group' || github.event_name == 'push' }}
