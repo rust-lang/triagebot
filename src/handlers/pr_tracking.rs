@@ -6,8 +6,8 @@
 //! - Adds the PR to the workqueue of one team member (after the PR has been assigned or reopened)
 //! - Removes the PR from the workqueue of one team member (after the PR has been unassigned or closed)
 
+use crate::github::{GitHubUser, UserId};
 use crate::github::{Label, PullRequestNumber};
-use crate::github::{User, UserId};
 use crate::{
     config::ReviewPrefsConfig,
     github::{IssuesAction, IssuesEvent},
@@ -118,8 +118,8 @@ impl RepositoryWorkqueueMap {
 }
 
 pub(super) enum ReviewPrefsInput {
-    Assigned { assignee: User },
-    Unassigned { assignee: User },
+    Assigned { assignee: GitHubUser },
+    Unassigned { assignee: GitHubUser },
     OtherChange,
 }
 
@@ -264,7 +264,7 @@ pub async fn retrieve_pull_request_assignments(
     owner: &str,
     repository: &str,
     client: &Octocrab,
-) -> anyhow::Result<Vec<(User, PullRequestNumber, AssignedPullRequest)>> {
+) -> anyhow::Result<Vec<(GitHubUser, PullRequestNumber, AssignedPullRequest)>> {
     let mut assignments = vec![];
 
     // We use the REST API to fetch open pull requests, as it is much (~5-10x)
@@ -290,15 +290,16 @@ pub async fn retrieve_pull_request_assignments(
         let assignees = pr
             .assignees
             .as_ref()
-            .map(|authors| authors.iter().map(User::from).collect::<Vec<_>>())
+            .map(|authors| authors.iter().map(GitHubUser::from).collect::<Vec<_>>())
             .unwrap_or_default();
         let author = pr
             .user
             .as_ref()
-            .map(|author| User::from(author.as_ref()))
-            .unwrap_or_else(|| User {
+            .map(|author| GitHubUser::from(author.as_ref()))
+            .unwrap_or_else(|| GitHubUser {
                 login: "ghost".to_string(),
                 id: 0,
+                r#type: "User".to_string(),
             });
         if waits_for_a_review(
             &labels,
@@ -309,10 +310,7 @@ pub async fn retrieve_pull_request_assignments(
         ) {
             for user in pr.assignees.unwrap_or_default() {
                 assignments.push((
-                    User {
-                        login: user.login,
-                        id: *user.id,
-                    },
+                    Into::<GitHubUser>::into(&user),
                     pr.number,
                     AssignedPullRequest {
                         title: pr.title.clone().unwrap_or_default(),
@@ -390,8 +388,8 @@ fn delete_pr_from_all_queues(workqueue: &mut ReviewerWorkqueue, pr: PullRequestN
 /// different labels.
 fn waits_for_a_review(
     labels: &[Label],
-    assignees: &[User],
-    author: &User,
+    assignees: &[GitHubUser],
+    author: &GitHubUser,
     is_open: bool,
     is_draft: bool,
 ) -> bool {
@@ -417,12 +415,12 @@ fn waits_for_a_review(
 #[cfg(test)]
 mod tests {
     use crate::config::Config;
-    use crate::github::{Issue, IssuesAction, IssuesEvent, Repository, User};
+    use crate::github::{GitHubUser, Issue, IssuesAction, IssuesEvent, Repository};
     use crate::github::{Label, PullRequestNumber};
     use crate::handlers::pr_tracking::{
         AssignedPullRequest, handle_input, parse_input, upsert_pr_into_user_queue,
     };
-    use crate::tests::github::{default_test_sender, issue, pull_request, user};
+    use crate::tests::github::{default_test_user, issue, pull_request, user};
     use crate::tests::{TestContext, run_db_test};
 
     #[tokio::test]
@@ -607,7 +605,7 @@ mod tests {
 
     async fn check_assigned_prs(
         ctx: &TestContext,
-        user: &User,
+        user: &GitHubUser,
         expected_prs: &[PullRequestNumber],
     ) {
         let workqueue_arc = ctx
@@ -628,7 +626,7 @@ mod tests {
         assert_eq!(assigned, expected_prs);
     }
 
-    async fn set_assigned_prs(ctx: &TestContext, user: &User, prs: &[PullRequestNumber]) {
+    async fn set_assigned_prs(ctx: &TestContext, user: &GitHubUser, prs: &[PullRequestNumber]) {
         {
             let workqueue_arc = ctx
                 .handler_ctx()
@@ -666,7 +664,7 @@ mod tests {
                 fork: false,
                 parent: None,
             },
-            sender: default_test_sender(),
+            sender: default_test_user(),
         };
 
         let input = parse_input(&handler_ctx, &event, config.as_ref())

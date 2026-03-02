@@ -1,6 +1,5 @@
 use super::issue_query::Query;
-use super::{GithubClient, GithubCompare, Issue, IssueRepository, PullRequestDetails, Sender};
-use crate::team_data::TeamClient;
+use super::{GithubClient, GithubCompare, Issue, IssueRepository, PullRequestDetails};
 
 use super::UserId;
 
@@ -16,25 +15,18 @@ use tracing as log;
 // User
 
 #[derive(Debug, PartialEq, Eq, Hash, serde::Deserialize, Clone)]
-pub struct User {
+pub struct GitHubUser {
     pub login: String,
     pub id: UserId,
+    pub r#type: String,
 }
 
-impl From<&Sender> for User {
-    fn from(sender: &Sender) -> Self {
-        Self {
-            id: sender.id,
-            login: sender.login.clone(),
-        }
-    }
-}
-
-impl From<&Author> for User {
+impl From<&Author> for GitHubUser {
     fn from(author: &Author) -> Self {
         Self {
             id: author.id.0,
             login: author.login.clone(),
+            r#type: author.r#type.clone(),
         }
     }
 }
@@ -44,35 +36,6 @@ impl From<&Author> for User {
 pub struct RepoContent {
     pub name: String,
     pub download_url: String,
-}
-
-impl User {
-    pub async fn current(client: &GithubClient) -> anyhow::Result<Self> {
-        client
-            .json(client.get(&format!("{}/user", client.api_url)))
-            .await
-    }
-
-    pub async fn is_team_member<'a>(&'a self, client: &'a TeamClient) -> anyhow::Result<bool> {
-        log::trace!("Getting team membership for {:?}", self.login);
-        let permission = client.teams().await?;
-        let map = permission.teams;
-        let is_triager = map
-            .get("wg-triage")
-            .is_some_and(|w| w.members.iter().any(|g| g.github == self.login));
-        let is_async_member = map
-            .get("wg-async")
-            .is_some_and(|w| w.members.iter().any(|g| g.github == self.login));
-        let in_all = map["all"].members.iter().any(|g| g.github == self.login);
-        log::trace!(
-            "{:?} is all?={:?}, triager?={:?}, async?={:?}",
-            self.login,
-            in_all,
-            is_triager,
-            is_async_member,
-        );
-        Ok(in_all || is_triager || is_async_member)
-    }
 }
 
 // New issue

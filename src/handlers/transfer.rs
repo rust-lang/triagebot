@@ -17,9 +17,9 @@ pub(super) async fn handle_command(
             .await?;
         return Ok(());
     }
-    if !event
-        .user()
-        .is_team_member(&ctx.team)
+    if !ctx
+        .team
+        .is_team_member(&event.user().login)
         .await
         .ok()
         .unwrap_or(false)

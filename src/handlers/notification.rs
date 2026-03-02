@@ -4,6 +4,7 @@
 //!
 //! Parsing is done in the `parser::command::ping` module.
 
+use crate::db::users::DbUser;
 use crate::db::{notifications, users};
 use crate::{
     github::{self, Event},
@@ -121,7 +122,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
 async fn id_from_user(
     ctx: &Context,
     login: &str,
-) -> anyhow::Result<Option<(Vec<github::User>, Option<String>)>> {
+) -> anyhow::Result<Option<(Vec<DbUser>, Option<String>)>> {
     if let Some((org, team)) = login.split_once('/') {
         // This is a team ping. For now, just add it to everyone's agenda on
         // that team, but also mark it as such (i.e., a team ping) for
@@ -155,11 +156,11 @@ async fn id_from_user(
         Ok(Some((
             team.members
                 .into_iter()
-                .map(|member| github::User {
+                .map(|member| DbUser {
                     id: member.github_id,
                     login: member.github,
                 })
-                .collect::<Vec<github::User>>(),
+                .collect::<Vec<_>>(),
             Some(team.name),
         )))
     } else {
@@ -174,7 +175,7 @@ async fn id_from_user(
             return Ok(None);
         };
         Ok(Some((
-            vec![github::User {
+            vec![DbUser {
                 login: login.to_string(),
                 id,
             }],

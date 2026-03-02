@@ -3,7 +3,7 @@
 //! Configured in [notify-zulip.*] sections
 //!
 
-use crate::github::User;
+use crate::github::GitHubUser;
 use crate::zulip::api::Recipient;
 use crate::zulip::render_zulip_username;
 use crate::{
@@ -249,7 +249,7 @@ pub(super) async fn handle_input(
     Ok(())
 }
 
-async fn get_zulip_ids(ctx: &Context, recipients: &[User]) -> String {
+async fn get_zulip_ids(ctx: &Context, recipients: &[GitHubUser]) -> String {
     let gh_ids_fut = recipients
         .iter()
         .map(|recipient| async move { ctx.team.github_to_zulip_id(recipient.id).await });

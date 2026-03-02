@@ -2,7 +2,7 @@
 
 use super::super::*;
 use crate::db::review_prefs::{RotationMode, upsert_repo_review_prefs, upsert_user_review_prefs};
-use crate::github::{PullRequestNumber, User, UserId};
+use crate::github::{GitHubUser, PullRequestNumber, UserId};
 use crate::handlers::pr_tracking::{AssignedPullRequest, ReviewerWorkqueue};
 use crate::tests::github::{issue, user};
 use crate::tests::{TestContext, run_db_test};
@@ -66,17 +66,21 @@ impl AssignCtx {
 
     async fn set_review_prefs(
         self,
-        user: &User,
+        user: &GitHubUser,
         capacity: Option<u32>,
         rotation_mode: RotationMode,
     ) -> Self {
-        upsert_user_review_prefs(self.test_ctx.db_client(), user.clone(), rotation_mode)
-            .await
-            .unwrap();
+        upsert_user_review_prefs(
+            self.test_ctx.db_client(),
+            user.clone().into(),
+            rotation_mode,
+        )
+        .await
+        .unwrap();
         if let Some(capacity) = capacity {
             upsert_repo_review_prefs(
                 self.test_ctx.db_client(),
-                user.clone(),
+                user.clone().into(),
                 "rust-lang/rust",
                 Some(capacity),
             )
@@ -86,7 +90,7 @@ impl AssignCtx {
         self
     }
 
-    async fn set_previous_reviewers(mut self, users: HashSet<&User>) -> Self {
+    async fn set_previous_reviewers(mut self, users: HashSet<&GitHubUser>) -> Self {
         let mut db = self.test_ctx.db_client_mut();
         let mut state: IssueData<'_, Reviewers> =
             IssueData::load(&mut db, &self.issue, PREVIOUS_REVIEWERS_KEY)

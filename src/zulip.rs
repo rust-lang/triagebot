@@ -8,9 +8,10 @@ use crate::db::review_prefs::{
     ReviewPreferences, RotationMode, get_review_prefs, get_review_prefs_batch,
     upsert_repo_review_prefs, upsert_team_review_prefs, upsert_user_review_prefs,
 };
+use crate::db::users::DbUser;
+use crate::github;
 use crate::github::queries::user_comments_in_org::UserComment;
 use crate::github::queries::user_prs_in_org::{PullRequestState, UserPullRequest};
-use crate::github::{self, User};
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::{ReviewerWorkqueue, get_assigned_prs};
@@ -544,15 +545,12 @@ async fn recent_comments_cmd(
 ) -> anyhow::Result<String> {
     const RECENT_COMMENTS_LIMIT: usize = 10;
 
-    let user = User {
-        login: ctx
-            .team
-            .username_from_gh_id(gh_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Username for GitHub user {gh_id} not found"))?,
-        id: gh_id,
-    };
-    if !user.is_team_member(&ctx.team).await? {
+    let gh_login = ctx
+        .team
+        .username_from_gh_id(gh_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Username for GitHub user {gh_id} not found"))?;
+    if !ctx.team.is_team_member(&gh_login).await? {
         return Err(anyhow::anyhow!(
             "This command is only available to team members."
         ));
@@ -851,7 +849,7 @@ async fn workqueue_commands(
         ctx.team.username_from_gh_id(gh_id).await?.ok_or_else(|| {
             anyhow::anyhow!("Cannot find your GitHub username in the team database")
         })?;
-    let user = User {
+    let user = DbUser {
         login: gh_username.clone(),
         id: gh_id,
     };
@@ -928,7 +926,7 @@ async fn workqueue_commands(
                 WorkqueueLimit::Unlimited => None,
                 WorkqueueLimit::Limit(limit) => Some(*limit),
             };
-            upsert_repo_review_prefs(&db_client, user, &repo, max_assigned_prs)
+            upsert_repo_review_prefs(&db_client, user.into(), &repo, max_assigned_prs)
                 .await
                 .context("Error occurred while setting review preferences.")?;
             tracing::info!(
@@ -944,7 +942,7 @@ async fn workqueue_commands(
         }
         WorkqueueCmd::SetRotationMode { rotation_mode } => {
             let rotation_mode = rotation_mode.0;
-            upsert_user_review_prefs(&db_client, user, rotation_mode)
+            upsert_user_review_prefs(&db_client, user.into(), rotation_mode)
                 .await
                 .context("Error occurred while setting review preferences.")?;
             tracing::info!("Setting rotation mode `{gh_username}` to {rotation_mode:?}");
@@ -963,9 +961,8 @@ async fn workqueue_commands(
                     "Team `{team}` not found in the team database."
                 ));
             }
-
             let rotation_mode = rotation_mode.0;
-            upsert_team_review_prefs(&db_client, user, team, rotation_mode)
+            upsert_team_review_prefs(&db_client, user.into(), team, rotation_mode)
                 .await
                 .context("Error occurred while setting team review preferences.")?;
             tracing::info!(

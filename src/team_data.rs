@@ -32,6 +32,27 @@ impl TeamClient {
         }
     }
 
+    pub async fn is_team_member(&self, gh_login: &str) -> anyhow::Result<bool> {
+        tracing::trace!("Getting team membership for {:?}", gh_login);
+        let permission = self.teams().await?;
+        let map = permission.teams;
+        let is_triager = map
+            .get("wg-triage")
+            .is_some_and(|w| w.members.iter().any(|g| g.github == gh_login));
+        let is_async_member = map
+            .get("wg-async")
+            .is_some_and(|w| w.members.iter().any(|g| g.github == gh_login));
+        let in_all = map["all"].members.iter().any(|g| g.github == gh_login);
+        tracing::trace!(
+            "{:?} is all?={:?}, triager?={:?}, async?={:?}",
+            gh_login,
+            in_all,
+            is_triager,
+            is_async_member,
+        );
+        Ok(in_all || is_triager || is_async_member)
+    }
+
     pub async fn zulip_to_github_id(&self, zulip_id: u64) -> anyhow::Result<Option<u64>> {
         let map = self.zulip_map().await?;
         Ok(map.users.get(&zulip_id).copied())

@@ -1,28 +1,20 @@
-use crate::github::{Issue, IssueState, Label, PullRequestDetails, Sender, User};
+use crate::github::{GitHubUser, Issue, IssueState, Label, PullRequestDetails};
 use bon::builder;
 use chrono::Utc;
 
-pub fn default_test_user() -> User {
-    User {
+pub fn default_test_user() -> GitHubUser {
+    GitHubUser {
         login: "triagebot-tester".to_string(),
         id: 1,
-    }
-}
-
-pub fn default_test_sender() -> Sender {
-    Sender {
-        user: User {
-            login: "triagebot-tester".to_string(),
-            id: 1,
-        },
         r#type: "User".to_string(),
     }
 }
 
-pub fn user(login: &str, id: u64) -> User {
-    User {
+pub fn user(login: &str, id: u64) -> GitHubUser {
+    GitHubUser {
         login: login.to_string(),
         id,
+        r#type: "User".to_string(),
     }
 }
 
@@ -30,9 +22,9 @@ pub fn user(login: &str, id: u64) -> User {
 pub fn issue(
     state: Option<IssueState>,
     number: Option<u64>,
-    author: Option<User>,
+    author: Option<GitHubUser>,
     body: Option<&str>,
-    assignees: Option<Vec<User>>,
+    assignees: Option<Vec<GitHubUser>>,
     pr: Option<bool>,
     org: Option<&str>,
     repo: Option<&str>,
@@ -89,9 +81,9 @@ pub fn issue(
 pub fn pull_request(
     state: Option<IssueState>,
     number: Option<u64>,
-    author: Option<User>,
+    author: Option<GitHubUser>,
     body: Option<&str>,
-    assignees: Option<Vec<User>>,
+    assignees: Option<Vec<GitHubUser>>,
     labels: Option<Vec<&str>>,
 ) -> Issue {
     issue()

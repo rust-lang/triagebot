@@ -1,6 +1,7 @@
 use super::Context;
 use crate::github::{
-    self, GithubClient, IssueCommentAction, IssueCommentEvent, IssuesAction, IssuesEvent, User,
+    self, GitHubUser, GithubClient, IssueCommentAction, IssueCommentEvent, IssuesAction,
+    IssuesEvent,
 };
 use crate::github::{Event, Issue};
 use crate::jobs::Job;
@@ -233,7 +234,7 @@ async fn zulip_owners(team_client: &TeamClient, issue: &Issue) -> anyhow::Result
     })
 }
 
-async fn owner_string(team_api: &TeamClient, assignee: &User) -> anyhow::Result<String> {
+async fn owner_string(team_api: &TeamClient, assignee: &GitHubUser) -> anyhow::Result<String> {
     if let Some(zulip_id) = team_api.github_to_zulip_id(assignee.id).await? {
         Ok(format!("@**|{zulip_id}**"))
     } else {

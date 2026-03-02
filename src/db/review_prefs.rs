@@ -1,5 +1,5 @@
-use crate::db::users::record_username;
-use crate::github::{User, UserId};
+use crate::db::users::{DbUser, record_username};
+use crate::github::UserId;
 use anyhow::Context;
 use bytes::BytesMut;
 use postgres_types::{FromSql, IsNull, ToSql, Type, to_sql_checked};
@@ -269,7 +269,7 @@ WHERE lower(u.username) = ANY($1);";
 /// if they do not exist yet.
 pub async fn upsert_user_review_prefs(
     db: &tokio_postgres::Client,
-    user: User,
+    user: DbUser,
     rotation_mode: RotationMode,
 ) -> anyhow::Result<u64, anyhow::Error> {
     // We need to have the user stored in the DB to have a valid FK link in review_prefs
@@ -293,7 +293,7 @@ SET rotation_mode = excluded.rotation_mode";
 /// if they do not exist yet.
 pub async fn upsert_team_review_prefs(
     db: &tokio_postgres::Client,
-    user: User,
+    user: DbUser,
     team: &str,
     rotation_mode: RotationMode,
 ) -> anyhow::Result<u64, anyhow::Error> {
@@ -318,7 +318,7 @@ SET rotation_mode = excluded.rotation_mode"#;
 /// if they do not exist yet.
 pub async fn upsert_repo_review_prefs(
     db: &tokio_postgres::Client,
-    user: User,
+    user: DbUser,
     repo: &str,
     max_assigned_prs: Option<u32>,
 ) -> anyhow::Result<u64, anyhow::Error> {
@@ -347,9 +347,15 @@ mod tests {
         get_review_prefs_batch, upsert_repo_review_prefs, upsert_team_review_prefs,
         upsert_user_review_prefs,
     };
-    use crate::db::users::get_user;
-    use crate::tests::github::user;
+    use crate::db::users::{DbUser, get_user};
     use crate::tests::run_db_test;
+
+    fn user(login: &str, id: u64) -> DbUser {
+        DbUser {
+            login: login.to_string(),
+            id,
+        }
+    }
 
     #[tokio::test]
     async fn insert_prefs_create_user() {

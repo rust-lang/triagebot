@@ -391,9 +391,10 @@ r#":warning: **Warning** :warning:
                 merge_commit_sha: Default::default(),
                 title: "Some title".to_string(),
                 html_url: Default::default(),
-                user: crate::github::User {
+                user: crate::github::GitHubUser {
                     login: "user".to_string(),
                     id: 654123,
+                    r#type: "User".to_string(),
                 },
                 labels: Default::default(),
                 assignees: Default::default(),
@@ -427,11 +428,9 @@ r#":warning: **Warning** :warning:
                 fork: false,
                 parent: None,
             },
-            sender: crate::github::Sender {
-                user: crate::github::User {
-                    login: "rustbot".to_string(),
-                    id: 987654,
-                },
+            sender: crate::github::GitHubUser {
+                login: "rustbot".to_string(),
+                id: 987654,
                 r#type: "Bot".to_string(),
             },
         }

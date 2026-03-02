@@ -10,9 +10,9 @@ pub(super) async fn handle_command(
     _cmd: CloseCommand,
 ) -> anyhow::Result<()> {
     let issue = event.issue().unwrap();
-    let is_team_member = event
-        .user()
-        .is_team_member(&ctx.team)
+    let is_team_member = ctx
+        .team
+        .is_team_member(&event.user().login)
         .await
         .unwrap_or(false);
     if !is_team_member {

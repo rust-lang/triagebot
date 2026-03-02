@@ -1,8 +1,6 @@
 use chrono::FixedOffset;
 
-use std::ops::Deref;
-
-use crate::github::{Comment, Issue, Label, Repository, User};
+use crate::github::{Comment, GitHubUser, Issue, Label, Repository};
 
 /// An event triggered by a webhook.
 #[derive(Debug)]
@@ -73,12 +71,12 @@ impl Event {
         }
     }
 
-    pub fn user(&self) -> &User {
+    pub fn user(&self) -> &GitHubUser {
         match self {
-            Event::Create(e) => &e.sender.user,
+            Event::Create(e) => &e.sender,
             Event::Issue(e) => &e.issue.user,
             Event::IssueComment(e) => &e.comment.user,
-            Event::Push(e) => &e.sender.user,
+            Event::Push(e) => &e.sender,
         }
     }
 
@@ -100,7 +98,7 @@ impl Event {
 pub struct CreateEvent {
     pub ref_type: CreateKind,
     repository: Repository,
-    sender: Sender,
+    sender: GitHubUser,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -120,7 +118,7 @@ pub struct PushEvent {
     #[serde(rename = "ref")]
     pub git_ref: String,
     pub repository: Repository,
-    sender: Sender,
+    sender: GitHubUser,
 }
 
 /// The action that occurred in an org_block event.
@@ -135,22 +133,6 @@ pub enum OrgBlockAction {
 
 /// Organization information from an org_block event.
 #[derive(Debug, serde::Deserialize)]
-pub struct Sender {
-    #[serde(flatten)]
-    pub user: User,
-    pub r#type: String,
-}
-
-impl Deref for Sender {
-    type Target = User;
-
-    fn deref(&self) -> &User {
-        &self.user
-    }
-}
-
-/// Organization information from an org_block event.
-#[derive(Debug, serde::Deserialize)]
 pub struct Organization {
     pub login: String,
     pub id: u64,
@@ -160,9 +142,9 @@ pub struct Organization {
 #[derive(Debug, serde::Deserialize)]
 pub struct OrgBlockEvent {
     pub action: OrgBlockAction,
-    pub blocked_user: User,
+    pub blocked_user: GitHubUser,
     pub organization: Organization,
-    pub sender: Sender,
+    pub sender: GitHubUser,
 }
 
 #[derive(PartialEq, Eq, Debug, serde::Deserialize)]
@@ -195,7 +177,7 @@ pub struct IssuesEvent {
     pub after: Option<String>,
     pub repository: Repository,
     /// The GitHub user that triggered the event.
-    pub sender: Sender,
+    pub sender: GitHubUser,
 }
 
 impl IssuesEvent {
@@ -218,11 +200,11 @@ pub enum IssuesAction {
     Reopened,
     Assigned {
         /// Github users assigned to the issue / pull request
-        assignee: User,
+        assignee: GitHubUser,
     },
     Unassigned {
         /// Github users removed from the issue / pull request
-        assignee: User,
+        assignee: GitHubUser,
     },
     Labeled {
         /// The label added from the issue
@@ -242,7 +224,7 @@ pub enum IssuesAction {
         /// The person requested to review the pull request
         ///
         /// This can be `None` when a review is requested for a team.
-        requested_reviewer: Option<User>,
+        requested_reviewer: Option<GitHubUser>,
     },
     ReviewRequestRemoved,
     ReadyForReview,
