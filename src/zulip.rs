@@ -698,15 +698,11 @@ In past {recent_days} days, the user opened `{org_recent_pr_count}{org_more_prs}
         .await
         .context("Cannot load recent comments")?;
 
-    if comments.is_empty() {
-        return Ok(format!(
-            "No recent comments found for **{username}** in the `{organization}` organization."
-        ));
-    }
-
-    message.push_str(&format!("\n\n## Recent comments in `{organization}`\n"));
-    for comment in &comments {
-        message.push_str(&format_user_comment(comment));
+    if !comments.is_empty() {
+        message.push_str(&format!("\n\n## Recent comments in `{organization}`\n"));
+        for comment in &comments {
+            message.push_str(&format_user_comment(comment));
+        }
     }
 
     Ok(message)
