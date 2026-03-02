@@ -594,6 +594,9 @@ pub(crate) struct MergeConflictConfig {
     pub add: HashSet<String>,
     #[serde(default)]
     pub unless: HashSet<String>,
+    /// Should we consider PRs from bots (like dependabot)
+    #[serde(default)]
+    pub(crate) consider_push_from_bots: bool,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
