@@ -21,7 +21,7 @@ impl GithubClient {
     ///
     /// Returns up to `limit` comments, sorted by creation date (most recent first).
     /// Each comment includes the URL, body snippet, and the issue/PR title it was made on.
-    pub async fn user_comments_in_org(
+    pub async fn recent_user_comments_in_org(
         &self,
         username: &str,
         org: &str,

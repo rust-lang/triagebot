@@ -43,11 +43,13 @@ pub enum ChatCommand {
     PingGoals(PingGoalsArgs),
     /// Update docs
     DocsUpdate,
-    /// Show recent GitHub comments of a user in the rust-lang organization.
-    Comments {
+    /// Show recent GitHub activity of a user.
+    ///
+    /// It also shows scoped information in a selected organization.
+    UserInfo {
         /// GitHub username to look up.
         username: String,
-        /// Organization where to find the comments.
+        /// Organization where to find the user's activity.
         #[arg(long = "org", default_value = "rust-lang")]
         organization: String,
     },
@@ -198,11 +200,11 @@ pub enum StreamCommand {
     DocsUpdate,
     /// Accept or decline a backport.
     Backport(BackportArgs),
-    /// Show recent GitHub comments of a user in the rust-lang organization.
-    Comments {
+    /// Show recent GitHub activity of a user.
+    UserInfo {
         /// GitHub username to look up.
         username: String,
-        /// Organization where to find the comments.
+        /// Organization where to find the activity.
         #[arg(long = "org", default_value = "rust-lang")]
         organization: String,
     },
@@ -446,17 +448,17 @@ mod tests {
     }
 
     #[test]
-    fn recent_comments_command() {
+    fn recent_activity_command() {
         assert_eq!(
-            parse_chat(&["comments", "octocat"]),
-            ChatCommand::Comments {
+            parse_chat(&["user-info", "octocat"]),
+            ChatCommand::UserInfo {
                 username: "octocat".to_string(),
                 organization: "rust-lang".to_string()
             }
         );
         assert_eq!(
-            parse_chat(&["comments", "foobar", "--org", "rust-lang-nursery"]),
-            ChatCommand::Comments {
+            parse_chat(&["user-info", "foobar", "--org", "rust-lang-nursery"]),
+            ChatCommand::UserInfo {
                 username: "foobar".to_string(),
                 organization: "rust-lang-nursery".to_string()
             }

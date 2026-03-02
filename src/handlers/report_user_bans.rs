@@ -39,7 +39,7 @@ pub async fn handle(ctx: &Context, event: &OrgBlockEvent) -> anyhow::Result<()> 
         let org = &event.organization.login;
         match ctx
             .github
-            .user_comments_in_org(username, org, MAX_RECENT_COMMENTS)
+            .recent_user_comments_in_org(username, org, MAX_RECENT_COMMENTS)
             .await
         {
             Ok(comments) if !comments.is_empty() => {
@@ -62,7 +62,7 @@ pub async fn handle(ctx: &Context, event: &OrgBlockEvent) -> anyhow::Result<()> 
 
         match ctx
             .github
-            .user_prs_in_org(username, org, MAX_RECENT_PRS)
+            .recent_user_prs_in_org(username, org, MAX_RECENT_PRS)
             .await
         {
             Ok(prs) if !prs.is_empty() => {
