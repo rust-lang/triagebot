@@ -583,23 +583,6 @@ async fn user_info_cmd(
     let all_prs_stats = analyze_pr_stats(&user_prs, pr_limit, recent_days);
     let org_prs_stats = analyze_pr_stats(&org_user_prs, pr_limit, recent_days);
 
-    let pr_bandwidth_msg = |stats: &PullRequestStats, org: Option<&str>| {
-        stats
-            .oldest_pr_created_at
-            .map(|date| {
-                format!(
-                    "Their most recent {} {}PRs were created during the past {} day(s).",
-                    pr_limit.min(stats.pr_count as usize),
-                    match org {
-                        Some(org) => format!("`{org}` "),
-                        None => String::new(),
-                    },
-                    (Utc::now() - date).num_days()
-                )
-            })
-            .unwrap_or_else(|| "N/A".to_string())
-    };
-
     let pr_orgs = all_prs_stats
         .recent_prs
         .iter()
@@ -653,6 +636,13 @@ async fn user_info_cmd(
         .filter(|repo| repo.fork)
         .count();
 
+    let recent_contributions_days = Duration::days(90);
+    let contributions = ctx
+        .github
+        .user_contributions_since(username, Utc::now() - recent_contributions_days)
+        .await
+        .context("Cannot load user contributions")?;
+
     let mut message = format!(
         r#"# User `{username}` activity
 
@@ -665,12 +655,14 @@ In past {recent_days} days, the user opened `{recent_pr_count}{more_prs}` PRs ({
 
 The PRs were opened in `{pr_repo_count}` repo(s) and `{org_pr_count}` organization(s){opened_orgs}.
 
-{pr_oldest_msg}
+Total contributions in the past {contributions_since} days:
+- Created `{contribution_prs}` PRs
+- Created `{contribution_issues}` issues
+- Created `{contribution_commits}` commits
+- Created `{contribution_repos}` repositories
 
 ## `{organization}` activity
 In past {recent_days} days, the user opened `{org_recent_pr_count}{org_more_prs}` PRs ({org_open_prs} open, {org_merged_prs} merged, {org_closed_prs} closed).
-
-{org_pr_oldest_msg}
 "#,
         date = format_date(Some(user.created_at)),
         ago = format!("`{}` days ago", (Utc::now() - user.created_at).num_days()),
@@ -687,9 +679,12 @@ In past {recent_days} days, the user opened `{org_recent_pr_count}{org_more_prs}
         } else {
             ""
         },
-        pr_oldest_msg = pr_bandwidth_msg(&all_prs_stats, None),
-        org_pr_oldest_msg = pr_bandwidth_msg(&org_prs_stats, Some(organization)),
-        recent_repo_count = recently_opened_repos.len()
+        recent_repo_count = recently_opened_repos.len(),
+        contributions_since = recent_contributions_days.num_days(),
+        contribution_prs = contributions.total_created_prs,
+        contribution_commits = contributions.total_created_commits,
+        contribution_issues = contributions.total_created_issues,
+        contribution_repos = contributions.total_created_repos,
     );
 
     let comments = ctx
@@ -709,15 +704,11 @@ In past {recent_days} days, the user opened `{org_recent_pr_count}{org_more_prs}
 }
 
 struct PullRequestStats<'a> {
-    pr_count: u64,
     recent_prs: Vec<&'a UserPullRequest>,
     recent_pr_count: u64,
     // Does the user possibly have more recent PRs than `recent_count`?
     // This can happen when we do not fetch enough PRs from GitHub.
     maybe_has_more: bool,
-    // At what time was the oldest PR that we know of created?
-    // None if there are no PRs.
-    oldest_pr_created_at: Option<DateTime<Utc>>,
 }
 
 fn analyze_pr_stats(
@@ -742,11 +733,9 @@ fn analyze_pr_stats(
         && prs.len() == pr_limit;
 
     PullRequestStats {
-        pr_count: prs.len() as u64,
         recent_pr_count: recent_prs.len() as u64,
         recent_prs,
         maybe_has_more,
-        oldest_pr_created_at,
     }
 }
 
