@@ -15,11 +15,10 @@
 
 use crate::{
     config::MergeConflictConfig,
-    db::PooledClient,
-    db::issue_data::IssueData,
+    db::{PooledClient, issue_data::IssueData},
     github::{
-        Event, GithubClient, Issue, IssuesAction, IssuesEvent, Label, MergeConflictInfo,
-        MergeableState, PushEvent, ReportedContentClassifiers, Repository,
+        Event, GitHubUserType, GithubClient, Issue, IssuesAction, IssuesEvent, Label,
+        MergeConflictInfo, MergeableState, PushEvent, ReportedContentClassifiers, Repository,
     },
     handlers::Context,
 };
@@ -113,6 +112,11 @@ async fn handle_pr(
     repo: Repository,
     issue: &Issue,
 ) -> anyhow::Result<()> {
+    if issue.user.r#type == GitHubUserType::Bot && !config.consider_push_from_bots {
+        log::trace!("ignoring issue {}", issue.number);
+        return Ok(());
+    }
+
     let mut db = ctx.db.get().await;
     match issue.mergeable {
         Some(true) => maybe_hide_comment(&ctx.github, &mut db, issue).await?,
@@ -197,7 +201,10 @@ async fn scan_prs(
     // close multiple PRs at once. If there are problems with "merge conflict"
     // notifications happening on closed PRs, then we'll need to add something
     // to prevent that race (like a delay or some other verification).
-    let prs = repo.get_merge_conflict_prs(gh).await?;
+    let mut prs = repo.get_merge_conflict_prs(gh).await?;
+    if !config.consider_push_from_bots {
+        prs.retain(|pr| pr.author.r#type != GitHubUserType::Bot);
+    }
     let (conflicting, unknowns): (Vec<_>, Vec<_>) = prs
         .into_iter()
         .filter(|pr| pr.mergeable != MergeableState::Mergeable)
