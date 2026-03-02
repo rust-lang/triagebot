@@ -18,7 +18,7 @@ use tracing as log;
 pub struct GitHubUser {
     pub login: String,
     pub id: UserId,
-    pub r#type: String,
+    pub r#type: GitHubUserType,
 }
 
 impl From<&Author> for GitHubUser {
@@ -26,9 +26,22 @@ impl From<&Author> for GitHubUser {
         Self {
             id: author.id.0,
             login: author.login.clone(),
-            r#type: author.r#type.clone(),
+            r#type: match author.r#type.as_str() {
+                "User" => GitHubUserType::User,
+                "Bot" => GitHubUserType::Bot,
+                _ => GitHubUserType::Custom(author.r#type.clone()),
+            },
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, serde::Deserialize, Clone)]
+#[serde(rename_all = "PascalCase")]
+pub enum GitHubUserType {
+    User,
+    Bot,
+    #[serde(untagged)]
+    Custom(String),
 }
 
 // https://docs.github.com/en/rest/repos/contents?apiVersion=2022-11-28#get-repository-content

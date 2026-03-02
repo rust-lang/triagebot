@@ -6,7 +6,7 @@
 //! - Adds the PR to the workqueue of one team member (after the PR has been assigned or reopened)
 //! - Removes the PR from the workqueue of one team member (after the PR has been unassigned or closed)
 
-use crate::github::{GitHubUser, UserId};
+use crate::github::{GitHubUser, GitHubUserType, UserId};
 use crate::github::{Label, PullRequestNumber};
 use crate::{
     config::ReviewPrefsConfig,
@@ -299,7 +299,7 @@ pub async fn retrieve_pull_request_assignments(
             .unwrap_or_else(|| GitHubUser {
                 login: "ghost".to_string(),
                 id: 0,
-                r#type: "User".to_string(),
+                r#type: GitHubUserType::Bot,
             });
         if waits_for_a_review(
             &labels,

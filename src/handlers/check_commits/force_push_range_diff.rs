@@ -3,6 +3,7 @@ use anyhow::Context as _;
 use crate::config::RangeDiffConfig;
 use crate::db::issue_data::IssueData;
 use crate::github::CommitBase;
+use crate::github::GitHubUserType;
 use crate::github::GithubCompare;
 use crate::github::IssueRepository;
 use crate::github::IssuesEvent;
@@ -30,7 +31,7 @@ pub(super) async fn handle_event(
         return Ok(());
     }
 
-    if !config.consider_push_from_bots && event.sender.r#type == "Bot" {
+    if !config.consider_push_from_bots && event.sender.r#type == GitHubUserType::Bot {
         return Ok(());
     }
 
