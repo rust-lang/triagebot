@@ -588,7 +588,7 @@ async fn user_info_cmd(
             .oldest_pr_created_at
             .map(|date| {
                 format!(
-                    "Last {} {}PRs created in the past {} day(s)",
+                    "Their most recent {} {}PRs were created during the past {} day(s).",
                     pr_limit.min(stats.pr_count as usize),
                     match org {
                         Some(org) => format!("`{org}` "),
@@ -634,6 +634,16 @@ async fn user_info_cmd(
             PullRequestState::Merged => merged_prs += 1,
         }
     }
+    let mut org_open_prs = 0;
+    let mut org_closed_prs = 0;
+    let mut org_merged_prs = 0;
+    for pr in &org_prs_stats.recent_prs {
+        match pr.state {
+            PullRequestState::Open => org_open_prs += 1,
+            PullRequestState::Closed => org_closed_prs += 1,
+            PullRequestState::Merged => org_merged_prs += 1,
+        }
+    }
     let recently_opened_repos = user_repos
         .iter()
         .filter(|repo| repo.created_at >= recent_date_cutoff)
@@ -644,19 +654,23 @@ async fn user_info_cmd(
         .count();
 
     let mut message = format!(
-        r#"User `{username}` activity
+        r#"# User `{username}` activity
 
 - Account created at: {date} ({ago})
 - Public repository count: {repos}
-- PRs created in past {recent_days} days: {recent_pr_count}{more_prs}
-  - {open_prs} open, {closed_prs} closed, {merged_prs} merged
-  - {pr_oldest_msg}
-  - PRs opened in {pr_repo_count} repo(s)
-  - PRs opened in {org_pr_count} organization(s){opened_orgs}
-- `{organization}` PRs created in past {recent_days} days: {org_recent_pr_count}{org_more_prs}
-  - {org_pr_oldest_msg}
-- Repos created in past {recent_days} days: {recent_repo_count}
-  - Out of that, {recent_forks} are forks
+- Repositories created in past {recent_days} days: `{recent_repo_count}` ({recent_forks} of those are forks)
+
+## Overall GitHub activity
+In past {recent_days} days, the user opened `{recent_pr_count}{more_prs}` PRs ({open_prs} open, {merged_prs} merged, {closed_prs} closed).
+
+The PRs were opened in `{pr_repo_count}` repo(s) and `{org_pr_count}` organization(s){opened_orgs}.
+
+{pr_oldest_msg}
+
+## `{organization}` activity
+In past {recent_days} days, the user opened `{org_recent_pr_count}{org_more_prs}` PRs ({org_open_prs} open, {org_merged_prs} merged, {org_closed_prs} closed).
+
+{org_pr_oldest_msg}
 "#,
         date = format_date(Some(user.created_at)),
         ago = format!("`{}` days ago", (Utc::now() - user.created_at).num_days()),
@@ -690,7 +704,7 @@ async fn user_info_cmd(
         ));
     }
 
-    message.push_str(&format!("\n\n**Recent comments in `{organization}`:**\n"));
+    message.push_str(&format!("\n\n## Recent comments in `{organization}`\n"));
     for comment in &comments {
         message.push_str(&format_user_comment(comment));
     }
