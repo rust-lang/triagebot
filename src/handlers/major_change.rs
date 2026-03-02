@@ -509,7 +509,7 @@ impl Display for SecondedLogicError {
             }
             SecondedLogicError::SecondLabelAbsent => write!(f, "second label is absent"),
             SecondedLogicError::SecondLabelRemoved { at } => {
-                write!(f, "second labek removed at {at}")
+                write!(f, "second label removed at {at}")
             }
             SecondedLogicError::ConcernsLabelPresent => write!(f, "concerns label set"),
             SecondedLogicError::ConcernsLabelAdded { at } => {
