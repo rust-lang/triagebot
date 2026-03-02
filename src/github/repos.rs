@@ -17,7 +17,9 @@ use tracing as log;
 #[derive(Debug, PartialEq, Eq, Hash, serde::Deserialize, Clone)]
 pub struct GitHubUser {
     pub login: String,
+    #[serde(alias = "databaseId")]
     pub id: UserId,
+    #[serde(alias = "__typename")]
     pub r#type: GitHubUserType,
 }
 
@@ -962,6 +964,8 @@ pub struct MergeConflictInfo {
     pub number: u64,
     /// Whether this pull can be merged.
     pub mergeable: MergeableState,
+    /// Author of the pull-request
+    pub author: GitHubUser,
     /// The branch name where this PR is requesting to be merged to.
     pub base_ref_name: String,
 }
@@ -993,6 +997,21 @@ impl Repository {
                                number
                                mergeable
                                baseRefName
+                               author {
+                                 __typename
+                                 ... on User {
+                                   databaseId
+                                   login
+                                 }
+                                 ... on Bot {
+                                   databaseId
+                                   login
+                                 }
+                                 ... on Mannequin {
+                                   databaseId
+                                   login
+                                 }
+                               }
                              }
                            }
                            pageInfo {
