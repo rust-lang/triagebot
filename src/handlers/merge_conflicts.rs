@@ -26,6 +26,7 @@ use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::time::Duration;
+use tokio::sync::OnceCell;
 use tokio_postgres::Client as DbClient;
 use tracing as log;
 
@@ -112,7 +113,7 @@ async fn handle_pr(
     repo: Repository,
     issue: &Issue,
 ) -> anyhow::Result<()> {
-    if issue.user.r#type == GitHubUserType::Bot && !config.consider_push_from_bots {
+    if issue.user.r#type == GitHubUserType::Bot && !config.consider_prs_from_bots {
         log::trace!("ignoring issue {}", issue.number);
         return Ok(());
     }
@@ -174,18 +175,11 @@ async fn scan_prs(
     branch_name: &str,
     push_sha: &str,
 ) -> anyhow::Result<()> {
-    // Make a guess as to what is responsible for the conflict. This is only a
-    // guess, it can be inaccurate due to many factors (races, rebases, force
-    // pushes, etc.).
-    let possibly = match repo.pulls_for_commit(gh, push_sha).await {
-        Ok(prs) if prs.len() == 1 => Some(format!("#{}", prs[0].number)),
-        Err(e) => {
-            log::warn!("could not determine PRs for {push_sha}: {e:?}");
-            None
-        }
-        _ => None,
-    }
-    .or_else(|| Some(push_sha.to_string()));
+    // Prepare the retrieval of the reason for the conflicts (ie the PR number if
+    // it's a PR that's the cause). We only load it eagerly in case there are no
+    // conflicts but also bc GitHub doesn't always updates the field in the first
+    // few milliseconds.
+    let reason = ReasonForConflict::new(push_sha.to_string());
 
     // There is a small risk of a race condition here. Consider the following
     // sequence of events:
@@ -202,7 +196,7 @@ async fn scan_prs(
     // notifications happening on closed PRs, then we'll need to add something
     // to prevent that race (like a delay or some other verification).
     let mut prs = repo.get_merge_conflict_prs(gh).await?;
-    if !config.consider_push_from_bots {
+    if !config.consider_prs_from_bots {
         prs.retain(|pr| pr.author.r#type != GitHubUserType::Bot);
     }
     let (conflicting, unknowns): (Vec<_>, Vec<_>) = prs
@@ -217,7 +211,8 @@ async fn scan_prs(
 
     for conflict in conflicting {
         let pr = repo.get_pr(gh, conflict.number).await?;
-        maybe_add_comment(gh, &mut db, config, &pr, possibly.as_deref()).await?;
+        let reason = reason.get_reason(gh, &repo).await;
+        maybe_add_comment(gh, &mut db, config, &pr, Some(reason)).await?;
     }
     if !unknowns.is_empty() {
         let config = config.clone();
@@ -225,11 +220,7 @@ async fn scan_prs(
         tokio::task::spawn(async move {
             // See module note about locking.
             tokio::time::sleep(UNKNOWN_RESCAN_DELAY).await;
-            // NOTE: The `possibly` here is even less likely to be correct due
-            // to the risk that another push happened while we were waiting.
-            // May want to consider changing it to `None` if it regularly
-            // points to the wrong thing.
-            if let Err(e) = scan_unknowns(&gh, db, &config, &repo, &unknowns, possibly).await {
+            if let Err(e) = scan_unknowns(&gh, db, &config, &repo, &unknowns, reason).await {
                 log::error!("failed to scan unknown PRs for merge conflicts: {e:?}");
             }
         });
@@ -246,7 +237,7 @@ async fn scan_unknowns(
     config: &MergeConflictConfig,
     repo: &Repository,
     unknowns: &[MergeConflictInfo],
-    possibly: Option<String>,
+    reason: ReasonForConflict,
 ) -> anyhow::Result<()> {
     log::debug!(
         "re-scanning {} unknown PRs for merge conflicts for {}",
@@ -257,7 +248,10 @@ async fn scan_unknowns(
         let pr = repo.get_pr(gh, unknown.number).await?;
         match pr.mergeable {
             Some(true) => maybe_hide_comment(gh, &mut db, &pr).await?,
-            Some(false) => maybe_add_comment(gh, &mut db, config, &pr, possibly.as_deref()).await?,
+            Some(false) => {
+                let reason = reason.get_reason(gh, repo).await;
+                maybe_add_comment(gh, &mut db, config, &pr, Some(reason)).await?
+            }
             // Ignore None, we don't want to repeatedly hammer GitHub asking for the answer.
             None => log::info!("unable to determine mergeable after delay for {unknown:?}"),
         }
@@ -270,7 +264,7 @@ async fn maybe_add_comment(
     db: &mut DbClient,
     config: &MergeConflictConfig,
     issue: &Issue,
-    possibly: Option<&str>,
+    reason: Option<&str>,
 ) -> anyhow::Result<()> {
     let mut state: IssueData<'_, MergeConflictState> =
         IssueData::load(db, issue, MERGE_CONFLICTS_KEY).await?;
@@ -279,7 +273,7 @@ async fn maybe_add_comment(
         return Ok(());
     }
 
-    let possibly = possibly
+    let possibly = reason
         .as_ref()
         .map(|s| format!(" (possibly {s})"))
         .unwrap_or_default();
@@ -336,4 +330,38 @@ async fn maybe_hide_comment(
     state.save().await?;
 
     Ok(())
+}
+
+struct ReasonForConflict {
+    cached_pr_number: OnceCell<Option<String>>,
+    push_sha: String,
+}
+
+impl ReasonForConflict {
+    fn new(push_sha: String) -> ReasonForConflict {
+        ReasonForConflict {
+            cached_pr_number: OnceCell::new(),
+            push_sha,
+        }
+    }
+
+    async fn get_reason(&self, gh: &GithubClient, repo: &Repository) -> &str {
+        self.cached_pr_number
+            .get_or_init(|| async {
+                // Make a guess as to what is responsible for the conflict. This is only a
+                // guess, it can be inaccurate due to many factors (races, rebases, force
+                // pushes, etc.).
+                match repo.pulls_for_commit(gh, &self.push_sha).await {
+                    Ok(prs) if prs.len() == 1 => Some(format!("#{}", prs[0].number)),
+                    Err(e) => {
+                        log::warn!("could not determine PRs for {}: {e:?}", self.push_sha);
+                        None
+                    }
+                    _ => None,
+                }
+            })
+            .await
+            .as_deref()
+            .unwrap_or(&self.push_sha)
+    }
 }
