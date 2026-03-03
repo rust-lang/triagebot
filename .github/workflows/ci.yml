@@ -38,7 +38,8 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     concurrency:
-      group: deploy
+      # Ensure that we do not deploy things in the merge group concurrently
+      group: ${{ github.event_name == 'merge_group' && 'deploy' || github.sha }}
       cancel-in-progress: false
     needs: [ test ]
     # We want to build the Docker image on the default branch to prime CI cache
