@@ -650,19 +650,17 @@ async fn user_info_cmd(
 - Public repository count: {repos}
 - Repositories created in past {recent_days} days: `{recent_repo_count}` ({recent_forks} of those are forks)
 
-## Overall GitHub activity
-In past {recent_days} days, the user opened `{recent_pr_count}{more_prs}` PRs ({open_prs} open, {merged_prs} merged, {closed_prs} closed).
+## GitHub activity in the past {recent_days} days
+The user opened `{recent_pr_count}{more_prs}` PRs ({open_prs} open, {merged_prs} merged, {closed_prs} closed) in `{pr_repo_count}` repo(s) and `{org_pr_count}` organization(s){opened_orgs}.
 
-The PRs were opened in `{pr_repo_count}` repo(s) and `{org_pr_count}` organization(s){opened_orgs}.
-
-Total contributions in the past {contributions_since} days:
+## GitHub activity in the past {contributions_since} days
 - Created `{contribution_prs}` PRs
 - Created `{contribution_issues}` issues
 - Created `{contribution_commits}` commits
 - Created `{contribution_repos}` repositories
 
-## `{organization}` activity
-In past {recent_days} days, the user opened `{org_recent_pr_count}{org_more_prs}` PRs ({org_open_prs} open, {org_merged_prs} merged, {org_closed_prs} closed).
+## `{organization}` activity in the past {recent_days} days
+The user opened `{org_recent_pr_count}{org_more_prs}` PRs ({org_open_prs} open, {org_merged_prs} merged, {org_closed_prs} closed).
 "#,
         date = format_date(Some(user.created_at)),
         ago = format!("`{}` days ago", (Utc::now() - user.created_at).num_days()),
