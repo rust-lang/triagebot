@@ -738,31 +738,20 @@ pub(super) async fn handle_command(
                 username.clone()
             }
             AssignCommand::ReleaseAssignment => {
-                if let AssignData {
-                    user: Some(current),
-                } = d
+                let current = &event.user().login;
+                if d.user.as_ref() == Some(current)
+                    || issue.contain_assignee(current)
+                    || is_team_member
                 {
-                    if *current == event.user().login || is_team_member {
-                        issue.remove_assignees(&ctx.github, Selection::All).await?;
-                        *d = AssignData { user: None };
-                        e.apply(&ctx.github, String::new()).await?;
-                        return Ok(());
-                    } else {
-                        return user_error!("Cannot release another user's assignment");
-                    }
+                    issue.remove_assignees(&ctx.github, Selection::All).await?;
+                    *d = AssignData { user: None };
+                    e.apply(&ctx.github, String::new()).await?;
+                    return Ok(());
+                } else if !issue.assignees.is_empty() {
+                    return user_error!("Cannot release another user's assignment");
                 } else {
-                    let current = &event.user().login;
-                    if issue.contain_assignee(current) {
-                        issue
-                            .remove_assignees(&ctx.github, Selection::One(current))
-                            .await?;
-                        *d = AssignData { user: None };
-                        e.apply(&ctx.github, String::new()).await?;
-                        return Ok(());
-                    } else {
-                        return user_error!("Cannot release unassigned issue");
-                    }
-                };
+                    return user_error!("Cannot release unassigned issue");
+                }
             }
             AssignCommand::RequestReview { .. } => {
                 return user_error!("r? is only allowed on PRs.");
