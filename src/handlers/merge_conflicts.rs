@@ -96,11 +96,26 @@ async fn handle_branch_push(
     let git_ref = push.git_ref.clone();
 
     let Some(branch_name) = push.git_ref.strip_prefix("refs/heads/") else {
-        log::trace!("ignoring push to {git_ref}");
+        log::trace!("not a branch? ignoring push to {git_ref}");
         return Ok(());
     };
-    if branch_name.starts_with("gh-readonly-queue/") {
-        log::trace!("ignoring push to {git_ref}");
+
+    // Let's ignore pushes not coming from the default branch, as it's pretty rare to
+    // have multiple active merge branches at the same time.
+    //
+    // On the other hand, it can be quite common for people to work directly on a
+    // branch in the repository instead of working from a fork.
+    //
+    // So, to reduce our costs, we ignore those pushes. (Worst case, a PR push would
+    // detect them).
+    //
+    // We also want to ignore special branches like `gh-readonly-queue/*` (special
+    // branches created by GitHub for its merge queues).
+    if branch_name != push.repository.default_branch {
+        log::trace!(
+            "ignoring push to {git_ref} (default_branch is {})",
+            push.repository.default_branch
+        );
         return Ok(());
     }
 
