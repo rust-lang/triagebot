@@ -24,9 +24,12 @@ use crate::{
 };
 use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::time::Duration;
-use tokio::sync::OnceCell;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, LazyLock},
+    time::{Duration, Instant},
+};
+use tokio::sync::{Mutex, OnceCell};
 use tokio_postgres::Client as DbClient;
 use tracing as log;
 
@@ -43,6 +46,16 @@ const MERGE_CONFLICTS_KEY: &str = "merge-conflicts";
 /// conflict notification is not that important to be perfect. If it is too
 /// unreliable, then we could add a loop that will try one or two more times.
 const UNKNOWN_RESCAN_DELAY: Duration = Duration::from_secs(60);
+
+/// The minimum amount of time before scans for the same branch or pr can
+/// be started.
+///
+/// Should be at minimum `UNKNOWN_RESCAN_DELAY`.
+const DELAY_BETWEEN_SCANS: Duration = Duration::from_secs(61);
+
+/// List of scans for a given branch or PR with the last attempt
+static SCANS: LazyLock<Arc<Mutex<HashMap<String, Instant>>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 /// State stored in the database for a PR.
 #[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
@@ -81,6 +94,7 @@ async fn handle_branch_push(
     push: &PushEvent,
 ) -> anyhow::Result<()> {
     let git_ref = push.git_ref.clone();
+
     let Some(branch_name) = push.git_ref.strip_prefix("refs/heads/") else {
         log::trace!("ignoring push to {git_ref}");
         return Ok(());
@@ -89,19 +103,24 @@ async fn handle_branch_push(
         log::trace!("ignoring push to {git_ref}");
         return Ok(());
     }
+
     let branch_name = branch_name.to_string();
     let push_sha = push.after.to_string();
     let config = config.clone();
     let repo = push.repository.clone();
     let db = ctx.db.get().await;
-    // Spawn since this can trigger a lot of work.
     let gh = ctx.github.clone();
-    tokio::task::spawn(async move {
-        // See module note about locking.
-        if let Err(e) = scan_prs(&gh, db, &config, repo, &branch_name, &push_sha).await {
-            log::error!("failed to scan PRs for merge conflicts: {e:?}");
-        }
-    });
+
+    // Spawn since this can trigger a lot of work.
+    spawn_scan_for(
+        format!("{full_name}/{branch_name}", full_name = &repo.full_name),
+        async move {
+            if let Err(e) = scan_prs(&gh, db, &config, repo, &branch_name, &push_sha).await {
+                log::error!("failed to scan PRs for merge conflicts: {e:?}");
+            }
+        },
+    )
+    .await;
 
     Ok(())
 }
@@ -128,13 +147,17 @@ async fn handle_pr(
             let db = ctx.db.get().await;
             let config = config.clone();
             let gh = ctx.github.clone();
-            tokio::task::spawn(async move {
-                // See module note about locking.
-                tokio::time::sleep(UNKNOWN_RESCAN_DELAY).await;
-                if let Err(e) = rescan_pr(&gh, db, &config, repo, pr_number).await {
-                    log::error!("failed to rescan PR for merge conflicts: {e:?}");
-                }
-            });
+            spawn_scan_for(
+                format!("{full_name}/{pr_number}", full_name = &repo.full_name),
+                async move {
+                    // See module note about locking.
+                    tokio::time::sleep(UNKNOWN_RESCAN_DELAY).await;
+                    if let Err(e) = rescan_pr(&gh, db, &config, repo, pr_number).await {
+                        log::error!("failed to rescan PR for merge conflicts: {e:?}");
+                    }
+                },
+            )
+            .await;
         }
     }
     Ok(())
@@ -209,21 +232,20 @@ async fn scan_prs(
         .filter(|pr| pr.base_ref_name == branch_name)
         .partition(|pr| pr.mergeable == MergeableState::Conflicting);
 
+    // Report conflicts for conflicting PRs
     for conflict in conflicting {
         let pr = repo.get_pr(gh, conflict.number).await?;
         let reason = reason.get_reason(gh, &repo).await;
         maybe_add_comment(gh, &mut db, config, &pr, Some(reason)).await?;
     }
+
+    // Wait and fetch the new status for unknowns PRs
     if !unknowns.is_empty() {
-        let config = config.clone();
-        let gh = gh.clone();
-        tokio::task::spawn(async move {
-            // See module note about locking.
-            tokio::time::sleep(UNKNOWN_RESCAN_DELAY).await;
-            if let Err(e) = scan_unknowns(&gh, db, &config, &repo, &unknowns, reason).await {
-                log::error!("failed to scan unknown PRs for merge conflicts: {e:?}");
-            }
-        });
+        // See module note about locking.
+        tokio::time::sleep(UNKNOWN_RESCAN_DELAY).await;
+        if let Err(e) = scan_unknowns(&gh, db, &config, &repo, &unknowns, reason).await {
+            log::error!("failed to scan unknown PRs for merge conflicts: {e:?}");
+        }
     }
 
     Ok(())
@@ -330,6 +352,40 @@ async fn maybe_hide_comment(
     state.save().await?;
 
     Ok(())
+}
+
+/// Start the `scan_fut` future if enough time has passed.
+///
+/// Checks for each `key` if the minimum delay between scans is respected.
+/// Otherwise `scan_fut` is dropped without ever being polled.
+async fn spawn_scan_for(
+    key: String,
+    scan_fut: impl std::future::Future<Output = ()> + Send + 'static,
+) {
+    let should_spawn = {
+        let mut scans = SCANS.lock().await;
+        let now = Instant::now();
+
+        if let Some(&last_spawn) = scans.get(&key) {
+            if now.duration_since(last_spawn) < DELAY_BETWEEN_SCANS {
+                // Don't spawn, threshold not met
+                tracing::debug!("threshold not met to scan for {key}");
+                false
+            } else {
+                // Last scan was sometime ago, fine to start a new one
+                scans.insert(key, now);
+                true
+            }
+        } else {
+            // No scan record, fine to start one
+            scans.insert(key, now);
+            true
+        }
+    };
+
+    if should_spawn {
+        tokio::spawn(scan_fut);
+    }
 }
 
 struct ReasonForConflict {
