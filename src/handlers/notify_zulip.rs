@@ -217,6 +217,13 @@ pub(super) async fn handle_input(
                 NotificationType::Reopened => &config.messages_on_reopen,
             };
 
+            let github_comment = match input.notification_type {
+                NotificationType::Open | NotificationType::Labeled => &config.github_comment,
+                NotificationType::Unlabeled
+                | NotificationType::Closed
+                | NotificationType::Reopened => &None,
+            };
+
             let recipient = Recipient::Stream {
                 id: config.zulip_stream,
                 topic: &topic,
@@ -225,6 +232,8 @@ pub(super) async fn handle_input(
             // Issue/PR authors/reviewers will receive a mention if the template has `{recipients}`.
             let recipients = &mut event.issue.assignees.clone();
             recipients.push(event.issue.user.clone());
+
+            let mut msgs_send = 0;
 
             for msg in msgs {
                 let msg = msg.replace("{number}", &event.issue.number.to_string());
@@ -241,6 +250,19 @@ pub(super) async fn handle_input(
 
                 if let Err(err) = req {
                     log::error!("Failed to send notification to Zulip {err}");
+                } else {
+                    msgs_send += 1;
+                }
+            }
+
+            if msgs_send > 0
+                && let Some(github_comment) = &github_comment
+            {
+                let github_comment =
+                    github_comment.replace("{zulip_topic_url}", &recipient.url(&ctx.zulip));
+
+                if let Err(err) = event.issue.post_comment(&ctx.github, &github_comment).await {
+                    log::error!("failed to post github notification comment {err}");
                 }
             }
         }

@@ -454,6 +454,8 @@ impl<'de> serde::Deserialize<'de> for NotifyZulipTablesConfig {
 pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) zulip_stream: u64,
     pub(crate) topic: String,
+    #[serde(default)]
+    pub(crate) github_comment: Option<String>,
     #[serde(rename = "message_on_add", default, deserialize_with = "string_or_seq")]
     pub(crate) messages_on_add: Vec<String>,
     #[serde(
@@ -1626,6 +1628,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
             &NotifyZulipLabelConfig {
                 zulip_stream: 0,
                 topic: "topic name".to_string(),
+                github_comment: None,
                 messages_on_add: vec![],
                 messages_on_remove: vec![],
                 messages_on_close: vec![],
@@ -1641,6 +1644,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
             [notify-zulip."label-to-react-on".clippy]
             zulip_stream = 0
             topic = "topic name"
+            github_comment = "github comment"
             message_on_add = [
                 "message one",
                 "message two",
@@ -1659,6 +1663,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
             &NotifyZulipLabelConfig {
                 zulip_stream: 0,
                 topic: "topic name".to_string(),
+                github_comment: Some("github comment".to_string()),
                 messages_on_add: vec!["message one".to_string(), "message two".to_string()],
                 messages_on_remove: vec!["on remove".to_string()],
                 messages_on_close: vec!["on close".to_string()],
