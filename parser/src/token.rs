@@ -359,7 +359,7 @@ fn tokenize_raw_string_prohibit_1() {
 }
 
 #[test]
-fn tokennize_take_line() {
+fn tokenize_take_line() {
     assert_eq!(
         Tokenizer::new("this is a text. this another one.").take_line(),
         Ok("this is a text. this another one.")
@@ -367,7 +367,7 @@ fn tokennize_take_line() {
 }
 
 #[test]
-fn tokennize_take_line_2() {
+fn tokenize_take_line_2() {
     assert_eq!(
         Tokenizer::new("punc is \nnewline").take_line(),
         Ok("punc is ")
@@ -375,12 +375,12 @@ fn tokennize_take_line_2() {
 }
 
 #[test]
-fn tokennize_take_line_3() {
+fn tokenize_take_line_3() {
     assert_eq!(Tokenizer::new("").take_line(), Ok(""));
 }
 
 #[test]
-fn tokennize_take_line_4() {
+fn tokenize_take_line_4() {
     assert_eq!(
         Tokenizer::new("To be used in 1.84. Another string.").take_line(),
         Ok("To be used in 1.84. Another string.")

@@ -229,7 +229,7 @@ pub async fn schedule_job(
         .await
         .is_err()
     {
-        // mean there's no job already in the db with that name and scheduled_at
+        // means there's no job already in the db with that name and scheduled_at
         insert_job(db, job_name, &when, &job_metadata).await?;
     }
 

@@ -351,7 +351,7 @@ async fn schedule_acceptance_job(
         };
 
         tracing::info!(
-            "major_change inserting to acceptence queue: {:?}",
+            "major_change inserting to acceptance queue: {:?}",
             &major_change_seconded
         );
 
@@ -457,7 +457,7 @@ fn zulip_topic_from_issue(issue: &ZulipGitHubReference) -> String {
 
 #[derive(Debug)]
 enum SecondedLogicError {
-    NotYetAcceptenceTime {
+    NotYetAcceptanceTime {
         accept_at: DateTime<Utc>,
         now: DateTime<Utc>,
     },
@@ -491,8 +491,8 @@ impl std::error::Error for SecondedLogicError {}
 impl Display for SecondedLogicError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SecondedLogicError::NotYetAcceptenceTime { accept_at, now } => {
-                write!(f, "not yet acceptence time ({accept_at} > {now})")
+            SecondedLogicError::NotYetAcceptanceTime { accept_at, now } => {
+                write!(f, "not yet acceptance time ({accept_at} > {now})")
             }
             SecondedLogicError::IssueStateChanged { at, draft, open } => {
                 write!(
@@ -532,17 +532,17 @@ struct MajorChangeSeconded {
 
 const MAJOR_CHANGE_ACCEPTENCE_JOB_NAME: &str = "major_change_acceptence";
 
-pub(crate) struct MajorChangeAcceptenceJob;
+pub(crate) struct MajorChangeAcceptanceJob;
 
 #[async_trait]
-impl Job for MajorChangeAcceptenceJob {
+impl Job for MajorChangeAcceptanceJob {
     fn name(&self) -> &'static str {
         MAJOR_CHANGE_ACCEPTENCE_JOB_NAME
     }
 
     async fn run(&self, ctx: &super::Context, metadata: &serde_json::Value) -> anyhow::Result<()> {
         let major_change: MajorChangeSeconded = serde_json::from_value(metadata.clone())
-            .context("unable to deserialize the metadata in major change acceptence job")?;
+            .context("unable to deserialize the metadata in major change acceptance job")?;
 
         let now = Utc::now();
 
@@ -582,7 +582,7 @@ async fn try_accept_mcp(
     now: DateTime<Utc>,
 ) -> anyhow::Result<()> {
     if major_change.accept_at > now {
-        anyhow::bail!(SecondedLogicError::NotYetAcceptenceTime {
+        anyhow::bail!(SecondedLogicError::NotYetAcceptanceTime {
             accept_at: major_change.accept_at,
             now
         });
