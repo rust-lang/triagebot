@@ -454,6 +454,8 @@ impl<'de> serde::Deserialize<'de> for NotifyZulipTablesConfig {
 pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) zulip_stream: u64,
     pub(crate) topic: String,
+    #[serde(default)]
+    pub(crate) github_comment: Option<String>,
     #[serde(rename = "message_on_add", default, deserialize_with = "string_or_seq")]
     pub(crate) messages_on_add: Vec<String>,
     #[serde(
@@ -1608,5 +1610,66 @@ Multi text body with ${mcp_issue} and ${mcp_title}
 
         // Stay empty as it's in an excluded repo
         assert_eq!(config.view_all_comments_link, None);
+    }
+
+    #[test]
+    fn notify_zulip_minimum() {
+        let config = r#"
+            [notify-zulip."label-to-react-on"]
+            zulip_stream = 0
+            topic = "topic name"
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        let notify_zulip = config.notify_zulip.unwrap();
+        let label_to_react_on = &notify_zulip.labels["label-to-react-on"];
+        let subconfig = &label_to_react_on.subtables[""];
+        assert_eq!(
+            subconfig,
+            &NotifyZulipLabelConfig {
+                zulip_stream: 0,
+                topic: "topic name".to_string(),
+                github_comment: None,
+                messages_on_add: vec![],
+                messages_on_remove: vec![],
+                messages_on_close: vec![],
+                messages_on_reopen: vec![],
+                required_labels: vec![]
+            }
+        );
+    }
+
+    #[test]
+    fn notify_zulip_maximum() {
+        let config = r#"
+            [notify-zulip."label-to-react-on".clippy]
+            zulip_stream = 0
+            topic = "topic name"
+            github_comment = "github comment"
+            message_on_add = [
+                "message one",
+                "message two",
+            ]
+            message_on_remove = "on remove"
+            message_on_close = "on close"
+            message_on_reopen = "on reopen"
+            required_labels = ["required-label"]
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        let notify_zulip = config.notify_zulip.unwrap();
+        let label_to_react_on = &notify_zulip.labels["label-to-react-on"];
+        let subconfig = &label_to_react_on.subtables["clippy"];
+        assert_eq!(
+            subconfig,
+            &NotifyZulipLabelConfig {
+                zulip_stream: 0,
+                topic: "topic name".to_string(),
+                github_comment: Some("github comment".to_string()),
+                messages_on_add: vec!["message one".to_string(), "message two".to_string()],
+                messages_on_remove: vec!["on remove".to_string()],
+                messages_on_close: vec!["on close".to_string()],
+                messages_on_reopen: vec!["on reopen".to_string()],
+                required_labels: vec!["required-label".to_string()]
+            }
+        );
     }
 }
