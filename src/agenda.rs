@@ -48,6 +48,7 @@ pub fn prioritization() -> Box<dyn Action> {
                                 "t-libs",
                                 "t-libs-api",
                                 "t-rustdoc",
+                                "S-waiting-on-author",
                             ],
                         }),
                     },

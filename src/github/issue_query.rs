@@ -182,6 +182,7 @@ impl IssuesQuery for Query<'_> {
                 updated_at_hts: crate::actions::to_human(issue.updated_at),
                 fcp_details,
                 mcp_details,
+                is_blocked: false,
             });
         }
 
@@ -316,7 +317,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
             .map(
                 |(updated_at, number, title, html_url, repo_name, labels, author, assignees)| {
                     let updated_at_hts = crate::actions::to_human(updated_at);
-
+                    let is_blocked = labels.contains("S-blocked");
                     crate::actions::IssueDecorator {
                         number,
                         title,
@@ -328,6 +329,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                         updated_at_hts,
                         fcp_details: None,
                         mcp_details: None,
+                        is_blocked,
                     }
                 },
             )
