@@ -52,6 +52,7 @@ pub struct IssueDecorator {
 
     pub fcp_details: Option<FCPDetails>,
     pub mcp_details: Option<MCPDetails>,
+    pub is_blocked: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
