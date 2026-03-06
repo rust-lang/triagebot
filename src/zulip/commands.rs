@@ -208,6 +208,8 @@ pub enum StreamCommand {
         #[arg(long = "org", default_value = "rust-lang")]
         organization: String,
     },
+    /// Label assignment: add one of `P-{low,medium,high,critical}` and remove `I-prioritize`
+    AssignPriority(AssignPrioArgs),
 }
 
 #[derive(clap::Parser, Debug, PartialEq, Clone)]
@@ -265,6 +267,33 @@ pub struct BackportArgs {
     pub verb: BackportVerbArgs,
     /// PR to be backported
     pub pr_num: PullRequestNumber,
+}
+
+#[derive(clap::Parser, Debug, PartialEq, Clone)]
+pub struct AssignPrioArgs {
+    /// Issue target of the prioritization
+    pub issue_num: PullRequestNumber,
+    /// Issue priority. Allowed: "low", "medium", "high", "critical", "none" (to just remove the prioritization)
+    pub prio: IssuePrio,
+}
+
+/// Priority labels
+#[derive(Clone, clap::ValueEnum, Debug, PartialEq)]
+pub enum IssuePrio {
+    Low,
+    Medium,
+    High,
+    Critical,
+    None,
+}
+
+impl std::fmt::Display for IssuePrio {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match &self {
+            Self::None => write!(f, ""),
+            _ => write!(f, "{}", format!("{:?}", self).to_lowercase()),
+        }
+    }
 }
 
 /// Helper function to parse CLI arguments without any colored help or error output.

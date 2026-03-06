@@ -1,3 +1,6 @@
+//! This module implements parts of the Zulip REST API that we use
+//! Documentation: https://zulip.com/api/send-message
+
 use crate::zulip::client::ZulipClient;
 use std::collections::HashMap;
 
