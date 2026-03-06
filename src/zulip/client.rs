@@ -1,3 +1,6 @@
+//! This module implements parts of the Zulip REST API that we use
+//! Documentation: https://zulip.com/api/send-message
+
 use crate::zulip::Recipient;
 use crate::zulip::api::{MessageApiResponse, ZulipUser, ZulipUsers};
 use anyhow::Context;

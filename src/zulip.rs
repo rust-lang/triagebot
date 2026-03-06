@@ -10,10 +10,10 @@ use crate::db::review_prefs::{
     upsert_repo_review_prefs, upsert_team_review_prefs, upsert_user_review_prefs,
 };
 use crate::db::users::DbUser;
-use crate::github;
 use crate::github::queries::user_comments_in_org::UserComment;
 use crate::github::queries::user_prs::PullRequestState;
 use crate::github::queries::user_prs::UserPullRequest;
+use crate::github::{self, Repository};
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::{ReviewerWorkqueue, get_assigned_prs};
@@ -23,8 +23,8 @@ use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
 use crate::zulip::commands::{
-    BackportChannelArgs, BackportVerbArgs, ChatCommand, LookupCmd, PingGoalsArgs, StreamCommand,
-    WorkqueueCmd, WorkqueueLimit, parse_cli,
+    AssignPrioArgs, BackportChannelArgs, BackportVerbArgs, ChatCommand, IssuePrio, LookupCmd,
+    PingGoalsArgs, StreamCommand, WorkqueueCmd, WorkqueueLimit, parse_cli,
 };
 use anyhow::{Context as _, format_err};
 use axum::Json;
@@ -377,6 +377,9 @@ async fn handle_command<'a>(
                 } => user_info_cmd(&ctx, gh_id, &username, &organization)
                     .await
                     .map(Some),
+                StreamCommand::AssignPriority(args) => {
+                    assign_issue_prio(ctx, message_data, &args).await
+                }
             };
         }
 
@@ -424,18 +427,8 @@ async fn accept_decline_backport(
         )));
     }
 
-    // TODO: factor out the Zulip "URL encoder" to make it practical to use
-    let zulip_send_req = crate::zulip::MessageApiRequest {
-        recipient: Recipient::Stream {
-            id: stream_id,
-            topic: &subject,
-        },
-        content: "",
-    };
-
-    // NOTE: the Zulip Message API cannot yet pin exactly a single message so the link in the GitHub comment will be to the whole topic
-    // See: https://rust-lang.zulipchat.com/#narrow/channel/122653-zulip/topic/.22near.22.20parameter.20in.20payload.20of.20send.20message.20API
-    let zulip_link = zulip_send_req.url(zulip_client);
+    let zulip_link =
+        crate::zulip::MessageApiRequest::new(stream_id, &subject, "").url(zulip_client);
 
     let (message_body, approve_backport) = match args.verb {
         BackportVerbArgs::Accept
@@ -484,6 +477,99 @@ async fn accept_decline_backport(
             .await
             .context("failed to remove labels from the issue")?;
     }
+
+    Ok(None)
+}
+
+async fn assign_issue_prio(
+    ctx: Arc<Context>,
+    message_data: &Message,
+    args_data: &AssignPrioArgs,
+) -> anyhow::Result<Option<String>> {
+    let message = message_data.clone();
+    let args = args_data.clone();
+    let stream_id = message.stream_id.unwrap();
+    let subject = message.subject.unwrap();
+    let zulip_client = &ctx.zulip;
+
+    // Repository owner and name are hardcoded
+    // This command is only used in this repository
+    let repo_owner = std::env::var("MAIN_GH_REPO_OWNER").unwrap_or("rust-lang".to_string());
+    let repo_name = std::env::var("MAIN_GH_REPO_NAME").unwrap_or("rust".to_string());
+
+    let repository = Repository {
+        full_name: format!("{}/{}", repo_owner, repo_name),
+        default_branch: "main".to_string(),
+        fork: false,
+        parent: None,
+    };
+
+    // Ensure this is an issue and not a pull request
+    let issue = repository
+        .get_issue(&ctx.github, args.issue_num)
+        .await
+        .context(format!("Could not retrieve #{}", args.issue_num))?;
+    if issue.pull_request.is_some() {
+        return Ok(Some(format!(
+            "Error: #{} is a pull request (must be an issue)",
+            args.issue_num
+        )));
+    }
+
+    let zulip_link =
+        crate::zulip::MessageApiRequest::new(stream_id, &subject, "").url(zulip_client);
+
+    // Remove I-prioritize and all P-* labels (if any)
+    issue
+        .remove_labels(
+            &ctx.github,
+            vec![
+                github::Label {
+                    name: "I-prioritize".to_string(),
+                },
+                github::Label {
+                    name: "P-low".to_string(),
+                },
+                github::Label {
+                    name: "P-medium".to_string(),
+                },
+                github::Label {
+                    name: "P-high".to_string(),
+                },
+                github::Label {
+                    name: "P-critical".to_string(),
+                },
+            ],
+        )
+        .await
+        .context("failed to remove labels from the issue")?;
+
+    // if just removing priority, nothing else to do
+    if args.prio == IssuePrio::None {
+        return Ok(None);
+    }
+
+    // post a comment on GitHub
+    let message_body = format!(
+        "Assigning P-{} (discussion on [Zulip]({zulip_link})).",
+        args.prio
+    );
+
+    issue
+        .post_comment(&ctx.github, &message_body)
+        .await
+        .with_context(|| anyhow::anyhow!("Unable to post comment on #{}", args.issue_num))?;
+
+    // Add the specified priority label
+    issue
+        .add_labels(
+            &ctx.github,
+            vec![github::Label {
+                name: format!("P-{}", args.prio),
+            }],
+        )
+        .await
+        .context(format!("failed to add labels to issue #{}", args.issue_num))?;
 
     Ok(None)
 }
@@ -1358,11 +1444,25 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
 
 #[derive(serde::Serialize)]
 pub(crate) struct MessageApiRequest<'a> {
+    /// The recipient of the message. Could be DM or a Stream
     pub(crate) recipient: Recipient<'a>,
+    /// The content of the message
     pub(crate) content: &'a str,
 }
 
-impl MessageApiRequest<'_> {
+impl<'a> MessageApiRequest<'_> {
+    pub fn new(stream_id: u64, subject: &'a str, content: &'a str) -> MessageApiRequest<'a> {
+        MessageApiRequest {
+            recipient: Recipient::Stream {
+                id: stream_id,
+                topic: subject,
+            },
+            content,
+        }
+    }
+
+    // note: the Zulip Message API cannot yet pin exactly a single message so the link in the GitHub comment will be to the whole topic
+    // See: https://rust-lang.zulipchat.com/#narrow/channel/122653-zulip/topic/.22near.22.20parameter.20in.20payload.20of.20send.20message.20API
     pub fn url(&self, zulip: &ZulipClient) -> String {
         self.recipient.url(zulip)
     }
