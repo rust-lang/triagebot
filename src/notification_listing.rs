@@ -82,7 +82,7 @@ pub async fn notifications(
             "<p><em>You can acknowledge a notification by sending </em><code>ack &lt;idx&gt;</code><em> \
             to </em><strong><code>@triagebot</code></strong><em> on Zulip, or you can acknowledge \
             all notifications by sending </em><code>ack all</code><em>. Read about the other notification commands \
-            <a href=\"https://forge.rust-lang.org/platforms/zulip/triagebot.html#issue-notifications\">here</a>.</em></p>"
+            <a href=\"https://forge.rust-lang.org/triagebot/notifications.html\">here</a>.</em></p>"
         );
     }
 
