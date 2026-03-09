@@ -183,7 +183,7 @@ pub async fn run_migrations(client: &mut DbClient) -> anyhow::Result<()> {
             let tx = client
                 .transaction()
                 .await
-                .context("Cannot create migration transactin")?;
+                .context("Cannot create migration transaction")?;
             tx.execute(*migration, &[])
                 .await
                 .with_context(|| format!("executing {idx}th migration"))?;
