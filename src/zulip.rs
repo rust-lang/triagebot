@@ -651,18 +651,17 @@ async fn user_info_cmd(
     }
 
     let pr_limit = 100;
-    let recent_days = 7;
+    let recent_days: u64 = 7;
 
     // Load data concurrently to make the command faster
-    let (user, user_prs, org_user_prs, user_repos) = futures::future::join4(
+    let (user, user_prs, org_user_prs, user_repos) = futures::future::try_join4(
         ctx.github.user_info(username),
         ctx.github.recent_user_prs(username, pr_limit),
         ctx.github
             .recent_user_prs_in_org(username, organization, pr_limit),
         ctx.github.recent_user_repositories(username, 100),
     )
-    .await;
-    let (user, user_prs, org_user_prs, user_repos) = (user?, user_prs?, org_user_prs?, user_repos?);
+    .await?;
 
     let recent_date_cutoff = Utc::now() - Duration::days(recent_days as i64);
 
@@ -729,6 +728,13 @@ async fn user_info_cmd(
         .await
         .context("Cannot load user contributions")?;
 
+    fn rate(value: u64, days: u64) -> String {
+        let rate = value as f64 / days as f64;
+        format!("{rate:.1}")
+    }
+
+    let recent_contributions_days = recent_contributions_days.num_days() as u64;
+
     let mut message = format!(
         r#"# User `{username}` activity
 
@@ -737,22 +743,32 @@ async fn user_info_cmd(
 - Repositories created in past {recent_days} days: `{recent_repo_count}` ({recent_forks} of those are forks)
 
 ## GitHub activity in the past {recent_days} days
-The user opened `{recent_pr_count}{more_prs}` PRs ({open_prs} open, {merged_prs} merged, {closed_prs} closed) in `{pr_repo_count}` repo(s) and `{org_pr_count}` organization(s){opened_orgs}.
+The user opened `{recent_pr_count}{more_prs}` PRs ({recent_pr_rate} per day) in `{pr_repo_count}` repo(s) and `{org_pr_count}` organization(s){opened_orgs}.
 
-## GitHub activity in the past {contributions_since} days
-- Created `{contribution_prs}` PRs
-- Created `{contribution_issues}` issues
-- Created `{contribution_commits}` commits
-- Created `{contribution_repos}` repositories
+- {open_prs} are still open
+- {merged_prs} were merged
+- {closed_prs} were closed
+
+## GitHub activity in the past {recent_contributions_days} days
+- Created `{contribution_prs}` PRs ({contribution_pr_rate} per day)
+- Created `{contribution_issues}` issues ({contribution_issue_rate} per day)
+- Created `{contribution_commits}` commits ({contribution_commit_rate} per day)
+- Created `{contribution_repos}` repositories ({contribution_repo_rate} per day)
 
 ## `{organization}` activity in the past {recent_days} days
-The user opened `{org_recent_pr_count}{org_more_prs}` PRs ({org_open_prs} open, {org_merged_prs} merged, {org_closed_prs} closed).
+The user opened `{org_recent_pr_count}{org_more_prs}` PRs ({recent_org_pr_rate} per day).
+
+- {org_open_prs} are still open
+- {org_merged_prs} were merged
+- {org_closed_prs} were closed
 "#,
         date = format_date(Some(user.created_at)),
         ago = format!("`{}` days ago", (Utc::now() - user.created_at).num_days()),
         repos = user.public_repos,
         recent_pr_count = all_prs_stats.recent_pr_count,
+        recent_pr_rate = rate(all_prs_stats.recent_pr_count, recent_days),
         org_recent_pr_count = org_prs_stats.recent_pr_count,
+        recent_org_pr_rate = rate(org_prs_stats.recent_pr_count, recent_days),
         more_prs = if all_prs_stats.maybe_has_more {
             "+"
         } else {
@@ -764,11 +780,20 @@ The user opened `{org_recent_pr_count}{org_more_prs}` PRs ({org_open_prs} open, 
             ""
         },
         recent_repo_count = recently_opened_repos.len(),
-        contributions_since = recent_contributions_days.num_days(),
         contribution_prs = contributions.total_created_prs,
+        contribution_pr_rate = rate(contributions.total_created_prs, recent_contributions_days),
         contribution_commits = contributions.total_created_commits,
+        contribution_commit_rate = rate(
+            contributions.total_created_commits,
+            recent_contributions_days
+        ),
         contribution_issues = contributions.total_created_issues,
+        contribution_issue_rate = rate(
+            contributions.total_created_issues,
+            recent_contributions_days
+        ),
         contribution_repos = contributions.total_created_repos,
+        contribution_repo_rate = rate(contributions.total_created_repos, recent_contributions_days),
     );
 
     let comments = ctx
@@ -798,7 +823,7 @@ struct PullRequestStats<'a> {
 fn analyze_pr_stats(
     prs: &[UserPullRequest],
     pr_limit: usize,
-    recent_days: u32,
+    recent_days: u64,
 ) -> PullRequestStats<'_> {
     let recent_pr_cutoff = Utc::now() - Duration::days(recent_days as i64);
     let recent_prs: Vec<&UserPullRequest> = prs
