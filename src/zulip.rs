@@ -809,6 +809,13 @@ The user opened `{org_recent_pr_count}{org_more_prs}` PRs ({recent_org_pr_rate} 
         }
     }
 
+    if !org_user_prs.is_empty() {
+        message.push_str(&format!("\n\n## Recent PRs in `{organization}`\n"));
+        for pr in org_user_prs.into_iter().take(10) {
+            message.push_str(&format_user_pr(&pr));
+        }
+    }
+
     Ok(message)
 }
 
