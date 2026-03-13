@@ -112,13 +112,24 @@ impl GithubClient {
             resp = self.retry(req, sleep, MAX_ATTEMPTS).await?;
         }
         let maybe_err = resp.error_for_status_ref().err();
+        let github_request_id = resp.headers().get("x-github-request-id").cloned();
         let body = resp
             .bytes()
             .await
             .with_context(|| format!("failed to read response body {req_dbg}"))?;
         if let Some(e) = maybe_err {
-            return Err(anyhow::Error::new(e))
-                .with_context(|| format!("response: {}", String::from_utf8_lossy(&body)));
+            return Err(anyhow::Error::new(e)).with_context(|| {
+                format!(
+                    "response (x-github-request-id: {}): {}",
+                    String::from_utf8_lossy(
+                        github_request_id
+                            .as_ref()
+                            .map(|id| id.as_bytes())
+                            .unwrap_or_default()
+                    ),
+                    String::from_utf8_lossy(&body)
+                )
+            });
         }
 
         Ok((body, req_dbg))
