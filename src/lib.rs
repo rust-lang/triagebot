@@ -17,7 +17,6 @@ pub mod handlers;
 pub mod http_client;
 mod interactions;
 pub mod jobs;
-pub mod notification_listing;
 mod rfcbot;
 pub mod team_data;
 pub mod triage;

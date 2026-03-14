@@ -27,7 +27,6 @@ mod merge_conflicts;
 mod milestone_prs;
 mod nominate;
 mod note;
-mod notification;
 mod notify_zulip;
 mod ping;
 pub mod pr_tracking;
@@ -111,12 +110,6 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         project_goals::handle(ctx, event)
             .await
             .map_err(|e| HandlerError::Other(e.context("project_goals handler failed")))
-    };
-
-    let notification = async {
-        notification::handle(ctx, event)
-            .await
-            .map_err(|e| HandlerError::Other(e.context("notification handler failed")))
     };
 
     let rustc_commits = async {
@@ -238,7 +231,6 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         prune_gh_comments,
         check_commits,
         project_goals,
-        notification,
         rustc_commits,
         milestone_prs,
         rendered_link,
@@ -253,7 +245,6 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         prune_gh_comments,
         check_commits,
         project_goals,
-        notification,
         rustc_commits,
         milestone_prs,
         rendered_link,
@@ -270,7 +261,6 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         prune_gh_comments,
         check_commits,
         project_goals,
-        notification,
         rustc_commits,
         milestone_prs,
         rendered_link,
