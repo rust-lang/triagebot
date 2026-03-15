@@ -375,9 +375,8 @@ macro_rules! command_handlers {
                 // always handle new PRs / issues
                 Event::Issue(IssuesEvent { action: IssuesAction::Opened, .. }) => {},
                 Event::Issue(IssuesEvent { action: IssuesAction::Edited, .. }) => {
-                    // if the issue was edited, but we don't get a `changes[body]` diff, it means only the title was edited, not the body.
-                    // don't process the same commands twice.
-                    if event.comment_from().is_none() {
+                    // If the comment didn't change, let's avoid processing the same commands twice.
+                    if !event.has_comment_changed() {
                         log::debug!("skipping title-only edit event");
                         return;
                     }
@@ -391,7 +390,7 @@ macro_rules! command_handlers {
                     match e.action {
                         IssueCommentAction::Created => {}
                         IssueCommentAction::Edited => {
-                            if event.comment_from().is_none() {
+                            if !event.has_comment_changed() {
                                 // We are not entirely sure why this happens.
                                 // Sometimes when someone posts a PR review,
                                 // GitHub sends an "edited" event with no
