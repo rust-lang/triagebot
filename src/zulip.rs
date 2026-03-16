@@ -736,7 +736,7 @@ async fn user_info_cmd(
     let recent_contributions_days = recent_contributions_days.num_days() as u64;
 
     let mut message = format!(
-        r#"# User `{username}` activity
+        r#"# User {username} activity
 
 - Account created at: {date} ({ago})
 - Public repository count: {repos}
@@ -762,6 +762,7 @@ The user opened `{org_recent_pr_count}{org_more_prs}` PRs ({recent_org_pr_rate} 
 - {org_merged_prs} were merged
 - {org_closed_prs} were closed
 "#,
+        username = format!("[{username}](https://github.com/{username})"),
         date = format_date(Some(user.created_at)),
         ago = format!("`{}` days ago", (Utc::now() - user.created_at).num_days()),
         repos = user.public_repos,
