@@ -369,7 +369,7 @@ async fn handle_command<'a>(
                 }
                 StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
                 StreamCommand::Backport(args) => {
-                    accept_decline_backport(ctx, message_data, &args).await
+                    accept_decline_backport(&ctx, message_data, &args).await
                 }
                 StreamCommand::UserInfo {
                     username,
@@ -390,7 +390,7 @@ async fn handle_command<'a>(
 
 // TODO: shorter variant of this command (f.e. `backport accept` or even `accept`) that infers everything from the Message payload
 async fn accept_decline_backport(
-    ctx: Arc<Context>,
+    ctx: &Context,
     message_data: &Message,
     args_data: &BackportArgs,
 ) -> anyhow::Result<Option<String>> {
@@ -482,7 +482,7 @@ async fn accept_decline_backport(
 }
 
 async fn assign_issue_prio(
-    ctx: Arc<Context>,
+    ctx: &Context,
     message_data: &Message,
     args_data: &AssignPrioArgs,
 ) -> anyhow::Result<Option<String>> {
@@ -519,28 +519,22 @@ async fn assign_issue_prio(
     let zulip_link =
         crate::zulip::MessageApiRequest::new(stream_id, &subject, "").url(zulip_client);
 
-    // Remove I-prioritize and all P-* labels (if any)
+    // Remove `I-prioritize` and all other P-* labels (if any)
+    let labels_to_remove: Vec<github::Label> = [
+        "I-prioritize".to_string(),
+        "P-low".to_string(),
+        "P-medium".to_string(),
+        "P-high".to_string(),
+        "P-critical".to_string(),
+    ]
+    .iter()
+    .filter(|l| l != &format!("P-{}", args.prio))
+    .map(|l| github::Label {
+        name: l.to_string(),
+    })
+    .collect();
     issue
-        .remove_labels(
-            &ctx.github,
-            vec![
-                github::Label {
-                    name: "I-prioritize".to_string(),
-                },
-                github::Label {
-                    name: "P-low".to_string(),
-                },
-                github::Label {
-                    name: "P-medium".to_string(),
-                },
-                github::Label {
-                    name: "P-high".to_string(),
-                },
-                github::Label {
-                    name: "P-critical".to_string(),
-                },
-            ],
-        )
+        .remove_labels(&ctx.github, labels_to_remove)
         .await
         .context("failed to remove labels from the issue")?;
 
