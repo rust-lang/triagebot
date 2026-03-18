@@ -62,6 +62,22 @@ impl Event {
         }
     }
 
+    /// This will check both `IssueComment` events but also `Issue` events
+    pub fn has_comment_changed(&self) -> bool {
+        match self {
+            Event::Create(_) => false,
+            Event::Issue(e) => e
+                .changes
+                .as_ref()
+                .map_or(false, |changes| changes.has_comment_changed(&e.issue)),
+            Event::IssueComment(e) => e
+                .changes
+                .as_ref()
+                .map_or(false, |changes| changes.has_comment_changed(&e.issue)),
+            Event::Push(_) => false,
+        }
+    }
+
     pub fn html_url(&self) -> Option<&str> {
         match self {
             Event::Create(_) => None,
@@ -254,6 +270,30 @@ pub struct ChangeInner {
 pub struct BaseChange {
     pub r#ref: ChangeInner,
     pub sha: ChangeInner,
+}
+
+impl Changes {
+    pub fn has_comment_changed(&self, issue: &Issue) -> bool {
+        if let Some(body) = &self.body {
+            // In theory if only the title is edited we don't get a `changes[body]` diff, but for some unknown reason
+            // we get an empty `changes[body]` for issues. As a workaround when `body.from` is empty we also check the
+            // presence of `changes[title]`, if it's present we consider that the body didn't actually changed.
+            //
+            // This is clearly a bug in GitHub side, they should only send us `changes[body]` if the body actually changed.
+            //
+            // This workaround is not perfect, as there is an edge-case when an issue is created without a body and whose
+            // title and body are both updated at the same time from the API (as it's not possible via the Web UI).
+            //
+            // https://rust-lang.zulipchat.com/#narrow/channel/224082-triagebot/topic/separate.20title.20and.20description
+            if body.from == "" && !issue.is_pr() {
+                self.title.is_none()
+            } else {
+                true
+            }
+        } else {
+            false
+        }
+    }
 }
 
 /// A pull request review event.
