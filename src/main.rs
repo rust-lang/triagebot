@@ -268,10 +268,6 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .merge(protected)
         .nest("/agenda", agenda)
         .route("/bors-commit-list", get(triagebot::bors::bors_commit_list))
-        .route(
-            "/notifications",
-            get(triagebot::notification_listing::notifications),
-        )
         .route("/zulip-hook", post(triagebot::zulip::webhook))
         .route("/github-hook", post(triagebot::github::webhook))
         .layer(middleware)
