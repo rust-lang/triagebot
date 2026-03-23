@@ -65,6 +65,7 @@ pub fn issue(
         merged: false,
         draft: false,
         comments: None,
+        review_comments: None,
         // The repository is parsed from comments_url, so this field is important
         comments_url: format!("https://api.github.com/repos/{org}/{repo}/issues/{number}/comments"),
         repository: Default::default(),

@@ -402,6 +402,7 @@ r#":warning: **Warning** :warning:
                 merged: false,
                 draft: false,
                 comments: Default::default(),
+                review_comments: Default::default(),
                 comments_url: Default::default(),
                 repository: Default::default(),
                 base: Some(crate::github::CommitBase {
