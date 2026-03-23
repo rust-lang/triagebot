@@ -18,9 +18,9 @@ use regex::Regex;
 use crate::{
     cache,
     github::queries::issue_with_comments::{
-        GitHubGraphQlComment, GitHubGraphQlReactionGroup, GitHubGraphQlReviewThreadComment,
-        GitHubIssueState, GitHubIssueStateReason, GitHubIssueWithComments, GitHubReviewState,
-        GitHubSimplifiedAuthor,
+        GitHubGraphQlComment, GitHubGraphQlReactionGroup, GitHubGraphQlReview,
+        GitHubGraphQlReviewThread, GitHubGraphQlReviewThreadComment, GitHubIssueState,
+        GitHubIssueStateReason, GitHubIssueWithComments, GitHubReviewState, GitHubSimplifiedAuthor,
     },
 };
 use crate::{
@@ -124,7 +124,32 @@ pub async fn gh_comments(
                             .map(|a| a.login.len() + a.avatar_url.len())
                             .unwrap_or(0)
                 })
-                .sum::<usize>();
+                .sum::<usize>()
+            + issue_with_comments.review_threads.as_ref().map_or(0, |rt| {
+                rt.nodes
+                    .iter()
+                    .map(|rt| {
+                        std::mem::size_of::<GitHubGraphQlReviewThread>()
+                            + rt.path.len()
+                            + rt.comments
+                                .nodes
+                                .iter()
+                                .map(|c| {
+                                    std::mem::size_of::<GitHubGraphQlReviewThreadComment>()
+                                        + c.url.len()
+                                        + c.body_html.len()
+                                        + c.diff_hunk.len()
+                                })
+                                .sum::<usize>()
+                    })
+                    .sum::<usize>()
+            })
+            + issue_with_comments.reviews.as_ref().map_or(0, |r| {
+                r.nodes
+                    .iter()
+                    .map(|_r| std::mem::size_of::<GitHubGraphQlReview>())
+                    .sum::<usize>()
+            });
 
         ctx.gh_comments.write().await.put(
             key.clone(),
