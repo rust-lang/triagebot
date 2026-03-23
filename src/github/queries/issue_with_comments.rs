@@ -80,6 +80,10 @@ pub struct GitHubGraphQlReviewThread {
     #[serde(rename = "isResolved")]
     pub is_resolved: bool,
     pub path: String,
+    #[serde(rename = "originalLine")]
+    pub original_line: Option<usize>,
+    #[serde(rename = "originalStartLine")]
+    pub original_start_line: Option<usize>,
     pub comments: GitHubGraphQlReviewThreadComments,
 }
 
@@ -97,6 +101,8 @@ pub struct GitHubGraphQlReviewThreadComment {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "bodyHTML")]
     pub body_html: String,
+    #[serde(rename = "diffHunk")]
+    pub diff_hunk: String,
     pub url: String,
     #[serde(rename = "reactionGroups")]
     pub reactions: Vec<GitHubGraphQlReactionGroup>,
@@ -309,6 +315,8 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             isOutdated
             isResolved
             path
+            originalLine
+            originalStartLine
             comments(first: 100) {
               nodes {
                 author {
@@ -318,6 +326,7 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
                 createdAt
                 updatedAt
                 bodyHTML
+                diffHunk
                 url
                 reactionGroups {
                   content

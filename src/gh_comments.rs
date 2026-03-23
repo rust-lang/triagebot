@@ -13,6 +13,7 @@ use hyper::{
     HeaderMap, StatusCode,
     header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE},
 };
+use regex::Regex;
 
 use crate::{
     cache,
@@ -336,6 +337,14 @@ pub async fn gh_comments(
                             review_thread.is_collapsed,
                             review_thread.is_resolved,
                             review_thread.is_outdated,
+                            &review_thread
+                                .comments
+                                .nodes
+                                .first()
+                                .map(|first| first.diff_hunk.as_str())
+                                .unwrap_or_default(),
+                            review_thread.original_start_line,
+                            review_thread.original_line,
                             &review_thread.comments.nodes,
                         )?;
                     }
@@ -632,6 +641,9 @@ fn write_review_thread_as_html(
     is_collapsed: bool,
     is_resolved: bool,
     is_outdated: bool,
+    diff_hunk: &str,
+    start_line: Option<usize>,
+    end_line: Option<usize>,
     comments: &[GitHubGraphQlReviewThreadComment],
 ) -> anyhow::Result<()> {
     let mut path_html = String::new();
@@ -657,6 +669,9 @@ fn write_review_thread_as_html(
         <div class="review-thread-comments">
 "###
     )?;
+
+    let diff_lines = parse_diff_hunk_and_relevant_lines(&diff_hunk, start_line, end_line);
+    write_diff_hunk_as_html(buffer, &diff_lines)?;
 
     for comment in comments {
         let author = comment.author.as_ref().unwrap_or(&GHOST_ACCOUNT);
@@ -710,6 +725,41 @@ fn write_review_thread_as_html(
     Ok(())
 }
 
+fn write_diff_hunk_as_html(buffer: &mut String, diff_lines: &[DiffLine]) -> anyhow::Result<()> {
+    if diff_lines.is_empty() {
+        return Ok(());
+    }
+
+    write!(buffer, r###"<table class="review-thread-diff">"###)?;
+
+    for line in diff_lines {
+        let row_class = match line.line_type {
+            LineType::Addition => "blob-code-addition",
+            LineType::Deletion => "blob-code-deletion",
+            LineType::Context => "blob-code-context",
+        };
+
+        let mut content_html = String::new();
+        pulldown_cmark_escape::escape_html(&mut content_html, &line.content)?;
+
+        write!(
+            buffer,
+            "<tr class='{row_class}'>
+                <td class='line-num'>{}</td>
+                <td class='line-num'>{}</td>
+                <td class='blob-code'><code>{}</code></td>
+            </tr>",
+            line.old_line.map(|n| n.to_string()).unwrap_or_default(),
+            line.new_line.map(|n| n.to_string()).unwrap_or_default(),
+            content_html
+        )?;
+    }
+
+    write!(buffer, "</table>")?;
+
+    Ok(())
+}
+
 fn write_reaction_groups_as_html(
     buffer: &mut String,
     reaction_groups: &[GitHubGraphQlReactionGroup],
@@ -748,6 +798,84 @@ fn write_reaction_groups_as_html(
     }
 
     Ok(())
+}
+
+#[derive(Debug)]
+enum LineType {
+    Addition,
+    Deletion,
+    Context,
+}
+
+#[derive(Debug)]
+struct DiffLine {
+    old_line: Option<usize>,
+    new_line: Option<usize>,
+    content: String,
+    line_type: LineType,
+}
+
+fn parse_diff_hunk_and_relevant_lines(
+    hunk: &str,
+    start_line: Option<usize>,
+    end_line: Option<usize>,
+) -> Vec<DiffLine> {
+    let mut result = Vec::new();
+    let lines: Vec<&str> = hunk.lines().collect();
+
+    if lines.is_empty() {
+        return result;
+    }
+
+    static HUNK_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"@@ \-(\d+),?\d* \+(\d+),?\d* @@").unwrap());
+
+    let (mut old_count, mut new_count) = if let Some(caps) = HUNK_RE.captures(lines[0]) {
+        let o = caps[1].parse::<usize>().unwrap_or(0);
+        let n = caps[2].parse::<usize>().unwrap_or(0);
+        (o, n)
+    } else {
+        return result;
+    };
+
+    for line in lines.iter().skip(1) {
+        let (content, o_num, n_num, l_type) = if let Some(stripped) = line.strip_prefix('+') {
+            let c = new_count;
+            new_count += 1;
+            (stripped, None, Some(c), LineType::Addition)
+        } else if let Some(stripped) = line.strip_prefix('-') {
+            let c = old_count;
+            old_count += 1;
+            (stripped, Some(c), None, LineType::Deletion)
+        } else {
+            let co = old_count;
+            let cn = new_count;
+            old_count += 1;
+            new_count += 1;
+
+            // Strip a space if it exists, otherwise keep the line as-is
+            let stripped = line.strip_prefix(' ').unwrap_or(line);
+            (stripped, Some(co), Some(cn), LineType::Context)
+        };
+
+        let is_relevant = end_line.is_some_and(|end| {
+            let start = start_line.unwrap_or(end);
+            let range = start..=end;
+
+            o_num.is_some_and(|n| range.contains(&n)) || n_num.is_some_and(|n| range.contains(&n))
+        });
+
+        if is_relevant {
+            result.push(DiffLine {
+                old_line: o_num,
+                new_line: n_num,
+                content: content.to_string(),
+                line_type: l_type,
+            });
+        }
+    }
+
+    result
 }
 
 fn extract_id_from_github_link(url: &str) -> &str {
