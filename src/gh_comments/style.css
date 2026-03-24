@@ -156,7 +156,7 @@ details:not([open]) > .review-thread-header {
 .review-thread-diff .blob-code {
     width: 100%;
     padding: 1px 10px;
-    white-space: preserve-spaces;
+    white-space: pre-wrap;
 }
 
 .review-thread-diff .blob-code-addition { background-color: #46954a26; }
