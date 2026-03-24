@@ -101,7 +101,10 @@ pub(super) async fn parse_input(
                 .cloned()
                 .collect::<Vec<_>>();
 
-            if !relevant_file_paths.is_empty() && !relevant_ccs.is_empty() {
+            // Has any relevant CCs? (empty cc is allowed)
+            let has_relevant_ccs = !relevant_ccs.is_empty() || cc.is_empty();
+
+            if !relevant_file_paths.is_empty() && has_relevant_ccs {
                 Some(ToMention {
                     entry: entry.to_string(),
                     relevant_file_paths,
