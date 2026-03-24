@@ -38,7 +38,12 @@ pub(super) async fn handle(
         return Ok(());
     }
 
-    if issue.comments.unwrap_or(0) < config.threshold.unwrap_or(DEFAULT_THRESHOLD) {
+    // We take both regular and review comments into account.
+    //
+    // Note that the number of the review comments is rarely populated in GitHub webhooks.
+    let comments = issue.comments.unwrap_or(0) + issue.review_comments.unwrap_or(0);
+
+    if comments < config.threshold.unwrap_or(DEFAULT_THRESHOLD) {
         return Ok(());
     }
 

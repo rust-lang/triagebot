@@ -59,6 +59,13 @@ pub struct Issue {
     /// Number of comments
     pub comments: Option<u32>,
 
+    /// Number of review comments
+    ///
+    /// This is only included in a reduced set of webhook events, such as
+    /// `opened`, `synchronize`, `closed` and maybe others.
+    #[serde(default)]
+    pub review_comments: Option<u32>,
+
     /// The API URL for discussion comments.
     ///
     /// Example: `https://api.github.com/repos/octocat/Hello-World/issues/1347/comments`
