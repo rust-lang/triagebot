@@ -1,5 +1,6 @@
 use crate::changelogs::ChangelogFormat;
 use crate::github::{GithubClient, Repository};
+use indoc::indoc;
 use parser::command::relabel::{Label, LabelDelta, RelabelCommand};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -92,6 +93,7 @@ define_config! {
     range_diff: RangeDiffConfig,
     review_changes_since: ReviewChangesSinceConfig,
     view_all_comments_link: ViewAllCommentsLinkConfig,
+    acknowledgement: AcknowledgementConfig,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
@@ -735,6 +737,79 @@ pub(crate) struct ViewAllCommentsLinkConfig {
     pub(crate) exclude_prs: bool,
 }
 
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AcknowledgementConfig {
+    /// Link to a Zulip channel for discussion. Required.
+    pub(crate) zulip: String,
+
+    /// The exact text the author must write to acknowledge.
+    #[serde(default = "AcknowledgementConfig::default_expect")]
+    pub(crate) expect: String,
+
+    /// Message posted when a new PR is opened by a first-time contributor.
+    #[serde(default = "AcknowledgementConfig::default_prompt")]
+    pub(crate) prompt: String,
+
+    /// Message posted when a PR is moved out of draft without acknowledgement.
+    #[serde(default = "AcknowledgementConfig::default_undrafted")]
+    pub(crate) undrafted: String,
+
+    /// Message posted when the author's reply doesn't match the expected text.
+    #[serde(default = "AcknowledgementConfig::default_wrong_response")]
+    pub(crate) wrong_response: String,
+}
+
+impl AcknowledgementConfig {
+    fn default_expect() -> String {
+        "I agree to the contribution guidelines.".to_string()
+    }
+
+    fn default_prompt() -> String {
+        indoc! {"
+            Hi there, {author}! This is your friendly neighborhood {bot}. \
+            I see you're new to the repository. I wanted to make sure you are \
+            aware of how we do things here.
+
+            In order to move this PR out of draft state, please write
+
+            > {expect}
+
+            in a message (all by itself, thanks).
+
+            If you have questions or would like to discuss this policy, \
+            please go to {zulip}.
+
+            You won't get this message once you have landed a PR in the repository. \
+            Apologies if you're getting it twice!
+        "}
+        .trim()
+        .to_string()
+    }
+
+    fn default_undrafted() -> String {
+        indoc! {"
+            Sorry, I need you to say `{expect}` in a message all by itself \
+            before the PR can be moved from draft state.
+        "}
+        .trim()
+        .to_string()
+    }
+
+    fn default_wrong_response() -> String {
+        "Sorry, I need you to say `{expect}` in a message all by itself.".to_string()
+    }
+
+    /// Perform template substitution on a message string.
+    pub(crate) fn substitute(&self, template: &str, author: &str, bot: &str) -> String {
+        template
+            .replace("{author}", &format!("@{author}"))
+            .replace("{expect}", &self.expect)
+            .replace("{zulip}", &self.zulip)
+            .replace("{bot}", bot)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
@@ -1051,6 +1126,7 @@ mod tests {
                 }),
                 review_changes_since: Some(ReviewChangesSinceConfig {}),
                 view_all_comments_link: None,
+                acknowledgement: None,
             }
         );
     }
@@ -1141,6 +1217,7 @@ mod tests {
                 range_diff: None,
                 review_changes_since: None,
                 view_all_comments_link: None,
+                acknowledgement: None,
             }
         );
     }

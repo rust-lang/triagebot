@@ -11,6 +11,7 @@ use std::fmt;
 use std::sync::Arc;
 use tracing as log;
 
+mod acknowledgement;
 mod assign;
 mod autolabel;
 mod backport;
@@ -234,6 +235,20 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         }
     };
 
+    let acknowledgement = async {
+        if let Some(acknowledgement_config) = config
+            .as_ref()
+            .ok()
+            .and_then(|c| c.acknowledgement.as_ref())
+        {
+            acknowledgement::handle(ctx, event, acknowledgement_config)
+                .await
+                .map_err(|e| HandlerError::Other(e.context("acknowledgement handler failed")))
+        } else {
+            Ok(())
+        }
+    };
+
     let (
         prune_gh_comments,
         check_commits,
@@ -249,6 +264,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         review_changes_since,
         github_releases,
         merge_conflicts,
+        acknowledgement,
     ) = futures::join!(
         prune_gh_comments,
         check_commits,
@@ -264,6 +280,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         review_changes_since,
         github_releases,
         merge_conflicts,
+        acknowledgement,
     );
 
     for result in [
@@ -281,6 +298,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         review_changes_since,
         github_releases,
         merge_conflicts,
+        acknowledgement,
     ] {
         if let Err(e) = result {
             errors.push(e);
