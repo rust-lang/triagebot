@@ -72,6 +72,19 @@ pub(crate) async fn handle(
         return Ok(());
     }
 
+    // Notice-only mode: when `expect` is empty, just post an informational
+    // message on newly opened PRs without requiring acknowledgement.
+    if !config.requires_acknowledgement() {
+        if matches!(trigger, Trigger::Opened) {
+            let prompt = config.prompt();
+            let body = config.substitute(&prompt, author, &ctx.username);
+            issue.post_comment(&ctx.github, &body).await?;
+        }
+        return Ok(());
+    }
+
+    // --- Gated mode: acknowledgement is required ---
+
     // Fetch existing comments to check for prior acknowledgement.
     // FIXME: only fetches the first 100 comments — add pagination if this
     // ever becomes a problem in practice.
@@ -103,8 +116,9 @@ pub(crate) async fn handle(
     }
 
     // Determine what message to post.
+    let prompt = config.prompt();
     let template = match &trigger {
-        Trigger::Opened => &config.prompt,
+        Trigger::Opened => &prompt,
         Trigger::Undrafted => &config.undrafted,
         Trigger::Comment(body) => {
             // Only respond if the comment is more recent than the bot's last comment

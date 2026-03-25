@@ -744,18 +744,23 @@ pub(crate) struct AcknowledgementConfig {
     pub(crate) zulip: String,
 
     /// The exact text the author must write to acknowledge.
+    /// If set to `""`, acknowledgement is not required and the bot simply
+    /// posts an informational notice without converting the PR to draft.
     #[serde(default = "AcknowledgementConfig::default_expect")]
     pub(crate) expect: String,
 
     /// Message posted when a new PR is opened by a first-time contributor.
-    #[serde(default = "AcknowledgementConfig::default_prompt")]
-    pub(crate) prompt: String,
+    /// If not set, a default is chosen based on whether `expect` is empty.
+    #[serde(default)]
+    pub(crate) prompt: Option<String>,
 
     /// Message posted when a PR is moved out of draft without acknowledgement.
+    /// Only used when `expect` is non-empty.
     #[serde(default = "AcknowledgementConfig::default_undrafted")]
     pub(crate) undrafted: String,
 
     /// Message posted when the author's reply doesn't match the expected text.
+    /// Only used when `expect` is non-empty.
     #[serde(default = "AcknowledgementConfig::default_wrong_response")]
     pub(crate) wrong_response: String,
 }
@@ -765,7 +770,8 @@ impl AcknowledgementConfig {
         "I agree to the contribution guidelines.".to_string()
     }
 
-    fn default_prompt() -> String {
+    /// Default prompt when acknowledgement is required (`expect` is non-empty).
+    fn default_gated_prompt() -> String {
         indoc! {"
             Hi there, {author}! This is your friendly neighborhood {bot}. \
             I see you're new to the repository. I wanted to make sure you are \
@@ -787,6 +793,23 @@ impl AcknowledgementConfig {
         .to_string()
     }
 
+    /// Default prompt when acknowledgement is not required (`expect` is empty).
+    fn default_notice_prompt() -> String {
+        indoc! {"
+            Hi there, {author}! This is your friendly neighborhood {bot}. \
+            I see you're new to the repository. I wanted to make sure you are \
+            aware of how we do things here.
+
+            If you have questions or would like to discuss anything, \
+            please go to {zulip}.
+
+            You won't get this message once you have landed a PR in the repository. \
+            Apologies if you're getting it twice!
+        "}
+        .trim()
+        .to_string()
+    }
+
     fn default_undrafted() -> String {
         indoc! {"
             Sorry, I need you to say `{expect}` in a message all by itself \
@@ -798,6 +821,23 @@ impl AcknowledgementConfig {
 
     fn default_wrong_response() -> String {
         "Sorry, I need you to say `{expect}` in a message all by itself.".to_string()
+    }
+
+    /// Whether acknowledgement is required (i.e., `expect` is non-empty).
+    pub(crate) fn requires_acknowledgement(&self) -> bool {
+        !self.expect.trim().is_empty()
+    }
+
+    /// Returns the prompt message, using the appropriate default if not
+    /// explicitly configured.
+    pub(crate) fn prompt(&self) -> String {
+        if let Some(prompt) = &self.prompt {
+            prompt.clone()
+        } else if self.requires_acknowledgement() {
+            Self::default_gated_prompt()
+        } else {
+            Self::default_notice_prompt()
+        }
     }
 
     /// Perform template substitution on a message string.
