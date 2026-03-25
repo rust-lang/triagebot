@@ -80,6 +80,14 @@ pub struct GitHubGraphQlReviewThread {
     #[serde(rename = "isResolved")]
     pub is_resolved: bool,
     pub path: String,
+    #[serde(rename = "diffSide")]
+    pub diff_side: GitHubDiffSide,
+    #[serde(rename = "startDiffSide")]
+    pub start_diff_side: Option<GitHubDiffSide>,
+    #[serde(rename = "originalLine")]
+    pub original_line: Option<usize>,
+    #[serde(rename = "originalStartLine")]
+    pub original_start_line: Option<usize>,
     pub comments: GitHubGraphQlReviewThreadComments,
 }
 
@@ -97,6 +105,8 @@ pub struct GitHubGraphQlReviewThreadComment {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "bodyHTML")]
     pub body_html: String,
+    #[serde(rename = "diffHunk")]
+    pub diff_hunk: String,
     pub url: String,
     #[serde(rename = "reactionGroups")]
     pub reactions: Vec<GitHubGraphQlReactionGroup>,
@@ -183,6 +193,13 @@ pub enum GitHubIssueStateReason {
     Duplicate,
     NotPlanned,
     Reopened,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum GitHubDiffSide {
+    Left,
+    Right,
 }
 
 impl GithubClient {
@@ -309,6 +326,10 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             isOutdated
             isResolved
             path
+            diffSide
+            startDiffSide
+            originalLine
+            originalStartLine
             comments(first: 100) {
               nodes {
                 author {
@@ -318,6 +339,7 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
                 createdAt
                 updatedAt
                 bodyHTML
+                diffHunk
                 url
                 reactionGroups {
                   content

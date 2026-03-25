@@ -13,13 +13,14 @@ use hyper::{
     HeaderMap, StatusCode,
     header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE},
 };
+use regex::Regex;
 
 use crate::{
     cache,
     github::queries::issue_with_comments::{
-        GitHubGraphQlComment, GitHubGraphQlReactionGroup, GitHubGraphQlReviewThreadComment,
-        GitHubIssueState, GitHubIssueStateReason, GitHubIssueWithComments, GitHubReviewState,
-        GitHubSimplifiedAuthor,
+        GitHubDiffSide, GitHubGraphQlComment, GitHubGraphQlReactionGroup, GitHubGraphQlReview,
+        GitHubGraphQlReviewThread, GitHubGraphQlReviewThreadComment, GitHubIssueState,
+        GitHubIssueStateReason, GitHubIssueWithComments, GitHubReviewState, GitHubSimplifiedAuthor,
     },
 };
 use crate::{
@@ -28,7 +29,7 @@ use crate::{
     utils::{immutable_headers, is_known_and_public_repo},
 };
 
-pub const STYLE_URL: &str = "/gh-comments/style@0.0.4.css";
+pub const STYLE_URL: &str = "/gh-comments/style@0.0.5.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
 pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.1.js";
 
@@ -123,7 +124,32 @@ pub async fn gh_comments(
                             .map(|a| a.login.len() + a.avatar_url.len())
                             .unwrap_or(0)
                 })
-                .sum::<usize>();
+                .sum::<usize>()
+            + issue_with_comments.review_threads.as_ref().map_or(0, |rt| {
+                rt.nodes
+                    .iter()
+                    .map(|rt| {
+                        std::mem::size_of::<GitHubGraphQlReviewThread>()
+                            + rt.path.len()
+                            + rt.comments
+                                .nodes
+                                .iter()
+                                .map(|c| {
+                                    std::mem::size_of::<GitHubGraphQlReviewThreadComment>()
+                                        + c.url.len()
+                                        + c.body_html.len()
+                                        + c.diff_hunk.len()
+                                })
+                                .sum::<usize>()
+                    })
+                    .sum::<usize>()
+            })
+            + issue_with_comments.reviews.as_ref().map_or(0, |r| {
+                r.nodes
+                    .iter()
+                    .map(|_r| std::mem::size_of::<GitHubGraphQlReview>())
+                    .sum::<usize>()
+            });
 
         ctx.gh_comments.write().await.put(
             key.clone(),
@@ -336,6 +362,18 @@ pub async fn gh_comments(
                             review_thread.is_collapsed,
                             review_thread.is_resolved,
                             review_thread.is_outdated,
+                            review_thread
+                                .comments
+                                .nodes
+                                .first()
+                                .map(|first| first.diff_hunk.as_str())
+                                .unwrap_or_default(),
+                            DiffLineRange::new(
+                                review_thread.start_diff_side,
+                                review_thread.diff_side,
+                                review_thread.original_start_line,
+                                review_thread.original_line,
+                            ),
                             &review_thread.comments.nodes,
                         )?;
                     }
@@ -632,6 +670,8 @@ fn write_review_thread_as_html(
     is_collapsed: bool,
     is_resolved: bool,
     is_outdated: bool,
+    diff_hunk: &str,
+    range: Option<DiffLineRange>,
     comments: &[GitHubGraphQlReviewThreadComment],
 ) -> anyhow::Result<()> {
     let mut path_html = String::new();
@@ -657,6 +697,9 @@ fn write_review_thread_as_html(
         <div class="review-thread-comments">
 "###
     )?;
+
+    let diff_lines = parse_diff_hunk_and_relevant_lines(diff_hunk, range);
+    write_diff_hunk_as_html(buffer, &diff_lines)?;
 
     for comment in comments {
         let author = comment.author.as_ref().unwrap_or(&GHOST_ACCOUNT);
@@ -710,6 +753,41 @@ fn write_review_thread_as_html(
     Ok(())
 }
 
+fn write_diff_hunk_as_html(buffer: &mut String, diff_lines: &[DiffLine]) -> anyhow::Result<()> {
+    if diff_lines.is_empty() {
+        return Ok(());
+    }
+
+    write!(buffer, r###"<table class="review-thread-diff">"###)?;
+
+    for line in diff_lines {
+        let row_class = match line.0 {
+            DiffLineNumber::Change(ChangeLineNumber::Added(_)) => "blob-code-addition",
+            DiffLineNumber::Change(ChangeLineNumber::Removed(_)) => "blob-code-deletion",
+            DiffLineNumber::Unchanged { .. } => "blob-code-context",
+        };
+
+        let mut content_html = String::new();
+        pulldown_cmark_escape::escape_html(&mut content_html, line.1)?;
+
+        write!(
+            buffer,
+            "<tr class='{row_class}'>
+                <td class='line-num'>{}</td>
+                <td class='line-num'>{}</td>
+                <td class='blob-code'><code>{}</code></td>
+            </tr>",
+            line.0.left().map(|n| n.to_string()).unwrap_or_default(),
+            line.0.right().map(|n| n.to_string()).unwrap_or_default(),
+            content_html
+        )?;
+    }
+
+    write!(buffer, "</table>")?;
+
+    Ok(())
+}
+
 fn write_reaction_groups_as_html(
     buffer: &mut String,
     reaction_groups: &[GitHubGraphQlReactionGroup],
@@ -748,6 +826,169 @@ fn write_reaction_groups_as_html(
     }
 
     Ok(())
+}
+
+#[derive(Debug, Copy, Clone)]
+enum ChangeLineNumber {
+    Removed(usize),
+    Added(usize),
+}
+
+impl ChangeLineNumber {
+    fn from_line_and_side(
+        line: Option<usize>,
+        side: Option<GitHubDiffSide>,
+    ) -> Option<ChangeLineNumber> {
+        match (line, side) {
+            (Some(line), Some(GitHubDiffSide::Left)) => Some(ChangeLineNumber::Removed(line)),
+            (Some(line), Some(GitHubDiffSide::Right)) => Some(ChangeLineNumber::Added(line)),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug)]
+enum DiffLineNumber {
+    Change(ChangeLineNumber),
+    Unchanged { left: usize, right: usize },
+}
+
+impl DiffLineNumber {
+    fn left(&self) -> Option<usize> {
+        match *self {
+            DiffLineNumber::Change(ChangeLineNumber::Removed(left))
+            | DiffLineNumber::Unchanged { left, .. } => Some(left),
+            _ => None,
+        }
+    }
+
+    fn right(&self) -> Option<usize> {
+        match *self {
+            DiffLineNumber::Change(ChangeLineNumber::Added(right))
+            | DiffLineNumber::Unchanged { right, .. } => Some(right),
+            _ => None,
+        }
+    }
+}
+
+impl PartialEq<ChangeLineNumber> for DiffLineNumber {
+    fn eq(&self, other: &ChangeLineNumber) -> bool {
+        use {ChangeLineNumber::*, DiffLineNumber::*};
+        match *other {
+            Removed(other_left) => {
+                matches!(*self, Change(Removed(left)) | Unchanged { left, ..} if left == other_left )
+            }
+            Added(other_right) => {
+                matches!(*self, Change(Added(right)) | Unchanged { right, ..} if right == other_right )
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+enum DiffLineRange {
+    Single(ChangeLineNumber),
+    Range {
+        start: ChangeLineNumber,
+        end: ChangeLineNumber,
+    },
+}
+
+impl DiffLineRange {
+    fn new(
+        start_side: Option<GitHubDiffSide>,
+        end_side: GitHubDiffSide,
+        start_line: Option<usize>,
+        end_line: Option<usize>,
+    ) -> Option<Self> {
+        let end = ChangeLineNumber::from_line_and_side(end_line, Some(end_side))?;
+        Some(
+            match ChangeLineNumber::from_line_and_side(start_line, start_side) {
+                Some(start) => Self::Range { start, end },
+                None => Self::Single(end),
+            },
+        )
+    }
+}
+
+#[derive(Debug)]
+struct DiffLine<'s>(DiffLineNumber, &'s str);
+
+fn parse_diff_hunk_and_relevant_lines(
+    hunk: &str,
+    range: Option<DiffLineRange>,
+) -> Vec<DiffLine<'_>> {
+    let lines: Vec<&str> = hunk.lines().collect();
+
+    let (Some(range), [_, ..]) = (range, &lines[..]) else {
+        return vec![];
+    };
+
+    static HUNK_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"@@ \-(\d+),?\d* \+(\d+),?\d* @@").unwrap());
+
+    let Some(caps) = HUNK_RE.captures(lines[0]) else {
+        return vec![];
+    };
+
+    let mut old_count = caps[1].parse::<usize>().unwrap_or(0);
+    let mut new_count = caps[2].parse::<usize>().unwrap_or(0);
+
+    let next_line = |count: &mut usize| {
+        let c = *count;
+        *count += 1;
+        c
+    };
+
+    let mut diff_lines = Vec::from_iter(lines.iter().skip(1).map(|line| {
+        use {ChangeLineNumber::*, DiffLineNumber::*};
+        if let Some(stripped) = line.strip_prefix('+') {
+            DiffLine(Change(Added(next_line(&mut new_count))), stripped)
+        } else if let Some(stripped) = line.strip_prefix('-') {
+            DiffLine(Change(Removed(next_line(&mut old_count))), stripped)
+        } else {
+            // Strip a space if it exists, otherwise keep the line as-is
+            let stripped = line.strip_prefix(' ').unwrap_or(line);
+            DiffLine(
+                Unchanged {
+                    left: next_line(&mut old_count),
+                    right: next_line(&mut new_count),
+                },
+                stripped,
+            )
+        }
+    }));
+
+    let find_ix = |lines: &[DiffLine], c: ChangeLineNumber| -> Option<usize> {
+        lines.iter().rposition(|DiffLine(n, _)| *n == c)
+    };
+
+    let (start_ix, end_ix);
+    match range {
+        DiffLineRange::Single(change_line_number) => {
+            if let Some(e) = find_ix(&diff_lines, change_line_number) {
+                end_ix = e;
+            } else {
+                return vec![];
+            }
+            // for non-range positions, GitHub displays (up to) 3 previous lines
+            start_ix = end_ix.saturating_sub(3);
+        }
+        DiffLineRange::Range { start, end } => {
+            if let Some(e) = find_ix(&diff_lines, end)
+                && let Some(s) = find_ix(&diff_lines[..=e], start)
+            {
+                (start_ix, end_ix) = (s, e)
+            } else {
+                return vec![];
+            }
+        }
+    }
+
+    diff_lines.drain(..start_ix);
+    diff_lines.truncate(end_ix + 1 - start_ix);
+
+    diff_lines
 }
 
 fn extract_id_from_github_link(url: &str) -> &str {

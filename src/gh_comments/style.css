@@ -98,6 +98,7 @@ body {
     padding: 8px 12px;
     font-size: 0.9em;
     color: var(--fg-muted);
+    cursor: pointer;
 }
 
 details:not([open]) > .comment-header,
@@ -135,6 +136,34 @@ details:not([open]) > .review-thread-header {
     margin-top: 0.5rem;
     margin-bottom: 0.5rem;
 }
+
+.review-thread-diff {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 12px;
+    margin-bottom: 0.5em;
+}
+
+.review-thread-diff .line-num {
+    min-width: 5ch;
+    text-align: right;
+    padding-left: 1ch;
+    padding-right: 1ch;
+    user-select: none;
+    vertical-align: top;
+}
+
+.review-thread-diff .blob-code {
+    width: 100%;
+    padding: 1px 10px;
+    white-space: pre-wrap;
+}
+
+.review-thread-diff .blob-code-addition { background-color: #46954a26; }
+.review-thread-diff .blob-code-deletion { background-color: #e5534b1a; }
+
+.review-thread-diff .blob-code-addition .line-num { background-color: #57ab5a4d; }
+.review-thread-diff .blob-code-deletion .line-num { background-color: #e5534b4d; }
 
 /* === Avatars and author info === */
 .avatar-link {
