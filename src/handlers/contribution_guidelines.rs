@@ -19,15 +19,15 @@ pub(crate) async fn handle(
     config: &ContributionGuidelinesConfig,
 ) -> anyhow::Result<()> {
     // Determine the trigger and get the issue reference.
-    let (trigger, issue, sender_login) = match event {
+    let (trigger, issue, sender_id) = match event {
         Event::Issue(e) if e.issue.is_pr() => {
             // Skip events triggered by the bot itself.
             if e.sender.login == ctx.username {
                 return Ok(());
             }
             match &e.action {
-                IssuesAction::Opened => (Trigger::Opened, &e.issue, &e.sender.login),
-                IssuesAction::ReadyForReview => (Trigger::Undrafted, &e.issue, &e.sender.login),
+                IssuesAction::Opened => (Trigger::Opened, &e.issue, e.sender.id),
+                IssuesAction::ReadyForReview => (Trigger::Undrafted, &e.issue, e.sender.id),
                 _ => return Ok(()),
             }
         }
@@ -39,7 +39,7 @@ pub(crate) async fn handle(
                 IssueCommentAction::Created => (
                     Trigger::Comment(&e.comment.body),
                     &e.issue,
-                    &e.comment.user.login,
+                    e.comment.user.id,
                 ),
                 _ => return Ok(()),
             }
@@ -47,12 +47,13 @@ pub(crate) async fn handle(
         _ => return Ok(()),
     };
 
-    let author = &issue.user.login;
+    let author_id = issue.user.id;
+    let author_login = &issue.user.login;
     let repo = issue.repository();
 
     // Only act on comments from the PR author.
     if matches!(trigger, Trigger::Comment(_)) {
-        if !sender_login.eq_ignore_ascii_case(author) {
+        if sender_id != author_id {
             return Ok(());
         }
     }
@@ -60,13 +61,13 @@ pub(crate) async fn handle(
     // Check if the author already has a merged PR in this repo.
     let query = format!(
         "author:{} repo:{}/{} type:pr is:merged",
-        author, repo.organization, repo.repository
+        author_login, repo.organization, repo.repository
     );
     let merged_count = ctx.github.issue_search_count(&query).await?;
     if merged_count > 0 {
         log::debug!(
             "contribution_guidelines: {} has {} merged PRs, skipping",
-            author,
+            author_login,
             merged_count
         );
         return Ok(());
@@ -77,7 +78,7 @@ pub(crate) async fn handle(
     if !config.requires_acknowledgement() {
         if matches!(trigger, Trigger::Opened) {
             let prompt = config.prompt();
-            let body = config.substitute(&prompt, author, &ctx.username);
+            let body = config.substitute(&prompt, author_login, &ctx.username);
             issue.post_comment(&ctx.github, &body).await?;
         }
         return Ok(());
@@ -94,7 +95,7 @@ pub(crate) async fn handle(
     let expect_lower = config.expect.trim().to_lowercase();
     let bot_prefix = format!("@{}", ctx.username);
     let acknowledged = comments.iter().any(|c| {
-        if !c.user.login.eq_ignore_ascii_case(author) {
+        if c.user.id != author_id {
             return false;
         }
         let body = c.body.trim();
@@ -109,7 +110,7 @@ pub(crate) async fn handle(
     if acknowledged {
         log::debug!(
             "contribution_guidelines: {} already acknowledged on PR #{}",
-            author,
+            author_login,
             issue.number
         );
         return Ok(());
@@ -168,7 +169,7 @@ pub(crate) async fn handle(
         }
     };
 
-    let body = config.substitute(template, author, &ctx.username);
+    let body = config.substitute(template, author_login, &ctx.username);
     issue.post_comment(&ctx.github, &body).await?;
 
     // Convert the PR to draft.
