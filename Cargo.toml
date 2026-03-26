@@ -48,7 +48,6 @@ hmac = "0.12.1"
 subtle = "2.6.1"
 sha2 = "0.10.9"
 imara-diff = "0.2.0"
-indoc = "2"
 pulldown-cmark-escape = "0.11.0"
 axum-extra = { version = "0.10.1", default-features = false }
 unicode-segmentation = "1.12.0"

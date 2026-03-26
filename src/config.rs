@@ -1,6 +1,5 @@
 use crate::changelogs::ChangelogFormat;
 use crate::github::{GithubClient, Repository};
-use indoc::indoc;
 use parser::command::relabel::{Label, LabelDelta, RelabelCommand};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -772,51 +771,42 @@ impl ContributionGuidelinesConfig {
 
     /// Default prompt when acknowledgement is required (`expect` is non-empty).
     fn default_gated_prompt() -> String {
-        indoc! {"
-            Hi there, {author}! This is your friendly neighborhood {bot}. \
-            I see you're new to the repository. I wanted to make sure you are \
-            aware of how we do things here.
-
-            In order to move this PR out of draft state, please write
-
-            > {expect}
-
-            in a message (all by itself, thanks).
-
-            If you have questions or would like to discuss this policy, \
-            please go to {zulip}.
-
-            You won't get this message once you have landed a PR in the repository. \
-            Apologies if you're getting it twice!
-        "}
-        .trim()
-        .to_string()
+        "Hi there, {author}! This is your friendly neighborhood {bot}. \
+         I see you're new to the repository. I wanted to make sure you are \
+         aware of how we do things here.\n\
+         \n\
+         In order to move this PR out of draft state, please write\n\
+         \n\
+         > {expect}\n\
+         \n\
+         in a message (all by itself, thanks).\n\
+         \n\
+         If you have questions or would like to discuss this policy, \
+         please go to {zulip}.\n\
+         \n\
+         You won't get this message once you have landed a PR in the \
+         repository. Apologies if you're getting it twice!"
+            .to_string()
     }
 
     /// Default prompt when acknowledgement is not required (`expect` is empty).
     fn default_notice_prompt() -> String {
-        indoc! {"
-            Hi there, {author}! This is your friendly neighborhood {bot}. \
-            I see you're new to the repository. I wanted to make sure you are \
-            aware of how we do things here.
-
-            If you have questions or would like to discuss anything, \
-            please go to {zulip}.
-
-            You won't get this message once you have landed a PR in the repository. \
-            Apologies if you're getting it twice!
-        "}
-        .trim()
-        .to_string()
+        "Hi there, {author}! This is your friendly neighborhood {bot}. \
+         I see you're new to the repository. I wanted to make sure you are \
+         aware of how we do things here.\n\
+         \n\
+         If you have questions or would like to discuss anything, \
+         please go to {zulip}.\n\
+         \n\
+         You won't get this message once you have landed a PR in the \
+         repository. Apologies if you're getting it twice!"
+            .to_string()
     }
 
     fn default_undrafted() -> String {
-        indoc! {"
-            Sorry, I need you to say `{expect}` in a message all by itself \
-            before the PR can be moved from draft state.
-        "}
-        .trim()
-        .to_string()
+        "Sorry, I need you to say `{expect}` in a message all by itself \
+         before the PR can be moved from draft state."
+            .to_string()
     }
 
     fn default_wrong_response() -> String {
