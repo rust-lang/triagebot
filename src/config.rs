@@ -93,7 +93,7 @@ define_config! {
     range_diff: RangeDiffConfig,
     review_changes_since: ReviewChangesSinceConfig,
     view_all_comments_link: ViewAllCommentsLinkConfig,
-    acknowledgement: AcknowledgementConfig,
+    contribution_guidelines: ContributionGuidelinesConfig,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
@@ -739,14 +739,14 @@ pub(crate) struct ViewAllCommentsLinkConfig {
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct AcknowledgementConfig {
+pub(crate) struct ContributionGuidelinesConfig {
     /// Link to a Zulip channel for discussion. Required.
     pub(crate) zulip: String,
 
     /// The exact text the author must write to acknowledge.
     /// If set to `""`, acknowledgement is not required and the bot simply
     /// posts an informational notice without converting the PR to draft.
-    #[serde(default = "AcknowledgementConfig::default_expect")]
+    #[serde(default = "ContributionGuidelinesConfig::default_expect")]
     pub(crate) expect: String,
 
     /// Message posted when a new PR is opened by a first-time contributor.
@@ -756,16 +756,16 @@ pub(crate) struct AcknowledgementConfig {
 
     /// Message posted when a PR is moved out of draft without acknowledgement.
     /// Only used when `expect` is non-empty.
-    #[serde(default = "AcknowledgementConfig::default_undrafted")]
+    #[serde(default = "ContributionGuidelinesConfig::default_undrafted")]
     pub(crate) undrafted: String,
 
     /// Message posted when the author's reply doesn't match the expected text.
     /// Only used when `expect` is non-empty.
-    #[serde(default = "AcknowledgementConfig::default_wrong_response")]
+    #[serde(default = "ContributionGuidelinesConfig::default_wrong_response")]
     pub(crate) wrong_response: String,
 }
 
-impl AcknowledgementConfig {
+impl ContributionGuidelinesConfig {
     fn default_expect() -> String {
         "I agree to the contribution guidelines.".to_string()
     }
@@ -1166,7 +1166,7 @@ mod tests {
                 }),
                 review_changes_since: Some(ReviewChangesSinceConfig {}),
                 view_all_comments_link: None,
-                acknowledgement: None,
+                contribution_guidelines: None,
             }
         );
     }
@@ -1257,7 +1257,7 @@ mod tests {
                 range_diff: None,
                 review_changes_since: None,
                 view_all_comments_link: None,
-                acknowledgement: None,
+                contribution_guidelines: None,
             }
         );
     }

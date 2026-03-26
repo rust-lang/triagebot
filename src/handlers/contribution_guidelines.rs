@@ -1,4 +1,4 @@
-use crate::config::AcknowledgementConfig;
+use crate::config::ContributionGuidelinesConfig;
 use crate::github::{Event, IssueCommentAction, IssuesAction};
 use crate::handlers::Context;
 use tracing as log;
@@ -16,7 +16,7 @@ enum Trigger<'a> {
 pub(crate) async fn handle(
     ctx: &Context,
     event: &Event,
-    config: &AcknowledgementConfig,
+    config: &ContributionGuidelinesConfig,
 ) -> anyhow::Result<()> {
     // Determine the trigger and get the issue reference.
     let (trigger, issue, sender_login) = match event {
@@ -65,7 +65,7 @@ pub(crate) async fn handle(
     let merged_count = ctx.github.issue_search_count(&query).await?;
     if merged_count > 0 {
         log::debug!(
-            "acknowledgement: {} has {} merged PRs, skipping",
+            "contribution_guidelines: {} has {} merged PRs, skipping",
             author,
             merged_count
         );
@@ -108,7 +108,7 @@ pub(crate) async fn handle(
 
     if acknowledged {
         log::debug!(
-            "acknowledgement: {} already acknowledged on PR #{}",
+            "contribution_guidelines: {} already acknowledged on PR #{}",
             author,
             issue.number
         );
@@ -175,11 +175,14 @@ pub(crate) async fn handle(
     if let Some(node_id) = &issue.node_id {
         if !issue.draft {
             ctx.github.convert_to_draft(node_id).await?;
-            log::info!("acknowledgement: converted PR #{} to draft", issue.number);
+            log::info!(
+                "contribution_guidelines: converted PR #{} to draft",
+                issue.number
+            );
         }
     } else {
         log::warn!(
-            "acknowledgement: no node_id on PR #{}, cannot convert to draft",
+            "contribution_guidelines: no node_id on PR #{}, cannot convert to draft",
             issue.number
         );
     }

@@ -11,7 +11,6 @@ use std::fmt;
 use std::sync::Arc;
 use tracing as log;
 
-mod acknowledgement;
 mod assign;
 mod autolabel;
 mod backport;
@@ -19,6 +18,7 @@ mod bot_pull_requests;
 mod check_commits;
 mod close;
 mod concern;
+mod contribution_guidelines;
 pub mod docs_update;
 mod github_releases;
 mod issue_links;
@@ -235,15 +235,17 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         }
     };
 
-    let acknowledgement = async {
-        if let Some(acknowledgement_config) = config
+    let contribution_guidelines = async {
+        if let Some(config) = config
             .as_ref()
             .ok()
-            .and_then(|c| c.acknowledgement.as_ref())
+            .and_then(|c| c.contribution_guidelines.as_ref())
         {
-            acknowledgement::handle(ctx, event, acknowledgement_config)
+            contribution_guidelines::handle(ctx, event, config)
                 .await
-                .map_err(|e| HandlerError::Other(e.context("acknowledgement handler failed")))
+                .map_err(|e| {
+                    HandlerError::Other(e.context("contribution_guidelines handler failed"))
+                })
         } else {
             Ok(())
         }
@@ -264,7 +266,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         review_changes_since,
         github_releases,
         merge_conflicts,
-        acknowledgement,
+        contribution_guidelines,
     ) = futures::join!(
         prune_gh_comments,
         check_commits,
@@ -280,7 +282,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         review_changes_since,
         github_releases,
         merge_conflicts,
-        acknowledgement,
+        contribution_guidelines,
     );
 
     for result in [
@@ -298,7 +300,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         review_changes_since,
         github_releases,
         merge_conflicts,
-        acknowledgement,
+        contribution_guidelines,
     ] {
         if let Err(e) = result {
             errors.push(e);
