@@ -17,6 +17,13 @@ async function generateSelfContainedHTML() {
   // Clone current DOM into a new document
   const doc = new DOMParser().parseFromString(document.documentElement.outerHTML, 'text/html');
 
+  // Reset all review threads expanded state to their default
+  const dataExpandable = doc.querySelectorAll('[data-expandable]');
+  dataExpandable.forEach(el => {
+    const attrValue = el.getAttribute('data-expandable');
+    el.open = (attrValue === 'true');
+  });
+  
   // Remove all elements with the data-to-remove-on-export attribute
   const dataElementsToRemove = doc.querySelectorAll('[data-to-remove-on-export]');
   dataElementsToRemove.forEach(el => el.remove());

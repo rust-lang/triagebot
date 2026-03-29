@@ -29,9 +29,9 @@ use crate::{
     utils::{immutable_headers, is_known_and_public_repo},
 };
 
-pub const STYLE_URL: &str = "/gh-comments/style@0.0.5.css";
+pub const STYLE_URL: &str = "/gh-comments/style@0.0.6.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
-pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.1.js";
+pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.2.js";
 
 pub const GH_COMMENTS_CACHE_CAPACITY_BYTES: usize = 35 * 1024 * 1024; // 35 Mb
 
@@ -184,6 +184,16 @@ pub async fn gh_comments(
   <script nonce="triagebot-gh-comments">
     const ISSUE_ID = {issue_id};
     document.addEventListener('DOMContentLoaded', function() {{
+      document.getElementById('gh-comments-expand-threads-btn').addEventListener('click', () => {{
+        document.querySelectorAll('[data-expandable]').forEach(details => {{
+          details.open = true;
+        }});
+      }});
+      document.getElementById('gh-comments-collapse-threads-btn').addEventListener('click', () => {{
+        document.querySelectorAll('[data-expandable]').forEach(details => {{
+          details.open = false;
+        }});
+      }});
       document.querySelectorAll('[data-utc-time]').forEach(element => {{
         const utcString = element.getAttribute('data-utc-time');
         const utcDate = new Date(utcString);
@@ -244,6 +254,14 @@ pub async fn gh_comments(
     writeln!(
         html,
         r#"<button id="gh-comments-export-btn" data-to-remove-on-export>Export</button>"#
+    )?;
+    writeln!(
+        html,
+        r#"<button id="gh-comments-expand-threads-btn">Expand threads</button>"#
+    )?;
+    writeln!(
+        html,
+        r#"<button id="gh-comments-collapse-threads-btn">Collapse threads</button>"#
     )?;
     writeln!(html, "</div>")?;
 
@@ -678,6 +696,7 @@ fn write_review_thread_as_html(
     pulldown_cmark_escape::escape_html(&mut path_html, &path)?;
 
     let open = if is_collapsed { "" } else { "open" };
+    let default_open = !is_collapsed;
     let status = if is_outdated {
         " · outdated"
     } else if is_resolved {
@@ -689,7 +708,7 @@ fn write_review_thread_as_html(
     writeln!(
         buffer,
         r###"
-      <details class="review-thread" {open}>
+      <details class="review-thread" data-expandable="{default_open}" {open}>
         <summary class="review-thread-header">
             <span>{path_html}{status}</span>
         </summary>
