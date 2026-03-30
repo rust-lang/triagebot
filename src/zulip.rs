@@ -2,9 +2,6 @@ pub mod api;
 pub mod client;
 mod commands;
 
-use crate::db::notifications::{
-    self, Identifier, add_metadata, delete_ping, move_indices, record_ping,
-};
 use crate::db::review_prefs::{
     ReviewPreferences, RotationMode, get_review_prefs, get_review_prefs_batch,
     upsert_repo_review_prefs, upsert_team_review_prefs, upsert_user_review_prefs,
@@ -260,16 +257,6 @@ async fn handle_command<'a>(
         tracing::info!("command parsed to {cmd:?} (impersonated: {impersonated})");
 
         let output = match &cmd {
-            ChatCommand::Acknowledge { identifier } => {
-                acknowledge(&ctx, gh_id, identifier.into()).await
-            }
-            ChatCommand::Add { url, description } => {
-                add_notification(&ctx, gh_id, url, &description.join(" ")).await
-            }
-            ChatCommand::Move { from, to } => move_notification(&ctx, gh_id, *from, *to).await,
-            ChatCommand::Meta { index, description } => {
-                add_meta_notification(&ctx, gh_id, *index, &description.join(" ")).await
-            }
             ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
             ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
             ChatCommand::Work(cmd) => workqueue_commands(&ctx, gh_id, cmd).await,
@@ -1099,11 +1086,7 @@ enum ImpersonationMode {
 /// Returns the impersonation mode of the command.
 fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
     match cmd {
-        ChatCommand::Acknowledge { .. }
-        | ChatCommand::Add { .. }
-        | ChatCommand::Move { .. }
-        | ChatCommand::Meta { .. }
-        | ChatCommand::DocsUpdate
+        ChatCommand::DocsUpdate
         | ChatCommand::PingGoals(_)
         | ChatCommand::UserInfo { .. }
         | ChatCommand::TeamStats { .. }
@@ -1530,112 +1513,6 @@ impl UpdateMessageApiRequest<'_> {
                 self.content,
             )
             .await
-    }
-}
-
-async fn acknowledge(
-    ctx: &Context,
-    gh_id: u64,
-    ident: Identifier<'_>,
-) -> anyhow::Result<Option<String>> {
-    let mut db = ctx.db.get().await;
-    let deleted = delete_ping(&mut db, gh_id, ident)
-        .await
-        .map_err(|e| format_err!("Failed to acknowledge {ident:?}: {e:?}."))?;
-
-    let resp = if deleted.is_empty() {
-        format!("No notifications matched `{ident:?}`, so none were deleted.")
-    } else {
-        let mut resp = String::from("Acknowledged:\n");
-        for deleted in deleted {
-            _ = writeln!(
-                resp,
-                " * [{}]({}){}",
-                deleted
-                    .short_description
-                    .as_deref()
-                    .unwrap_or(&deleted.origin_url),
-                deleted.origin_url,
-                deleted
-                    .metadata
-                    .map_or(String::new(), |m| format!(" ({m})")),
-            );
-        }
-        resp
-    };
-
-    Ok(Some(resp))
-}
-
-async fn add_notification(
-    ctx: &Context,
-    gh_id: u64,
-    url: &str,
-    description: &str,
-) -> anyhow::Result<Option<String>> {
-    let description = description.trim();
-    let description = if description.is_empty() {
-        None
-    } else {
-        Some(description.to_string())
-    };
-    match record_ping(
-        &*ctx.db.get().await,
-        &notifications::Notification {
-            user_id: gh_id,
-            origin_url: url.to_owned(),
-            origin_html: String::new(),
-            short_description: description,
-            time: chrono::Utc::now().into(),
-            team_name: None,
-        },
-    )
-    .await
-    {
-        Ok(()) => Ok(Some("Created!".to_string())),
-        Err(e) => Err(format_err!("Failed to create: {e:?}")),
-    }
-}
-
-async fn add_meta_notification(
-    ctx: &Context,
-    gh_id: u64,
-    idx: u32,
-    description: &str,
-) -> anyhow::Result<Option<String>> {
-    let idx = idx
-        .checked_sub(1)
-        .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
-    let description = if description.is_empty() {
-        None
-    } else {
-        Some(description.to_string())
-    };
-    let mut db = ctx.db.get().await;
-    match add_metadata(&mut db, gh_id, idx, description.as_deref()).await {
-        Ok(()) => Ok(Some("Added metadata!".to_string())),
-        Err(e) => Err(format_err!("Failed to add: {e:?}")),
-    }
-}
-
-async fn move_notification(
-    ctx: &Context,
-    gh_id: u64,
-    from: u32,
-    to: u32,
-) -> anyhow::Result<Option<String>> {
-    let from = from
-        .checked_sub(1)
-        .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
-    let to = to
-        .checked_sub(1)
-        .ok_or_else(|| anyhow::anyhow!("1-based indexes"))?;
-    match move_indices(&mut *ctx.db.get().await, gh_id, from, to).await {
-        Ok(()) => {
-            // to 1-base indices
-            Ok(Some(format!("Moved {} to {}.", from + 1, to + 1)))
-        }
-        Err(e) => Err(format_err!("Failed to move: {e:?}.")),
     }
 }
 
