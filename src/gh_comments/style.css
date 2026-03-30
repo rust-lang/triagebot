@@ -49,6 +49,7 @@ body {
 
 .meta-header, .meta-links {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     margin-bottom: 1rem;
     gap: 9px;
