@@ -215,7 +215,50 @@ pub async fn gh_comments(
   </script>
 </head>
 <body>
-<div class="comments-container">
+"###
+    )?;
+
+    if let Some(review_threads) = issue_with_comments.review_threads.as_ref() {
+        write!(
+            html,
+            r###"
+            <input type="checkbox" id="toc-toggle" class="toc-toggle toc-desktop">
+
+            <label for="toc-toggle" class="toc-toggle-label toc-desktop">
+                <span></span>
+            </label>
+
+            <nav class="toc toc-desktop">
+                <div class="toc-header">Review Threads</div>
+                <ul class="toc-list">"###
+        )?;
+
+        for (number, rt) in review_threads.nodes.iter().enumerate() {
+            let first_comment = &rt.comments.nodes[0];
+            let id = extract_id_from_github_link(&first_comment.url);
+            let author = &first_comment
+                .author
+                .as_ref()
+                .unwrap_or(&GHOST_ACCOUNT)
+                .login;
+            let dt_human = first_comment.created_at.to_rfc2822();
+            let dt_rfc3339 = first_comment.created_at.to_rfc3339();
+            write!(
+                html,
+                r###"<li>
+                    <a href="#{id}" class="toc-link">
+                        <span>{author} - #{number}</span> <span data-utc-time="{dt_rfc3339}">{dt_human}</span>
+                    </a>
+                </li>"###
+            )?;
+        }
+
+        write!(html, r###"</ul></nav>"###)?;
+    }
+
+    write!(
+        html,
+        r###"<main class="comments-container">
 <h1 class="title"><bdi class="markdown-body">{title_html}</bdi> <a class="github-link" href="https://github.com/{owner}/{repo}/issues/{issue_id}">{owner}/{repo}#{issue_id}</a></h1>
 "###,
     )?;
@@ -417,7 +460,7 @@ pub async fn gh_comments(
         }
     }
 
-    writeln!(html, r###"</div></body>"###).unwrap();
+    writeln!(html, r###"</main></body>"###).unwrap();
 
     let mut headers = HeaderMap::new();
     headers.insert(

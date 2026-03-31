@@ -18,6 +18,7 @@
     --fg-muted: #57606a;
     --fg-accent: #0969da;
     --border-default: #d0d7de;
+    --toc-width: min(330px, 75vw);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -37,14 +38,19 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
     background: var(--bg-default);
     color: var(--fg-default);
-    margin: 20px;
     display: flex;
-    justify-content: center;
+    padding: 0;
+    margin: 0;
 }
 
 .comments-container {
     width: 100%;
     max-width: 980px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1.25em;
+    padding-right: 1.25rem;
+    box-sizing: border-box;
 }
 
 .meta-header, .meta-links {
@@ -301,6 +307,94 @@ details:not([open]) > .review-thread-header {
     text-decoration: underline;
 }
 
+/* === Table of content === */
+.toc {
+    width: var(--toc-width);
+    height: 100vh;
+    border-right: 1px solid var(--border-default);
+    background: var(--bg-default);
+    position: sticky;
+    top: 0;
+    margin-left: calc(-1 * var(--toc-width) - 1px); /* Hidden by default */
+    transition: margin-left 0.3s;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    z-index: 90;
+}
+
+.toc-header {
+    padding: 15px;
+    font-weight: 800;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+}
+
+.toc-link {
+    text-decoration: none;
+    color: var(--fg-default);
+}
+
+.toc li {
+    border-bottom: 1px solid var(--border-default);
+    padding: 0.5rem;
+}
+
+.toc span[data-utc-time] {
+    color: gray;
+    font-size: 0.9rem;
+}
+
+.toc-toggle {
+    display: none;
+}
+
+/* When checkbox is checked, move the sidebar toggle */
+.toc-toggle:checked ~ .toc-toggle-label {
+    transform: translateX(var(--toc-width));
+}
+
+/* When checkbox is checked, move the sidebar and content */
+.toc-toggle:checked ~ .toc {
+    margin-left: 0;
+}
+
+.toc-toggle-label {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 100;
+    cursor: pointer;
+    display: block;
+    width: 14px;
+    height: 12px;
+    transition: all 0.3s;
+}
+
+/* Hamburger Bars */
+.toc-toggle-label span, 
+.toc-toggle-label span::before, 
+.toc-toggle-label span::after {
+    display: block;
+    background: var(--fg-default);
+    height: 2px;
+    width: 100%;
+    position: absolute;
+}
+
+.toc-toggle-label span { top: 5px; }                       /* Middle bar */
+.toc-toggle-label span::before { content: ""; top: -5px; } /* Top bar */
+.toc-toggle-label span::after { content: ""; top: 5px; }   /* Bottom bar */
+
 /* === Responsive === */
 @media (max-width: 640px) {
     /* mobile layout */
@@ -322,6 +416,12 @@ details:not([open]) > .review-thread-header {
 
     .review-thread {
         margin-left: 40px;
+    }
+}
+
+@media (max-width: 1320px) {
+    .toc-desktop {
+        display: none;
     }
 }
 
