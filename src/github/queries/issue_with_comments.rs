@@ -16,8 +16,8 @@ pub struct GitHubIssueWithComments {
     pub author: Option<GitHubSimplifiedAuthor>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
-    #[serde(rename = "updatedAt")]
-    pub updated_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "lastEditedAt")]
+    pub last_edited_at: Option<chrono::DateTime<chrono::Utc>>,
     #[serde(rename = "reactionGroups")]
     pub reactions: Vec<GitHubGraphQlReactionGroup>,
     pub comments: GitHubGraphQlComments,
@@ -53,8 +53,8 @@ pub struct GitHubGraphQlComment {
     pub author: Option<GitHubSimplifiedAuthor>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
-    #[serde(rename = "updatedAt")]
-    pub updated_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "lastEditedAt")]
+    pub last_edited_at: Option<chrono::DateTime<chrono::Utc>>,
     #[serde(rename = "isMinimized")]
     pub is_minimized: bool,
     #[serde(rename = "minimizedReason")]
@@ -101,8 +101,8 @@ pub struct GitHubGraphQlReviewThreadComment {
     pub author: Option<GitHubSimplifiedAuthor>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
-    #[serde(rename = "updatedAt")]
-    pub updated_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "lastEditedAt")]
+    pub last_edited_at: Option<chrono::DateTime<chrono::Utc>>,
     #[serde(rename = "bodyHTML")]
     pub body_html: String,
     #[serde(rename = "diffHunk")]
@@ -131,8 +131,8 @@ pub struct GitHubGraphQlReview {
     pub state: GitHubReviewState,
     #[serde(rename = "submittedAt")]
     pub submitted_at: chrono::DateTime<chrono::Utc>,
-    #[serde(rename = "updatedAt")]
-    pub updated_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "lastEditedAt")]
+    pub last_edited_at: Option<chrono::DateTime<chrono::Utc>>,
     #[serde(rename = "bodyHTML")]
     pub body_html: String,
     #[serde(rename = "isMinimized")]
@@ -243,6 +243,7 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
         bodyHTML
         createdAt
         updatedAt
+        lastEditedAt
         author {
           login
           avatarUrl
@@ -260,7 +261,7 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
               avatarUrl
             }
             createdAt
-            updatedAt
+            lastEditedAt
             isMinimized
             minimizedReason
             bodyHTML
@@ -285,7 +286,7 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
         titleHTML
         bodyHTML
         createdAt
-        updatedAt
+        lastEditedAt
         author {
           login
           avatarUrl
@@ -303,7 +304,7 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
               avatarUrl
             }
             createdAt
-            updatedAt
+            lastEditedAt
             isMinimized
             minimizedReason
             bodyHTML
@@ -337,7 +338,7 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
                   avatarUrl
                 }
                 createdAt
-                updatedAt
+                lastEditedAt
                 bodyHTML
                 diffHunk
                 url
@@ -367,7 +368,7 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             id
             state
             submittedAt
-            updatedAt
+            lastEditedAt
             isMinimized
             minimizedReason
             bodyHTML

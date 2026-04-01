@@ -300,7 +300,7 @@ pub async fn gh_comments(
             .as_ref()
             .unwrap_or(&GHOST_ACCOUNT),
         &issue_with_comments.created_at,
-        &issue_with_comments.updated_at,
+        &issue_with_comments.last_edited_at,
         &issue_with_comments.reactions,
         false,
         None,
@@ -348,7 +348,7 @@ pub async fn gh_comments(
                         &comment.url,
                         comment.author.as_ref().unwrap_or(&GHOST_ACCOUNT),
                         &comment.created_at,
-                        &comment.updated_at,
+                        &comment.last_edited_at,
                         &comment.reactions,
                         comment.is_minimized,
                         comment.minimized_reason.as_deref(),
@@ -364,7 +364,7 @@ pub async fn gh_comments(
                         review.author.as_ref().unwrap_or(&GHOST_ACCOUNT),
                         review.state,
                         &review.submitted_at,
-                        &review.updated_at,
+                        &review.last_edited_at,
                         &review.reactions,
                         review.is_minimized,
                         review.minimized_reason.as_deref(),
@@ -409,7 +409,7 @@ pub async fn gh_comments(
                 &comment.url,
                 comment.author.as_ref().unwrap_or(&GHOST_ACCOUNT),
                 &comment.created_at,
-                &comment.updated_at,
+                &comment.last_edited_at,
                 &comment.reactions,
                 comment.is_minimized,
                 comment.minimized_reason.as_deref(),
@@ -465,7 +465,7 @@ fn write_comment_as_html(
     comment_url: &str,
     author: &GitHubSimplifiedAuthor,
     created_at: &chrono::DateTime<Utc>,
-    updated_at: &chrono::DateTime<Utc>,
+    last_edited_at: &Option<chrono::DateTime<Utc>>,
     reaction_groups: &[GitHubGraphQlReactionGroup],
     minimized: bool,
     minimized_reason: Option<&str>,
@@ -512,7 +512,7 @@ fn write_comment_as_html(
         write_reaction_groups_as_html(buffer, reaction_groups)?;
         writeln!(buffer, "</details></div>")?;
     } else {
-        let edited = if created_at != updated_at {
+        let edited = if last_edited_at.is_some() {
             "<span> · edited</span>"
         } else {
             ""
@@ -565,7 +565,7 @@ fn write_review_as_html(
     author: &GitHubSimplifiedAuthor,
     state: GitHubReviewState,
     submitted_at: &chrono::DateTime<Utc>,
-    updated_at: &chrono::DateTime<Utc>,
+    last_edited_at: &Option<chrono::DateTime<Utc>>,
     reaction_groups: &[GitHubGraphQlReactionGroup],
     minimized: bool,
     minimized_reason: Option<&str>,
@@ -650,7 +650,7 @@ fn write_review_as_html(
             write_reaction_groups_as_html(buffer, reaction_groups)?;
             writeln!(buffer, "</details></div>")?;
         } else {
-            let edited = if submitted_at != updated_at {
+            let edited = if last_edited_at.is_some() {
                 "<span> · edited</span>"
             } else {
                 ""
@@ -733,7 +733,7 @@ fn write_review_thread_as_html(
         let reaction_groups = &*comment.reactions;
         let id = extract_id_from_github_link(comment_url);
 
-        let edited = if comment.created_at != comment.updated_at {
+        let edited = if comment.last_edited_at.is_some() {
             "<span> · edited</span>"
         } else {
             ""
