@@ -243,7 +243,9 @@ pub async fn gh_comments(
         )?;
 
         for (number, rt) in review_threads.nodes.iter().enumerate() {
-            let first_comment = &rt.comments.nodes[0];
+            let Some(first_comment) = rt.comments.nodes.get(0) else {
+                continue;
+            };
             let id = extract_id_from_github_link(&first_comment.url);
             let author = &first_comment
                 .author
@@ -423,11 +425,12 @@ pub async fn gh_comments(
                     )?;
 
                     // Try to print the associated review threads
-                    for review_thread in review_threads
-                        .nodes
-                        .iter()
-                        .filter(|rt| rt.comments.nodes[0].pull_request_review.id == review.id)
-                    {
+                    for review_thread in review_threads.nodes.iter().filter(|rt| {
+                        matches!(
+                            rt.comments.nodes.get(0),
+                            Some(first_comment) if first_comment.pull_request_review.id == review.id
+                        )
+                    }) {
                         write_review_thread_as_html(
                             &mut html,
                             &review_thread.path,
