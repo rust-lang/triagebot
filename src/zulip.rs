@@ -357,7 +357,15 @@ async fn handle_command<'a>(
                 }
                 StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
                 StreamCommand::Backport(args) => {
-                    accept_decline_backport(&ctx, message_data, &args).await
+                    let _ = match accept_decline_backport(&ctx, message_data, &args).await {
+                        // give user feedback
+                        Ok(_) => ctx.zulip.add_reaction(message_data.id, "check").await,
+                        Err(err) => {
+                            log::error!("Could not handle backport #{}: {:?}", args.pr_num, err);
+                            ctx.zulip.add_reaction(message_data.id, "scream").await
+                        }
+                    };
+                    Ok(None)
                 }
                 StreamCommand::UserInfo {
                     username,
