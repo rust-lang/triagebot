@@ -330,6 +330,8 @@ details:not([open]) > .review-thread-header {
     text-transform: uppercase;
     letter-spacing: 0.05em;
     border-bottom: 1px solid var(--border-default);
+    display: flex;
+    justify-content: space-between;
 }
 
 .toc-list {

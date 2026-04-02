@@ -194,6 +194,12 @@ pub async fn gh_comments(
           details.open = false;
         }});
       }});
+      document.getElementById('gh-comments-reverse-toc-order-btn').addEventListener('click', () => {{
+        var tocList = document.getElementById('toc-list');
+        for (var i = 1; i < tocList.childNodes.length; i++) {{
+          tocList.insertBefore(tocList.childNodes[i], tocList.firstChild);
+        }}
+      }});
       document.querySelectorAll('[data-utc-time]').forEach(element => {{
         const utcString = element.getAttribute('data-utc-time');
         const utcDate = new Date(utcString);
@@ -229,8 +235,11 @@ pub async fn gh_comments(
             </label>
 
             <nav class="toc toc-desktop">
-                <div class="toc-header">Review Threads</div>
-                <ul class="toc-list">"###
+                <div class="toc-header">
+                    Review Threads
+                    <button id="gh-comments-reverse-toc-order-btn">⇅</button>
+                </div>
+                <ul class="toc-list" id="toc-list">"###
         )?;
 
         for (number, rt) in review_threads.nodes.iter().enumerate() {
