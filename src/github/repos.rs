@@ -457,6 +457,23 @@ impl GithubClient {
             anyhow::bail!("expected issue count, got {data}");
         }
     }
+
+    /// Converts a pull request to draft state using the GraphQL API.
+    ///
+    /// `pull_request_id` is the GraphQL node ID of the pull request
+    /// (available as `Issue::node_id` from webhook payloads).
+    pub async fn convert_to_draft(&self, pull_request_id: &str) -> anyhow::Result<()> {
+        self.graphql_query(
+            "mutation($id: ID!) {
+                convertPullRequestToDraft(input: {pullRequestId: $id}) {
+                    clientMutationId
+                }
+            }",
+            serde_json::json!({"id": pull_request_id}),
+        )
+        .await?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]

@@ -21,6 +21,12 @@ use crate::github::GithubCommit;
 #[derive(Debug, serde::Deserialize)]
 pub struct Issue {
     pub number: u64,
+    /// The GraphQL node ID for this issue or pull request.
+    ///
+    /// For PR webhook events, this is the PR's node ID (suitable for
+    /// GraphQL mutations like `convertPullRequestToDraft`).
+    #[serde(default)]
+    pub node_id: Option<String>,
     #[serde(deserialize_with = "opt_string")]
     pub body: String,
     pub created_at: chrono::DateTime<Utc>,

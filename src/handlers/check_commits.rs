@@ -371,7 +371,7 @@ r#"This is warning 2.
 r#":warning: **Warning** :warning:
 
 * This is warning 1.
-    
+
     Look at this list:
      - 12
       - 13
@@ -419,6 +419,7 @@ r#":warning: **Warning** :warning:
                 milestone: None,
                 mergeable: None,
                 author_association: octocrab::models::AuthorAssociation::Contributor,
+                node_id: None,
             },
             changes: None,
             before: None,

@@ -18,6 +18,7 @@ mod bot_pull_requests;
 mod check_commits;
 mod close;
 mod concern;
+mod contribution_guidelines;
 pub mod docs_update;
 mod github_releases;
 mod issue_links;
@@ -227,6 +228,22 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         }
     };
 
+    let contribution_guidelines = async {
+        if let Some(config) = config
+            .as_ref()
+            .ok()
+            .and_then(|c| c.contribution_guidelines.as_ref())
+        {
+            contribution_guidelines::handle(ctx, event, config)
+                .await
+                .map_err(|e| {
+                    HandlerError::Other(e.context("contribution_guidelines handler failed"))
+                })
+        } else {
+            Ok(())
+        }
+    };
+
     let (
         prune_gh_comments,
         check_commits,
@@ -241,6 +258,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         review_changes_since,
         github_releases,
         merge_conflicts,
+        contribution_guidelines,
     ) = futures::join!(
         prune_gh_comments,
         check_commits,
@@ -255,6 +273,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         review_changes_since,
         github_releases,
         merge_conflicts,
+        contribution_guidelines,
     );
 
     for result in [
@@ -271,6 +290,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         review_changes_since,
         github_releases,
         merge_conflicts,
+        contribution_guidelines,
     ] {
         if let Err(e) = result {
             errors.push(e);
