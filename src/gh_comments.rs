@@ -29,7 +29,7 @@ use crate::{
     utils::{immutable_headers, is_known_and_public_repo},
 };
 
-pub const STYLE_URL: &str = "/gh-comments/style@0.0.6.css";
+pub const STYLE_URL: &str = "/gh-comments/style@0.0.7.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
 pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.2.js";
 
@@ -194,6 +194,12 @@ pub async fn gh_comments(
           details.open = false;
         }});
       }});
+      document.getElementById('gh-comments-reverse-toc-order-btn').addEventListener('click', () => {{
+        var tocList = document.getElementById('toc-list');
+        for (var i = 1; i < tocList.childNodes.length; i++) {{
+          tocList.insertBefore(tocList.childNodes[i], tocList.firstChild);
+        }}
+      }});
       document.querySelectorAll('[data-utc-time]').forEach(element => {{
         const utcString = element.getAttribute('data-utc-time');
         const utcDate = new Date(utcString);
@@ -215,7 +221,55 @@ pub async fn gh_comments(
   </script>
 </head>
 <body>
-<div class="comments-container">
+"###
+    )?;
+
+    if let Some(review_threads) = issue_with_comments.review_threads.as_ref() {
+        write!(
+            html,
+            r###"
+            <input type="checkbox" id="toc-toggle" class="toc-toggle toc-desktop">
+
+            <label for="toc-toggle" class="toc-toggle-label toc-desktop">
+                <span></span>
+            </label>
+
+            <nav class="toc toc-desktop">
+                <div class="toc-header">
+                    Review Threads
+                    <button id="gh-comments-reverse-toc-order-btn">⇅</button>
+                </div>
+                <ul class="toc-list" id="toc-list">"###
+        )?;
+
+        for (number, rt) in review_threads.nodes.iter().enumerate() {
+            let Some(first_comment) = rt.comments.nodes.get(0) else {
+                continue;
+            };
+            let id = extract_id_from_github_link(&first_comment.url);
+            let author = &first_comment
+                .author
+                .as_ref()
+                .unwrap_or(&GHOST_ACCOUNT)
+                .login;
+            let dt_human = first_comment.created_at.to_rfc2822();
+            let dt_rfc3339 = first_comment.created_at.to_rfc3339();
+            write!(
+                html,
+                r###"<li>
+                    <a href="#{id}" class="toc-link">
+                        <span>{author} - #{number}</span> <span data-utc-time="{dt_rfc3339}">{dt_human}</span>
+                    </a>
+                </li>"###
+            )?;
+        }
+
+        write!(html, r###"</ul></nav>"###)?;
+    }
+
+    write!(
+        html,
+        r###"<main class="comments-container">
 <h1 class="title"><bdi class="markdown-body">{title_html}</bdi> <a class="github-link" href="https://github.com/{owner}/{repo}/issues/{issue_id}">{owner}/{repo}#{issue_id}</a></h1>
 "###,
     )?;
@@ -371,11 +425,12 @@ pub async fn gh_comments(
                     )?;
 
                     // Try to print the associated review threads
-                    for review_thread in review_threads
-                        .nodes
-                        .iter()
-                        .filter(|rt| rt.comments.nodes[0].pull_request_review.id == review.id)
-                    {
+                    for review_thread in review_threads.nodes.iter().filter(|rt| {
+                        matches!(
+                            rt.comments.nodes.get(0),
+                            Some(first_comment) if first_comment.pull_request_review.id == review.id
+                        )
+                    }) {
                         write_review_thread_as_html(
                             &mut html,
                             &review_thread.path,
@@ -417,7 +472,7 @@ pub async fn gh_comments(
         }
     }
 
-    writeln!(html, r###"</div></body>"###).unwrap();
+    writeln!(html, r###"</main></body>"###).unwrap();
 
     let mut headers = HeaderMap::new();
     headers.insert(
