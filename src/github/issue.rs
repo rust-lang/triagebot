@@ -643,6 +643,10 @@ impl Issue {
 pub struct Comment {
     pub id: u64,
     pub node_id: String,
+    #[serde(default)]
+    pub in_reply_to_id: Option<u64>,
+    #[serde(default)]
+    pub pull_request_review_id: Option<u64>,
     #[serde(deserialize_with = "opt_string")]
     pub body: String,
     pub html_url: String,
