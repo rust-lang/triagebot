@@ -237,6 +237,28 @@ impl Issue {
         Ok(())
     }
 
+    pub async fn edit_review_comment(
+        &self,
+        client: &GithubClient,
+        id: u64,
+        new_body: &str,
+    ) -> anyhow::Result<Comment> {
+        let comment_url = format!("{}/pulls/comments/{}", self.repository().url(client), id);
+        #[derive(serde::Serialize)]
+        struct EditComment<'a> {
+            body: &'a str,
+        }
+        let comment = client
+            .json(
+                client
+                    .patch(&comment_url)
+                    .json(&EditComment { body: new_body }),
+            )
+            .await
+            .context("failed to edit review comment")?;
+        Ok(comment)
+    }
+
     pub async fn remove_labels(
         &self,
         client: &GithubClient,
