@@ -4,7 +4,7 @@ use anyhow::bail;
 
 use crate::{
     config::RenderedLinkConfig,
-    github::{Event, IssuesAction, IssuesEvent},
+    github::{Event, IssuesAction, IssuesEvent, PullRequestFileStatus},
     handlers::Context,
 };
 
@@ -51,6 +51,15 @@ async fn add_rendered_link(
                         .exclude_files
                         .iter()
                         .any(|tf| f.filename.starts_with(tf))
+            })
+            .filter(|f| match f.status {
+                PullRequestFileStatus::Added
+                | PullRequestFileStatus::Modified
+                | PullRequestFileStatus::Changed
+                | PullRequestFileStatus::Renamed => true,
+                PullRequestFileStatus::Removed
+                | PullRequestFileStatus::Copied
+                | PullRequestFileStatus::Unchanged => false,
             })
             // Sort the relavant files by the total number of lines changed, as to
             // improve our guess for the relevant file to show the link to.
