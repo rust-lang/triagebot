@@ -774,11 +774,24 @@ impl Issue {
 #[derive(Debug, serde::Deserialize)]
 pub struct PullRequestFile {
     pub sha: String,
+    pub status: PullRequestFileStatus,
     pub filename: String,
     pub blob_url: String,
     pub additions: u64,
     pub deletions: u64,
     pub changes: u64,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PullRequestFileStatus {
+    Added,
+    Removed,
+    Modified,
+    Renamed,
+    Copied,
+    Changed,
+    Unchanged,
 }
 
 impl Issue {
