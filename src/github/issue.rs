@@ -632,7 +632,7 @@ impl Issue {
         let review = client
             .json(client.get(&review_url))
             .await
-            .context("unable to fetch review")?;
+            .with_context(|| format!("unable to fetch review ({review_id})"))?;
         Ok(review)
     }
 }
@@ -663,10 +663,15 @@ pub struct Comment {
 #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum PullRequestReviewState {
+    #[serde(alias = "APPROVED")]
     Approved,
+    #[serde(alias = "CHANGES_REQUESTED")]
     ChangesRequested,
+    #[serde(alias = "COMMENTED")]
     Commented,
+    #[serde(alias = "DISMISSED")]
     Dismissed,
+    #[serde(alias = "PENDING")]
     Pending,
 }
 
