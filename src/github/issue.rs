@@ -237,6 +237,28 @@ impl Issue {
         Ok(())
     }
 
+    pub async fn edit_review_comment(
+        &self,
+        client: &GithubClient,
+        id: u64,
+        new_body: &str,
+    ) -> anyhow::Result<Comment> {
+        let comment_url = format!("{}/pulls/comments/{}", self.repository().url(client), id);
+        #[derive(serde::Serialize)]
+        struct EditComment<'a> {
+            body: &'a str,
+        }
+        let comment = client
+            .json(
+                client
+                    .patch(&comment_url)
+                    .json(&EditComment { body: new_body }),
+            )
+            .await
+            .context("failed to edit review comment")?;
+        Ok(comment)
+    }
+
     pub async fn remove_labels(
         &self,
         client: &GithubClient,
@@ -596,6 +618,23 @@ impl Issue {
             .await?;
         Ok(())
     }
+
+    pub async fn get_review(
+        &self,
+        client: &GithubClient,
+        review_id: u64,
+    ) -> anyhow::Result<Comment> {
+        let review_url = format!(
+            "{}/pulls/{}/reviews/{review_id}",
+            self.repository().url(client),
+            self.number,
+        );
+        let review = client
+            .json(client.get(&review_url))
+            .await
+            .context("unable to fetch review")?;
+        Ok(review)
+    }
 }
 
 // Comments
@@ -604,6 +643,10 @@ impl Issue {
 pub struct Comment {
     pub id: u64,
     pub node_id: String,
+    #[serde(default)]
+    pub in_reply_to_id: Option<u64>,
+    #[serde(default)]
+    pub pull_request_review_id: Option<u64>,
     #[serde(deserialize_with = "opt_string")]
     pub body: String,
     pub html_url: String,
