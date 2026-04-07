@@ -49,6 +49,12 @@ pub(crate) async fn handle(
             ..
         },
     ) = event
+        && (
+            // review
+            event.comment.pr_review_state.is_some()
+            // review comments
+            || event.comment.pull_request_review_id.is_some()
+        )
     {
         let issue_repo = event.issue.repository();
         let pr_num = event.issue.number;
@@ -58,8 +64,7 @@ pub(crate) async fn handle(
 
         let link = format!("https://{host}/gh-changes-since/{issue_repo}/{pr_num}/{base}..{head}");
 
-        if event.comment.pull_request_review_id.is_none() && event.comment.pr_review_state.is_some()
-        {
+        if event.comment.pr_review_state.is_some() {
             // this is a review (not a review comment)
 
             {
