@@ -37,10 +37,12 @@ pub(crate) async fn handle(
     if let Event::IssueComment(
         event @ IssueCommentEvent {
             action: IssueCommentAction::Created,
-            issue: Issue {
-                pull_request: Some(_),
-                ..
-            },
+            issue:
+                Issue {
+                    pull_request: Some(_),
+                    merged: false,
+                    ..
+                },
             comment:
                 Comment {
                     in_reply_to_id: None,
