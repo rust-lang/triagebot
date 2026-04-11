@@ -965,7 +965,6 @@ impl IssueRepository {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::Label;
@@ -973,13 +972,19 @@ mod tests {
     #[test]
     fn test_case_insensitive_label_matching() {
         let issue_labels = vec![
-            Label { name: "E-needs-mcve".to_string() },
-            Label { name: "T-compiler".to_string() },
+            Label {
+                name: "E-needs-mcve".to_string(),
+            },
+            Label {
+                name: "T-compiler".to_string(),
+            },
         ];
 
         // Simulate what remove_labels does with the fix
         let to_remove = vec![
-            Label { name: "e-needs-mcve".to_string() }, // lowercase version
+            Label {
+                name: "e-needs-mcve".to_string(),
+            }, // lowercase version
         ];
 
         let matched: Vec<Label> = to_remove
@@ -992,6 +997,11 @@ mod tests {
             })
             .collect();
 
-        assert_eq!(matched, vec![Label { name: "E-needs-mcve".to_string() }]);
+        assert_eq!(
+            matched,
+            vec![Label {
+                name: "E-needs-mcve".to_string()
+            }]
+        );
     }
 }
