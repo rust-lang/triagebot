@@ -267,11 +267,16 @@ impl Issue {
         log::info!("remove_labels from {}: {:?}", self.global_id(), labels);
 
         // Don't try to remove labels not already present on this issue.
+        // Use case-insensitive comparison to match GitHub's behavior when adding labels.
         let labels = labels
             .into_iter()
-            .filter(|l| self.labels().contains(l))
+            .filter_map(|l| {
+                self.labels()
+                    .iter()
+                    .find(|existing| existing.name.to_lowercase() == l.name.to_lowercase())
+                    .cloned()
+            })
             .collect::<Vec<_>>();
-
         log::info!(
             "remove_labels: {} filtered to {:?}",
             self.global_id(),
