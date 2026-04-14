@@ -138,7 +138,7 @@ pub(crate) async fn handle(
                 // parent review is empty, let's add the link to the review comment instead
 
                 let new_body = format!(
-                    "*[View changes since the review]({link})*\n\n{}",
+                    "{}\n\n*[View changes since the review]({link})*",
                     event.comment.body
                 );
 
