@@ -258,6 +258,11 @@ impl Issue {
             .context("failed to edit review comment")?;
         Ok(comment)
     }
+    fn find_label_case_insensitive<'a>(labels: &'a [Label], name: &str) -> Option<&'a Label> {
+        labels
+            .iter()
+            .find(|l| l.name.to_lowercase() == name.to_lowercase())
+    }
 
     pub async fn remove_labels(
         &self,
@@ -270,12 +275,7 @@ impl Issue {
         // Use case-insensitive comparison to match GitHub's behavior when adding labels.
         let labels = labels
             .into_iter()
-            .filter_map(|l| {
-                self.labels()
-                    .iter()
-                    .find(|existing| existing.name.to_lowercase() == l.name.to_lowercase())
-                    .cloned()
-            })
+            .filter_map(|l| Self::find_label_case_insensitive(self.labels(), &l.name).cloned())
             .collect::<Vec<_>>();
         log::info!(
             "remove_labels: {} filtered to {:?}",
@@ -967,8 +967,7 @@ impl IssueRepository {
 
 #[cfg(test)]
 mod tests {
-    use super::Label;
-
+    use super::{Issue, Label};
     #[test]
     fn test_case_insensitive_label_matching() {
         let issue_labels = vec![
@@ -980,28 +979,23 @@ mod tests {
             },
         ];
 
-        // Simulate what remove_labels does with the fix
-        let to_remove = vec![
-            Label {
-                name: "e-needs-mcve".to_string(),
-            }, // lowercase version
-        ];
-
-        let matched: Vec<Label> = to_remove
-            .into_iter()
-            .filter_map(|l| {
-                issue_labels
-                    .iter()
-                    .find(|existing| existing.name.to_lowercase() == l.name.to_lowercase())
-                    .cloned()
+        assert_eq!(
+            Issue::find_label_case_insensitive(&issue_labels, "e-needs-mcve"),
+            Some(&Label {
+                name: "E-needs-mcve".to_string()
             })
-            .collect();
+        );
 
         assert_eq!(
-            matched,
-            vec![Label {
+            Issue::find_label_case_insensitive(&issue_labels, "E-NEEDS-MCVE"),
+            Some(&Label {
                 name: "E-needs-mcve".to_string()
-            }]
+            })
+        );
+
+        assert_eq!(
+            Issue::find_label_case_insensitive(&issue_labels, "non-existent"),
+            None
         );
     }
 }
