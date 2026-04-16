@@ -45,6 +45,8 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         .build()
         .expect("Failed to build octocrab.");
 
+    check_ongoing_service_maintenance();
+
     // Loading the workqueue takes ~10-15s on large repos, and it's annoying for local rebuilds.
     // Allow users to opt out of it.
     let skip_loading_workqueue = env::var("SKIP_WORKQUEUE").is_ok_and(|v| v == "1");
@@ -363,6 +365,17 @@ fn spawn_job_runner(ctx: Arc<Context>) {
 /// This helps avoid having random jobs run while testing other things.
 fn is_scheduled_jobs_disabled() -> bool {
     env::var_os("TRIAGEBOT_TEST_DISABLE_JOBS").is_some()
+}
+
+/// Evaluates signals of ongoing service maintenance at startup time
+/// For now we check only whether we are updating Github webhooks
+fn check_ongoing_service_maintenance() {
+    let gh_webhook_secrets =
+        env::var("GITHUB_WEBHOOK_SECRET").expect("GITHUB_WEBHOOK_SECRET is required");
+
+    if gh_webhook_secrets.split(',').count() > 1 {
+        tracing::warn!("ongoing maintenance: multiple github webhooks secrets are set");
+    }
 }
 
 #[tokio::main(flavor = "current_thread")]
