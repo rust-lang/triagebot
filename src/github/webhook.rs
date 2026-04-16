@@ -339,12 +339,20 @@ fn check_payload_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPay
         }
     };
 
-    let mut mac = Hmac::<Sha256>::new_from_slice(
-        std::env::var("GITHUB_WEBHOOK_SECRET")
-            .expect("Missing GITHUB_WEBHOOK_SECRET")
-            .as_bytes(),
-    )
-    .unwrap();
-    mac.update(payload);
-    mac.verify_slice(&signature).map_err(|_| SignedPayloadError)
+    // although the env var name suggests a single webhook secret passed in,
+    // for the sake of easing some operational tasks, internally we support
+    // a comma-separated list of them.
+    let gh_webhook_secrets =
+        std::env::var("GITHUB_WEBHOOK_SECRET").expect("Missing GITHUB_WEBHOOK_SECRET");
+
+    for secret in gh_webhook_secrets.split(',') {
+        let mut mac = Hmac::<Sha256>::new_from_slice(secret.trim().as_bytes()).unwrap();
+
+        mac.update(payload);
+        if mac.verify_slice(&signature).is_ok() {
+            return Ok(());
+        }
+    }
+
+    Err(SignedPayloadError)
 }
