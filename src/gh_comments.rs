@@ -29,7 +29,7 @@ use crate::{
     utils::{immutable_headers, is_known_and_public_repo},
 };
 
-pub const STYLE_URL: &str = "/gh-comments/style@0.0.7.css";
+pub const STYLE_URL: &str = "/gh-comments/style@0.0.8.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
 pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.2.js";
 
@@ -270,7 +270,7 @@ pub async fn gh_comments(
     write!(
         html,
         r###"<main class="comments-container">
-<h1 class="title"><bdi class="markdown-body">{title_html}</bdi> <a class="github-link" href="https://github.com/{owner}/{repo}/issues/{issue_id}">{owner}/{repo}#{issue_id}</a></h1>
+<h1 class="title"><span class="markdown-body">{title_html}</span> <a class="github-link" href="https://github.com/{owner}/{repo}/issues/{issue_id}">{owner}/{repo}#{issue_id}</a></h1>
 "###,
     )?;
 

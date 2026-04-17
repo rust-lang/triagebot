@@ -65,7 +65,7 @@ body {
     margin-bottom: 0;
 }
 
-.title bdi {
+.title .markdown-body {
     font-size: 28px;
     font-weight: 600;
     display: inline-block;
@@ -300,6 +300,7 @@ details:not([open]) > .review-thread-header {
 /* === Markdown overrides === */
 .markdown-body {
     font-size: 14px;
+    overflow-wrap: anywhere;
 }
 
 .markdown-body .user-mention {
