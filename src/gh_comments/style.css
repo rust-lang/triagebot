@@ -19,6 +19,8 @@
     --fg-accent: #0969da;
     --border-default: #d0d7de;
     --toc-width: min(330px, 75vw);
+    --bgColor-success-muted: #46954a26;
+    --bgColor-danger-muted: #e5534b1a;
 }
 
 @media (prefers-color-scheme: dark) {
