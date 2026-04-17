@@ -19,6 +19,8 @@
     --fg-accent: #0969da;
     --border-default: #d0d7de;
     --toc-width: min(330px, 75vw);
+    --bgColor-success-muted: #46954a26;
+    --bgColor-danger-muted: #e5534b1a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -65,7 +67,7 @@ body {
     margin-bottom: 0;
 }
 
-.title bdi {
+.title .markdown-body {
     font-size: 28px;
     font-weight: 600;
     display: inline-block;
@@ -91,6 +93,10 @@ body {
     overflow: hidden;
 }
 
+.comment:target, .review-thread:target {
+    box-shadow: 0 0 0 1px var(--fg-accent);
+}
+
 .review-thread {
     margin-left: 80px;
     margin-bottom: 1rem;
@@ -105,6 +111,9 @@ body {
     padding: 8px 12px;
     font-size: 0.9em;
     color: var(--fg-muted);
+}
+
+.review-thread-header {
     cursor: pointer;
 }
 
@@ -117,13 +126,17 @@ details:not([open]) > .review-thread-header {
     padding: 16px;
 }
 
+.review-thread-comment {
+    position: relative;
+    padding: 0.5rem 1rem;
+}
+
 .review-thread-comment:first-child {
     padding-top: 1rem;
 }
 
-.review-thread-comment {
-    position: relative;
-    padding: 0.5rem 1rem;
+.review-thread-comment:target {
+    box-shadow: inset 0 0 0 1px var(--fg-accent);
 }
 
 .review-header, .review-thread-comment-header {
@@ -199,13 +212,17 @@ details:not([open]) > .review-thread-header {
 }
 
 .author-info a {
-    color: var(--fg-default);
-    font-weight: 600;
+    color: var(--fg-muted);
     text-decoration: none;
 }
 
 .author-info a:hover {
     text-decoration: underline;
+}
+
+.author-info .author-info-name {
+    color: var(--fg-default);
+    font-weight: 600;
 }
 
 .github-link {
@@ -223,6 +240,7 @@ details:not([open]) > .review-thread-header {
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
     width: 2rem;
     height: 2rem;
     border-radius: 50%;
@@ -278,12 +296,14 @@ details:not([open]) > .review-thread-header {
 .reaction {
     border-radius: 100px;
     border: 0.00625rem solid var(--border-default);
+    background-color: transparent;
     padding: 5px 9px;
     font-size: 13px;
 }
 
 .reaction .reaction-number {
     margin-left: 0.35rem;
+    color: var(--fg-muted);
 }
 
 /* === Tab links === */
@@ -299,6 +319,7 @@ details:not([open]) > .review-thread-header {
 /* === Markdown overrides === */
 .markdown-body {
     font-size: 14px;
+    overflow-wrap: anywhere;
 }
 
 .markdown-body .user-mention {
