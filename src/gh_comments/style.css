@@ -296,12 +296,14 @@ details:not([open]) > .review-thread-header {
 .reaction {
     border-radius: 100px;
     border: 0.00625rem solid var(--border-default);
+    background-color: transparent;
     padding: 5px 9px;
     font-size: 13px;
 }
 
 .reaction .reaction-number {
     margin-left: 0.35rem;
+    color: var(--fg-muted);
 }
 
 /* === Tab links === */

@@ -894,7 +894,7 @@ fn write_reaction_groups_as_html(
 
             write!(
                 buffer,
-                r##"<div class="reaction">{emoji}<span class="reaction-number">{total_count}</span></div>"##
+                r##"<button class="reaction" disabled="disabled">{emoji}<span class="reaction-number">{total_count}</span></button>"##
             )?;
         }
 
