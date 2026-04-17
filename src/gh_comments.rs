@@ -551,8 +551,8 @@ fn write_comment_as_html(
               <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
             </a>
             <div class="author-info">
-              <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
-              <span>on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></span><span> · hidden as {minimized_reason}</span>
+              <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
+              <a href="#{id}">on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></a><span> · hidden as {minimized_reason}</span>
             </div>
           </div>
 
@@ -584,8 +584,8 @@ fn write_comment_as_html(
       <div id="{id}" class="comment">
         <div class="comment-header">
           <div class="author-info desktop">
-            <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
-            <span>on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></span>{edited}
+            <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
+            <a href="#{id}">on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></a>{edited}
           </div>
 
           <div class="author-mobile">
@@ -593,8 +593,8 @@ fn write_comment_as_html(
               <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
             </a>
             <div class="author-info">
-              <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
-              <span>on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></span>{edited}
+              <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
+              <a href="#{id}">on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></a>{edited}
             </div>
           </div>
 
@@ -672,8 +672,8 @@ fn write_review_as_html(
       <div class="review-header">
         <div class="review-badge {badge_color}">{badge_svg}</div>
         <div class="author-info">
-          <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
-          <span>{state_message} on <span data-utc-time="{submitted_at_rfc3339}">{submitted_at}</span></span>
+          <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
+          <a href="#{id}">{state_message} on <span data-utc-time="{submitted_at_rfc3339}">{submitted_at}</span></a>
         </div>
       </div>
     </div>
@@ -803,8 +803,8 @@ fn write_review_thread_as_html(
               <a href="https://github.com/{author_login}" target="_blank">
                 <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar avatar-small">
               </a>
-              <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
-              <span>on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></span>{edited}
+              <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
+              <a href="#{id}">on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></a>{edited}
             </div>
             <a href="{comment_url}" target="_blank" class="github-link">View on GitHub</a>
           </div>

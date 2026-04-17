@@ -210,13 +210,17 @@ details:not([open]) > .review-thread-header {
 }
 
 .author-info a {
-    color: var(--fg-default);
-    font-weight: 600;
+    color: var(--fg-muted);
     text-decoration: none;
 }
 
 .author-info a:hover {
     text-decoration: underline;
+}
+
+.author-info .author-info-name {
+    color: var(--fg-default);
+    font-weight: 600;
 }
 
 .github-link {
