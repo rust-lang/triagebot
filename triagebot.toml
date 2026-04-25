@@ -37,3 +37,13 @@ This is just testing some functionality, please ignore this ping.
 label = "help wanted"
 
 [review-changes-since]
+
+[mentions."src/gh_comments/"]
+message = """\
+Static files in `src/gh_comments/` were modified, make sure to update their version number in `src/gh_comments.rs` to bust the client cache.
+"""
+
+[mentions."src/gha_logs/"]
+message = """\
+Static files in `src/gha_logs/` were modified, make sure to update their version number in `src/gha_logs.rs` to bust the client cache.
+"""
