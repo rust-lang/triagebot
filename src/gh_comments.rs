@@ -31,7 +31,7 @@ use crate::{
 
 pub const STYLE_URL: &str = "/gh-comments/style@0.0.8.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
-pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.2.js";
+pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.3.js";
 
 pub const GH_COMMENTS_CACHE_CAPACITY_BYTES: usize = 35 * 1024 * 1024; // 35 Mb
 
