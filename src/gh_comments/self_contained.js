@@ -8,7 +8,11 @@ document.addEventListener('DOMContentLoaded', function() {
       triggerUserDownload(htmlContent, `gh-comments-${ISSUE_ID}-export-${new Date().toISOString().slice(0,10)}.html`);
     } catch (e) {
       console.log(e);
-      alert(`Error: ${e.message}`);
+      if (e instanceof Error) {
+        alert(`Unable to export the comments: ${e}`);
+      } else {
+        alert(`Unable to export the comments. See the console for more details.`);
+      }
     }
   });
 });
