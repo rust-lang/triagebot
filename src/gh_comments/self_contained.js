@@ -83,7 +83,13 @@ async function inlineImages(doc) {
         canvas.getContext('2d').drawImage(tempImg, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL('image/png'));
       };
-      tempImg.onerror = reject;
+      tempImg.onerror = (event) => {
+        // We got an error, probably a CORS rejection (happens with user images on GitHub), but we
+        // can't be certain. We only get an event, not an error.
+        //
+        // Anyway, let's ignore this error and use the initial source.
+        resolve(src);
+      };
       tempImg.src = src;
     });
   }));
