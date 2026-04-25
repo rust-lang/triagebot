@@ -194,7 +194,7 @@ pub async fn gh_comments(
           details.open = false;
         }});
       }});
-      document.getElementById('gh-comments-reverse-toc-order-btn').addEventListener('click', () => {{
+      document.getElementById('gh-comments-reverse-toc-order-btn')?.addEventListener('click', () => {{
         var tocList = document.getElementById('toc-list');
         for (var i = 1; i < tocList.childNodes.length; i++) {{
           tocList.insertBefore(tocList.childNodes[i], tocList.firstChild);
