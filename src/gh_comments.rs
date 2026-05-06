@@ -292,9 +292,22 @@ pub async fn gh_comments(
         r##"<div class="state-badge {state_class}">{state_text}</div>"##
     )?;
 
-    // Print time and number of comments (+ reviews) loaded
-    if let Some(reviews) = issue_with_comments.reviews.as_ref() {
-        let count = issue_with_comments.comments.nodes.len() + reviews.nodes.len();
+    // Print time and number of comments, reviews and review comments loaded
+    if let (Some(reviews), Some(review_threads)) = (
+        issue_with_comments.reviews.as_ref(),
+        issue_with_comments.review_threads.as_ref(),
+    ) {
+        let count = issue_with_comments.comments.nodes.len()
+            + reviews
+                .nodes
+                .iter()
+                .filter(|r| !r.body_html.is_empty())
+                .count()
+            + review_threads
+                .nodes
+                .iter()
+                .map(|n| n.comments.nodes.len())
+                .sum::<usize>();
         writeln!(
             html,
             r###"<p>{count} comments and reviews loaded in {duration_secs:.2}s</p>"###,
