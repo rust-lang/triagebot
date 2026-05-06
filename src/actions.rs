@@ -46,6 +46,7 @@ pub struct IssueDecorator {
     pub repo_name: String,
     pub labels: String,
     pub author: String,
+    pub team: String,
     pub assignees: String,
     // Human (readable) timestamp
     pub updated_at_hts: String,

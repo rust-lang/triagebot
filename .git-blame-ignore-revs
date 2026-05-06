@@ -1,5 +1,7 @@
 # Use `git config blame.ignorerevsfile .git-blame-ignore-revs` to make `git blame` ignore the following commits.
+# Or add '-C' to git-blame(1) to get around this/these commit(s)
 
 # Urgau 2026-02-23 17:44 Split `github.rs` file into multiple smaller sub-modules
-# Please add '-C' to git-blame(1) to get around this commit
 00127fd78e4571fbdb7b5b5d41b73ebf3bf4e895
+# Urgau 2026-02-23 17:44  Adjust GitHub module splitting after review comments
+a74d4afb004a2af5d04a900511ce0dea1a9aa91f

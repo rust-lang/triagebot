@@ -1,11 +1,14 @@
-{% macro render(issue, with_age="", backport_branch="") %}{% if issue.is_blocked %}[blocked]{% endif %} "{{issue.title}}" [{{issue.repo_name}}#{{issue.number}}]({{issue.html_url}}){% if issue.mcp_details.zulip_link %} ([Zulip]({{issue.mcp_details.zulip_link}})){% endif %}{% if with_age %} (last review activity: {{issue.updated_at_hts}}){%- endif -%}
+{% macro render(issue, with_age="", with_team_tag="", backport_branch="") %}
+{%- if with_team_tag %}[{{issue.team}}] {% endif %}
+{%- if issue.is_blocked %}[blocked] {% endif %}"{{issue.title}}" [{{issue.repo_name}}#{{issue.number}}]({{issue.html_url}})
+{%- if issue.mcp_details.zulip_link %} ([Zulip]({{issue.mcp_details.zulip_link}})){% endif %}
+{%- if with_age %} (last review activity: {{issue.updated_at_hts}}){%- endif -%}
 {%- if backport_branch != "" %}
   - Authored by {{ issue.author }}
   - Voting [Zulip topic](#)
 <!--
-Triagebot commands for handling backports on GitHub
-If approved: @triagebot backport {{ backport_branch }} accept {{ issue.number }}
-If declined: @triagebot backport {{ backport_branch }} decline {{ issue.number }}
+@**triagebot** backport {{ backport_branch | replace(from=":", to="") | trim() }} accept {{ issue.number }}
+@**triagebot** backport {{ backport_branch | replace(from=":", to="") | trim() }} decline {{ issue.number }}
 -->
 {%- endif -%}
 {% if issue.mcp_details.concerns %}{%- for concern in issue.mcp_details.concerns %}
