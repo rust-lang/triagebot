@@ -9,7 +9,7 @@ use axum::{
     http::HeaderValue,
     response::IntoResponse,
 };
-use gix_imara_diff::{Algorithm, Diff, InternedInput, Interner, Token, UnifiedDiffPrinter};
+use gix_imara_diff::{Algorithm, Diff, Hunk, InternedInput, Interner, Token, UnifiedDiffPrinter};
 use hyper::header::CACHE_CONTROL;
 use hyper::{
     HeaderMap, StatusCode,
@@ -371,30 +371,26 @@ fn process_old_new(
         // Run postprocessing to improve hunk boundaries
         diff.postprocess_lines(&input);
 
-        // Determine if there are any differences
-        let has_hunks = diff.hunks().next().is_some();
+        // Collect and filter-out hunks don't contain any diff marker (-, +)
+        // as those are context-only changes, which are not interesting in
+        // a range-diff.
+        //
+        // See <https://github.com/rust-lang/triagebot/issues/2394>
+        let hunks = diff
+            .hunks()
+            .filter(|hunk| contains_diff_marker(&input, hunk.clone()))
+            .collect::<Vec<_>>();
 
-        if has_hunks {
-            let has_content_changes = 'context: {
-                for mut hunk in diff.hunks() {
-                    let contains_diff_marker = |idx: u32, source: &[Token]| {
-                        let line = &input.interner[source[idx as usize]];
-                        line.starts_with('+') || line.starts_with('-')
-                    };
-
-                    if hunk.before.any(|i| contains_diff_marker(i, &input.before))
-                        || hunk.after.any(|i| contains_diff_marker(i, &input.after))
-                    {
-                        break 'context true;
-                    }
-                }
-                false
-            };
+        // Show the changes if there are any hunks to be shown
+        if !hunks.is_empty() {
+            // FIXME: Remove the checkbox as we now filter-out all the context-only hunks
+            // without the possibly to show them after afterwards
+            let has_content_changes = true;
 
             let printer = HtmlDiffPrinter(&input.interner, filename);
             let unified_diff = CustomUnifiedDiff {
                 printer: &printer,
-                diff: &diff,
+                hunks: &hunks,
                 config: config.clone(),
                 before: &input.before,
                 after: &input.after,
@@ -686,7 +682,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
 /// Custom imara-diff UnifiedDiff
 struct CustomUnifiedDiff<'a, P: UnifiedDiffPrinter> {
     printer: &'a P,
-    diff: &'a Diff,
+    hunks: &'a [Hunk],
     config: CustomUnifiedDiffConfig,
     before: &'a [Token],
     after: &'a [Token],
@@ -697,10 +693,10 @@ struct CustomUnifiedDiffConfig {
     context_len: u32,
 }
 
-// Copied from https://github.com/GitoxideLabs/gitoxide/blob/8af2691270a72c711bbec8100ce07273de29f52a/gix-imara-diff/src/unified_diff.rs#L218
+// Customized version of <https://github.com/GitoxideLabs/gitoxide/blob/8af2691270a72c711bbec8100ce07273de29f52a/gix-imara-diff/src/unified_diff.rs#L218>
 impl<P: UnifiedDiffPrinter> fmt::Display for CustomUnifiedDiff<'_, P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let first_hunk = self.diff.hunks().next().unwrap_or_default();
+        let first_hunk = self.hunks.first().cloned().unwrap_or_default();
         let context_len = self.config.context_len.min(1024 * 1024);
         let mut pos = first_hunk.before.start.saturating_sub(context_len);
         let mut before_context_start = pos;
@@ -708,7 +704,7 @@ impl<P: UnifiedDiffPrinter> fmt::Display for CustomUnifiedDiff<'_, P> {
         let mut before_context_len = 0;
         let mut after_context_len = 0;
         let mut buffer = String::new();
-        for hunk in self.diff.hunks() {
+        for hunk in self.hunks {
             if hunk.before.start - pos > 2 * context_len {
                 if !buffer.is_empty() {
                     let end = (pos + context_len).min(self.before.len() as u32);
@@ -780,6 +776,18 @@ impl<'a> gix_imara_diff::TokenSource for SplitWordBoundaries<'a> {
     }
 }
 
+// Determine if a hunk contains any diff marker (+, -) in the underline inputs
+fn contains_diff_marker(input: &InternedInput<&str>, mut hunk: Hunk) -> bool {
+    let contains_diff_marker = |idx: u32, source: &[Token]| {
+        let line = &input.interner[source[idx as usize]];
+        line.starts_with('+') || line.starts_with('-')
+    };
+
+    hunk.before.any(|i| contains_diff_marker(i, &input.before))
+        || hunk.after.any(|i| contains_diff_marker(i, &input.after))
+}
+
+// function to create a <a> to a GitHub commit
 fn a_github_commit(owner: &str, repo: &str, ref_: &str) -> String {
     format!(
         r#"<a href="https://github.com/{owner}/{repo}/commit/{ref_}" class="commit">{}</a>"#,
