@@ -9,13 +9,13 @@ use axum::{
     http::HeaderValue,
     response::IntoResponse,
 };
+use gix_imara_diff::{
+    Algorithm, Diff, InternedInput, Interner, Token, UnifiedDiffConfig, UnifiedDiffPrinter,
+};
 use hyper::header::CACHE_CONTROL;
 use hyper::{
     HeaderMap, StatusCode,
     header::{CONTENT_SECURITY_POLICY, CONTENT_TYPE},
-};
-use imara_diff::{
-    Algorithm, Diff, InternedInput, Interner, Token, UnifiedDiffConfig, UnifiedDiffPrinter,
 };
 use pulldown_cmark_escape::FmtWriter;
 use regex::Regex;
@@ -682,7 +682,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
 // Simple abstraction over `unicode_segmentation::split_word_bounds` for `imara_diff::TokenSource`
 struct SplitWordBoundaries<'a>(&'a str);
 
-impl<'a> imara_diff::TokenSource for SplitWordBoundaries<'a> {
+impl<'a> gix_imara_diff::TokenSource for SplitWordBoundaries<'a> {
     type Token = &'a str;
     type Tokenizer = unicode_segmentation::UWordBounds<'a>;
 
