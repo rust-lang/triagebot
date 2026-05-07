@@ -9,9 +9,7 @@ use axum::{
     http::HeaderValue,
     response::IntoResponse,
 };
-use gix_imara_diff::{
-    Algorithm, Diff, InternedInput, Interner, Token, UnifiedDiffConfig, UnifiedDiffPrinter,
-};
+use gix_imara_diff::{Algorithm, Diff, InternedInput, Interner, Token, UnifiedDiffPrinter};
 use hyper::header::CACHE_CONTROL;
 use hyper::{
     HeaderMap, StatusCode,
@@ -200,7 +198,7 @@ fn process_old_new(
     (newbase, newhead, mut new): (&str, &str, GithubCompare),
 ) -> axum::response::Result<(StatusCode, HeaderMap, String), AppError> {
     // Configure unified diff
-    let config = UnifiedDiffConfig::default();
+    let config = CustomUnifiedDiffConfig { context_len: 3 };
 
     // Sort by filename, so it's consistent with GitHub UI
     old.files
@@ -394,7 +392,13 @@ fn process_old_new(
             };
 
             let printer = HtmlDiffPrinter(&input.interner, filename);
-            let diff = diff.unified_diff(&printer, config.clone(), &input);
+            let unified_diff = CustomUnifiedDiff {
+                printer: &printer,
+                diff: &diff,
+                config: config.clone(),
+                before: &input.before,
+                after: &input.after,
+            };
 
             let before_href =
                 format_args!("https://github.com/{owner}/{repo}/blob/{oldhead}/{filename}");
@@ -413,7 +417,7 @@ fn process_old_new(
 
             write!(
                 html,
-                r#" <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary><pre class="diff-content">{diff}</pre>"#
+                r#" <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary><pre class="diff-content">{unified_diff}</pre>"#
             )?;
             writeln!(html, "</details>")?;
 
@@ -674,6 +678,86 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
                     writeln!(f)?;
                 }
             }
+        }
+        Ok(())
+    }
+}
+
+/// Custom imara-diff UnifiedDiff
+struct CustomUnifiedDiff<'a, P: UnifiedDiffPrinter> {
+    printer: &'a P,
+    diff: &'a Diff,
+    config: CustomUnifiedDiffConfig,
+    before: &'a [Token],
+    after: &'a [Token],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CustomUnifiedDiffConfig {
+    context_len: u32,
+}
+
+// Copied from https://github.com/GitoxideLabs/gitoxide/blob/8af2691270a72c711bbec8100ce07273de29f52a/gix-imara-diff/src/unified_diff.rs#L218
+impl<P: UnifiedDiffPrinter> fmt::Display for CustomUnifiedDiff<'_, P> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let first_hunk = self.diff.hunks().next().unwrap_or_default();
+        let context_len = self.config.context_len.min(1024 * 1024);
+        let mut pos = first_hunk.before.start.saturating_sub(context_len);
+        let mut before_context_start = pos;
+        let mut after_context_start = first_hunk.after.start.saturating_sub(context_len);
+        let mut before_context_len = 0;
+        let mut after_context_len = 0;
+        let mut buffer = String::new();
+        for hunk in self.diff.hunks() {
+            if hunk.before.start - pos > 2 * context_len {
+                if !buffer.is_empty() {
+                    let end = (pos + context_len).min(self.before.len() as u32);
+                    self.printer.display_header(
+                        &mut *f,
+                        before_context_start,
+                        after_context_start,
+                        before_context_len + end - pos,
+                        after_context_len + end - pos,
+                    )?;
+                    write!(f, "{buffer}")?;
+                    for &token in &self.before[pos as usize..end as usize] {
+                        self.printer.display_context_token(&mut *f, token)?;
+                    }
+                    buffer.clear();
+                }
+                pos = hunk.before.start - context_len;
+                before_context_start = pos;
+                after_context_start = hunk.after.start - context_len;
+                before_context_len = 0;
+                after_context_len = 0;
+            }
+            for &token in &self.before[pos as usize..hunk.before.start as usize] {
+                self.printer.display_context_token(&mut buffer, token)?;
+            }
+            let context_len = hunk.before.start - pos;
+            before_context_len += hunk.before.len() as u32 + context_len;
+            after_context_len += hunk.after.len() as u32 + context_len;
+            self.printer.display_hunk(
+                &mut buffer,
+                &self.before[hunk.before.start as usize..hunk.before.end as usize],
+                &self.after[hunk.after.start as usize..hunk.after.end as usize],
+            )?;
+            pos = hunk.before.end;
+        }
+        if !buffer.is_empty() {
+            let end = (pos + context_len).min(self.before.len() as u32);
+            self.printer.display_header(
+                &mut *f,
+                before_context_start,
+                after_context_start,
+                before_context_len + end - pos,
+                after_context_len + end - pos,
+            )?;
+            write!(f, "{buffer}")?;
+            for &token in &self.before[pos as usize..end as usize] {
+                self.printer.display_context_token(&mut *f, token)?;
+            }
+            buffer.clear();
         }
         Ok(())
     }
