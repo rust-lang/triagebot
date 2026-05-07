@@ -289,12 +289,6 @@ fn process_old_new(
     .spacer {{
       margin-bottom: 1rem;
     }}
-    .hide {{
-      display: none;
-    }}
-    #show-context-only-changes-cb:checked ~ .hide {{
-      display: block;
-    }}
     @media (prefers-color-scheme: dark) {{
       body {{
         background: #0C0C0C;
@@ -348,8 +342,6 @@ fn process_old_new(
 <body>
 <h3>range-diff of {a_oldbase}..{a_oldhead} {a_newbase}..{a_newhead} in {owner}/{repo}</h3>
 <span>Legend: {REMOVED_BLOCK_SIGN}&nbsp;before | {ADDED_BLOCK_SIGN}&nbsp;after</span>
-<input type="checkbox" id="show-context-only-changes-cb">
-<label for="show-context-only-changes-cb"> Show context-only changes</label>
 <div class="spacer"></div>
 "#
     )?;
@@ -383,10 +375,6 @@ fn process_old_new(
 
         // Show the changes if there are any hunks to be shown
         if !hunks.is_empty() {
-            // FIXME: Remove the checkbox as we now filter-out all the context-only hunks
-            // without the possibly to show them after afterwards
-            let has_content_changes = true;
-
             let printer = HtmlDiffPrinter(&input.interner, filename);
             let unified_diff = CustomUnifiedDiff {
                 printer: &printer,
@@ -401,16 +389,7 @@ fn process_old_new(
             let after_href =
                 format_args!("https://github.com/{owner}/{repo}/blob/{newhead}/{filename}");
 
-            if has_content_changes {
-                write!(html, r#"<details open=""><summary>{filename}"#)?;
-            } else {
-                /* Context only changes, hide by default */
-                write!(
-                    html,
-                    r#"<details open="" class="hide" data-context-only-changes=""><summary>{filename} <i>(context-only changes)</i>"#
-                )?;
-            }
-
+            write!(html, r#"<details open=""><summary>{filename}"#)?;
             write!(
                 html,
                 r#" <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary><pre class="diff-content">{unified_diff}</pre>"#
