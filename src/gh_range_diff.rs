@@ -265,30 +265,30 @@ fn process_old_new(
     .line-removed-after {{
       color: rgb(220, 0, 0)
     }}
+    .line-removed-after .word-added {{
+      color: white;
+      background-color: rgb(63, 128, 94);
+    }}
     .line-added-after {{
       color: rgb(0, 221, 0)
+    }}
+    .line-added-after .word-added {{
+      color: white;
+      background-color: rgb(0, 73, 0);
     }}
     .line-removed-before {{
       color: rgb(192, 78, 76)
     }}
-    .line-added-before {{
-      color: rgb(63, 128, 94)
-    }}
-    .word-removed-after {{
-      color: white;
-      background-color: rgb(220, 0, 0);
-    }}
-    .word-added-after {{
-      color: white;
-      background-color: rgb(0, 73, 0);
-    }}
-    .word-removed-before {{
+    .line-removed-before .word-removed {{
       color: white;
       background-color: rgb(192, 78, 76);
     }}
-    .word-added-before {{
+    .line-added-before {{
+      color: rgb(63, 128, 94)
+    }}
+    .line-added-before .word-removed {{
       color: white;
-      background-color: rgb(63, 128, 94);
+      background-color: rgb(220, 0, 0);
     }}
     .spacer {{
       margin-bottom: 1rem;
@@ -321,30 +321,30 @@ fn process_old_new(
       .line-removed-after {{
         color: rgba(255, 0, 0, 1);
       }}
+      .line-removed-after .word-added {{
+        color: black;
+        background-color: rgb(0, 100, 0);
+      }}
       .line-added-after {{
         color: rgba(0, 255, 0, 1);
+      }}
+      .line-added-after .word-added {{
+        color: black;
+        background-color: rgb(0, 255, 0);
       }}
       .line-removed-before {{
         color: rgb(255, 159, 131);
       }}
+      .line-removed-before .word-removed {{
+        color: black;
+        background-color: rgb(100, 0, 0);
+      }}
       .line-added-before {{
         color: rgba(11, 142, 0, 1);
       }}
-      .word-removed-after {{
+      .line-added-before .word-removed {{
         color: black;
-        background-color: rgba(255, 0, 0, 1);
-      }}
-      .word-added-after {{
-        color: black;
-        background-color: rgba(0, 255, 0, 1);
-      }}
-      .word-removed-before {{
-        color: black;
-        background-color: rgba(100, 0, 0, 1);
-      }}
-      .word-added-before {{
-        color: black;
-        background-color: rgba(0, 100, 0, 1);
+        background-color: rgb(255, 0, 0);
       }}
     }}
     </style>
@@ -510,24 +510,22 @@ impl HtmlDiffPrinter<'_> {
         // diff lines though, since then the coloring distracts from what is
         // relevant.)
         if is_add || is_remove {
-            let prefix_class = match (hunk_token_status, is_add) {
-                (HunkTokenStatus::Removed, true) => "added-before",
-                (HunkTokenStatus::Removed, false) => "removed-before",
-                (HunkTokenStatus::Added, true) => "added-after",
-                (HunkTokenStatus::Added, false) => "removed-after",
+            let line_class = match (is_add, hunk_token_status) {
+                (true, HunkTokenStatus::Removed) => "line-added-before",
+                (false, HunkTokenStatus::Removed) => "line-removed-before",
+                (true, HunkTokenStatus::Added) => "line-added-after",
+                (false, HunkTokenStatus::Added) => "line-removed-after",
             };
-            write!(f, r#"<span class="line-{prefix_class}">"#)?;
+            write!(f, r#"<span class="{line_class}">"#)?;
 
             for (word, changed) in words {
                 if changed {
-                    let prefix_class = match (hunk_token_status, is_add) {
-                        (HunkTokenStatus::Removed, true) => "removed-after",
-                        (HunkTokenStatus::Removed, false) => "removed-before",
-                        (HunkTokenStatus::Added, true) => "added-after",
-                        (HunkTokenStatus::Added, false) => "added-before",
+                    let word_class = match hunk_token_status {
+                        HunkTokenStatus::Removed => "word-removed",
+                        HunkTokenStatus::Added => "word-added",
                     };
 
-                    write!(f, r#"<span class="word-{prefix_class}">"#)?;
+                    write!(f, r#"<span class="{word_class}">"#)?;
                     pulldown_cmark_escape::escape_html(FmtWriter(&mut f), word)?;
                     write!(f, "</span>")?;
                 } else {
