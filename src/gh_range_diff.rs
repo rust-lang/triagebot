@@ -9,13 +9,11 @@ use axum::{
     http::HeaderValue,
     response::IntoResponse,
 };
+use gix_imara_diff::{Algorithm, Diff, Hunk, InternedInput, Interner, Token, UnifiedDiffPrinter};
 use hyper::header::CACHE_CONTROL;
 use hyper::{
     HeaderMap, StatusCode,
     header::{CONTENT_SECURITY_POLICY, CONTENT_TYPE},
-};
-use imara_diff::{
-    Algorithm, Diff, InternedInput, Interner, Token, UnifiedDiffConfig, UnifiedDiffPrinter,
 };
 use pulldown_cmark_escape::FmtWriter;
 use regex::Regex;
@@ -200,7 +198,7 @@ fn process_old_new(
     (newbase, newhead, mut new): (&str, &str, GithubCompare),
 ) -> axum::response::Result<(StatusCode, HeaderMap, String), AppError> {
     // Configure unified diff
-    let config = UnifiedDiffConfig::default();
+    let config = CustomUnifiedDiffConfig { context_len: 3 };
 
     // Sort by filename, so it's consistent with GitHub UI
     old.files
@@ -291,12 +289,6 @@ fn process_old_new(
     .spacer {{
       margin-bottom: 1rem;
     }}
-    .hide {{
-      display: none;
-    }}
-    #show-context-only-changes-cb:checked ~ .hide {{
-      display: block;
-    }}
     @media (prefers-color-scheme: dark) {{
       body {{
         background: #0C0C0C;
@@ -350,8 +342,6 @@ fn process_old_new(
 <body>
 <h3>range-diff of {a_oldbase}..{a_oldhead} {a_newbase}..{a_newhead} in {owner}/{repo}</h3>
 <span>Legend: {REMOVED_BLOCK_SIGN}&nbsp;before | {ADDED_BLOCK_SIGN}&nbsp;after</span>
-<input type="checkbox" id="show-context-only-changes-cb">
-<label for="show-context-only-changes-cb"> Show context-only changes</label>
 <div class="spacer"></div>
 "#
     )?;
@@ -373,47 +363,36 @@ fn process_old_new(
         // Run postprocessing to improve hunk boundaries
         diff.postprocess_lines(&input);
 
-        // Determine if there are any differences
-        let has_hunks = diff.hunks().next().is_some();
+        // Collect and filter-out hunks don't contain any diff marker (-, +)
+        // as those are context-only changes, which are not interesting in
+        // a range-diff.
+        //
+        // See <https://github.com/rust-lang/triagebot/issues/2394>
+        let hunks = diff
+            .hunks()
+            .filter(|hunk| contains_diff_marker(&input, hunk.clone()))
+            .collect::<Vec<_>>();
 
-        if has_hunks {
-            let has_content_changes = 'context: {
-                for mut hunk in diff.hunks() {
-                    let contains_diff_marker = |idx: u32, source: &[Token]| {
-                        let line = &input.interner[source[idx as usize]];
-                        line.starts_with('+') || line.starts_with('-')
-                    };
-
-                    if hunk.before.any(|i| contains_diff_marker(i, &input.before))
-                        || hunk.after.any(|i| contains_diff_marker(i, &input.after))
-                    {
-                        break 'context true;
-                    }
-                }
-                false
-            };
-
+        // Show the changes if there are any hunks to be shown
+        if !hunks.is_empty() {
             let printer = HtmlDiffPrinter(&input.interner, filename);
-            let diff = diff.unified_diff(&printer, config.clone(), &input);
+            let unified_diff = CustomUnifiedDiff {
+                printer: &printer,
+                hunks: &hunks,
+                config: config.clone(),
+                before: &input.before,
+                after: &input.after,
+            };
 
             let before_href =
                 format_args!("https://github.com/{owner}/{repo}/blob/{oldhead}/{filename}");
             let after_href =
                 format_args!("https://github.com/{owner}/{repo}/blob/{newhead}/{filename}");
 
-            if has_content_changes {
-                write!(html, r#"<details open=""><summary>{filename}"#)?;
-            } else {
-                /* Context only changes, hide by default */
-                write!(
-                    html,
-                    r#"<details open="" class="hide" data-context-only-changes=""><summary>{filename} <i>(context-only changes)</i>"#
-                )?;
-            }
-
+            write!(html, r#"<details open=""><summary>{filename}"#)?;
             write!(
                 html,
-                r#" <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary><pre class="diff-content">{diff}</pre>"#
+                r#" <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary><pre class="diff-content">{unified_diff}</pre>"#
             )?;
             writeln!(html, "</details>")?;
 
@@ -679,10 +658,90 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
     }
 }
 
+/// Custom imara-diff UnifiedDiff
+struct CustomUnifiedDiff<'a, P: UnifiedDiffPrinter> {
+    printer: &'a P,
+    hunks: &'a [Hunk],
+    config: CustomUnifiedDiffConfig,
+    before: &'a [Token],
+    after: &'a [Token],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CustomUnifiedDiffConfig {
+    context_len: u32,
+}
+
+// Customized version of <https://github.com/GitoxideLabs/gitoxide/blob/8af2691270a72c711bbec8100ce07273de29f52a/gix-imara-diff/src/unified_diff.rs#L218>
+impl<P: UnifiedDiffPrinter> fmt::Display for CustomUnifiedDiff<'_, P> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let first_hunk = self.hunks.first().cloned().unwrap_or_default();
+        let context_len = self.config.context_len.min(1024 * 1024);
+        let mut pos = first_hunk.before.start.saturating_sub(context_len);
+        let mut before_context_start = pos;
+        let mut after_context_start = first_hunk.after.start.saturating_sub(context_len);
+        let mut before_context_len = 0;
+        let mut after_context_len = 0;
+        let mut buffer = String::new();
+        for hunk in self.hunks {
+            if hunk.before.start - pos > 2 * context_len {
+                if !buffer.is_empty() {
+                    let end = (pos + context_len).min(self.before.len() as u32);
+                    self.printer.display_header(
+                        &mut *f,
+                        before_context_start,
+                        after_context_start,
+                        before_context_len + end - pos,
+                        after_context_len + end - pos,
+                    )?;
+                    write!(f, "{buffer}")?;
+                    for &token in &self.before[pos as usize..end as usize] {
+                        self.printer.display_context_token(&mut *f, token)?;
+                    }
+                    buffer.clear();
+                }
+                pos = hunk.before.start - context_len;
+                before_context_start = pos;
+                after_context_start = hunk.after.start - context_len;
+                before_context_len = 0;
+                after_context_len = 0;
+            }
+            for &token in &self.before[pos as usize..hunk.before.start as usize] {
+                self.printer.display_context_token(&mut buffer, token)?;
+            }
+            let context_len = hunk.before.start - pos;
+            before_context_len += hunk.before.len() as u32 + context_len;
+            after_context_len += hunk.after.len() as u32 + context_len;
+            self.printer.display_hunk(
+                &mut buffer,
+                &self.before[hunk.before.start as usize..hunk.before.end as usize],
+                &self.after[hunk.after.start as usize..hunk.after.end as usize],
+            )?;
+            pos = hunk.before.end;
+        }
+        if !buffer.is_empty() {
+            let end = (pos + context_len).min(self.before.len() as u32);
+            self.printer.display_header(
+                &mut *f,
+                before_context_start,
+                after_context_start,
+                before_context_len + end - pos,
+                after_context_len + end - pos,
+            )?;
+            write!(f, "{buffer}")?;
+            for &token in &self.before[pos as usize..end as usize] {
+                self.printer.display_context_token(&mut *f, token)?;
+            }
+            buffer.clear();
+        }
+        Ok(())
+    }
+}
+
 // Simple abstraction over `unicode_segmentation::split_word_bounds` for `imara_diff::TokenSource`
 struct SplitWordBoundaries<'a>(&'a str);
 
-impl<'a> imara_diff::TokenSource for SplitWordBoundaries<'a> {
+impl<'a> gix_imara_diff::TokenSource for SplitWordBoundaries<'a> {
     type Token = &'a str;
     type Tokenizer = unicode_segmentation::UWordBounds<'a>;
 
@@ -696,6 +755,18 @@ impl<'a> imara_diff::TokenSource for SplitWordBoundaries<'a> {
     }
 }
 
+// Determine if a hunk contains any diff marker (+, -) in the underline inputs
+fn contains_diff_marker(input: &InternedInput<&str>, mut hunk: Hunk) -> bool {
+    let contains_diff_marker = |idx: u32, source: &[Token]| {
+        let line = &input.interner[source[idx as usize]];
+        line.starts_with('+') || line.starts_with('-')
+    };
+
+    hunk.before.any(|i| contains_diff_marker(i, &input.before))
+        || hunk.after.any(|i| contains_diff_marker(i, &input.after))
+}
+
+// function to create a <a> to a GitHub commit
 fn a_github_commit(owner: &str, repo: &str, ref_: &str) -> String {
     format!(
         r#"<a href="https://github.com/{owner}/{repo}/commit/{ref_}" class="commit">{}</a>"#,
