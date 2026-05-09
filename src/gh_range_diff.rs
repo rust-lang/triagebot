@@ -209,10 +209,8 @@ fn process_old_new(
     // Create the HTML buffer with a very rough approximation for the capacity
     let mut html: String = String::with_capacity(800 + old.files.len() * 100);
 
-    let a_oldbase = a_github_commit(owner, repo, oldbase);
-    let a_oldhead = a_github_commit(owner, repo, oldhead);
-    let a_newbase = a_github_commit(owner, repo, newbase);
-    let a_newhead = a_github_commit(owner, repo, newhead);
+    let a_compare_before = a_github_compare("compare-before", owner, repo, oldbase, oldhead);
+    let a_compare_after = a_github_compare("compare-after", owner, repo, newbase, newhead);
 
     // Write HTML header, style, ...
     writeln!(
@@ -236,9 +234,15 @@ fn process_old_new(
       overflow-wrap: break-word;
       white-space: normal;
     }}
-    .commit {{
+    .compare {{
       text-decoration: none;
       color: unset;
+    }}
+    .compare-before {{
+      color: rgb(255, 93, 93);
+    }}
+    .compare-after {{
+      color: rgb(55, 227, 55);
     }}
     .diff-content {{
       overflow-x: auto;
@@ -297,6 +301,12 @@ fn process_old_new(
       a {{
         color: #41a6ff;
       }}
+      .compare-before {{
+        color: rgb(255, 93, 93);
+      }}
+      .compare-after {{
+        color: rgb(88, 177, 88);
+      }}
       .filename-block {{
         background-color: #5f8fe5;
       }}
@@ -340,8 +350,8 @@ fn process_old_new(
     </style>
 </head>
 <body>
-<h3>range-diff of {a_oldbase}..{a_oldhead} {a_newbase}..{a_newhead} in {owner}/{repo}</h3>
-<span>Legend: {REMOVED_BLOCK_SIGN}&nbsp;before | {ADDED_BLOCK_SIGN}&nbsp;after</span>
+<h3>range-diff of {a_compare_before} {a_compare_after} in {owner}/{repo}</h3>
+<span>Legend: {REMOVED_BLOCK_SIGN}&nbsp;Removed from previous diff | {ADDED_BLOCK_SIGN}&nbsp;Added in new diff</span>
 <div class="spacer"></div>
 "#
     )?;
@@ -766,10 +776,11 @@ fn contains_diff_marker(input: &InternedInput<&str>, mut hunk: Hunk) -> bool {
         || hunk.after.any(|i| contains_diff_marker(i, &input.after))
 }
 
-// function to create a <a> to a GitHub commit
-fn a_github_commit(owner: &str, repo: &str, ref_: &str) -> String {
+// Function to create an <a> link to a GitHub compare
+fn a_github_compare(class: &str, owner: &str, repo: &str, base: &str, head: &str) -> String {
     format!(
-        r#"<a href="https://github.com/{owner}/{repo}/commit/{ref_}" class="commit">{}</a>"#,
-        &ref_[..=6]
+        r#"<a href="https://github.com/{owner}/{repo}/compare/{base}..{head}" class="compare {class}">{base_6}..{head_6}</a>"#,
+        base_6 = &base[..base.len().min(7)],
+        head_6 = &head[..head.len().min(7)]
     )
 }
