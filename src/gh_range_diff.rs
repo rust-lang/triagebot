@@ -520,6 +520,13 @@ impl HtmlDiffPrinter<'_> {
 
             for (word, changed) in words {
                 if changed {
+                    let prefix_class = match (hunk_token_status, is_add) {
+                        (HunkTokenStatus::Removed, true) => "removed-after",
+                        (HunkTokenStatus::Removed, false) => "removed-before",
+                        (HunkTokenStatus::Added, true) => "added-after",
+                        (HunkTokenStatus::Added, false) => "added-before",
+                    };
+
                     write!(f, r#"<span class="word-{prefix_class}">"#)?;
                     pulldown_cmark_escape::escape_html(FmtWriter(&mut f), word)?;
                     write!(f, "</span>")?;
