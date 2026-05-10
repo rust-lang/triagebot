@@ -266,8 +266,8 @@ fn process_old_new(
       color: rgb(220, 0, 0)
     }}
     .line-removed-after .word-added {{
-      color: white;
-      background-color: #C85000;
+      color: black;
+      background-color: #FFA500;
     }}
     .line-added-after {{
       color: rgb(0, 221, 0)
@@ -323,7 +323,7 @@ fn process_old_new(
       }}
       .line-removed-after .word-added {{
         color: black;
-        background-color: #C85000;
+        background-color: #D48B04;
       }}
       .line-added-after {{
         color: rgba(0, 255, 0, 1);
