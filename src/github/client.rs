@@ -101,7 +101,7 @@ impl GithubClient {
     }
 
     pub async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<(Bytes, String)> {
-        const MAX_DEFAULT_RESPONSE_SIZE: usize = 1 * 1024 * 1024; // 1 Mib
+        const MAX_DEFAULT_RESPONSE_SIZE: usize = 8 * 1024 * 1024; // 8 Mib
 
         self.send_req_with_limit(req, MAX_DEFAULT_RESPONSE_SIZE)
             .await
@@ -335,7 +335,7 @@ impl GithubClient {
     ) -> anyhow::Result<serde_json::Value> {
         // Our GraphQl query can end-up being quite big, let's set a higher default
         // response size than for normal REST Api response.
-        const MAX_DEFAULT_GRAPH_QL_RESPONSE_SIZE: usize = 6 * 1024 * 1024;
+        const MAX_DEFAULT_GRAPH_QL_RESPONSE_SIZE: usize = 10 * 1024 * 1024;
 
         let (body, _dbg) = self
             .send_req_with_limit(
