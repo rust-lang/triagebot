@@ -599,17 +599,41 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
                     // Compute the (word) diff
                     let diff = Diff::compute(Algorithm::Histogram, &input);
 
-                    (diff, input)
+                    // Calculate if the line is too different to highlight individual words
+                    // We check the ratio of changed tokens against the total tokens
+                    let total_tokens = input.before.len() + input.after.len();
+
+                    let removed_count = (0..input.before.len())
+                        .filter(|&i| diff.is_removed(i as u32))
+                        .count();
+                    let added_count = (0..input.after.len())
+                        .filter(|&i| diff.is_added(i as u32))
+                        .count();
+
+                    let changed_tokens = removed_count + added_count;
+
+                    // If more than 60% of the combined unique positions changed
+                    // force word highlighting on all tokens
+                    let force_highlight = if total_tokens > 0 {
+                        (changed_tokens as f32 / total_tokens as f32) >= 0.6
+                    } else {
+                        true
+                    };
+
+                    (diff, input, force_highlight)
                 })
                 .collect();
 
             // Process all before lines first
-            for (diff, input) in &diffs_and_inputs {
+            for (diff, input, force_highlight) in &diffs_and_inputs {
                 self.handle_hunk_line(
                     &mut f,
                     HunkTokenStatus::Removed,
                     input.before.iter().enumerate().map(|(b_pos, b_token)| {
-                        (input.interner[*b_token], diff.is_removed(b_pos as u32))
+                        (
+                            input.interner[*b_token],
+                            *force_highlight || diff.is_removed(b_pos as u32),
+                        )
                     }),
                 )?;
             }
@@ -622,12 +646,15 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
             }
 
             // Then process all after lines
-            for (diff, input) in &diffs_and_inputs {
+            for (diff, input, force_hightlight) in &diffs_and_inputs {
                 self.handle_hunk_line(
                     &mut f,
                     HunkTokenStatus::Added,
                     input.after.iter().enumerate().map(|(a_pos, a_token)| {
-                        (input.interner[*a_token], diff.is_added(a_pos as u32))
+                        (
+                            input.interner[*a_token],
+                            *force_hightlight || diff.is_added(a_pos as u32),
+                        )
                     }),
                 )?;
             }
