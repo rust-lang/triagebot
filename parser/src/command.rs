@@ -340,7 +340,7 @@ fn review_errors() {
         };
         assert_eq!(
             err.source().unwrap().downcast_ref(),
-            Some(&assign::ParseError::NoUser)
+            Some(&assign::ParseError::NoUserReview)
         );
         assert_eq!(input.next(), None);
     }

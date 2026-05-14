@@ -28,14 +28,20 @@ impl Error<'_> {
 
 impl fmt::Display for Error<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let space = 10;
-        let end = std::cmp::min(self.input.len(), self.position + space);
-        write!(
-            f,
-            "...'{}' | error: {} at >| '{}'...",
-            &self.input[self.position.saturating_sub(space)..self.position],
-            self.source,
-            &self.input[self.position..end],
-        )
+        if self.input.is_empty() {
+            writeln!(f, "{}", self.source)
+        } else {
+            const MARGIN: usize = 10;
+
+            let start = self.position.saturating_sub(MARGIN);
+            let end = std::cmp::min(self.input.len(), self.position + MARGIN);
+            write!(
+                f,
+                "{} when parsing: {}[!]{}",
+                self.source,
+                &self.input[start..self.position],
+                &self.input[self.position..end],
+            )
+        }
     }
 }
