@@ -30,6 +30,7 @@ pub enum AssignCommand {
 pub enum ParseError {
     ExpectedEnd,
     MentionUser,
+    NoUserReview,
     NoUser,
 }
 
@@ -40,6 +41,10 @@ impl fmt::Display for ParseError {
         match self {
             ParseError::MentionUser => write!(f, "user should start with @"),
             ParseError::ExpectedEnd => write!(f, "expected end of command"),
+            ParseError::NoUserReview => write!(
+                f,
+                "specify user to assign to (if you want to reroll without a specific reviewer in mind, use `@rustbot reroll`)"
+            ),
             ParseError::NoUser => write!(f, "specify user to assign to"),
         }
     }
@@ -104,11 +109,11 @@ impl AssignCommand {
                 let name = strip_circumfix(name, '`', '`').unwrap_or(name);
                 let name = name.strip_prefix('@').unwrap_or(name).to_string();
                 if name.is_empty() {
-                    return Err(input.error(ParseError::NoUser));
+                    return Err(input.error(ParseError::NoUserReview));
                 }
                 Ok(Some(AssignCommand::RequestReview { name }))
             }
-            _ => Err(input.error(ParseError::NoUser)),
+            _ => Err(input.error(ParseError::NoUserReview)),
         }
     }
 }
@@ -194,7 +199,7 @@ mod tests {
                     .source()
                     .unwrap()
                     .downcast_ref(),
-                Some(&ParseError::NoUser),
+                Some(&ParseError::NoUserReview),
                 "failed on {input}"
             )
         }
