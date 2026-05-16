@@ -416,9 +416,15 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             let reviews_cursor_changed = reviews_end_cursor != reviews_cursor;
 
             // Update cursors for next iteration
-            comments_cursor = comments_end_cursor;
-            review_threads_cursor = review_threads_end_cursor;
-            reviews_cursor = reviews_end_cursor;
+            if comments_end_cursor.is_some() {
+                comments_cursor = comments_end_cursor;
+            }
+            if review_threads_end_cursor.is_some() {
+                review_threads_cursor = review_threads_end_cursor;
+            }
+            if reviews_end_cursor.is_some() {
+                reviews_cursor = reviews_end_cursor;
+            }
 
             // Early return if first page has no more pages for any field (1 API call)
             if all_comments.is_empty()
