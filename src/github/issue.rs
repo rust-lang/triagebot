@@ -258,6 +258,11 @@ impl Issue {
             .context("failed to edit review comment")?;
         Ok(comment)
     }
+    fn find_label_case_insensitive<'a>(labels: &'a [Label], name: &str) -> Option<&'a Label> {
+        labels
+            .iter()
+            .find(|l| l.name.to_lowercase() == name.to_lowercase())
+    }
 
     pub async fn remove_labels(
         &self,
@@ -267,11 +272,11 @@ impl Issue {
         log::info!("remove_labels from {}: {:?}", self.global_id(), labels);
 
         // Don't try to remove labels not already present on this issue.
+        // Use case-insensitive comparison to match GitHub's behavior when adding labels.
         let labels = labels
             .into_iter()
-            .filter(|l| self.labels().contains(l))
+            .filter_map(|l| Self::find_label_case_insensitive(self.labels(), &l.name).cloned())
             .collect::<Vec<_>>();
-
         log::info!(
             "remove_labels: {} filtered to {:?}",
             self.global_id(),
@@ -957,5 +962,40 @@ impl IssueRepository {
         let url = format!("{}/collaborators/{username}/permission", self.url(client));
         let permission = client.json(client.get(&url)).await?;
         Ok(permission)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Issue, Label};
+    #[test]
+    fn test_case_insensitive_label_matching() {
+        let issue_labels = vec![
+            Label {
+                name: "E-needs-mcve".to_string(),
+            },
+            Label {
+                name: "T-compiler".to_string(),
+            },
+        ];
+
+        assert_eq!(
+            Issue::find_label_case_insensitive(&issue_labels, "e-needs-mcve"),
+            Some(&Label {
+                name: "E-needs-mcve".to_string()
+            })
+        );
+
+        assert_eq!(
+            Issue::find_label_case_insensitive(&issue_labels, "E-NEEDS-MCVE"),
+            Some(&Label {
+                name: "E-needs-mcve".to_string()
+            })
+        );
+
+        assert_eq!(
+            Issue::find_label_case_insensitive(&issue_labels, "non-existent"),
+            None
+        );
     }
 }
