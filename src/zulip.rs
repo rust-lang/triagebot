@@ -269,7 +269,7 @@ async fn handle_command<'a>(
             ChatCommand::UserInfo {
                 username,
                 organization,
-            } => user_info_cmd(&ctx, gh_id, username, &organization)
+            } => user_info_cmd(&ctx, gh_id, username, organization)
                 .await
                 .map(Some),
             ChatCommand::TeamStats { name, repo } => {
@@ -664,6 +664,13 @@ async fn user_info_cmd(
 
     let pr_limit = 100;
     let recent_days: u64 = 7;
+
+    // Get username from input string
+    let username = username
+        .trim_end_matches('/')
+        .rsplit_once('/')
+        .map(|(_left, right)| right)
+        .unwrap_or(username);
 
     // Load data concurrently to make the command faster
     let (user, user_prs, org_user_prs, user_repos) = futures::future::try_join4(
