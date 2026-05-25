@@ -267,6 +267,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             triagebot::gh_comments::SELF_CONTAINED_URL,
             get(triagebot::gh_comments::self_contained_js),
         )
+        .route(
+            triagebot::gh_comments::RELATIVE_TIME_ELEMENT_URL,
+            get(triagebot::gh_comments::relative_time_element_js),
+        )
         .merge(protected)
         .nest("/agenda", agenda)
         .route("/bors-commit-list", get(triagebot::bors::bors_commit_list))

@@ -32,6 +32,7 @@ use crate::{
 pub const STYLE_URL: &str = "/gh-comments/style@0.0.8.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
 pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.3.js";
+pub const RELATIVE_TIME_ELEMENT_URL: &str = "/gh-comments/relative-time-element@5.0.0.js";
 
 pub const GH_COMMENTS_CACHE_CAPACITY_BYTES: usize = 35 * 1024 * 1024; // 35 Mb
 
@@ -181,6 +182,7 @@ pub async fn gh_comments(
   <link rel="stylesheet" href="{MARKDOWN_URL}" />
   <link rel="stylesheet" href="{STYLE_URL}" />
   <script src="{SELF_CONTAINED_URL}" data-to-remove-on-export></script>
+  <script src="{RELATIVE_TIME_ELEMENT_URL}" type="module" data-to-remove-on-export></script>
   <script nonce="triagebot-gh-comments">
     const ISSUE_ID = {issue_id};
     document.addEventListener('DOMContentLoaded', function() {{
@@ -199,11 +201,6 @@ pub async fn gh_comments(
         for (var i = 1; i < tocList.childNodes.length; i++) {{
           tocList.insertBefore(tocList.childNodes[i], tocList.firstChild);
         }}
-      }});
-      document.querySelectorAll('[data-utc-time]').forEach(element => {{
-        const utcString = element.getAttribute('data-utc-time');
-        const utcDate = new Date(utcString);
-        element.textContent = utcDate.toLocaleString();
       }});
       if (window.location.origin !== "null") {{
         document.querySelectorAll('.markdown-body a').forEach(link => {{
@@ -258,7 +255,7 @@ pub async fn gh_comments(
                 html,
                 r###"<li>
                     <a href="#{id}" class="toc-link">
-                        <span>{author} - #{number}</span> <span data-utc-time="{dt_rfc3339}">{dt_human}</span>
+                        <span>#{number} - {author}</span> - <relative-time datetime="{dt_rfc3339}" format="micro">{dt_human}</relative-time>
                     </a>
                 </li>"###
             )?;
@@ -527,6 +524,16 @@ pub async fn self_contained_js() -> impl IntoResponse {
     )
 }
 
+pub async fn relative_time_element_js() -> impl IntoResponse {
+    const RELATIVE_TIME_ELEMENT_JS: &str =
+        include_str!("gh_comments/relative-time-element@5.0.0.js");
+
+    (
+        immutable_headers("text/javascript; charset=utf-8"),
+        RELATIVE_TIME_ELEMENT_JS,
+    )
+}
+
 fn write_comment_as_html(
     buffer: &mut String,
     body_html: &str,
@@ -556,7 +563,7 @@ fn write_comment_as_html(
         <summary class="comment-header">
           <div class="author-info desktop">
             <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
-            <span>on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></span><span> · hidden as {minimized_reason}</span>
+            <span> <relative-time datetime="{created_at_rfc3339}">{created_at}</relative-time></span><span> · hidden as {minimized_reason}</span>
           </div>
 
           <div class="author-mobile">
@@ -565,7 +572,7 @@ fn write_comment_as_html(
             </a>
             <div class="author-info">
               <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
-              <a href="#{id}">on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></a><span> · hidden as {minimized_reason}</span>
+              <a href="#{id}"> <relative-time datetime="{created_at_rfc3339}">{created_at}</relative-time></a><span> · hidden as {minimized_reason}</span>
             </div>
           </div>
 
@@ -598,7 +605,7 @@ fn write_comment_as_html(
         <div class="comment-header">
           <div class="author-info desktop">
             <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
-            <a href="#{id}">on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></a>{edited}
+            <a href="#{id}"> <relative-time datetime="{created_at_rfc3339}">{created_at}</relative-time></a>{edited}
           </div>
 
           <div class="author-mobile">
@@ -607,7 +614,7 @@ fn write_comment_as_html(
             </a>
             <div class="author-info">
               <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
-              <a href="#{id}">on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></a>{edited}
+              <a href="#{id}"> <relative-time datetime="{created_at_rfc3339}">{created_at}</relative-time></a>{edited}
             </div>
           </div>
 
@@ -686,7 +693,7 @@ fn write_review_as_html(
         <div class="review-badge {badge_color}">{badge_svg}</div>
         <div class="author-info">
           <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
-          <a href="#{id}">{state_message} on <span data-utc-time="{submitted_at_rfc3339}">{submitted_at}</span></a>
+          <a href="#{id}">{state_message} <relative-time datetime="{submitted_at_rfc3339}">{submitted_at}</relative-time></a>
         </div>
       </div>
     </div>
@@ -817,7 +824,7 @@ fn write_review_thread_as_html(
                 <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar avatar-small">
               </a>
               <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
-              <a href="#{id}">on <span data-utc-time="{created_at_rfc3339}">{created_at}</span></a>{edited}
+              <a href="#{id}"> <relative-time datetime="{created_at_rfc3339}">{created_at}</relative-time></a>{edited}
             </div>
             <a href="{comment_url}" target="_blank" class="github-link">View on GitHub</a>
           </div>
