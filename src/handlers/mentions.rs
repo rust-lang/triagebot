@@ -20,6 +20,7 @@ pub(super) struct MentionsInput {
     to_mention: Vec<ToMention>,
 }
 
+#[derive(Debug)]
 struct ToMention {
     entry: String,
     relevant_file_paths: Vec<PathBuf>,
@@ -67,10 +68,18 @@ pub(super) async fn parse_input(
         return Ok(None);
     };
 
-    let modified_paths: Vec<_> = modified_files
+    let mut modified_paths: Vec<_> = modified_files
         .iter()
         .map(|fd| Path::new(&fd.filename))
         .collect();
+
+    // also include the previous filename (in case of renames)
+    modified_paths.extend(
+        modified_files
+            .iter()
+            .filter_map(|fd| fd.previous_filename.as_ref())
+            .map(|filename| Path::new(filename)),
+    );
 
     let to_mention: Vec<_> = config
         .entries
