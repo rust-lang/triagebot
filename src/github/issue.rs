@@ -158,6 +158,9 @@ pub struct GithubCompare {
 pub struct FileDiff {
     /// The fullname path of the file.
     pub filename: String,
+    /// The previous fullname path of the file.
+    #[serde(default)]
+    pub previous_filename: Option<String>,
     /// The patch/diff for the file.
     ///
     /// Can be empty when there isn't any changes to the content of the file

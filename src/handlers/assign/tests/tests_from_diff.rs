@@ -33,6 +33,7 @@ fn make_fake_diff(paths: &[(&str, u32, u32)]) -> Vec<FileDiff> {
             FileDiff {
                 filename: path.to_string(),
                 patch: diff,
+                previous_filename: None,
             }
         })
         .collect()
@@ -63,6 +64,7 @@ fn from_diff_submodule() {
             +Subproject commit b001609960ca33047e5cbc5a231c1e24b6041d4b\n\
         "
         .to_string(),
+        previous_filename: None,
     }];
     test_from_diff(&diff, config, &["user1", "user2"]);
 }
@@ -130,6 +132,7 @@ fn empty_file_still_counts() {
         patch: "new file mode 100644\n\
                 index 0000000..e69de29\n"
             .to_string(),
+        previous_filename: None,
     }];
     test_from_diff(&diff, config, &["parser"]);
 }

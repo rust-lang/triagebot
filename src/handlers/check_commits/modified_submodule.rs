@@ -36,6 +36,7 @@ fn no_submodule_update() {
             -let mut my_var = 5;\
             +let mut my_var = \"tmp\";"
             .to_string(),
+        previous_filename: None,
     };
 
     assert_eq!(modifies_submodule(&[filediff]), None)
@@ -50,6 +51,7 @@ fn simple_submodule_update() {
             -Subproject commit c0f3b53c8e5de87714d18a5f42998859302ae03a\n\
             +Subproject commit 8158f78f738715c060d230351623a7f7cc01bf97"
             .to_string(),
+        previous_filename: None,
     };
 
     assert_eq!(
@@ -66,6 +68,7 @@ fn no_submodule_update_tricky_case() {
             -let mut subproject_commit = 5;\
             +let mut subproject_commit = \"+Subproject commit \";"
             .to_string(),
+        previous_filename: None,
     };
 
     assert_eq!(modifies_submodule(&[filediff]), None)
