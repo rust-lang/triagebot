@@ -17,6 +17,16 @@ pub enum ChatCommand {
     /// Inspect or modify your reviewer workqueue.
     #[clap(subcommand)]
     Work(WorkqueueCmd),
+    /// Unlock a specific GitHub issue or pull-request.
+    Unlock {
+        /// Orgnization that is specifically being queried.
+        #[arg(long = "org", default_value = "rust-lang")]
+        organization: String,
+        /// Repository where the issue or pull-request is.
+        repo: String,
+        /// Issue or pull-request number to unlock.
+        id: PullRequestNumber,
+    },
     /// Ping project goal owners.
     PingGoals(PingGoalsArgs),
     /// Update docs
@@ -155,6 +165,16 @@ pub enum StreamCommand {
     },
     /// Label assignment: add one of `P-{low,medium,high,critical}` and remove `I-prioritize`
     AssignPriority(AssignPrioArgs),
+    /// Unlock a specific GitHub issue or pull-request.
+    Unlock {
+        /// Orgnization that is specifically being queried.
+        #[arg(long = "org", default_value = "rust-lang")]
+        organization: String,
+        /// Repository where the issue or pull-request is.
+        repo: String,
+        /// Issue or pull-request number to unlock.
+        id: PullRequestNumber,
+    },
 }
 
 #[derive(clap::Parser, Debug, PartialEq, Clone)]

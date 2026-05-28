@@ -10,7 +10,7 @@ use crate::db::users::DbUser;
 use crate::github::queries::user_comments_in_org::UserComment;
 use crate::github::queries::user_prs::PullRequestState;
 use crate::github::queries::user_prs::UserPullRequest;
-use crate::github::{self, Repository};
+use crate::github::{self, PullRequestNumber, Repository};
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::{ReviewerWorkqueue, get_assigned_prs};
@@ -261,6 +261,11 @@ async fn handle_command<'a>(
         let output = match &cmd {
             ChatCommand::Whoami => whoami_cmd(&ctx, gh_id).await,
             ChatCommand::Lookup(cmd) => lookup_cmd(&ctx, cmd).await,
+            ChatCommand::Unlock {
+                organization,
+                repo,
+                id,
+            } => unlock_cmd(&ctx, gh_id, organization, repo, *id).await,
             ChatCommand::Work(cmd) => workqueue_commands(&ctx, gh_id, cmd).await,
             ChatCommand::PingGoals(args) => {
                 ping_goals_cmd(ctx.clone(), gh_id, message_data, args).await
@@ -390,6 +395,11 @@ async fn handle_command<'a>(
                     };
                     Ok(None)
                 }
+                StreamCommand::Unlock {
+                    organization,
+                    repo,
+                    id,
+                } => unlock_cmd(&ctx, gh_id, &organization, &repo, id).await,
             };
         }
 
@@ -634,6 +644,51 @@ async fn ping_goals_cmd(
             "That command is only permitted for those running the project-goal program.",
         ))
     }
+}
+
+/// Unlock a specific issue in our managed repos.
+/// This command can only be used by team members.
+async fn unlock_cmd(
+    ctx: &Context,
+    gh_id: u64,
+    org: &str,
+    repo: &str,
+    issue_id: PullRequestNumber,
+) -> anyhow::Result<Option<String>> {
+    let gh_login = ctx
+        .team
+        .username_from_gh_id(gh_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Username for GitHub user {gh_id} not found"))?;
+
+    if !ctx.team.is_team_member(&gh_login).await? {
+        return Err(anyhow::anyhow!(
+            "This command is only available to team members."
+        ));
+    }
+
+    if ctx.team.repos().await?.repos.get(org).is_none() {
+        return Err(anyhow::anyhow!(
+            "Organization `{org}` is not managed by the team database."
+        ));
+    }
+
+    let issue_repo = github::IssueRepository {
+        organization: org.to_string(),
+        repository: repo.to_string(),
+    };
+
+    let issue = ctx
+        .github
+        .issue(&issue_repo, issue_id)
+        .await
+        .context(format!("Could not get {issue_repo}#{issue_id} details"))?;
+
+    issue.unlock(&ctx.github).await?;
+
+    Ok(Some(format!(
+        "Successfully unlocked {issue_repo}#{issue_id}!"
+    )))
 }
 
 /// Output recent GitHub activity made by a given user (both globally and in a given organization).
@@ -1108,6 +1163,7 @@ fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
         | ChatCommand::PingGoals(_)
         | ChatCommand::UserInfo { .. }
         | ChatCommand::TeamStats { .. }
+        | ChatCommand::Unlock { .. }
         | ChatCommand::Lookup(_) => ImpersonationMode::Disabled,
         ChatCommand::Whoami => ImpersonationMode::Silent,
         ChatCommand::Work(cmd) => match cmd {
