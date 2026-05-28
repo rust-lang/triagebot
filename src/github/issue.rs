@@ -818,6 +818,20 @@ impl Issue {
             .context("failed to lock issue")?;
         Ok(())
     }
+
+    /// Unlock an issue.
+    pub async fn unlock(&self, client: &GithubClient) -> anyhow::Result<()> {
+        let lock_url = format!(
+            "{}/issues/{}/lock",
+            self.repository().url(client),
+            self.number
+        );
+        client
+            .send_req(client.delete(&lock_url))
+            .await
+            .context("failed to unlock issue")?;
+        Ok(())
+    }
 }
 
 // Pull-request files
