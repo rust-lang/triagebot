@@ -6,6 +6,7 @@ use regex::Regex;
 pub mod assign;
 pub mod close;
 pub mod concern;
+pub mod lock;
 pub mod nominate;
 pub mod note;
 pub mod ping;
@@ -24,6 +25,7 @@ pub enum Command<'a> {
     Prioritize(Result<prioritize::PrioritizeCommand, Error<'a>>),
     Second(Result<second::SecondCommand, Error<'a>>),
     Shortcut(Result<shortcut::ShortcutCommand, Error<'a>>),
+    Lock(Result<lock::LockCommand, Error<'a>>),
     Close(Result<close::CloseCommand, Error<'a>>),
     Note(Result<note::NoteCommand, Error<'a>>),
     Concern(Result<concern::ConcernCommand, Error<'a>>),
@@ -130,6 +132,11 @@ impl<'a> Input<'a> {
             &original_tokenizer,
         ));
         success.extend(parse_single_command(
+            lock::LockCommand::parse,
+            Command::Lock,
+            &original_tokenizer,
+        ));
+        success.extend(parse_single_command(
             close::CloseCommand::parse,
             Command::Close,
             &original_tokenizer,
@@ -210,6 +217,7 @@ impl Command<'_> {
             Command::Prioritize(r) => r.is_ok(),
             Command::Second(r) => r.is_ok(),
             Command::Shortcut(r) => r.is_ok(),
+            Command::Lock(r) => r.is_ok(),
             Command::Close(r) => r.is_ok(),
             Command::Note(r) => r.is_ok(),
             Command::Concern(r) => r.is_ok(),
@@ -359,6 +367,26 @@ fn review_ignored() {
         let mut input = Input::new(input, vec!["bot"]);
         assert_eq!(input.next(), None);
     }
+}
+
+#[test]
+fn lock() {
+    let input = "@bot lock";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert_eq!(
+        input.next(),
+        Some(Command::Lock(Ok(lock::LockCommand::Lock)))
+    );
+}
+
+#[test]
+fn unlock() {
+    let input = "@bot unlock";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert_eq!(
+        input.next(),
+        Some(Command::Lock(Ok(lock::LockCommand::Unlock)))
+    );
 }
 
 #[test]

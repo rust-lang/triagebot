@@ -21,6 +21,7 @@ mod concern;
 pub mod docs_update;
 mod github_releases;
 mod issue_links;
+mod lock;
 pub(crate) mod major_change;
 mod mentions;
 mod merge_conflicts;
@@ -497,6 +498,7 @@ command_handlers! {
     relabel: Relabel,
     major_change: Second,
     shortcut: Shortcut,
+    lock: Lock,
     close: Close,
     note: Note,
     concern: Concern,
