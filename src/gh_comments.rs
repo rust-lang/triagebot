@@ -888,33 +888,54 @@ fn write_reaction_groups_as_html(
     buffer: &mut String,
     reaction_groups: &[GitHubGraphQlReactionGroup],
 ) -> anyhow::Result<()> {
-    let any_reactions = reaction_groups.iter().any(|rg| rg.users.total_count > 0);
+    let any_reactions = reaction_groups.iter().any(|rg| rg.reactors.total_count > 0);
 
     if any_reactions {
         writeln!(buffer, r##"<div class="reactions">"##)?;
 
         for reaction_group in reaction_groups {
-            let total_count = reaction_group.users.total_count;
+            let total_count = reaction_group.reactors.total_count;
 
             if total_count == 0 {
                 continue;
             }
 
             use crate::github::queries::issue_with_comments::GitHubGraphQlReactionContent::*;
-            let emoji = match reaction_group.content {
-                ThumbsUp => "👍",
-                ThumbsDown => "👎",
-                Laugh => "😄",
-                Hooray => "🎉",
-                Confused => "😕",
-                Heart => "❤️",
-                Rocket => "🚀",
-                Eyes => "👀",
+            let (emoji, emoji_desc) = match reaction_group.content {
+                ThumbsUp => ("👍", "thumbs up"),
+                ThumbsDown => ("👎", "thumbs down"),
+                Laugh => ("😄", "laugh"),
+                Hooray => ("🎉", "hooray"),
+                Confused => ("😕", "confused"),
+                Heart => ("❤️", "heart"),
+                Rocket => ("🚀", "rocket"),
+                Eyes => ("👀", "eyes"),
+            };
+
+            let title = {
+                let users = reaction_group
+                    .reactors
+                    .nodes
+                    .iter()
+                    .filter_map(|r| r.login.as_deref())
+                    .collect::<Vec<_>>();
+                let left = total_count.saturating_sub(users.len() as u32);
+
+                let users = users.join(", ");
+                let reacted = if left == 0 {
+                    format!("{users} reacted with {emoji_desc} emoji")
+                } else {
+                    format!("{users} and {left} users reacted with {emoji_desc} emoji")
+                };
+
+                let mut title = String::new();
+                pulldown_cmark_escape::escape_html(&mut title, &reacted)?;
+                title
             };
 
             write!(
                 buffer,
-                r##"<button class="reaction" disabled="disabled">{emoji}<span class="reaction-number">{total_count}</span></button>"##
+                r##"<button class="reaction" disabled="disabled" title="{title}">{emoji}<span class="reaction-number">{total_count}</span></button>"##
             )?;
         }
 
