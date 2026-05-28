@@ -147,13 +147,20 @@ pub struct GitHubGraphQlReview {
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubGraphQlReactionGroup {
     pub content: GitHubGraphQlReactionContent,
-    pub users: GitHubGraphQlReactionGroupUsers,
+    pub reactors: GitHubGraphQlReactionGroupReactors,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct GitHubGraphQlReactionGroupUsers {
+pub struct GitHubGraphQlReactionGroupReactors {
     #[serde(rename = "totalCount")]
     pub total_count: u32,
+    pub nodes: Vec<GitHubGraphQlReactionGroupReactor>,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct GitHubGraphQlReactionGroupReactor {
+    #[serde(default)]
+    pub login: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy, PartialEq, Eq)]
@@ -250,8 +257,13 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
         }
         reactionGroups {
           content
-          users {
+          reactors(first: 10) {
             totalCount
+            nodes {
+              ... on User {
+                login
+              }
+            }
           }
         }
         comments(first: 100, after: $commentsCursor) {
@@ -268,8 +280,13 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             url
             reactionGroups {
               content
-              users {
+              reactors(first: 10) {
                 totalCount
+                nodes {
+                  ... on User {
+                    login
+                  }
+                }
               }
             }
           }
@@ -293,8 +310,13 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
         }
         reactionGroups {
           content
-          users {
+          reactors(first: 10) {
             totalCount
+            nodes {
+              ... on User {
+                login
+              }
+            }
           }
         }
         comments(first: 100, after: $commentsCursor) {
@@ -311,8 +333,13 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             url
             reactionGroups {
               content
-              users {
+              reactors(first: 10) {
                 totalCount
+                nodes {
+                  ... on User {
+                    login
+                  }
+                }
               }
             }
           }
@@ -344,8 +371,13 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
                 url
                 reactionGroups {
                   content
-                  users {
+                  reactors(first: 10) {
                     totalCount
+                    nodes {
+                      ... on User {
+                        login
+                      }
+                    }
                   }
                 }
                 pullRequestReview {
@@ -375,8 +407,13 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             url
             reactionGroups {
               content
-              users {
+              reactors(first: 10) {
                 totalCount
+                nodes {
+                  ... on User {
+                    login
+                  }
+                }
               }
             }
           }
