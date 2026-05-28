@@ -14,7 +14,7 @@ note_id: xxx
 
 - (TIP) add here non-recurrent scheduled meetings, [check the schedule calendar](https://github.com/rust-lang/calendar)
 - (TIP) mention upcoming Rust stable releases, [check the release calendar](https://calendar.google.com/calendar/htmlembed?src=l1b1gkqvfbgunjs18nemq4c580%40group.calendar.google.com)
-- Reminder: if you see a PR/issue that seems like there might be legal implications due to copyright/IP/etc, please let us know (or at least message @_**davidtwco** or @_**Wesley Wiser** so we can pass it along).
+- Reminder: if you see a PR/issue that seems like there might be legal implications due to copyright/IP/etc, please let us know (or at least message @_**davidtwco** or @_**Boxy** so we can pass it along).
 
 ### Other WG meetings
 
@@ -37,9 +37,7 @@ note_id: xxx
 - MCPs blocked on unresolved concerns
   - <Here group MCPs blocked on unresolved concerns>
 - Finalized FCPs (disposition merge)
-{{-issues::render(issues=fcp_finished_tcompiler, indent="  ", empty="No new finished FCP (disposition merge) this time.")}}
-- Other teams finalized FCPs
-{{-issues::render(issues=fcp_finished_not_tcompiler, indent="  ", empty="No new finished FCP (disposition merge) this time.")}}
+{{-issues::render(issues=fcp_finished_tcompiler, indent="  ", with_age=false, with_team_tag=true, empty="No new finished FCP (disposition merge) this time.")}}
 
 ## Backport nominations
 

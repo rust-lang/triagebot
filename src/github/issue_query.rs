@@ -161,17 +161,25 @@ impl IssuesQuery for Query<'_> {
                 None
             };
 
+            let labels = issue
+                .labels
+                .iter()
+                .map(|l| l.name.as_ref())
+                .collect::<Vec<&str>>();
+
+            // guess the team this issue belongs to:
+            // get the first T-* label associated with it
+            let t_label = labels
+                .iter()
+                .find(|s| s.starts_with("T-"))
+                .map_or("", |v| v);
+
             issues_decorator.push(crate::actions::IssueDecorator {
                 title: issue.title.clone(),
                 number: issue.number,
                 html_url: issue.html_url.clone(),
                 repo_name: repo.name().to_owned(),
-                labels: issue
-                    .labels
-                    .iter()
-                    .map(|l| l.name.as_ref())
-                    .collect::<Vec<_>>()
-                    .join(", "),
+                labels: labels.join(","),
                 assignees: issue
                     .assignees
                     .iter()
@@ -179,6 +187,7 @@ impl IssuesQuery for Query<'_> {
                     .collect::<Vec<_>>()
                     .join(", "),
                 author: issue.user.login,
+                team: t_label.to_string(),
                 updated_at_hts: crate::actions::to_human(issue.updated_at),
                 fcp_details,
                 mcp_details,
@@ -325,6 +334,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                         repo_name: repo_name.to_string(),
                         labels,
                         author,
+                        team: "UNUSED".to_string(),
                         assignees,
                         updated_at_hts,
                         fcp_details: None,

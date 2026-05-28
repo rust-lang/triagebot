@@ -134,7 +134,7 @@ If you want a test Zulip instance, you can [register a free one](https://zulip.c
 - Configure a [webhook forwarding service](#configure-webhook-forwarding)
 - Create in your Zulip instance an outgoing webhook bot, binding it to the forwarding address created before.
 - Launch your local triagebot setting `ZULIP_WEBHOOK_SECRET` to the webhook bot `token` value (you get that as part of the Zulip bot configuration)
-- Set other Zulip env vars as needed (see example in `.env.sample`).
+- Set other Zulip env vars as needed (see example in `.env.sample`): specifically you will need `TEAMS_API_URL` to point to a host with custom Zulip user mappings (relevant file: `zulip_map.json`).
 
 You can also simulate a Zulip webhook payload with `cURL`. For example, this is the payload sent to the triagebot server when tagging a Zulip bot in a stream.
 ``` sh
