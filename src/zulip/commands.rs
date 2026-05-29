@@ -17,6 +17,16 @@ pub enum ChatCommand {
     /// Inspect or modify your reviewer workqueue.
     #[clap(subcommand)]
     Work(WorkqueueCmd),
+    /// Unlock a specific GitHub issue or pull-request.
+    Unlock {
+        /// Orgnization that is specifically being queried.
+        #[arg(long = "org", default_value_t = get_default_org())]
+        organization: String,
+        /// Repository where the issue or pull-request is.
+        repo: String,
+        /// Issue or pull-request number to unlock.
+        id: PullRequestNumber,
+    },
     /// Ping project goal owners.
     PingGoals(PingGoalsArgs),
     /// Update docs
@@ -28,7 +38,7 @@ pub enum ChatCommand {
         /// GitHub username to look up.
         username: String,
         /// Organization where to find the user's activity.
-        #[arg(long = "org", default_value = "rust-lang")]
+        #[arg(long = "org", default_value_t = get_default_org())]
         organization: String,
     },
     /// Shows review queue statistics of members of the given Rust team.
@@ -37,7 +47,7 @@ pub enum ChatCommand {
         name: String,
         /// Repository that is specifically being queried.
         /// Defaults to `rust` (if you do not specify an org, it will be filled to `rust-lang/`).
-        #[arg(long, default_value = "rust-lang/rust")]
+        #[arg(long, default_value_t = get_default_org_repo())]
         repo: String,
     },
 }
@@ -64,7 +74,7 @@ pub enum WorkqueueCmd {
     Show {
         /// Repository for which to show the statistics.
         /// Defaults to `rust` (if you do not specify an org, it will be filled to `rust-lang/`).
-        #[arg(long, default_value = "rust-lang/rust")]
+        #[arg(long, default_value_t = get_default_org_repo())]
         repo: String,
     },
     /// Set the maximum capacity limit of your workqueue for a specific repository.
@@ -73,7 +83,7 @@ pub enum WorkqueueCmd {
         limit: WorkqueueLimit,
         /// Repository on which to set the limit.
         /// Defaults to `rust` (if you do not specify an org, it will be filled to `rust-lang/`).
-        #[arg(long, default_value = "rust-lang/rust")]
+        #[arg(long, default_value_t = get_default_org_repo())]
         repo: String,
     },
     /// Set your rotation mode (`on` rotation or `off` rotation).
@@ -150,11 +160,21 @@ pub enum StreamCommand {
         /// GitHub username to look up.
         username: String,
         /// Organization where to find the activity.
-        #[arg(long = "org", default_value = "rust-lang")]
+        #[arg(long = "org", default_value_t = get_default_org())]
         organization: String,
     },
     /// Label assignment: add one of `P-{low,medium,high,critical}` and remove `I-prioritize`
     AssignPriority(AssignPrioArgs),
+    /// Unlock a specific GitHub issue or pull-request.
+    Unlock {
+        /// Orgnization that is specifically being queried.
+        #[arg(long = "org", default_value_t = get_default_org())]
+        organization: String,
+        /// Repository where the issue or pull-request is.
+        repo: String,
+        /// Issue or pull-request number to unlock.
+        id: PullRequestNumber,
+    },
 }
 
 #[derive(clap::Parser, Debug, PartialEq, Clone)]
@@ -265,6 +285,17 @@ pub fn parse_cli<'a, T: Parser, I: Iterator<Item = &'a str>>(input: I) -> anyhow
         .try_get_matches_from(input)?;
     let value = T::from_arg_matches(&matches)?;
     Ok(value)
+}
+
+fn get_default_org() -> String {
+    std::env::var("MAIN_GH_REPO_OWNER").unwrap_or_else(|_| "rust-lang".to_string())
+}
+
+fn get_default_org_repo() -> String {
+    let repo_owner = std::env::var("MAIN_GH_REPO_OWNER").unwrap_or("rust-lang".to_string());
+    let repo_name = std::env::var("MAIN_GH_REPO_NAME").unwrap_or("rust".to_string());
+
+    format!("{}/{}", repo_owner, repo_name)
 }
 
 #[cfg(test)]

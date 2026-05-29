@@ -208,6 +208,13 @@ impl GithubClient {
             .context("failed to retrive the compare")
     }
 
+    pub async fn issue(&self, repo: &IssueRepository, issue_num: u64) -> anyhow::Result<Issue> {
+        let url = format!("{}/issues/{issue_num}", repo.url(self));
+        self.json(self.get(&url))
+            .await
+            .with_context(|| format!("{repo} failed to get issue {issue_num}"))
+    }
+
     pub async fn pull_request(&self, repo: &IssueRepository, pr_num: u64) -> anyhow::Result<Issue> {
         let url = format!("{}/pulls/{pr_num}", repo.url(self));
         let mut pr: Issue = self
@@ -869,11 +876,15 @@ impl Repository {
     }
 
     pub async fn get_issue(&self, client: &GithubClient, issue_num: u64) -> anyhow::Result<Issue> {
-        let url = format!("{}/issues/{issue_num}", self.url(client));
         client
-            .json(client.get(&url))
+            .issue(
+                &IssueRepository {
+                    organization: self.owner().to_string(),
+                    repository: self.name().to_string(),
+                },
+                issue_num,
+            )
             .await
-            .with_context(|| format!("{} failed to get issue {issue_num}", self.full_name))
     }
 
     pub async fn get_pr(&self, client: &GithubClient, pr_num: u64) -> anyhow::Result<Issue> {

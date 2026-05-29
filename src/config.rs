@@ -69,6 +69,7 @@ define_config! {
     nominate: NominateConfig,
     prioritize: PrioritizeConfig,
     major_change: MajorChangeConfig,
+    lock: LockConfig,
     close: CloseConfig,
     autolabel: AutolabelConfig,
     notify_zulip: NotifyZulipConfig,
@@ -549,6 +550,10 @@ pub(crate) struct MajorChangeTrackingIssueTemplateConfig {
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct LockConfig {}
+
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct CloseConfig {}
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
@@ -881,6 +886,10 @@ mod tests {
 
             [note]
 
+            [close]
+
+            [lock]
+
             [concern]
             labels = ["has-concerns"]
 
@@ -993,7 +1002,8 @@ mod tests {
                 shortcut: Some(ShortcutConfig { _empty: () }),
                 prioritize: None,
                 major_change: None,
-                close: None,
+                lock: Some(LockConfig {}),
+                close: Some(CloseConfig {}),
                 autolabel: None,
                 notify_zulip: None,
                 github_releases: None,
@@ -1118,6 +1128,7 @@ mod tests {
                 shortcut: None,
                 prioritize: None,
                 major_change: None,
+                lock: None,
                 close: None,
                 autolabel: None,
                 notify_zulip: None,
