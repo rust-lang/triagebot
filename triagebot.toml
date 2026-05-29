@@ -5,6 +5,8 @@ allow-unauthenticated = ["bug", "invalid", "question", "enhancement"]
 
 [note]
 
+[lock]
+
 [concern]
 labels = ["has-concerns"]
 
