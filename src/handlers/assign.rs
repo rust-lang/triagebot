@@ -189,8 +189,12 @@ pub(super) async fn handle_input(
             }
         } else if matches!(
             event.issue.author_association,
-            AuthorAssociation::FirstTimer | AuthorAssociation::FirstTimeContributor
+            AuthorAssociation::FirstTimer
+                | AuthorAssociation::FirstTimeContributor
+                | AuthorAssociation::None
         ) {
+            // See https://github.com/llvm/llvm-project/blob/00062ed982256651a28187e865d6ae14e21d8395/.github/workflows/new-prs.yml#L22-L34
+            // for why we are also checking None
             let assignee_text = match &assignee {
                 Some(assignee) => messages::welcome_with_reviewer(&assignee.name),
                 None => messages::WELCOME_WITHOUT_REVIEWER.to_string(),
