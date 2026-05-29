@@ -1,11 +1,13 @@
 use std::sync::{Arc, LazyLock};
 
 use anyhow::Context as _;
+use async_trait::async_trait;
+use chrono::{Duration, Utc};
 
 use crate::{
     cache,
     config::ReviewChangesSinceConfig,
-    github::{Comment, Event, Issue, IssueCommentAction, IssueCommentEvent},
+    github::{Comment, Event, Issue, IssueCommentAction, IssueCommentEvent, IssueRepository},
     handlers::Context,
 };
 
@@ -137,19 +139,84 @@ pub(crate) async fn handle(
             if let ReviewBodyState::Absent = review_body_state {
                 // parent review is empty, let's add the link to the review comment instead
 
-                let new_body = format!(
-                    "{}\n\n*[View changes since the review]({link})*",
-                    event.comment.body
-                );
+                // unfortunately, review comments are not updated by GitHub in the UI, which
+                // creates friction for contributors as they might want to edit the review
+                // comment, but get blocked since we modified it in the mean time
+                //
+                // we therefore defer adding the link by one minute
 
-                event
-                    .issue
-                    .edit_review_comment(&ctx.github, event.comment.id, &new_body)
-                    .await
-                    .context("failed to update the review comment body")?;
+                let pr_repo = event.issue.repository();
+                let args = AddReviewChangesSinceLinkJobArgs {
+                    org: pr_repo.organization.clone(),
+                    repo: pr_repo.repository.clone(),
+                    pr_id: event.issue.number,
+                    review_comment_id: event.comment.id,
+                    link,
+                };
+
+                crate::db::schedule_job(
+                    &*ctx.db.get().await,
+                    ADD_REVIEW_CHANGES_SINCE_LINK_JOB_NAME,
+                    serde_json::to_value(args)?,
+                    Utc::now() + Duration::minutes(1),
+                ).await.context("failed to setup the job to add the review changes since link to the review comment")?;
             }
         }
     }
 
     Ok(())
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct AddReviewChangesSinceLinkJobArgs {
+    org: String,
+    repo: String,
+    pr_id: u64,
+    review_comment_id: u64,
+    link: String,
+}
+
+pub(crate) struct AddReviewChangesSinceLinkJob;
+
+const ADD_REVIEW_CHANGES_SINCE_LINK_JOB_NAME: &str = "add_review_changes_since_link_job";
+
+#[async_trait]
+impl crate::jobs::Job for AddReviewChangesSinceLinkJob {
+    fn name(&self) -> &str {
+        ADD_REVIEW_CHANGES_SINCE_LINK_JOB_NAME
+    }
+
+    async fn run(&self, ctx: &Context, metadata: &serde_json::Value) -> anyhow::Result<()> {
+        let args: AddReviewChangesSinceLinkJobArgs = serde_json::from_value(metadata.clone())
+            .with_context(|| {
+                format!("failed to deserialize the metadata {metadata:?} into args")
+            })?;
+
+        let pr_repo = IssueRepository {
+            organization: args.org.clone(),
+            repository: args.repo.clone(),
+        };
+
+        let pr = ctx
+            .github
+            .pull_request(&pr_repo, args.pr_id)
+            .await
+            .context("failed to get the pr")?;
+
+        let review_comment = pr
+            .get_review_comment(&ctx.github, args.review_comment_id)
+            .await
+            .context("couldn't get the review comment")?;
+
+        let new_body = format!(
+            "{}\n\n*[View changes since the review]({})*",
+            review_comment.body, &args.link
+        );
+
+        pr.edit_review_comment(&ctx.github, args.review_comment_id, &new_body)
+            .await
+            .context("failed to update the review comment body")?;
+
+        Ok(())
+    }
 }

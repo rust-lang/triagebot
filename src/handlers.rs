@@ -37,7 +37,7 @@ mod relabel;
 mod relnotes;
 mod rendered_link;
 pub mod report_user_bans;
-mod review_changes_since;
+pub(crate) mod review_changes_since;
 mod review_reminder;
 mod review_requested;
 mod review_submitted;

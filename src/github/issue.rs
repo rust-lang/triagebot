@@ -638,6 +638,22 @@ impl Issue {
             .with_context(|| format!("unable to fetch review ({review_id})"))?;
         Ok(review)
     }
+
+    pub async fn get_review_comment(
+        &self,
+        client: &GithubClient,
+        review_comment_id: u64,
+    ) -> anyhow::Result<Comment> {
+        let review_comment_url = format!(
+            "{}/pulls/comments/{review_comment_id}",
+            self.repository().url(client),
+        );
+        let review = client
+            .json(client.get(&review_comment_url))
+            .await
+            .with_context(|| format!("unable to fetch review comment ({review_comment_id})"))?;
+        Ok(review)
+    }
 }
 
 // Comments

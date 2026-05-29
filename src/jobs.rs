@@ -56,7 +56,7 @@ use crate::{
     github::client::GithubRateLimitLoggingJob,
     handlers::{
         Context, docs_update::DocsUpdateJob, major_change::MajorChangeAcceptanceJob,
-        rustc_commits::RustcCommitsJob,
+        review_changes_since::AddReviewChangesSinceLinkJob, rustc_commits::RustcCommitsJob,
     },
 };
 
@@ -76,6 +76,7 @@ pub fn jobs() -> Vec<Box<dyn Job + Send + Sync>> {
         Box::new(PullRequestAssignmentUpdate),
         Box::new(MajorChangeAcceptanceJob),
         Box::new(GithubRateLimitLoggingJob),
+        Box::new(AddReviewChangesSinceLinkJob),
     ]
 }
 
