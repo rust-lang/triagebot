@@ -418,7 +418,7 @@ r#":warning: **Warning** :warning:
                 state: crate::github::IssueState::Open,
                 milestone: None,
                 mergeable: None,
-                author_association: octocrab::models::AuthorAssociation::Contributor,
+                author_association: octocrab::models::AuthorAssociation::Contributor.into(),
             },
             changes: None,
             before: None,

@@ -1,6 +1,5 @@
 use anyhow::Context;
 use chrono::Utc;
-use octocrab::models::AuthorAssociation;
 use reqwest::StatusCode;
 use std::fmt;
 use std::sync::OnceLock;
@@ -734,6 +733,38 @@ impl Issue {
             .await
             .context("failed to post comment")?;
         Ok(comment)
+    }
+}
+
+// Author association
+
+#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq)]
+#[serde(transparent)]
+pub struct AuthorAssociation(octocrab::models::AuthorAssociation);
+
+impl AuthorAssociation {
+    pub fn is_probably_first_timer(&self) -> bool {
+        use octocrab::models::AuthorAssociation;
+
+        // See https://github.com/llvm/llvm-project/blob/00062ed982256651a28187e865d6ae14e21d8395/.github/workflows/new-prs.yml#L22-L34
+        // for why we are also checking None
+        matches!(
+            self.0,
+            AuthorAssociation::FirstTimer
+                | AuthorAssociation::FirstTimeContributor
+                | AuthorAssociation::None
+        )
+    }
+
+    pub fn is_org_member(&self) -> bool {
+        use octocrab::models::AuthorAssociation;
+        matches!(self.0, AuthorAssociation::Member | AuthorAssociation::Owner)
+    }
+}
+
+impl From<octocrab::models::AuthorAssociation> for AuthorAssociation {
+    fn from(value: octocrab::models::AuthorAssociation) -> Self {
+        Self(value)
     }
 }
 
