@@ -45,6 +45,13 @@ excluded-repos = [
   "rust-lang/team", # no write permissions
 ]
 
+# Allow mods/members to lock/unlock an issue or PR (`@rustbot lock`)
+# Documentation at: https://forge.rust-lang.org/triagebot/lock.html
+[lock]
+excluded-repos = [
+  "rust-lang/team", # no write permissions
+]
+
 # Enable merge conflicts notifications in PRs
 # Documentation at: https://forge.rust-lang.org/triagebot/merge-conflicts.html
 [merge-conflicts]
