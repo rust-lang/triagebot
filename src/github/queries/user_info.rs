@@ -1,10 +1,12 @@
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 
-use crate::github::GithubClient;
+use crate::github::{GithubClient, UserId};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct UserInfo {
+    pub id: UserId,
+    pub login: String,
     /// When was the user account created?
     pub created_at: DateTime<Utc>,
     pub public_repos: u32,
