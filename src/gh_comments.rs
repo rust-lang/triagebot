@@ -787,7 +787,7 @@ fn write_review_thread_as_html(
         r###"
       <details class="review-thread" data-expandable="{default_open}" {open}>
         <summary class="review-thread-header">
-            <span>{path_html}{status}</span>
+            <span><span class="indicator"></span>{path_html}{status}</span>
         </summary>
 
         <div class="review-thread-comments">

@@ -118,6 +118,20 @@ details > .review-thread-header {
     cursor: pointer;
 }
 
+.indicator {
+    margin-right: 0.5rem;
+}
+
+details .comment-header .indicator::before,
+details .review-thread-header .indicator::before {
+    content: "\25b6"; /* Unicode for ▶ */
+}
+
+details[open] .comment-header .indicator::before,
+details[open] .review-thread-header .indicator::before {
+    content: "\25bc"; /* Unicode for ▼ */
+}
+
 details:not([open]) > .comment-header,
 details:not([open]) > .review-thread-header {
     border-bottom: 0px;
