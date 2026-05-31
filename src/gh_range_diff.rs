@@ -385,7 +385,11 @@ fn process_old_new(
 
         // Show the changes if there are any hunks to be shown
         if !hunks.is_empty() {
-            let printer = HtmlDiffPrinter(&input.interner, filename);
+            let printer = HtmlDiffPrinter {
+                interner: &input.interner,
+                filename: Some(filename),
+                mode: HtmlDiffPrinterMode::DoubleDiff,
+            };
             let unified_diff = CustomUnifiedDiff {
                 printer: &printer,
                 hunks: &hunks,
@@ -475,13 +479,23 @@ fn process_old_new(
 const REMOVED_BLOCK_SIGN: &str = r#"<span class="removed-block"> - </span>"#;
 const ADDED_BLOCK_SIGN: &str = r#"<span class="added-block"> + </span>"#;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 enum HunkTokenStatus {
     Added,
     Removed,
 }
 
-struct HtmlDiffPrinter<'a>(pub &'a Interner<&'a str>, pub &'a str);
+struct HtmlDiffPrinter<'a> {
+    pub interner: &'a Interner<&'a str>,
+    pub filename: Option<&'a str>,
+    pub mode: HtmlDiffPrinterMode,
+}
+
+#[derive(PartialEq)]
+enum HtmlDiffPrinterMode {
+    DoubleDiff,
+    NormalDiff,
+}
 
 impl HtmlDiffPrinter<'_> {
     #[expect(clippy::unused_self, reason = "might use it later")]
@@ -500,8 +514,14 @@ impl HtmlDiffPrinter<'_> {
         let mut words = words.peekable();
 
         let first_word = words.peek();
-        let is_add = first_word.is_some_and(|w| w.0.starts_with('+'));
-        let is_remove = first_word.is_some_and(|w| w.0.starts_with('-'));
+        let is_add = match self.mode {
+            HtmlDiffPrinterMode::DoubleDiff => first_word.is_some_and(|w| w.0.starts_with('+')),
+            HtmlDiffPrinterMode::NormalDiff => hunk_token_status == HunkTokenStatus::Added,
+        };
+        let is_remove = match self.mode {
+            HtmlDiffPrinterMode::DoubleDiff => first_word.is_some_and(|w| w.0.starts_with('-')),
+            HtmlDiffPrinterMode::NormalDiff => hunk_token_status == HunkTokenStatus::Removed,
+        };
 
         // Highlight in the same was as `git range-diff` does for diff-lines
         // that changed. In addition we also do word highlighting.
@@ -555,16 +575,17 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
     ) -> fmt::Result {
         const NEW_LINE: &str = "\n";
 
-        write!(
-            f,
-            r#"<span class="filename-line"> <span class="filename-block">@@</span> <b>{}</b>{NEW_LINE}</span>"#,
-            self.1
-        )?;
+        if let Some(filename) = &self.filename {
+            write!(
+                f,
+                r#"<span class="filename-line"> <span class="filename-block">@@</span> <b>{filename}</b>{NEW_LINE}</span>"#,
+            )?;
+        }
         Ok(())
     }
 
     fn display_context_token(&self, mut f: impl fmt::Write, token: Token) -> fmt::Result {
-        let token = self.0[token];
+        let token = self.interner[token];
         write!(f, "    ")?;
         pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
         if !token.ends_with('\n') {
@@ -592,8 +613,8 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
                 .map(|(b_token, a_token)| {
                     // Split both lines by words and intern them.
                     let input: InternedInput<&str> = InternedInput::new(
-                        SplitWordBoundaries(self.0[*b_token]),
-                        SplitWordBoundaries(self.0[*a_token]),
+                        SplitWordBoundaries(self.interner[*b_token]),
+                        SplitWordBoundaries(self.interner[*a_token]),
                     );
 
                     // Compute the (word) diff
@@ -640,7 +661,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
 
             // Add potentially missing new-line after the last before diff line
             if let Some(&last) = before.last() {
-                if !self.0[last].ends_with('\n') {
+                if !self.interner[last].ends_with('\n') {
                     writeln!(f)?;
                 }
             }
@@ -661,7 +682,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
 
             // Add potentially missing new-line after the last after diff line
             if let Some(&last) = after.last() {
-                if !self.0[last].ends_with('\n') {
+                if !self.interner[last].ends_with('\n') {
                     writeln!(f)?;
                 }
             }
@@ -670,28 +691,28 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
 
             if let Some(&last) = before.last() {
                 for &token in before {
-                    let token = self.0[token];
+                    let token = self.interner[token];
                     self.handle_hunk_line(
                         &mut f,
                         HunkTokenStatus::Removed,
                         std::iter::once((token, false)),
                     )?;
                 }
-                if !self.0[last].ends_with('\n') {
+                if !self.interner[last].ends_with('\n') {
                     writeln!(f)?;
                 }
             }
 
             if let Some(&last) = after.last() {
                 for &token in after {
-                    let token = self.0[token];
+                    let token = self.interner[token];
                     self.handle_hunk_line(
                         &mut f,
                         HunkTokenStatus::Added,
                         std::iter::once((token, false)),
                     )?;
                 }
-                if !self.0[last].ends_with('\n') {
+                if !self.interner[last].ends_with('\n') {
                     writeln!(f)?;
                 }
             }
