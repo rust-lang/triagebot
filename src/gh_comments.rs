@@ -496,7 +496,7 @@ pub async fn gh_comments(
     headers.insert(
         CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(
-            "default-src 'none'; script-src 'nonce-triagebot-gh-comments' 'self'; style-src 'self' 'unsafe-inline'; img-src *",
+            "default-src 'none'; script-src 'nonce-triagebot-gh-comments' 'self'; style-src 'self' 'unsafe-inline'; img-src * data:",
         ),
     );
 
@@ -576,6 +576,8 @@ fn write_comment_as_html(
             </div>
           </div>
 
+          <span style="flex:1"></span>
+          <span class="fold-indicator"></span>
           <a href="{comment_url}" target="_blank" class="github-link">View on GitHub</a>
         </summary>
 
@@ -787,7 +789,7 @@ fn write_review_thread_as_html(
         r###"
       <details class="review-thread" data-expandable="{default_open}" {open}>
         <summary class="review-thread-header">
-            <span><span class="indicator"></span>{path_html}{status}</span>
+            <span><span class="indicator"></span>{path_html}{status}</span><span class="fold-indicator"></span> 
         </summary>
 
         <div class="review-thread-comments">
