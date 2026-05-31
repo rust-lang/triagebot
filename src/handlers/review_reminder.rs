@@ -1,5 +1,3 @@
-use octocrab::models::AuthorAssociation;
-
 use crate::{config::ShortcutConfig, db::issue_data::IssueData, github::Issue, handlers::Context};
 
 /// Key for the state in the database
@@ -22,10 +20,7 @@ pub(crate) async fn remind_author_of_bot_ready(
         return Ok(());
     };
 
-    if matches!(
-        issue.author_association,
-        AuthorAssociation::Member | AuthorAssociation::Owner
-    ) {
+    if issue.author_association.is_org_member() {
         // Don't post the reminder for org members (public-only unfortunately) and owner of the org.
         return Ok(());
     }

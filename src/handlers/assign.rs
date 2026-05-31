@@ -33,7 +33,6 @@ use crate::{
     interactions::EditIssueBody,
 };
 use anyhow::{Context as _, bail};
-use octocrab::models::AuthorAssociation;
 use parser::command::assign::AssignCommand;
 use parser::command::{Command, Input};
 use rand::seq::IteratorRandom;
@@ -177,20 +176,14 @@ pub(super) async fn handle_input(
 
                 if let Some(ref mut welcome) = welcome
                     && let Some(contrib) = &config.contributing_url
-                    && matches!(
-                        event.issue.author_association,
-                        AuthorAssociation::FirstTimer | AuthorAssociation::FirstTimeContributor
-                    )
+                    && event.issue.author_association.is_probably_first_timer()
                 {
                     welcome.push_str("\n\n");
                     welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
                 }
                 welcome
             }
-        } else if matches!(
-            event.issue.author_association,
-            AuthorAssociation::FirstTimer | AuthorAssociation::FirstTimeContributor
-        ) {
+        } else if event.issue.author_association.is_probably_first_timer() {
             let assignee_text = match &assignee {
                 Some(assignee) => messages::welcome_with_reviewer(&assignee.name),
                 None => messages::WELCOME_WITHOUT_REVIEWER.to_string(),
