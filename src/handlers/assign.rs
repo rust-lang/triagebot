@@ -185,15 +185,27 @@ pub(super) async fn handle_input(
             }
         } else if event.issue.author_association.is_probably_first_timer() {
             let assignee_text = match &assignee {
-                Some(assignee) => messages::welcome_with_reviewer(&assignee.name),
-                None => messages::WELCOME_WITHOUT_REVIEWER.to_string(),
+                Some(assignee) => Some(messages::welcome_with_reviewer(&assignee.name)),
+                None => {
+                    // If the assign fallback group is empty, then we don't expect any automatic
+                    // assignment, and this message would just be spam.
+                    if config.fallback_review_group().is_some() {
+                        Some(messages::WELCOME_WITHOUT_REVIEWER.to_string())
+                    } else {
+                        None
+                    }
+                }
             };
-            let mut welcome = messages::new_user_welcome_message(&assignee_text);
-            if let Some(contrib) = &config.contributing_url {
-                welcome.push_str("\n\n");
-                welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
+            if let Some(assignee_text) = assignee_text {
+                let mut welcome = messages::new_user_welcome_message(&assignee_text);
+                if let Some(contrib) = &config.contributing_url {
+                    welcome.push_str("\n\n");
+                    welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
+                }
+                Some(welcome)
+            } else {
+                None
             }
-            Some(welcome)
         } else if !from_comment {
             match &assignee {
                 Some(assignee) => Some(messages::returning_user_welcome_message(
