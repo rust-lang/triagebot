@@ -19,7 +19,7 @@ use pulldown_cmark_escape::FmtWriter;
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::github::GithubCompare;
+use crate::github::{GithubCommit, GithubCompare};
 use crate::utils::is_known_and_public_repo;
 use crate::{errors::AppError, github, handlers::Context};
 
@@ -353,6 +353,7 @@ fn process_old_new(
 <h3>range-diff of {a_compare_before} {a_compare_after} in {owner}/{repo}</h3>
 <span>Legend: {REMOVED_BLOCK_SIGN}&nbsp;Removed from previous diff | {ADDED_BLOCK_SIGN}&nbsp;Added in new diff</span>
 <div class="spacer"></div>
+<h3>Changes</h3>
 "#
     )?;
 
@@ -447,6 +448,98 @@ fn process_old_new(
     // Print message when there aren't any differences
     if diff_displayed == 0 {
         writeln!(html, "<p>No differences</p>")?;
+    }
+
+    writeln!(html, "<h3>Commits</h3>")?;
+
+    let mut old_commits_it = old.commits.iter();
+    let mut new_commits_it = new.commits.iter();
+    let mut commit_number = 0;
+
+    loop {
+        let old_commit = old_commits_it.next();
+        let new_commit = new_commits_it.next();
+        commit_number += 1;
+
+        if let None = old_commit
+            && let None = new_commit
+        {
+            break;
+        }
+
+        fn commit_content_as_txt(commit: &GithubCommit) -> String {
+            let mut content = String::new();
+
+            if let Some(author_name) = &commit.commit.author.name {
+                let _ = write!(content, "Author: {author_name}");
+
+                if let Some(author_email) = &commit.commit.author.email {
+                    let _ = write!(content, " <{author_email}>");
+                }
+                content.push_str("\n\n");
+            }
+
+            content.push_str(&commit.commit.message);
+            content
+        }
+
+        // Prepare the inputs
+        let old_content = old_commit
+            .map(commit_content_as_txt)
+            .unwrap_or_else(|| "".to_string());
+        let new_content = new_commit
+            .map(commit_content_as_txt)
+            .unwrap_or_else(|| "".to_string());
+
+        // Prepare the
+        let old_sha = old_commit
+            .map(|c| a_github_commit("", owner, repo, &c.sha))
+            .unwrap_or_else(|| ".......".to_string());
+
+        let new_sha = new_commit
+            .map(|c| a_github_commit("", owner, repo, &c.sha))
+            .unwrap_or_else(|| ".......".to_string());
+
+        let first_line_message = new_commit
+            .or(old_commit)
+            .map(|c| c.commit.message.lines().next())
+            .flatten()
+            .unwrap_or("");
+
+        // Compute the diff
+        let input: InternedInput<&str> = InternedInput::new(&*old_content, &*new_content);
+        let mut diff = Diff::compute(Algorithm::Histogram, &input);
+        diff.postprocess_lines(&input);
+
+        // Collect all the hunks
+        let hunks = diff.hunks().collect::<Vec<_>>();
+
+        // Show the diff if there are any changes
+        if !hunks.is_empty() {
+            let printer = HtmlDiffPrinter {
+                interner: &input.interner,
+                filename: None,
+                mode: HtmlDiffPrinterMode::NormalDiff,
+            };
+
+            let unified_diff = CustomUnifiedDiff {
+                printer: &printer,
+                hunks: &hunks,
+                config: CustomUnifiedDiffConfig { context_len: 1000 },
+                before: &input.before,
+                after: &input.after,
+            };
+
+            writeln!(
+                html,
+                "<details open><summary><span>{commit_number}: {old_sha} -- {new_sha} {first_line_message}</span></summary><pre>{unified_diff}</pre></details>",
+            )?;
+        } else {
+            writeln!(
+                html,
+                r#"<details><summary><span>{commit_number}: {old_sha} -- {new_sha} {first_line_message}</span></summary><pre style="margin-left: 4ch">{new_content}</pre></details>"#,
+            )?;
+        }
     }
 
     writeln!(
@@ -835,5 +928,13 @@ fn a_github_compare(class: &str, owner: &str, repo: &str, base: &str, head: &str
         r#"<a href="https://github.com/{owner}/{repo}/compare/{base}..{head}" class="compare {class}">{base_6}..{head_6}</a>"#,
         base_6 = &base[..base.len().min(7)],
         head_6 = &head[..head.len().min(7)]
+    )
+}
+
+// Function to create an <a> link to a GitHub
+fn a_github_commit(class: &str, owner: &str, repo: &str, sha: &str) -> String {
+    format!(
+        r#"<a href="https://github.com/{owner}/{repo}/commit/{sha}" class="{class}">{sha_6}</a>"#,
+        sha_6 = &sha[..sha.len().min(7)],
     )
 }
