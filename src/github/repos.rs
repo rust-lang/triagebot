@@ -1108,6 +1108,8 @@ pub struct GitTreeObject {
 #[derive(Debug, serde::Deserialize)]
 pub struct GitUser {
     pub date: DateTime<FixedOffset>,
+    pub name: Option<String>,
+    pub email: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]

@@ -326,6 +326,8 @@ fn dummy_commit_from_body(sha: &str, body: &str) -> GithubCommit {
         commit: crate::github::GithubCommitCommitField {
             author: crate::github::GitUser {
                 date: DateTime::<FixedOffset>::MIN_UTC.into(),
+                name: Some("octocrab".to_string()),
+                email: Some("example@example.com".to_string()),
             },
             message: body.to_string(),
             tree: crate::github::GitCommitTree {

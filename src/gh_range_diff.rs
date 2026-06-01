@@ -19,7 +19,7 @@ use pulldown_cmark_escape::FmtWriter;
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::github::GithubCompare;
+use crate::github::{GithubCommit, GithubCompare};
 use crate::utils::is_known_and_public_repo;
 use crate::{errors::AppError, github, handlers::Context};
 
@@ -353,6 +353,7 @@ fn process_old_new(
 <h3>range-diff of {a_compare_before} {a_compare_after} in {owner}/{repo}</h3>
 <span>Legend: {REMOVED_BLOCK_SIGN}&nbsp;Removed from previous diff | {ADDED_BLOCK_SIGN}&nbsp;Added in new diff</span>
 <div class="spacer"></div>
+<h3>Changes</h3>
 "#
     )?;
 
@@ -385,7 +386,11 @@ fn process_old_new(
 
         // Show the changes if there are any hunks to be shown
         if !hunks.is_empty() {
-            let printer = HtmlDiffPrinter(&input.interner, filename);
+            let printer = HtmlDiffPrinter {
+                interner: &input.interner,
+                filename: Some(filename),
+                mode: HtmlDiffPrinterMode::DoubleDiff,
+            };
             let unified_diff = CustomUnifiedDiff {
                 printer: &printer,
                 hunks: &hunks,
@@ -445,6 +450,98 @@ fn process_old_new(
         writeln!(html, "<p>No differences</p>")?;
     }
 
+    writeln!(html, "<h3>Commits</h3>")?;
+
+    let mut old_commits_it = old.commits.iter();
+    let mut new_commits_it = new.commits.iter();
+    let mut commit_number = 0;
+
+    loop {
+        let old_commit = old_commits_it.next();
+        let new_commit = new_commits_it.next();
+        commit_number += 1;
+
+        if let None = old_commit
+            && let None = new_commit
+        {
+            break;
+        }
+
+        fn commit_content_as_txt(commit: &GithubCommit) -> String {
+            let mut content = String::new();
+
+            if let Some(author_name) = &commit.commit.author.name {
+                let _ = write!(content, "Author: {author_name}");
+
+                if let Some(author_email) = &commit.commit.author.email {
+                    let _ = write!(content, " <{author_email}>");
+                }
+                content.push_str("\n\n");
+            }
+
+            content.push_str(&commit.commit.message);
+            content
+        }
+
+        // Prepare the inputs
+        let old_content = old_commit
+            .map(commit_content_as_txt)
+            .unwrap_or_else(|| "".to_string());
+        let new_content = new_commit
+            .map(commit_content_as_txt)
+            .unwrap_or_else(|| "".to_string());
+
+        // Prepare the
+        let old_sha = old_commit
+            .map(|c| a_github_commit("", owner, repo, &c.sha))
+            .unwrap_or_else(|| ".......".to_string());
+
+        let new_sha = new_commit
+            .map(|c| a_github_commit("", owner, repo, &c.sha))
+            .unwrap_or_else(|| ".......".to_string());
+
+        let first_line_message = new_commit
+            .or(old_commit)
+            .map(|c| c.commit.message.lines().next())
+            .flatten()
+            .unwrap_or("");
+
+        // Compute the diff
+        let input: InternedInput<&str> = InternedInput::new(&*old_content, &*new_content);
+        let mut diff = Diff::compute(Algorithm::Histogram, &input);
+        diff.postprocess_lines(&input);
+
+        // Collect all the hunks
+        let hunks = diff.hunks().collect::<Vec<_>>();
+
+        // Show the diff if there are any changes
+        if !hunks.is_empty() {
+            let printer = HtmlDiffPrinter {
+                interner: &input.interner,
+                filename: None,
+                mode: HtmlDiffPrinterMode::NormalDiff,
+            };
+
+            let unified_diff = CustomUnifiedDiff {
+                printer: &printer,
+                hunks: &hunks,
+                config: CustomUnifiedDiffConfig { context_len: 1000 },
+                before: &input.before,
+                after: &input.after,
+            };
+
+            writeln!(
+                html,
+                "<details open><summary><span>{commit_number}: {old_sha} -- {new_sha} {first_line_message}</span></summary><pre>{unified_diff}</pre></details>",
+            )?;
+        } else {
+            writeln!(
+                html,
+                r#"<details><summary><span>{commit_number}: {old_sha} -- {new_sha} {first_line_message}</span></summary><pre style="margin-left: 4ch">{new_content}</pre></details>"#,
+            )?;
+        }
+    }
+
     writeln!(
         html,
         r"
@@ -475,13 +572,23 @@ fn process_old_new(
 const REMOVED_BLOCK_SIGN: &str = r#"<span class="removed-block"> - </span>"#;
 const ADDED_BLOCK_SIGN: &str = r#"<span class="added-block"> + </span>"#;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 enum HunkTokenStatus {
     Added,
     Removed,
 }
 
-struct HtmlDiffPrinter<'a>(pub &'a Interner<&'a str>, pub &'a str);
+struct HtmlDiffPrinter<'a> {
+    pub interner: &'a Interner<&'a str>,
+    pub filename: Option<&'a str>,
+    pub mode: HtmlDiffPrinterMode,
+}
+
+#[derive(PartialEq)]
+enum HtmlDiffPrinterMode {
+    DoubleDiff,
+    NormalDiff,
+}
 
 impl HtmlDiffPrinter<'_> {
     #[expect(clippy::unused_self, reason = "might use it later")]
@@ -500,8 +607,14 @@ impl HtmlDiffPrinter<'_> {
         let mut words = words.peekable();
 
         let first_word = words.peek();
-        let is_add = first_word.is_some_and(|w| w.0.starts_with('+'));
-        let is_remove = first_word.is_some_and(|w| w.0.starts_with('-'));
+        let is_add = match self.mode {
+            HtmlDiffPrinterMode::DoubleDiff => first_word.is_some_and(|w| w.0.starts_with('+')),
+            HtmlDiffPrinterMode::NormalDiff => hunk_token_status == HunkTokenStatus::Added,
+        };
+        let is_remove = match self.mode {
+            HtmlDiffPrinterMode::DoubleDiff => first_word.is_some_and(|w| w.0.starts_with('-')),
+            HtmlDiffPrinterMode::NormalDiff => hunk_token_status == HunkTokenStatus::Removed,
+        };
 
         // Highlight in the same was as `git range-diff` does for diff-lines
         // that changed. In addition we also do word highlighting.
@@ -555,16 +668,17 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
     ) -> fmt::Result {
         const NEW_LINE: &str = "\n";
 
-        write!(
-            f,
-            r#"<span class="filename-line"> <span class="filename-block">@@</span> <b>{}</b>{NEW_LINE}</span>"#,
-            self.1
-        )?;
+        if let Some(filename) = &self.filename {
+            write!(
+                f,
+                r#"<span class="filename-line"> <span class="filename-block">@@</span> <b>{filename}</b>{NEW_LINE}</span>"#,
+            )?;
+        }
         Ok(())
     }
 
     fn display_context_token(&self, mut f: impl fmt::Write, token: Token) -> fmt::Result {
-        let token = self.0[token];
+        let token = self.interner[token];
         write!(f, "    ")?;
         pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
         if !token.ends_with('\n') {
@@ -592,8 +706,8 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
                 .map(|(b_token, a_token)| {
                     // Split both lines by words and intern them.
                     let input: InternedInput<&str> = InternedInput::new(
-                        SplitWordBoundaries(self.0[*b_token]),
-                        SplitWordBoundaries(self.0[*a_token]),
+                        SplitWordBoundaries(self.interner[*b_token]),
+                        SplitWordBoundaries(self.interner[*a_token]),
                     );
 
                     // Compute the (word) diff
@@ -640,7 +754,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
 
             // Add potentially missing new-line after the last before diff line
             if let Some(&last) = before.last() {
-                if !self.0[last].ends_with('\n') {
+                if !self.interner[last].ends_with('\n') {
                     writeln!(f)?;
                 }
             }
@@ -661,7 +775,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
 
             // Add potentially missing new-line after the last after diff line
             if let Some(&last) = after.last() {
-                if !self.0[last].ends_with('\n') {
+                if !self.interner[last].ends_with('\n') {
                     writeln!(f)?;
                 }
             }
@@ -670,28 +784,28 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
 
             if let Some(&last) = before.last() {
                 for &token in before {
-                    let token = self.0[token];
+                    let token = self.interner[token];
                     self.handle_hunk_line(
                         &mut f,
                         HunkTokenStatus::Removed,
                         std::iter::once((token, false)),
                     )?;
                 }
-                if !self.0[last].ends_with('\n') {
+                if !self.interner[last].ends_with('\n') {
                     writeln!(f)?;
                 }
             }
 
             if let Some(&last) = after.last() {
                 for &token in after {
-                    let token = self.0[token];
+                    let token = self.interner[token];
                     self.handle_hunk_line(
                         &mut f,
                         HunkTokenStatus::Added,
                         std::iter::once((token, false)),
                     )?;
                 }
-                if !self.0[last].ends_with('\n') {
+                if !self.interner[last].ends_with('\n') {
                     writeln!(f)?;
                 }
             }
@@ -814,5 +928,13 @@ fn a_github_compare(class: &str, owner: &str, repo: &str, base: &str, head: &str
         r#"<a href="https://github.com/{owner}/{repo}/compare/{base}..{head}" class="compare {class}">{base_6}..{head_6}</a>"#,
         base_6 = &base[..base.len().min(7)],
         head_6 = &head[..head.len().min(7)]
+    )
+}
+
+// Function to create an <a> link to a GitHub
+fn a_github_commit(class: &str, owner: &str, repo: &str, sha: &str) -> String {
+    format!(
+        r#"<a href="https://github.com/{owner}/{repo}/commit/{sha}" class="{class}">{sha_6}</a>"#,
+        sha_6 = &sha[..sha.len().min(7)],
     )
 }
