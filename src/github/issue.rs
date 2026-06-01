@@ -653,6 +653,19 @@ impl Issue {
             .with_context(|| format!("unable to fetch review comment ({review_comment_id})"))?;
         Ok(review)
     }
+
+    pub async fn get_reviews(&self, client: &GithubClient) -> anyhow::Result<Vec<Comment>> {
+        let review_url = format!(
+            "{}/pulls/{}/reviews",
+            self.repository().url(client),
+            self.number,
+        );
+        let reviews: Vec<Comment> = client
+            .json(client.get(&review_url))
+            .await
+            .with_context(|| format!("unable to fetch reviews for {}", self.number))?;
+        Ok(reviews)
+    }
 }
 
 // Comments
