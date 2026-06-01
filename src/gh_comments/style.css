@@ -113,13 +113,49 @@ body {
     color: var(--fg-muted);
 }
 
-.review-thread-header {
+details > .comment-header,
+details > .review-thread-header {
     cursor: pointer;
 }
 
 details:not([open]) > .comment-header,
 details:not([open]) > .review-thread-header {
     border-bottom: 0px;
+}
+
+.indicator {
+    margin-right: 0.5rem;
+}
+
+details .comment-header .indicator::before,
+details .review-thread-header .indicator::before {
+    content: "\25b6"; /* Unicode for ▶ */
+}
+
+details[open] .comment-header .indicator::before,
+details[open] .review-thread-header .indicator::before {
+    content: "\25bc"; /* Unicode for ▼ */
+}
+
+.comment-header .fold-indicator {
+    margin-right: 0.5rem;
+}
+
+details .comment-header .fold-indicator,
+details .review-thread-header .fold-indicator {
+    width: 16px;
+    height: 16px;
+    background-color: var(--fg-muted);
+    /* Octicon unfold - MIT Licensed - https://github.com/primer/octicons/blob/fef9ded9c9b21893ba65609d895cf226a7a8eba2/ */
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m8.177.677 2.896 2.896a.25.25 0 0 1-.177.427H8.75v1.25a.75.75 0 0 1-1.5 0V4H5.104a.25.25 0 0 1-.177-.427L7.823.677a.25.25 0 0 1 .354 0ZM7.25 10.75a.75.75 0 0 1 1.5 0V12h2.146a.25.25 0 0 1 .177.427l-2.896 2.896a.25.25 0 0 1-.354 0l-2.896-2.896A.25.25 0 0 1 5.104 12H7.25v-1.25Zm-5-2a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM6 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 6 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM12 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 12 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5Z'/%3E%3C/svg%3E");
+    mask-repeat: no-repeat;
+    mask-size: contain;
+}
+
+details[open] .comment-header .fold-indicator,
+details[open] .review-thread-header .fold-indicator {
+    /* Octicon fold - MIT Licensed - https://github.com/primer/octicons/blob/fef9ded9c9b21893ba65609d895cf226a7a8eba2/ */
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M10.896 2H8.75V.75a.75.75 0 0 0-1.5 0V2H5.104a.25.25 0 0 0-.177.427l2.896 2.896a.25.25 0 0 0 .354 0l2.896-2.896A.25.25 0 0 0 10.896 2ZM8.75 15.25a.75.75 0 0 1-1.5 0V14H5.104a.25.25 0 0 1-.177-.427l2.896-2.896a.25.25 0 0 1 .354 0l2.896 2.896a.25.25 0 0 1-.177.427H8.75v1.25Zm-6.5-6.5a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM6 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 6 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM12 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 12 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5Z'/%3E%3C/svg%3E");
 }
 
 .comment-body {

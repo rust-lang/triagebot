@@ -29,7 +29,7 @@ use crate::{
     utils::{immutable_headers, is_known_and_public_repo},
 };
 
-pub const STYLE_URL: &str = "/gh-comments/style@0.0.8.css";
+pub const STYLE_URL: &str = "/gh-comments/style@0.0.9.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
 pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.3.js";
 pub const RELATIVE_TIME_ELEMENT_URL: &str = "/gh-comments/relative-time-element@5.0.0.js";
@@ -496,7 +496,7 @@ pub async fn gh_comments(
     headers.insert(
         CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(
-            "default-src 'none'; script-src 'nonce-triagebot-gh-comments' 'self'; style-src 'self' 'unsafe-inline'; img-src *",
+            "default-src 'none'; script-src 'nonce-triagebot-gh-comments' 'self'; style-src 'self' 'unsafe-inline'; img-src * data:",
         ),
     );
 
@@ -576,6 +576,8 @@ fn write_comment_as_html(
             </div>
           </div>
 
+          <span style="flex:1"></span>
+          <span class="fold-indicator"></span>
           <a href="{comment_url}" target="_blank" class="github-link">View on GitHub</a>
         </summary>
 
@@ -787,7 +789,7 @@ fn write_review_thread_as_html(
         r###"
       <details class="review-thread" data-expandable="{default_open}" {open}>
         <summary class="review-thread-header">
-            <span>{path_html}{status}</span>
+            <span><span class="indicator"></span>{path_html}{status}</span><span class="fold-indicator"></span> 
         </summary>
 
         <div class="review-thread-comments">
