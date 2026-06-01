@@ -68,7 +68,7 @@ Please choose another assignee by using `r? @reviewer`."
     )
 }
 
-pub const WELCOME_WITHOUT_REVIEWER: &str = "@Mark-Simulacrum (NB. this repo may be misconfigured)";
+pub const WELCOME_WITHOUT_REVIEWER: &str = "a reviewer";
 
 pub const REVIEWER_IS_PR_AUTHOR: &str = "Pull request author cannot be assigned as reviewer.
 
