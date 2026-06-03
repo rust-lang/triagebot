@@ -270,7 +270,7 @@ async fn handle_command<'a>(
             ChatCommand::PingGoals(args) => {
                 ping_goals_cmd(ctx.clone(), gh_id, message_data, args).await
             }
-            ChatCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
+            ChatCommand::DocsUpdate => trigger_docs_update(&ctx.zulip, message_data),
             ChatCommand::UserInfo {
                 username,
                 organization,
@@ -362,7 +362,7 @@ async fn handle_command<'a>(
                 StreamCommand::PingGoals(args) => {
                     ping_goals_cmd(ctx, gh_id, message_data, &args).await
                 }
-                StreamCommand::DocsUpdate => trigger_docs_update(message_data, &ctx.zulip),
+                StreamCommand::DocsUpdate => trigger_docs_update(&ctx.zulip, message_data),
                 StreamCommand::Backport(args) => {
                     let _ = match accept_decline_backport(&ctx, message_data, &args).await {
                         // give user feedback
@@ -1679,7 +1679,7 @@ async fn post_waiter(
     Ok(None)
 }
 
-fn trigger_docs_update(message: &Message, zulip: &ZulipClient) -> anyhow::Result<Option<String>> {
+fn trigger_docs_update(zulip: &ZulipClient, message: &Message) -> anyhow::Result<Option<String>> {
     let message = message.clone();
     // The default Zulip timeout of 10 seconds can be too short, so process in
     // the background.
