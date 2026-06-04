@@ -268,6 +268,27 @@ fn resumes_after_code() {
 }
 
 #[test]
+fn text_after_claim() {
+    let input = "@bot claim I'd like to work on this";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert!(matches!(input.next(), Some(Command::Assign(Ok(_)))));
+}
+
+#[test]
+fn text_after_unclaim() {
+    let input = "@bot unclaim (I don't have time).";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert!(matches!(input.next(), Some(Command::Assign(Ok(_)))));
+}
+
+#[test]
+fn text_after_reroll() {
+    let input = "@bot reroll blahblah";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert!(matches!(input.next(), Some(Command::Assign(Ok(_)))));
+}
+
+#[test]
 fn edit_1() {
     let input_old = "@bot modify labels: +bug.";
     let mut input_old = Input::new(input_old, vec!["bot"]);
