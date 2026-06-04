@@ -57,11 +57,9 @@ impl AssignCommand {
             toks.next_token()?;
             if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
-                *input = toks;
-                Ok(Some(AssignCommand::Claim))
-            } else {
-                Err(toks.error(ParseError::ExpectedEnd))
             }
+            *input = toks;
+            Ok(Some(AssignCommand::Claim))
         } else if let Some(Token::Word("assign")) = toks.peek_token()? {
             toks.next_token()?;
             if let Some(Token::Word(user)) = toks.next_token()? {
@@ -79,20 +77,16 @@ impl AssignCommand {
             toks.next_token()?;
             if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
-                *input = toks;
-                Ok(Some(AssignCommand::ReleaseAssignment))
-            } else {
-                Err(toks.error(ParseError::ExpectedEnd))
             }
+            *input = toks;
+            Ok(Some(AssignCommand::ReleaseAssignment))
         } else if let Some(Token::Word("reroll")) = toks.peek_token()? {
             toks.next_token()?;
             if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
-                *input = toks;
-                Ok(Some(AssignCommand::Reroll))
-            } else {
-                Err(toks.error(ParseError::ExpectedEnd))
             }
+            *input = toks;
+            Ok(Some(AssignCommand::Reroll))
         } else {
             Ok(None)
         }
