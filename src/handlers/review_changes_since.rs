@@ -158,7 +158,7 @@ pub(crate) async fn handle(
                     &*ctx.db.get().await,
                     ADD_REVIEW_CHANGES_SINCE_LINK_JOB_NAME,
                     serde_json::to_value(args)?,
-                    Utc::now() + Duration::minutes(1),
+                    Utc::now() + Duration::minutes(5),
                 ).await.context("failed to setup the job to add the review changes since link to the review comment")?;
             }
         }
