@@ -20,8 +20,8 @@ use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
 use crate::zulip::commands::{
-    AssignPrioArgs, BackportChannelArgs, BackportVerbArgs, ChatCommand, IssuePrio, LookupCmd,
-    PingGoalsArgs, StreamCommand, WorkqueueCmd, WorkqueueLimit, parse_cli,
+    BackportChannelArgs, BackportVerbArgs, ChatCommand, IssuePrio, LookupCmd, PingGoalsArgs,
+    StreamCommand, WorkqueueCmd, WorkqueueLimit, parse_cli,
 };
 use anyhow::{Context as _, format_err};
 use axum::Json;
@@ -29,7 +29,6 @@ use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
 use chrono::{DateTime, Duration, Utc};
-use commands::BackportArgs;
 use itertools::Itertools;
 use rust_team_data::v1::{TeamKind, TeamMember};
 use secrecy::{ExposeSecret, SecretString};
@@ -363,15 +362,22 @@ async fn handle_command<'a>(
                     ping_goals_cmd(ctx, gh_id, message_data, &args).await
                 }
                 StreamCommand::DocsUpdate => trigger_docs_update(&ctx.zulip, message_data),
-                StreamCommand::Backport(args) => {
-                    let _ = match accept_decline_backport(&ctx, message_data, &args).await {
-                        // give user feedback
-                        Ok(_) => ctx.zulip.add_reaction(message_data.id, "check").await,
-                        Err(err) => {
-                            log::error!("Could not handle backport #{}: {:?}", args.pr_num, err);
-                            ctx.zulip.add_reaction(message_data.id, "scream").await
-                        }
-                    };
+                StreamCommand::Backport {
+                    channel,
+                    verb,
+                    pr_num,
+                } => {
+                    let _ =
+                        match accept_decline_backport(&ctx, message_data, &channel, &verb, pr_num)
+                            .await
+                        {
+                            // give user feedback
+                            Ok(_) => ctx.zulip.add_reaction(message_data.id, "check").await,
+                            Err(err) => {
+                                log::error!("Could not handle backport #{}: {:?}", pr_num, err);
+                                ctx.zulip.add_reaction(message_data.id, "scream").await
+                            }
+                        };
                     Ok(None)
                 }
                 StreamCommand::UserInfo {
@@ -380,16 +386,12 @@ async fn handle_command<'a>(
                 } => user_info_cmd(&ctx, gh_id, &username, &organization)
                     .await
                     .map(Some),
-                StreamCommand::AssignPriority(args) => {
-                    let _ = match assign_issue_prio(&ctx, message_data, &args).await {
+                StreamCommand::AssignPriority { issue_num, prio } => {
+                    let _ = match assign_issue_prio(&ctx, message_data, issue_num, prio).await {
                         // give user feedback
                         Ok(_) => ctx.zulip.add_reaction(message_data.id, "check").await,
                         Err(err) => {
-                            log::error!(
-                                "Could not assign priority to #{}: {:?}",
-                                args.issue_num,
-                                err
-                            );
+                            log::error!("Could not assign priority to #{}: {:?}", issue_num, err);
                             ctx.zulip.add_reaction(message_data.id, "scream").await
                         }
                     };
@@ -412,10 +414,11 @@ async fn handle_command<'a>(
 async fn accept_decline_backport(
     ctx: &Context,
     message_data: &Message,
-    args_data: &BackportArgs,
+    channel: &BackportChannelArgs,
+    verb: &BackportVerbArgs,
+    pr_num: PullRequestNumber,
 ) -> anyhow::Result<Option<String>> {
     let message = message_data.clone();
-    let args = args_data.clone();
     let stream_id = message.stream_id.unwrap();
     let subject = message.subject.unwrap();
     let zulip_client = &ctx.zulip;
@@ -440,34 +443,34 @@ async fn accept_decline_backport(
 
     let issue = ctx
         .github
-        .pull_request(&issue_repo, args.pr_num)
+        .pull_request(&issue_repo, pr_num)
         .await
         .context(format!(
             "Could not get #{} details (hint: maybe not a PR?)",
-            args.pr_num
+            pr_num
         ))?;
 
     let nominated = issue.labels.iter().any(|l| l.name.contains("-nominated"));
     if !nominated {
         return Ok(Some(format!(
             "Can't approve backport: #{} was not {} nominated",
-            &args.pr_num, args.channel,
+            &pr_num, channel,
         )));
     }
 
     let zulip_link =
         crate::zulip::MessageApiRequest::new(stream_id, &subject, "").url(zulip_client);
 
-    let (message_body, approve_backport) = match args.verb {
+    let (message_body, approve_backport) = match verb {
         BackportVerbArgs::Accept
         | BackportVerbArgs::Accepted
         | BackportVerbArgs::Approve
         | BackportVerbArgs::Approved => (
-            get_text_backport_approved(&args.channel, &args.verb, team_name, &zulip_link),
+            get_text_backport_approved(&channel, &verb, team_name, &zulip_link),
             true,
         ),
         BackportVerbArgs::Decline | BackportVerbArgs::Declined => (
-            get_text_backport_declined(&args.channel, &args.verb, team_name, &zulip_link),
+            get_text_backport_declined(&channel, &verb, team_name, &zulip_link),
             false,
         ),
     };
@@ -476,7 +479,7 @@ async fn accept_decline_backport(
     issue
         .post_comment(&ctx.github, &message_body)
         .await
-        .with_context(|| anyhow::anyhow!("unable to post comment on #{}", args.pr_num))?;
+        .with_context(|| anyhow::anyhow!("unable to post comment on #{}", pr_num))?;
 
     // Add or remove backport labels
     if approve_backport {
@@ -484,7 +487,7 @@ async fn accept_decline_backport(
             .add_labels(
                 &ctx.github,
                 vec![github::Label {
-                    name: format!("{}-accepted", args.channel),
+                    name: format!("{}-accepted", channel),
                 }],
             )
             .await
@@ -495,10 +498,10 @@ async fn accept_decline_backport(
                 &ctx.github,
                 vec![
                     github::Label {
-                        name: format!("{}-nominated", args.channel),
+                        name: format!("{}-nominated", channel),
                     },
                     github::Label {
-                        name: format!("{}-accepted", args.channel),
+                        name: format!("{}-accepted", channel),
                     },
                 ],
             )
@@ -512,10 +515,10 @@ async fn accept_decline_backport(
 async fn assign_issue_prio(
     ctx: &Context,
     message_data: &Message,
-    args_data: &AssignPrioArgs,
+    issue_num: PullRequestNumber,
+    prio: IssuePrio,
 ) -> anyhow::Result<Option<String>> {
     let message = message_data.clone();
-    let args = args_data.clone();
     let stream_id = message.stream_id.unwrap();
     let subject = message.subject.unwrap();
     let zulip_client = &ctx.zulip;
@@ -534,13 +537,13 @@ async fn assign_issue_prio(
 
     // Ensure this is an issue and not a pull request
     let issue = repository
-        .get_issue(&ctx.github, args.issue_num)
+        .get_issue(&ctx.github, issue_num)
         .await
-        .context(format!("Could not retrieve #{}", args.issue_num))?;
+        .context(format!("Could not retrieve #{}", issue_num))?;
     if issue.pull_request.is_some() {
         anyhow::bail!(format!(
             "Error: #{} is a pull request (must be an issue)",
-            args.issue_num
+            issue_num
         ));
     }
 
@@ -556,7 +559,7 @@ async fn assign_issue_prio(
         "P-critical".to_string(),
     ]
     .into_iter()
-    .filter(|l| l != &format!("P-{}", args.prio))
+    .filter(|l| l != &format!("P-{}", prio))
     .map(|l| github::Label {
         name: l.to_string(),
     })
@@ -567,31 +570,31 @@ async fn assign_issue_prio(
         .context("failed to remove labels from the issue")?;
 
     // if just removing priority, nothing else to do
-    if args.prio == IssuePrio::None {
+    if prio == IssuePrio::None {
         return Ok(None);
     }
 
     // post a comment on GitHub
     let message_body = format!(
         "Assigning P-{} (discussion on [Zulip]({zulip_link})).",
-        args.prio
+        prio
     );
 
     issue
         .post_comment(&ctx.github, &message_body)
         .await
-        .with_context(|| anyhow::anyhow!("Unable to post comment on #{}", args.issue_num))?;
+        .with_context(|| anyhow::anyhow!("Unable to post comment on #{}", issue_num))?;
 
     // Add the specified priority label
     issue
         .add_labels(
             &ctx.github,
             vec![github::Label {
-                name: format!("P-{}", args.prio),
+                name: format!("P-{}", prio),
             }],
         )
         .await
-        .context(format!("failed to add labels to issue #{}", args.issue_num))?;
+        .context(format!("failed to add labels to issue #{}", issue_num))?;
 
     Ok(None)
 }
