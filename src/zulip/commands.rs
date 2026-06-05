@@ -155,12 +155,12 @@ pub enum StreamCommand {
     DocsUpdate,
     /// Accept or decline a backport.
     Backport {
-        /// Release channel this backport is pointing to. Allowed: "beta" or "stable".
-        channel: BackportChannelArgs,
         /// Accept or decline this backport? Allowed: "accept", "accepted", "approve", "approved", "decline", "declined".
         verb: BackportVerbArgs,
+        /// Release channel for this backport. Allowed: "beta" or "stable".
+        channel: Option<BackportChannelArgs>,
         /// PR to be backported
-        pr_num: PullRequestNumber,
+        pr_num: Option<PullRequestNumber>,
     },
     /// Show recent GitHub activity of a user.
     UserInfo {
@@ -209,6 +209,28 @@ impl std::fmt::Display for BackportChannelArgs {
         match &self {
             BackportChannelArgs::Beta => write!(f, "beta"),
             BackportChannelArgs::Stable => write!(f, "stable"),
+        }
+    }
+}
+
+impl TryFrom<&str> for &BackportChannelArgs {
+    type Error = &'static str;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "stable" => Ok(&BackportChannelArgs::Stable),
+            "beta" => Ok(&BackportChannelArgs::Beta),
+            _ => Err("unsupported `{value}` backport channel"),
+        }
+    }
+}
+
+impl TryFrom<&str> for BackportChannelArgs {
+    type Error = &'static str;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "stable" => Ok(BackportChannelArgs::Stable),
+            "beta" => Ok(BackportChannelArgs::Beta),
+            _ => Err("unsupported `{value}` backport channel"),
         }
     }
 }
@@ -389,19 +411,37 @@ mod tests {
     #[test]
     fn backports_command() {
         assert_eq!(
-            parse_stream(&["backport", "beta", "accept", "123456"]),
+            parse_stream(&["backport", "accept", "beta", "123456"]),
             StreamCommand::Backport {
-                channel: BackportChannelArgs::Beta,
                 verb: BackportVerbArgs::Accept,
-                pr_num: 123456
+                channel: Some(BackportChannelArgs::Beta),
+                pr_num: Some(123456)
             }
         );
         assert_eq!(
-            parse_stream(&["backport", "stable", "decline", "123456"]),
+            parse_stream(&["backport", "decline", "stable", "123456"]),
             StreamCommand::Backport {
-                channel: BackportChannelArgs::Stable,
                 verb: BackportVerbArgs::Decline,
-                pr_num: 123456
+                channel: Some(BackportChannelArgs::Stable),
+                pr_num: Some(123456)
+            }
+        );
+
+        assert_eq!(
+            parse_stream(&["backport", "decline", "stable"]),
+            StreamCommand::Backport {
+                verb: BackportVerbArgs::Decline,
+                channel: Some(BackportChannelArgs::Stable),
+                pr_num: None
+            }
+        );
+
+        assert_eq!(
+            parse_stream(&["backport", "decline"]),
+            StreamCommand::Backport {
+                verb: BackportVerbArgs::Decline,
+                channel: None,
+                pr_num: None
             }
         );
     }

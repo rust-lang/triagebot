@@ -363,18 +363,18 @@ async fn handle_command<'a>(
                 }
                 StreamCommand::DocsUpdate => trigger_docs_update(&ctx.zulip, message_data),
                 StreamCommand::Backport {
-                    channel,
                     verb,
+                    channel,
                     pr_num,
                 } => {
                     let _ =
-                        match accept_decline_backport(&ctx, message_data, &channel, &verb, pr_num)
+                        match accept_decline_backport(&ctx, message_data, &verb, channel, pr_num)
                             .await
                         {
                             // give user feedback
                             Ok(_) => ctx.zulip.add_reaction(message_data.id, "check").await,
                             Err(err) => {
-                                log::error!("Could not handle backport #{}: {:?}", pr_num, err);
+                                log::error!("Could not handle backport #{:?}: {:?}", pr_num, err);
                                 ctx.zulip.add_reaction(message_data.id, "scream").await
                             }
                         };
@@ -410,16 +410,16 @@ async fn handle_command<'a>(
     }
 }
 
-// TODO: shorter variant of this command (f.e. `backport accept` or even `accept`) that infers everything from the Message payload
 async fn accept_decline_backport(
     ctx: &Context,
     message_data: &Message,
-    channel: &BackportChannelArgs,
     verb: &BackportVerbArgs,
-    pr_num: PullRequestNumber,
+    channel: Option<BackportChannelArgs>,
+    pr_num: Option<PullRequestNumber>,
 ) -> anyhow::Result<Option<String>> {
     let message = message_data.clone();
     let stream_id = message.stream_id.unwrap();
+    // expected something like "#123456: beta-nominated"
     let subject = message.subject.unwrap();
     let zulip_client = &ctx.zulip;
     let zulip_stream = zulip_client.get_zulip_channel_by_id(stream_id).await?;
@@ -430,6 +430,39 @@ async fn accept_decline_backport(
         .map_or(&*zulip_stream.name, |s| s.0)
         .strip_prefix("t-")
         .unwrap_or_default();
+
+    let mut pr_num = pr_num;
+    let mut channel = channel.clone();
+
+    // Parse the stream subjetc if the channel or the pr num are not provided
+    if pr_num.is_none() || channel.is_none() {
+        let (_pr_num, _channel) = subject
+            .rsplit_once(':')
+            .context("Could not parse a valid PR num")?;
+
+        if pr_num.is_none() {
+            pr_num = Some(
+                _pr_num
+                    .strip_prefix('#')
+                    .context("Could not parse a valid PR num")?
+                    .parse::<u64>()
+                    .context("Could not parse a valid PR num")?,
+            );
+        }
+
+        if channel.is_none() {
+            channel = Some(
+                _channel
+                    .rsplit_once('-')
+                    .map(|s| s.0.trim().try_into())
+                    .expect("Could not parse a valid release channel")
+                    .unwrap(),
+            );
+        }
+    };
+
+    let pr_num = pr_num.context("No PR number to apply to")?;
+    let channel = channel.context("No PR number to apply to")?;
 
     // Repository owner and name are hardcoded
     // This command is only used in this repository
