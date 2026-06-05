@@ -154,7 +154,14 @@ pub enum StreamCommand {
     /// Update docs.
     DocsUpdate,
     /// Accept or decline a backport.
-    Backport(BackportArgs),
+    Backport {
+        /// Release channel this backport is pointing to. Allowed: "beta" or "stable".
+        channel: BackportChannelArgs,
+        /// Accept or decline this backport? Allowed: "accept", "accepted", "approve", "approved", "decline", "declined".
+        verb: BackportVerbArgs,
+        /// PR to be backported
+        pr_num: PullRequestNumber,
+    },
     /// Show recent GitHub activity of a user.
     UserInfo {
         /// GitHub username to look up.
@@ -164,7 +171,12 @@ pub enum StreamCommand {
         organization: String,
     },
     /// Label assignment: add one of `P-{low,medium,high,critical}` and remove `I-prioritize`
-    AssignPriority(AssignPrioArgs),
+    AssignPriority {
+        /// Issue target of the prioritization
+        issue_num: PullRequestNumber,
+        /// Issue priority. Allowed: "low", "medium", "high", "critical", "none" (to just remove the prioritization)
+        prio: IssuePrio,
+    },
     /// Unlock a specific GitHub issue or pull-request.
     Unlock {
         /// Orgnization that is specifically being queried.
@@ -222,24 +234,6 @@ impl std::fmt::Display for BackportVerbArgs {
             BackportVerbArgs::Decline | BackportVerbArgs::Declined => write!(f, "declined"),
         }
     }
-}
-
-#[derive(clap::Parser, Debug, PartialEq, Clone)]
-pub struct BackportArgs {
-    /// Release channel this backport is pointing to. Allowed: "beta" or "stable".
-    pub channel: BackportChannelArgs,
-    /// Accept or decline this backport? Allowed: "accept", "accepted", "approve", "approved", "decline", "declined".
-    pub verb: BackportVerbArgs,
-    /// PR to be backported
-    pub pr_num: PullRequestNumber,
-}
-
-#[derive(clap::Parser, Debug, PartialEq, Clone)]
-pub struct AssignPrioArgs {
-    /// Issue target of the prioritization
-    pub issue_num: PullRequestNumber,
-    /// Issue priority. Allowed: "low", "medium", "high", "critical", "none" (to just remove the prioritization)
-    pub prio: IssuePrio,
 }
 
 /// Priority labels
@@ -396,19 +390,19 @@ mod tests {
     fn backports_command() {
         assert_eq!(
             parse_stream(&["backport", "beta", "accept", "123456"]),
-            StreamCommand::Backport(BackportArgs {
+            StreamCommand::Backport {
                 channel: BackportChannelArgs::Beta,
                 verb: BackportVerbArgs::Accept,
                 pr_num: 123456
-            })
+            }
         );
         assert_eq!(
             parse_stream(&["backport", "stable", "decline", "123456"]),
-            StreamCommand::Backport(BackportArgs {
+            StreamCommand::Backport {
                 channel: BackportChannelArgs::Stable,
                 verb: BackportVerbArgs::Decline,
                 pr_num: 123456
-            })
+            }
         );
     }
 
