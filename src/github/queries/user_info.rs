@@ -5,6 +5,8 @@ use crate::github::GithubClient;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct UserInfo {
+    pub id: u64,
+    pub login: String,
     /// When was the user account created?
     pub created_at: DateTime<Utc>,
     pub public_repos: u32,

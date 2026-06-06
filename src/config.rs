@@ -3,6 +3,7 @@ use crate::github::{GithubClient, Repository};
 use parser::command::relabel::{Label, LabelDelta, RelabelCommand};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::num::NonZeroU8;
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::{Duration, Instant};
 use tracing as log;
@@ -177,6 +178,9 @@ pub(crate) struct AssignConfig {
     #[serde(default)]
     #[serde(alias = "custom_welcome_messages")]
     pub(crate) custom_messages: Option<AssignCustomMessages>,
+    /// Check activity
+    #[serde(default)]
+    pub(crate) check_activity: Option<AssignCheckActivityConfig>,
 }
 
 impl AssignConfig {
@@ -231,6 +235,15 @@ impl WarnNonDefaultBranchConfig {
             }
         }
     }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AssignCheckActivityConfig {
+    /// Number of inactive days before a reminder is posted
+    pub(crate) inactivity_reminder: NonZeroU8,
+    /// Number of inactive days before the assignment is released
+    pub(crate) inactivity_limit: NonZeroU8,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
@@ -993,6 +1006,7 @@ mod tests {
                     users_on_vacation: HashSet::from(["jyn514".into()]),
                     review_prefs: None,
                     custom_messages: None,
+                    check_activity: None,
                 }),
                 note: Some(NoteConfig { _empty: () }),
                 ping: Some(PingConfig { teams: ping_teams }),
@@ -1120,6 +1134,7 @@ mod tests {
                     owners: HashMap::new(),
                     users_on_vacation: HashSet::new(),
                     review_prefs: None,
+                    check_activity: None,
                 }),
                 note: None,
                 ping: None,
@@ -1166,6 +1181,23 @@ mod tests {
             config.assign.and_then(|c| c.review_prefs),
             Some(AssignReviewPrefsConfig {})
         ));
+    }
+
+    #[test]
+    fn assign_check_activity() {
+        let config = r#"
+            [assign.check_activity]
+            inactivity_reminder = 6 #days
+            inactivity_limit = 7 #days
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        assert_eq!(
+            config.assign.and_then(|c| c.check_activity),
+            Some(AssignCheckActivityConfig {
+                inactivity_reminder: NonZeroU8::new(6).unwrap(),
+                inactivity_limit: NonZeroU8::new(7).unwrap()
+            })
+        );
     }
 
     #[test]
