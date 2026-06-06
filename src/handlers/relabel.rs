@@ -199,6 +199,8 @@ mod tests {
         match_pattern,
     };
     use crate::config::RelabelConfig;
+    use crate::github::Label as GitHubLabel;
+    use crate::tests::github::issue;
 
     #[test]
     fn test_match_pattern() -> anyhow::Result<()> {
@@ -267,8 +269,6 @@ mod tests {
 
     #[test]
     fn test_compute_label_deltas() {
-        use crate::github::Label as GitHubLabel;
-
         let mut deltas = vec![
             LabelDelta::Add(Label("I-nominated".to_string())),
             LabelDelta::Add(Label("I-nominated".to_string())),
@@ -314,5 +314,17 @@ mod tests {
                 }],
             ),
         );
+    }
+
+    #[test]
+    fn test_case_insensitive_label_lookup() {
+        let issue = issue().labels(vec!["E-needs-mcve"]).call();
+
+        assert!(issue.contains_label(&GitHubLabel {
+            name: "E-needs-mcve".to_string(),
+        }));
+        assert!(issue.contains_label(&GitHubLabel {
+            name: "e-needs-mcve".to_string(),
+        }));
     }
 }

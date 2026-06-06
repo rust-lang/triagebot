@@ -271,7 +271,7 @@ impl Issue {
         // Don't try to remove labels not already present on this issue.
         let labels = labels
             .into_iter()
-            .filter(|l| self.labels().contains(l))
+            .filter(|l| self.contains_label(l))
             .collect::<Vec<_>>();
 
         log::info!(
@@ -323,7 +323,7 @@ impl Issue {
         // Don't try to add labels already present on this issue.
         let labels = labels
             .into_iter()
-            .filter(|l| !self.labels().contains(l))
+            .filter(|l| !self.contains_label(l))
             .map(|l| l.name)
             .collect::<Vec<_>>();
 
@@ -367,6 +367,12 @@ impl Issue {
 
     pub fn labels(&self) -> &[Label] {
         &self.labels
+    }
+
+    pub fn contains_label(&self, label: &Label) -> bool {
+        self.labels
+            .iter()
+            .any(|l| l.name.to_lowercase() == label.name.to_lowercase())
     }
 
     pub fn contain_assignee(&self, user: &str) -> bool {
