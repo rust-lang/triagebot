@@ -436,13 +436,13 @@ async fn accept_decline_backport(
 
     // Parse the stream subjetc if the channel or the pr num are not provided
     if pr_num.is_none() || channel.is_none() {
-        let (_pr_num, _channel) = subject
+        let (maybe_pr_num, maybe_channel) = subject
             .rsplit_once(':')
             .context("Could not parse a valid PR num")?;
 
         if pr_num.is_none() {
             pr_num = Some(
-                _pr_num
+                maybe_pr_num
                     .strip_prefix('#')
                     .context("Could not parse a valid PR num")?
                     .parse::<u64>()
@@ -452,7 +452,7 @@ async fn accept_decline_backport(
 
         if channel.is_none() {
             channel = Some(
-                _channel
+                maybe_channel
                     .rsplit_once('-')
                     .map(|s| s.0.trim().try_into())
                     .expect("Could not parse a valid release channel")
@@ -462,7 +462,7 @@ async fn accept_decline_backport(
     };
 
     let pr_num = pr_num.context("No PR number to apply to")?;
-    let channel = channel.context("No PR number to apply to")?;
+    let channel = channel.context("No channel to apply to")?;
 
     // Repository owner and name are hardcoded
     // This command is only used in this repository
