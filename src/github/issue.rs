@@ -570,15 +570,20 @@ impl Issue {
         Ok(commits)
     }
 
-    /// Returns the GraphQL ID of this issue.
+    /// Returns the GraphQL ID of this issue or pull-request.
     async fn graphql_issue_id(&self, client: &GithubClient) -> anyhow::Result<String> {
         let repo = self.repository();
         let mut issue_id = client
             .graphql_query(
                 "query($owner:String!, $repo:String!, $issueNum:Int!) {
                     repository(owner: $owner, name: $repo) {
-                        issue(number: $issueNum) {
-                            id
+                        issueOrPullRequest(number: $issueNum) {
+                            ... on Issue {
+                                id
+                            }
+                            ... on PullRequest {
+                                id
+                            }
                         }
                     }
                 }
@@ -591,7 +596,7 @@ impl Issue {
             )
             .await?;
         let serde_json::Value::String(issue_id) =
-            issue_id["data"]["repository"]["issue"]["id"].take()
+            issue_id["data"]["repository"]["issueOrPullRequest"]["id"].take()
         else {
             anyhow::bail!("expected issue id, got {issue_id}");
         };
@@ -624,6 +629,26 @@ impl Issue {
                 }),
             )
             .await?;
+        Ok(())
+    }
+
+    /// Enqueues this pull request into the repository's merge queue.
+    pub async fn enqueue_to_merge_queue(&self, client: &GithubClient) -> anyhow::Result<()> {
+        let pr_id = self.graphql_issue_id(client).await?;
+
+        client
+            .graphql_query(
+                "mutation ($pullRequestId: ID!) {
+                  enqueuePullRequest(input: { pullRequestId: $pullRequestId }) {
+                    clientMutationId
+                  }
+                }",
+                serde_json::json!({
+                    "pullRequestId": pr_id,
+                }),
+            )
+            .await?;
+
         Ok(())
     }
 

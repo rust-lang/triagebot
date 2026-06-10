@@ -24,6 +24,7 @@ mod issue_links;
 mod lock;
 pub(crate) mod major_change;
 mod mentions;
+mod merge;
 mod merge_conflicts;
 mod milestone_prs;
 mod nominate;
@@ -503,6 +504,7 @@ command_handlers! {
     note: Note,
     concern: Concern,
     transfer: Transfer,
+    merge: Merge,
 }
 
 #[derive(Debug)]

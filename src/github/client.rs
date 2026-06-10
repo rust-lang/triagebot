@@ -3,7 +3,6 @@ use async_trait::async_trait;
 use futures::{FutureExt, future::BoxFuture};
 use http_body_util::BodyExt;
 use http_body_util::Limited;
-use itertools::Itertools;
 use reqwest::Body;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
@@ -359,15 +358,43 @@ impl GithubClient {
         query: &str,
         vars: serde_json::Value,
     ) -> anyhow::Result<serde_json::Value> {
-        let result: serde_json::Value = self.graphql_query_with_errors(query, vars).await?;
-        if let Some(errors) = result["errors"].as_array() {
-            let messages = errors
-                .iter()
-                .map(|err| err["message"].as_str().unwrap_or_default())
-                .format("\n");
-            anyhow::bail!("error: {messages}");
+        let mut result: serde_json::Value = self.graphql_query_with_errors(query, vars).await?;
+        if let Some(errors) = result["errors"].take().as_array_mut() {
+            anyhow::bail!(GraphQlErrors {
+                errors: std::mem::take(errors)
+                    .into_iter()
+                    .map(|err| serde_json::from_value(err).unwrap_or_default())
+                    .collect(),
+            })
         }
         Ok(result)
+    }
+}
+
+#[derive(Debug)]
+pub struct GraphQlErrors {
+    pub errors: Vec<GraphQlError>,
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct GraphQlError {
+    #[serde(default)]
+    pub message: String,
+    #[serde(default)]
+    pub path: Vec<String>,
+    #[serde(default, rename = "type")]
+    pub type_: String,
+}
+
+impl std::fmt::Display for GraphQlErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, err) in self.errors.iter().enumerate() {
+            if i > 0 {
+                f.write_str("\n")?;
+            }
+            f.write_str(&err.message)?;
+        }
+        Ok(())
     }
 }
 
