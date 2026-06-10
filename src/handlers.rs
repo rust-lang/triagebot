@@ -11,7 +11,7 @@ use std::fmt;
 use std::sync::Arc;
 use tracing as log;
 
-mod assign;
+pub(crate) mod assign;
 mod autolabel;
 mod backport;
 mod bot_pull_requests;

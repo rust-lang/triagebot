@@ -33,6 +33,7 @@ use crate::{
     interactions::EditIssueBody,
 };
 use anyhow::{Context as _, bail};
+use chrono::{Duration, Utc};
 use parser::command::assign::AssignCommand;
 use parser::command::{Command, Input};
 use rand::seq::IteratorRandom;
@@ -44,6 +45,7 @@ use tokio::sync::RwLock;
 use tokio_postgres::Client as DbClient;
 use tracing as log;
 
+pub(crate) mod activity;
 mod messages;
 
 #[cfg(test)]
@@ -773,24 +775,46 @@ pub(super) async fn handle_command(
             );
             return Ok(());
         }
+        let to_assign = match ctx.github.user_info(&to_assign).await {
+            Ok(user) => user,
+            Err(err) => {
+                log::error!("error determining the user to assign {to_assign}: {err:?}");
+                return user_error!(format!("User `{to_assign}` not found."));
+            }
+        };
         *d = AssignData {
-            user: Some(to_assign.clone()),
+            user: Some(to_assign.login.clone()),
         };
 
-        match issue.set_assignee(&ctx.github, &to_assign).await {
+        match issue.set_assignee(&ctx.github, &to_assign.login).await {
             Ok(()) => {
                 e.apply(&ctx.github, String::new()).await?;
-                return Ok(());
-            } // we are done
+            }
             Err(AssignmentError::InvalidAssignee) => {
                 issue.set_assignee(&ctx.github, &ctx.username).await?;
                 let cmt_body = format!(
-                    "This issue has been assigned to @{to_assign} via [this comment]({}).",
+                    "This issue has been assigned to @{} via [this comment]({}).",
+                    &to_assign.login,
                     event.html_url().unwrap()
                 );
                 e.apply(&ctx.github, cmt_body).await?;
             }
             Err(e) => return Err(e.into()),
+        }
+
+        if let Some(activity_config) = &config.check_activity {
+            activity::schedule_activity_job(
+                ctx,
+                activity::AssignCheckActivityInput {
+                    repo: issue.repository().full_repo_name(),
+                    issue: issue.number,
+                    assignee: to_assign.id,
+                    warning_details: None,
+                },
+                Utc::now() + Duration::days(activity_config.inactivity_reminder.get().into()),
+            )
+            .await
+            .context("failed to schedule activity job")?;
         }
     }
 
