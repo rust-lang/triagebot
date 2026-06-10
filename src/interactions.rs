@@ -31,7 +31,7 @@ impl<'a> ErrorComment<'a> {
         let mut body = String::new();
         writeln!(body, "**Error**: {message}")?;
         writeln!(body)?;
-        writeln!(body, "{REPORT_TO}")?;
+        writeln!(body, "*{REPORT_TO}*")?;
         Ok(body)
     }
 
