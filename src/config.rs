@@ -3,6 +3,7 @@ use crate::github::{GithubClient, Repository};
 use parser::command::relabel::{Label, LabelDelta, RelabelCommand};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::num::NonZeroU8;
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::{Duration, Instant};
 use tracing as log;
@@ -160,6 +161,9 @@ pub(crate) struct AssignConfig {
     pub(crate) warn_non_default_branch: WarnNonDefaultBranchConfig,
     /// A URL to include in the welcome message.
     pub(crate) contributing_url: Option<String>,
+    /// Community reviews before auto-assignement
+    #[serde(default)]
+    pub(crate) community_reviews: Option<AssignCommunityReviewsConfig>,
     /// Ad-hoc groups that can be referred to in `owners`.
     #[serde(default)]
     pub(crate) adhoc_groups: HashMap<String, Vec<String>>,
@@ -192,6 +196,15 @@ impl AssignConfig {
     pub(crate) fn fallback_review_group(&self) -> Option<&[String]> {
         self.adhoc_groups.get("fallback").map(Vec::as_slice)
     }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AssignCommunityReviewsConfig {
+    /// The minimum number of community reviews before automatic assignment
+    pub(crate) minimum_approvals: NonZeroU8,
+    /// Label indicating that comminuty reviews are required
+    pub(crate) label: String,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
@@ -993,6 +1006,7 @@ mod tests {
                     users_on_vacation: HashSet::from(["jyn514".into()]),
                     review_prefs: None,
                     custom_messages: None,
+                    community_reviews: None,
                 }),
                 note: Some(NoteConfig { _empty: () }),
                 ping: Some(PingConfig { teams: ping_teams }),
@@ -1120,6 +1134,7 @@ mod tests {
                     owners: HashMap::new(),
                     users_on_vacation: HashSet::new(),
                     review_prefs: None,
+                    community_reviews: None,
                 }),
                 note: None,
                 ping: None,
@@ -1166,6 +1181,23 @@ mod tests {
             config.assign.and_then(|c| c.review_prefs),
             Some(AssignReviewPrefsConfig {})
         ));
+    }
+
+    #[test]
+    fn assign_review_min_reviews() {
+        let config = r#"
+            [assign.community_reviews]
+            minimum_approvals = 2
+            label = "S-waiting-on-community-reviews"
+        "#;
+        let config = toml::from_str::<Config>(&config).unwrap();
+        assert_eq!(
+            config.assign.and_then(|c| c.community_reviews),
+            Some(AssignCommunityReviewsConfig {
+                minimum_approvals: NonZeroU8::new(2).unwrap(),
+                label: "S-waiting-on-community-reviews".to_string(),
+            })
+        );
     }
 
     #[test]
