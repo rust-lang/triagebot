@@ -1,0 +1,149 @@
+use chrono::{DateTime, Utc};
+use octocrab::Octocrab;
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock};
+
+use async_trait::async_trait;
+use tera::{Context, Tera};
+
+// TODO: can this crate be replaced with octocrab?
+use crate::github::{self, GithubClient, Repository};
+use crate::team_data::TeamClient;
+
+#[async_trait]
+pub trait Action {
+    async fn call(&self, octocrab: &Octocrab) -> anyhow::Result<String>;
+}
+
+pub struct Step<'a> {
+    pub name: &'a str,
+    pub actions: Vec<Query<'a>>,
+}
+
+pub struct Query<'a> {
+    /// Vec of (owner, name)
+    pub repos: Vec<(&'a str, &'a str)>,
+    pub queries: Vec<QueryMap<'a>>,
+}
+
+#[derive(Copy, Clone)]
+pub enum QueryKind {
+    List,
+    Count,
+}
+
+pub struct QueryMap<'a> {
+    pub name: &'a str,
+    pub kind: QueryKind,
+    pub query: Arc<dyn github::issue_query::IssuesQuery + Send + Sync>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct IssueDecorator {
+    pub number: u64,
+    pub title: String,
+    pub html_url: String,
+    pub repo_name: String,
+    pub labels: String,
+    pub author: String,
+    pub team: String,
+    pub assignees: String,
+    // Human (readable) timestamps
+    pub created_at_hts: String,
+    pub updated_at_hts: String,
+    pub is_blocked: bool,
+}
+
+// TODO: embed templates in binary
+// (so the compiled binary can run from everywhere)
+pub static TEMPLATES: LazyLock<Tera> = LazyLock::new(|| match Tera::new("templates/*") {
+    Ok(t) => t,
+    Err(e) => {
+        println!("Parsing error(s): {e}");
+        ::std::process::exit(1);
+    }
+});
+
+pub fn to_human(d: DateTime<Utc>) -> String {
+    let d1 = chrono::Utc::now() - d;
+    let days = d1.num_days();
+    if days > 60 {
+        format!("{} months ago", days / 30)
+    } else {
+        format!("about {days} days ago")
+    }
+}
+
+// TODO: try using the octocrab client
+#[async_trait]
+impl Action for Step<'_> {
+    async fn call(&self, _octocrab: &Octocrab) -> anyhow::Result<String> {
+        let mut gh = GithubClient::new_from_env();
+        gh.set_retry_rate_limit(true);
+        let team_api = TeamClient::new_from_env();
+
+        let mut context = Context::new();
+        let mut results = HashMap::new();
+
+        let mut handles: Vec<tokio::task::JoinHandle<anyhow::Result<(String, QueryKind, Vec<_>)>>> =
+            Vec::new();
+        let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(5));
+
+        for Query { repos, queries } in &self.actions {
+            for repo in repos {
+                let repository = Repository {
+                    full_name: format!("{}/{}", repo.0, repo.1),
+                    // These are unused for query.
+                    default_branch: "main".to_string(),
+                    fork: false,
+                    parent: None,
+                };
+
+                for QueryMap { name, kind, query } in queries {
+                    let semaphore = semaphore.clone();
+                    let name = String::from(*name);
+                    let kind = *kind;
+                    let repository = repository.clone();
+                    let gh = gh.clone();
+                    let team_api = team_api.clone();
+                    let query = query.clone();
+                    handles.push(tokio::task::spawn(async move {
+                        let _permit = semaphore.acquire().await?;
+                        let issues = query.query(&repository, &gh, &team_api).await?;
+                        Ok((name, kind, issues))
+                    }));
+                }
+            }
+        }
+
+        for handle in handles {
+            let (name, kind, issues) = handle.await.unwrap()?;
+            match kind {
+                QueryKind::List => {
+                    results.entry(name).or_insert(Vec::new()).extend(issues);
+                }
+                QueryKind::Count => {
+                    let count = issues.len();
+                    let result = if let Some(value) = context.get(&name) {
+                        value.as_u64().unwrap() + count as u64
+                    } else {
+                        count as u64
+                    };
+
+                    context.insert(name, &result);
+                }
+            }
+        }
+
+        for (name, issues) in &results {
+            context.insert(name, issues);
+        }
+
+        let date = chrono::Utc::now();
+        context.insert("CURRENT_DATE", &date);
+
+        Ok(TEMPLATES
+            .render(&format!("{}.tt", self.name), &context)
+            .unwrap())
+    }
+}

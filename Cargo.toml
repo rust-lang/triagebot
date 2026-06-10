@@ -5,6 +5,8 @@ authors = ["Mark Rousskov <mark.simulacrum@gmail.com>"]
 edition = "2024"
 
 [workspace]
+resolver = "3"
+members = ["utils/compiler-p-high"]
 
 [dependencies]
 serde_json = "1"
