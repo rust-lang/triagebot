@@ -1,0 +1,20 @@
+{% import "_issues_heading.tt" as issues_heading %}
+{% import "_issues.tt" as issues %}
+---
+title: T-compiler P-high issues
+tags: p-high-issues
+---
+
+# 2026 Q1 T-compiler P-high Issue Review Pre-triage
+
+# P-high missing team label
+
+{{-issues_heading::render(issues=tracking_issues)}}
+
+# P-high T-compiler issues missing owner (no WG and no assignee)
+
+{{-issues_heading::render(issues=tracking_issues)}}
+
+# P-high T-compiler issues with owner (WG or assignee)
+
+{{-issues_heading::render(issues=tracking_issues)}}

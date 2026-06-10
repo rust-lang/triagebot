@@ -1,6 +1,6 @@
 #![allow(clippy::new_without_default)]
 
-mod actions;
+pub mod actions;
 pub mod agenda;
 pub mod bors;
 mod cache;
