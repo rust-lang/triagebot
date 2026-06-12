@@ -1,5 +1,5 @@
 use crate::{
-    github::{Event, GithubClient, IssuesAction},
+    github::{Event, GithubClient, IssuesAction, IssuesEvent},
     handlers::Context,
 };
 use anyhow::Context as _;
@@ -57,20 +57,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     // eventually automate it separately.
     e.issue.set_milestone(&ctx.github, &version).await?;
 
-    let files = e.issue.diff(&ctx.github).await?;
-    if let Some(files) = files
-        && let Some(cargo) = files.iter().find(|fd| fd.filename == "src/tools/cargo")
-    {
-        // The webhook timeout of 10 seconds can be too short, so process in
-        // the background.
-        let diff = cargo.patch.clone();
-        tokio::task::spawn(async move {
-            let gh = GithubClient::new_from_env();
-            if let Err(e) = milestone_cargo(&gh, &version, &diff).await {
-                log::error!("failed to milestone cargo: {e:?}");
-            }
-        });
-    }
+    milestone_submodules(&ctx.github, e, &version).await?;
 
     Ok(())
 }
@@ -106,10 +93,41 @@ async fn get_version_standalone(
     ))
 }
 
-/// Milestones all PRs in the cargo repo when the submodule is synced in
-/// rust-lang/rust.
-async fn milestone_cargo(
+async fn milestone_submodules(
     gh: &GithubClient,
+    event: &IssuesEvent,
+    version: &str,
+) -> anyhow::Result<()> {
+    let Some(files) = event.issue.diff(gh).await? else {
+        return Ok(());
+    };
+    for (repo, submodule) in [
+        ("rust-lang/cargo", "src/tools/cargo"),
+        ("rust-lang/reference", "src/doc/reference"),
+    ] {
+        if let Some(fd) = files.iter().find(|fd| fd.filename == submodule) {
+            // The webhook timeout of 10 seconds can be too short, so process in
+            // the background.
+            let diff = fd.patch.clone();
+            let ver = version.to_string();
+            tokio::task::spawn(async move {
+                let gh = GithubClient::new_from_env();
+                if let Err(e) = milestone_submodule(&gh, repo, submodule, &ver, &diff).await {
+                    log::error!("failed to milestone {submodule}: {e:?}");
+                }
+            });
+        }
+    }
+
+    Ok(())
+}
+
+/// Milestones all PRs in the submodule when the submodule is synced in
+/// rust-lang/rust.
+async fn milestone_submodule(
+    gh: &GithubClient,
+    repo_name: &str,
+    submodule: &str,
     release_version: &str,
     submodule_diff: &str,
 ) -> anyhow::Result<()> {
@@ -117,19 +135,22 @@ async fn milestone_cargo(
     // looking at the diff content which indicates the old and new hash.
     let subproject_re = Regex::new("Subproject commit ([0-9a-f]+)").unwrap();
     let mut caps = subproject_re.captures_iter(submodule_diff);
-    let cargo_start_hash = &caps.next().unwrap()[1];
-    let cargo_end_hash = &caps.next().unwrap()[1];
-    assert!(caps.next().is_none());
+    let submodule_start_hash = &caps.next().unwrap()[1];
+    let submodule_end_hash = &caps.next().unwrap()[1];
+    if let Some(next) = caps.next() {
+        anyhow::bail!("unexpected submodule capture {}", &next[1]);
+    }
 
-    // Get all of the git commits in the cargo repo.
-    let cargo_repo = gh.repository("rust-lang/cargo").await?;
-    log::info!("loading cargo changes {cargo_start_hash}...{cargo_end_hash}");
-    let commits = cargo_repo
-        .github_commits_in_range(gh, cargo_start_hash, cargo_end_hash)
+    // Get all of the git commits in the submodule repo.
+    let submodule_repo = gh.repository(repo_name).await?;
+    log::info!(
+        "loading submodule {repo_name} changes {submodule_start_hash}...{submodule_end_hash}"
+    );
+    let commits = submodule_repo
+        .github_commits_in_range(gh, submodule_start_hash, submodule_end_hash)
         .await?;
 
-    // For each commit, look for a message from bors that indicates which
-    // PR was merged.
+    // For each commit, look for a message that indicates which PR was merged.
     //
     // GitHub has a specific API for this at
     // /repos/{owner}/{repo}/commits/{commit_sha}/pulls
@@ -146,7 +167,7 @@ async fn milestone_cargo(
         .filter(|commit|
             // Assumptions:
             // * A merge commit always has two parent commits.
-            // * Cargo's PR never got merged as fast-forward / rebase / squash merge.
+            // * Submodule PRs never got merged as fast-forward / rebase / squash merge.
             commit.parents.len() == 2)
         .filter_map(|commit| {
             let first = commit.commit.message.lines().next().unwrap_or_default();
@@ -159,12 +180,12 @@ async fn milestone_cargo(
                     .expect("digits only")
             })
         });
-    let milestone = cargo_repo
+    let milestone = submodule_repo
         .get_or_create_milestone(gh, release_version, "closed")
         .await?;
     for pr_num in pr_nums {
-        log::info!("setting cargo milestone {milestone:?} for {pr_num}");
-        cargo_repo.set_milestone(gh, &milestone, pr_num).await?;
+        log::info!("setting submodule {submodule} milestone {milestone:?} for {pr_num}");
+        submodule_repo.set_milestone(gh, &milestone, pr_num).await?;
     }
 
     Ok(())
