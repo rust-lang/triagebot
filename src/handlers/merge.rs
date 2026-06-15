@@ -31,7 +31,7 @@ pub(super) async fn handle_command(
             .await
             .context("failed to get the user repository permission")?;
 
-        perm.permission == "write" || perm.permission == "admin"
+        perm.permission.has_write_permissions()
     };
 
     if !has_perm {

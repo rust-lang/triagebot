@@ -987,7 +987,17 @@ impl IssueRepository {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct CollaboratorPermission {
-    pub permission: String,
+    pub permission: GitHubPermission,
+}
+
+// https://docs.github.com/en/rest/collaborators/collaborators?apiVersion=2026-03-10#get-repository-permissions-for-a-user
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GitHubPermission {
+    Admin,
+    Write,
+    Read,
+    None,
 }
 
 impl IssueRepository {
@@ -999,5 +1009,14 @@ impl IssueRepository {
         let url = format!("{}/collaborators/{username}/permission", self.url(client));
         let permission = client.json(client.get(&url)).await?;
         Ok(permission)
+    }
+}
+
+impl GitHubPermission {
+    pub fn has_write_permissions(&self) -> bool {
+        match self {
+            GitHubPermission::Admin | GitHubPermission::Write => true,
+            GitHubPermission::Read | GitHubPermission::None => false,
+        }
     }
 }
