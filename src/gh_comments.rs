@@ -29,7 +29,7 @@ use crate::{
     utils::{immutable_headers, is_known_and_public_repo},
 };
 
-pub const STYLE_URL: &str = "/gh-comments/style@0.0.9.css";
+pub const STYLE_URL: &str = "/gh-comments/style@0.0.10.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260117.css";
 pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.3.js";
 pub const RELATIVE_TIME_ELEMENT_URL: &str = "/gh-comments/relative-time-element@5.0.0.js";
@@ -545,8 +545,10 @@ fn write_comment_as_html(
     minimized: bool,
     minimized_reason: Option<&str>,
 ) -> anyhow::Result<()> {
+    let author_url = &author.url;
     let author_login = &author.login;
     let author_avatar_url = &author.avatar_url;
+    let author_avatar_extra_class = avatar_extra_class(&author.type_);
     let created_at_rfc3339 = created_at.to_rfc3339();
     let id = extract_id_from_github_link(comment_url);
 
@@ -555,23 +557,23 @@ fn write_comment_as_html(
             buffer,
             r###"
     <div class="comment-wrapper">
-      <a href="https://github.com/{author_login}" target="_blank" class="desktop">
-        <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
+      <a href="{author_url}" target="_blank" class="desktop">
+        <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar {author_avatar_extra_class}">
       </a>
       
       <details id="{id}" class="comment">
         <summary class="comment-header">
           <div class="author-info desktop">
-            <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+            <a href="{author_url}" target="_blank">{author_login}</a>
             <span> <relative-time datetime="{created_at_rfc3339}">{created_at}</relative-time></span><span> · hidden as {minimized_reason}</span>
           </div>
 
           <div class="author-mobile">
-            <a href="https://github.com/{author_login}" target="_blank">
-              <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
+            <a href="{author_url}" target="_blank">
+              <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar {author_avatar_extra_class}">
             </a>
             <div class="author-info">
-              <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
+              <a href="{author_url}" target="_blank" class="author-info-name">{author_login}</a>
               <a href="#{id}"> <relative-time datetime="{created_at_rfc3339}">{created_at}</relative-time></a><span> · hidden as {minimized_reason}</span>
             </div>
           </div>
@@ -599,23 +601,23 @@ fn write_comment_as_html(
             buffer,
             r###"
     <div class="comment-wrapper">
-      <a href="https://github.com/{author_login}" target="_blank" class="desktop">
-        <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
+      <a href="{author_url}" target="_blank" class="desktop">
+        <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar {author_avatar_extra_class}">
       </a>
 
       <div id="{id}" class="comment">
         <div class="comment-header">
           <div class="author-info desktop">
-            <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
+            <a href="{author_url}" target="_blank" class="author-info-name">{author_login}</a>
             <a href="#{id}"> <relative-time datetime="{created_at_rfc3339}">{created_at}</relative-time></a>{edited}
           </div>
 
           <div class="author-mobile">
-            <a href="https://github.com/{author_login}" target="_blank">
-              <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
+            <a href="{author_url}" target="_blank">
+              <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar {author_avatar_extra_class}">
             </a>
             <div class="author-info">
-              <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
+              <a href="{author_url}" target="_blank" class="author-info-name">{author_login}</a>
               <a href="#{id}"> <relative-time datetime="{created_at_rfc3339}">{created_at}</relative-time></a>{edited}
             </div>
           </div>
@@ -647,8 +649,10 @@ fn write_review_as_html(
     minimized: bool,
     minimized_reason: Option<&str>,
 ) -> anyhow::Result<()> {
+    let author_url = &author.url;
     let author_login = &author.login;
     let author_avatar_url = &author.avatar_url;
+    let author_avatar_extra_class = avatar_extra_class(&author.type_);
     let submitted_at_rfc3339 = submitted_at.to_rfc3339();
     let id = extract_id_from_github_link(review_url);
 
@@ -687,14 +691,14 @@ fn write_review_as_html(
         buffer,
         r###"
     <div id="{id}" class="review">
-      <a href="https://github.com/{author_login}" target="_blank">
-        <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar">
+      <a href="{author_url}" target="_blank">
+        <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar {author_avatar_extra_class}">
       </a>
       
       <div class="review-header">
         <div class="review-badge {badge_color}">{badge_svg}</div>
         <div class="author-info">
-          <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
+          <a href="{author_url}" target="_blank" class="author-info-name">{author_login}</a>
           <a href="#{id}">{state_message} <relative-time datetime="{submitted_at_rfc3339}">{submitted_at}</relative-time></a>
         </div>
       </div>
@@ -712,7 +716,7 @@ fn write_review_as_html(
       <details class="comment">
         <summary class="comment-header">
           <div class="author-info">
-            <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+            <a href="{author_url}" target="_blank">{author_login}</a>
             <span>left a comment · hidden as {minimized_reason}</span>
           </div>
 
@@ -741,7 +745,7 @@ fn write_review_as_html(
       <div class="comment">
         <div class="comment-header">
           <div class="author-info">
-            <a href="https://github.com/{author_login}" target="_blank">{author_login}</a>
+            <a href="{author_url}" target="_blank">{author_login}</a>
             <span>left a comment</span>{edited}
           </div>
 
@@ -801,8 +805,10 @@ fn write_review_thread_as_html(
 
     for comment in comments {
         let author = comment.author.as_ref().unwrap_or(&GHOST_ACCOUNT);
+        let author_url = &author.url;
         let author_login = &author.login;
         let author_avatar_url = &author.avatar_url;
+        let author_avatar_extra_class = avatar_extra_class(&author.type_);
         let created_at = &comment.created_at;
         let created_at_rfc3339 = comment.created_at.to_rfc3339();
         let body_html = &comment.body_html;
@@ -822,10 +828,10 @@ fn write_review_thread_as_html(
       <div id="{id}" class="review-thread-comment">
           <div class="review-thread-comment-header">
             <div class="author-info">
-              <a href="https://github.com/{author_login}" target="_blank">
-                <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar avatar-small">
+              <a href="{author_url}" target="_blank">
+                <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar {author_avatar_extra_class} avatar-small">
               </a>
-              <a href="https://github.com/{author_login}" target="_blank" class="author-info-name">{author_login}</a>
+              <a href="{author_url}" target="_blank" class="author-info-name">{author_login}</a>
               <a href="#{id}"> <relative-time datetime="{created_at_rfc3339}">{created_at}</relative-time></a>{edited}
             </div>
             <a href="{comment_url}" target="_blank" class="github-link">View on GitHub</a>
@@ -1112,4 +1118,8 @@ fn parse_diff_hunk_and_relevant_lines(
 
 fn extract_id_from_github_link(url: &str) -> &str {
     url.rfind('#').map(|pos| &url[pos + 1..]).unwrap_or("")
+}
+
+fn avatar_extra_class(type_: &str) -> &str {
+    if type_ == "Bot" { "avatar-bot" } else { "" }
 }

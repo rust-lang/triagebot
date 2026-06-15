@@ -29,6 +29,9 @@ pub struct GitHubIssueWithComments {
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubSimplifiedAuthor {
     pub login: String,
+    pub url: String,
+    #[serde(rename = "__typename")]
+    pub type_: String,
     #[serde(rename = "avatarUrl")]
     pub avatar_url: String,
 }
@@ -37,7 +40,9 @@ impl Default for GitHubSimplifiedAuthor {
     fn default() -> Self {
         // Default to the "Deleted user" (https://github.com/ghost)
         GitHubSimplifiedAuthor {
+            type_: "User".to_string(),
             login: "ghost".to_string(),
+            url: "https://github.com/ghost".to_string(),
             avatar_url: "https://avatars.githubusercontent.com/u/10137?v=4".to_string(),
         }
     }
@@ -252,8 +257,10 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
         updatedAt
         lastEditedAt
         author {
+          url
           login
           avatarUrl
+          __typename
         }
         reactionGroups {
           content
@@ -269,8 +276,10 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
         comments(first: 100, after: $commentsCursor) {
           nodes {
             author {
+              url
               login
               avatarUrl
+              __typename
             }
             createdAt
             lastEditedAt
@@ -305,8 +314,10 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
         createdAt
         lastEditedAt
         author {
+          url
           login
           avatarUrl
+          __typename
         }
         reactionGroups {
           content
@@ -322,8 +333,10 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
         comments(first: 100, after: $commentsCursor) {
           nodes {
             author {
+              url
               login
               avatarUrl
+              __typename
             }
             createdAt
             lastEditedAt
@@ -361,8 +374,10 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             comments(first: 100) {
               nodes {
                 author {
+                  url
                   login
                   avatarUrl
+                  __typename
                 }
                 createdAt
                 lastEditedAt
@@ -394,8 +409,10 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
         reviews(first: 100, after: $reviewsCursor) {
           nodes {
             author {
+              url
               login
               avatarUrl
+              __typename
             }
             id
             state
