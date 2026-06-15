@@ -83,6 +83,7 @@ define_config! {
     no_merges: NoMergesConfig,
     pr_tracking: ReviewPrefsConfig,
     transfer: TransferConfig,
+    merge: MergeConfig,
     merge_conflicts: MergeConflictConfig,
     bot_pull_requests: BotPullRequests,
     rendered_link: RenderedLinkConfig,
@@ -594,6 +595,21 @@ pub(crate) struct TransferConfig {}
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
+pub(crate) struct MergeConfig {
+    #[serde(rename = "type")]
+    pub(crate) type_: MergeType,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum MergeType {
+    /// Github Merge queue
+    MergeQueue,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 pub(crate) struct MergeConflictConfig {
     #[serde(default)]
     pub remove: HashSet<String>,
@@ -940,6 +956,9 @@ mod tests {
             [range-diff]
 
             [review-changes-since]
+
+            [merge]
+            type = "merge-queue"
         "##;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -1061,6 +1080,9 @@ mod tests {
                 }),
                 review_changes_since: Some(ReviewChangesSinceConfig {}),
                 view_all_comments_link: None,
+                merge: Some(MergeConfig {
+                    type_: MergeType::MergeQueue
+                }),
             }
         );
     }
@@ -1152,6 +1174,7 @@ mod tests {
                 range_diff: None,
                 review_changes_since: None,
                 view_all_comments_link: None,
+                merge: None,
             }
         );
     }

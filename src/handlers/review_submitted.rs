@@ -36,7 +36,7 @@ pub(crate) async fn handle(
                 .await
                 .context("failed to get the user repository permission")?;
 
-            perm.permission == "write" || perm.permission == "admin"
+            perm.permission.has_write_permissions()
         } {
             // Remove review labels
             event

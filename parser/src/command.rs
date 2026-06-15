@@ -7,6 +7,7 @@ pub mod assign;
 pub mod close;
 pub mod concern;
 pub mod lock;
+pub mod merge;
 pub mod nominate;
 pub mod note;
 pub mod ping;
@@ -30,6 +31,7 @@ pub enum Command<'a> {
     Note(Result<note::NoteCommand, Error<'a>>),
     Concern(Result<concern::ConcernCommand, Error<'a>>),
     Transfer(Result<transfer::TransferCommand, Error<'a>>),
+    Merge(Result<merge::MergeCommand, Error<'a>>),
 }
 
 #[derive(Debug)]
@@ -146,6 +148,11 @@ impl<'a> Input<'a> {
             Command::Transfer,
             &original_tokenizer,
         ));
+        success.extend(parse_single_command(
+            merge::MergeCommand::parse,
+            Command::Merge,
+            &original_tokenizer,
+        ));
 
         assert!(
             success.len() <= 1,
@@ -222,6 +229,7 @@ impl Command<'_> {
             Command::Note(r) => r.is_ok(),
             Command::Concern(r) => r.is_ok(),
             Command::Transfer(r) => r.is_ok(),
+            Command::Merge(r) => r.is_ok(),
         }
     }
 
@@ -444,4 +452,11 @@ fn resolve() {
             title: "this is my concern".to_string()
         })))
     );
+}
+
+#[test]
+fn merge() {
+    let input = "@bot merge";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert_eq!(input.next(), Some(Command::Merge(Ok(merge::MergeCommand))));
 }
