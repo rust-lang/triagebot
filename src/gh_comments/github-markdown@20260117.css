@@ -122,9 +122,18 @@
     --button-default-fgColor-rest: var(--control-fgColor-rest);
     --button-default-borderColor-active: var(--button-default-borderColor-rest);
     --button-default-borderColor-hover: var(--button-default-borderColor-rest);
+  }
+
+  .markdown-body .hx_IssueLabel {
     --lightness-threshold: .6;
     --background-alpha: .18;
     --border-alpha: .3;
+    --perceived-lightness: calc(((var(--label-r) * .2126) + (var(--label-g) * .7152) + (var(--label-b) * .0722)) / 255);
+    --lightness-switch: max(0, min(calc((1/(var(--lightness-threshold) - var(--perceived-lightness)))), 1));
+    --lighten-by: calc(((var(--lightness-threshold) - var(--perceived-lightness)) * 100) * var(--lightness-switch));
+    color: hsl(var(--label-h), calc(var(--label-s) * 1%), calc((var(--label-l) + var(--lighten-by)) * 1%));
+    background: rgba(var(--label-r), var(--label-g), var(--label-b), var(--background-alpha));
+    border-color: hsla(var(--label-h), calc(var(--label-s) * 1%), calc((var(--label-l) + var(--lighten-by)) * 1%), var(--border-alpha));
   }
 }
 @media (prefers-color-scheme: light) {
@@ -209,9 +218,17 @@
     --diffBlob-deletionNum-fgColor: var(--fgColor-default);
     --diffBlob-deletionWord-fgColor: var(--fgColor-default);
     --button-default-borderColor-hover: var(--button-default-borderColor-rest);
+  }
+  
+  .markdown-body .hx_IssueLabel {
     --lightness-threshold: .453;
     --border-threshold: .96;
+    --perceived-lightness: calc(((var(--label-r) * .2126) + (var(--label-g) * .7152) + (var(--label-b) * .0722)) / 255);
+    --lightness-switch: max(0, min(calc((1/(var(--lightness-threshold) - var(--perceived-lightness)))), 1));
     --border-alpha: max(0, min(calc((var(--perceived-lightness) - var(--border-threshold)) * 100), 1));
+    color: hsl(0deg, 0%, calc(var(--lightness-switch) * 100%));
+    background: rgb(var(--label-r), var(--label-g), var(--label-b));
+    border-color: hsla(var(--label-h), calc(var(--label-s) * 1%), calc((var(--label-l) - 25) * 1%), var(--border-alpha));
   }
 }
 
@@ -2223,12 +2240,6 @@
   min-height: 52px;
 }
 
-.markdown-body .hx_IssueLabel {
-  color: hsl(0deg, 0%, calc(var(--lightness-switch) * 100%));
-  background: rgb(var(--label-r), var(--label-g), var(--label-b));
-  border-color: hsla(var(--label-h), calc(var(--label-s) * 1%), calc((var(--label-l) - 25) * 1%), var(--border-alpha));
-}
-
 .markdown-body .Label--inline {
   padding: .12em .5em;
   font-size: 85%;
@@ -2239,7 +2250,8 @@
   font-size: 12px;
   font-weight: var(--base-text-weight-medium,500);
   white-space: nowrap;
-  border: 1px solid #0000;
+  border-width: 1px;
+  border-style: solid;
   border-radius: 2em;
   padding: 0 7px;
   line-height: 18px;
