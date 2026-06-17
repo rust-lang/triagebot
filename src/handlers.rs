@@ -98,6 +98,18 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         Ok(())
     };
 
+    let assign_comments = async {
+        if let Some(assign_config) = config.as_ref().ok().and_then(|c| c.assign.as_ref())
+            && let Event::IssueComment(event) = event
+        {
+            assign::handle_comment(ctx, assign_config, event)
+                .await
+                .map_err(|e| HandlerError::Other(e.context("assign (from reviews) handler failed")))
+        } else {
+            Ok(())
+        }
+    };
+
     let check_commits = async {
         if let Ok(check_commits_config) = &config {
             check_commits::handle(ctx, host, event, check_commits_config)
@@ -231,6 +243,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
 
     let (
         prune_gh_comments,
+        assign_comments,
         check_commits,
         project_goals,
         rustc_commits,
@@ -245,6 +258,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         merge_conflicts,
     ) = futures::join!(
         prune_gh_comments,
+        assign_comments,
         check_commits,
         project_goals,
         rustc_commits,
@@ -261,6 +275,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
 
     for result in [
         prune_gh_comments,
+        assign_comments,
         check_commits,
         project_goals,
         rustc_commits,

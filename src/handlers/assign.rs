@@ -22,14 +22,18 @@
 //! `assign.owners` config, it will auto-select an assignee based on the files
 //! the PR modifies.
 
+use crate::config::AssignCommunityReviewsConfig;
 use crate::db::issue_data::IssueData;
 use crate::db::review_prefs::{RotationMode, get_review_prefs_batch};
 use crate::errors::{self, AssignmentError, user_error};
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::{
     config::AssignConfig,
-    github::{self, Event, FileDiff, Issue, IssuesAction, utils::Selection},
-    handlers::{Context, GithubClient, IssuesEvent},
+    github::{
+        self, Comment, Event, FileDiff, Issue, IssueCommentAction, IssueCommentEvent, IssuesAction,
+        PullRequestReviewState, utils::Selection,
+    },
+    handlers::{Context, IssuesEvent},
     interactions::EditIssueBody,
 };
 use anyhow::{Context as _, bail};
@@ -84,6 +88,7 @@ fn get_repo_workqueue(ctx: &Context, repo: &str) -> Arc<RwLock<ReviewerWorkqueue
 pub(super) enum AssignInput {
     Opened { draft: bool },
     ReadyForReview,
+    UnlabeledMinReviews { draft: bool },
 }
 
 /// Prepares the input when a new PR is opened.
@@ -92,15 +97,29 @@ pub(super) async fn parse_input(
     event: &IssuesEvent,
     config: Option<&AssignConfig>,
 ) -> Result<Option<AssignInput>, String> {
-    if config.is_none() || !event.issue.is_pr() {
+    if !event.issue.is_pr() {
         return Ok(None);
     }
 
-    match event.action {
+    let Some(config) = config else {
+        return Ok(None);
+    };
+
+    match &event.action {
         IssuesAction::Opened => Ok(Some(AssignInput::Opened {
             draft: event.issue.draft,
         })),
         IssuesAction::ReadyForReview => Ok(Some(AssignInput::ReadyForReview)),
+        IssuesAction::Unlabeled { label: Some(label) }
+            if config
+                .community_reviews
+                .as_ref()
+                .is_some_and(|community_reviews| community_reviews.label == label.name) =>
+        {
+            Ok(Some(AssignInput::UnlabeledMinReviews {
+                draft: event.issue.draft,
+            }))
+        }
         _ => Ok(None),
     }
 }
@@ -115,20 +134,82 @@ pub(super) async fn handle_input(
 ) -> anyhow::Result<()> {
     let assign_command = find_assign_command(ctx, event);
 
-    // Perform assignment when:
-    // - PR was opened normally
-    // - PR was opened as a draft with an explicit r? (but not r? ghost)
-    // - PR was converted from a draft and there are no current assignees
     let should_assign = match input {
-        AssignInput::Opened { draft: false } => true,
+        AssignInput::Opened { draft: false } => {
+            if let Some(community_reviews) = &config.community_reviews
+                && assign_command.is_none()
+            {
+                // PR was opened normally, but minimum approval configured,
+                // add label and welcome message BUT don't perform assignment
+                event
+                    .issue
+                    .add_labels(
+                        &ctx.github,
+                        vec![github::Label {
+                            name: community_reviews.label.to_string(),
+                        }],
+                    )
+                    .await?;
+                if event.issue.author_association.is_probably_first_timer() {
+                    let mut welcome = messages::new_user_welcome_message_community_reviews(
+                        community_reviews.minimum_approvals.get(),
+                    );
+                    if let Some(contrib) = &config.contributing_url {
+                        welcome.push_str("\n\n");
+                        welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
+                    }
+                    event
+                        .issue
+                        .post_comment(&ctx.github, &welcome)
+                        .await
+                        .context("couldn't post welcome message")?;
+                }
+                false
+            } else {
+                // PR was opened normally, perform assignment if not assignees manually set
+                event.issue.assignees.is_empty()
+            }
+        }
         AssignInput::Opened { draft: true } => {
-            // Even if the PR is opened as a draft, we still want to perform assignment if r?
+            // PR is opened as a draft, we still want to perform assignment if r?
             // was used. However, historically, `r? ghost` was supposed to mean "do not
             // perform assignment". So in that case, we skip the assignment and only perform it once
             // the PR has been marked as being ready for review.
             assign_command.as_ref().is_some_and(|a| a != GHOST_ACCOUNT)
         }
-        AssignInput::ReadyForReview => event.issue.assignees.is_empty(),
+        AssignInput::ReadyForReview => {
+            if let Some(community_reviews) = &config.community_reviews
+                && assign_command.is_none()
+            {
+                if !event.issue.assignees.is_empty()
+                    || event.issue.labels.contains(&github::Label {
+                        name: community_reviews.label.to_string(),
+                    })
+                {
+                    // PR was converted from a draft, but there are current assignees or
+                    // min reviews label is set, don't perform assignment
+                    false
+                } else {
+                    // PR was converted from a draft and there are no current assignees,
+                    // but min reviews configured, perform assignment if enough reviews
+                    update_community_review_label(ctx, &community_reviews, &event.issue).await?
+                }
+            } else {
+                // PR was converted from a draft, perform assignment if there are
+                // no current assignees
+                event.issue.assignees.is_empty()
+            }
+        }
+        AssignInput::UnlabeledMinReviews { draft: false } => {
+            // Minimum reviews label was removed and the PR is not in a draft state
+            // perform assignement if no current assignees
+            event.issue.assignees.is_empty()
+        }
+        AssignInput::UnlabeledMinReviews { draft: true } => {
+            // Minimum reviews label was removed, but PR is still in a draft state (should
+            // only happened if someone manually edited the label), don't perform assignement
+            false
+        }
     };
 
     if !should_assign {
@@ -183,7 +264,9 @@ pub(super) async fn handle_input(
                 }
                 welcome
             }
-        } else if event.issue.author_association.is_probably_first_timer() {
+        } else if event.issue.author_association.is_probably_first_timer()
+            && config.community_reviews.is_none()
+        {
             let assignee_text = match &assignee {
                 Some(assignee) => Some(messages::welcome_with_reviewer(&assignee.name)),
                 None => {
@@ -208,17 +291,27 @@ pub(super) async fn handle_input(
             }
         } else if !from_comment {
             match &assignee {
-                Some(assignee) => Some(messages::returning_user_welcome_message(
-                    &assignee.name,
-                    &ctx.username,
-                )),
+                Some(assignee) => Some(if config.community_reviews.is_some() {
+                    messages::returning_user_welcome_message_community_reviews(
+                        &assignee.name,
+                        &ctx.username,
+                    )
+                } else {
+                    messages::returning_user_welcome_message(&assignee.name, &ctx.username)
+                }),
                 None => {
                     // If the assign fallback group is empty, then we don't expect any automatic
                     // assignment, and this message would just be spam.
                     if config.fallback_review_group().is_some() {
-                        Some(messages::returning_user_welcome_message_no_reviewer(
-                            &event.issue.user.login,
-                        ))
+                        Some(if config.community_reviews.is_some() {
+                            messages::returning_user_welcome_message_no_reviewer_community_reviews(
+                                &event.issue.user.login,
+                            )
+                        } else {
+                            messages::returning_user_welcome_message_no_reviewer(
+                                &event.issue.user.login,
+                            )
+                        })
                     } else {
                         None
                     }
@@ -229,7 +322,7 @@ pub(super) async fn handle_input(
             None
         };
         if let Some(assignee) = &assignee {
-            set_assignee(ctx, &event.issue, &ctx.github, assignee).await?;
+            set_assignee(ctx, config, &event.issue, assignee).await?;
         }
 
         if let Some(mut welcome) = welcome {
@@ -321,11 +414,67 @@ fn is_self_assign(assignee: &str, pr_author: &str) -> bool {
     assignee.to_lowercase() == pr_author.to_lowercase()
 }
 
+/// Determine if the issue has enough community (review) approvals
+async fn has_enough_community_approvals(
+    ctx: &Context,
+    config: &AssignCommunityReviewsConfig,
+    issue: &Issue,
+) -> anyhow::Result<bool> {
+    let reviews = issue
+        .get_reviews(&ctx.github)
+        .await
+        .context("unable to fetch reviews for determining assignement")?;
+
+    let mut approval_reviews: HashSet<_> = reviews
+        .iter()
+        .filter(|c| c.pr_review_state == Some(PullRequestReviewState::Approved))
+        .map(|c| c.user.id)
+        .collect::<HashSet<_>>();
+
+    // GitHub doesn't allow PR authors to approve a PR them-selves but just
+    // in case let's remove the PR author.
+    approval_reviews.remove(&issue.user.id);
+
+    Ok(approval_reviews.len() >= config.minimum_approvals.get().into())
+}
+
+/// Update the min community reviews label on the PR.
+/// Returns true if the PR already has enough community approvals.
+async fn update_community_review_label(
+    ctx: &Context,
+    config: &AssignCommunityReviewsConfig,
+    issue: &Issue,
+) -> anyhow::Result<bool> {
+    let enough_reviews = has_enough_community_approvals(ctx, config, issue).await?;
+
+    if enough_reviews {
+        issue
+            .remove_labels(
+                &ctx.github,
+                vec![github::Label {
+                    name: config.label.to_string(),
+                }],
+            )
+            .await?;
+    } else {
+        issue
+            .add_labels(
+                &ctx.github,
+                vec![github::Label {
+                    name: config.label.to_string(),
+                }],
+            )
+            .await?;
+    }
+
+    Ok(enough_reviews)
+}
+
 /// Sets the assignee of a PR, alerting any errors.
 async fn set_assignee(
     ctx: &Context,
+    config: &AssignConfig,
     issue: &Issue,
-    github: &GithubClient,
     reviewer: &ReviewerSelection,
 ) -> anyhow::Result<()> {
     let mut db = ctx.db.get().await;
@@ -341,7 +490,7 @@ async fn set_assignee(
         );
         return Ok(());
     }
-    if let Err(err) = issue.set_assignee(github, &reviewer.name).await {
+    if let Err(err) = issue.set_assignee(&ctx.github, &reviewer.name).await {
         log::warn!(
             "failed to set assignee of PR {} to {}: {err:?}",
             issue.global_id(),
@@ -349,7 +498,7 @@ async fn set_assignee(
         );
         if let Err(e) = issue
             .post_comment(
-                github,
+                &ctx.github,
                 &format!(
                     "Failed to set assignee to `{}`: {err}\n\
                      \n\
@@ -386,6 +535,19 @@ They may take a while to respond."
                 log::warn!("failed to post reviewer warning comment: {err}");
             }
         }
+    }
+
+    // Since we are assigning someone we cannot be waiting on community reviews
+    // remove the label if it's still present
+    if let Some(min_reviews) = &config.community_reviews {
+        issue
+            .remove_labels(
+                &ctx.github,
+                vec![github::Label {
+                    name: min_reviews.label.to_string(),
+                }],
+            )
+            .await?;
     }
 
     // Record the reviewer in the database
@@ -680,7 +842,7 @@ pub(super) async fn handle_command(
                         .await
                         .context("Cannot determine assignee when rerolling")?;
                 if let Some(assignee) = assignee {
-                    set_assignee(ctx, issue, &ctx.github, &assignee)
+                    set_assignee(ctx, config, issue, &assignee)
                         .await
                         .context("Cannot set assignee when rerolling")?;
                 } else {
@@ -727,7 +889,7 @@ pub(super) async fn handle_command(
             }
         };
 
-        set_assignee(ctx, issue, &ctx.github, &assignee).await?;
+        set_assignee(ctx, config, issue, &assignee).await?;
     } else {
         let mut client = ctx.db.get().await;
         let mut e: EditIssueBody<'_, AssignData> =
@@ -792,6 +954,48 @@ pub(super) async fn handle_command(
             }
             Err(e) => return Err(e.into()),
         }
+    }
+
+    Ok(())
+}
+
+/// Process a comment/review/review comment
+pub(super) async fn handle_comment(
+    ctx: &Context,
+    config: &AssignConfig,
+    event: &IssueCommentEvent,
+) -> anyhow::Result<()> {
+    // If not a new review on a PR, bail out
+    if !matches!(
+        event,
+        IssueCommentEvent {
+            action: IssueCommentAction::Created,
+            issue: Issue {
+                pull_request: Some(_),
+                merged: false,
+                draft: false,
+                ..
+            },
+            comment: Comment {
+                in_reply_to_id: None,
+                pr_review_state: Some(PullRequestReviewState::Approved),
+                ..
+            },
+            ..
+        }
+    ) {
+        return Ok(());
+    }
+
+    let Some(min_reviews) = &config.community_reviews else {
+        return Ok(());
+    };
+
+    if event.issue.labels.contains(&github::Label {
+        name: min_reviews.label.to_string(),
+    }) {
+        // Let's update the status, but only if the label wasn't already removed.
+        update_community_review_label(ctx, min_reviews, &event.issue).await?;
     }
 
     Ok(())

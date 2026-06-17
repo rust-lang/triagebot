@@ -6,8 +6,15 @@
 pub fn new_user_welcome_message(reviewer: &str) -> String {
     format!(
         "Thanks for the pull request, and welcome! \
-The Rust team is excited to review your changes, and you should hear from {reviewer} \
+The Rust Project is excited to review your changes, and you should hear from {reviewer} \
 some time within the next two weeks."
+    )
+}
+
+pub fn new_user_welcome_message_community_reviews(min_reviews: u8) -> String {
+    format!(
+        "Thanks for the pull request, and welcome!\
+You should hear from one of our reviewers after this PR is reviewed by at least {min_reviews} reviewers from the community"
     )
 }
 
@@ -42,6 +49,24 @@ Use `r?` to explicitly pick a reviewer"
 
 pub fn returning_user_welcome_message_no_reviewer(pr_author: &str) -> String {
     format!("@{pr_author}: no appropriate reviewer found, use `r?` to override")
+}
+
+pub fn returning_user_welcome_message_community_reviews(assignee: &str, bot: &str) -> String {
+    format!(
+        "r? @{assignee}
+
+{bot} has assigned @{assignee} for the project review.
+They will have a look at your PR within the next two weeks and either review your PR or \
+reassign to another reviewer.
+
+Use `r?` to explicitly pick a reviewer"
+    )
+}
+
+pub fn returning_user_welcome_message_no_reviewer_community_reviews(pr_author: &str) -> String {
+    format!(
+        "@{pr_author}: no appropriate reviewer found for the project review, use `r?` to override"
+    )
 }
 
 pub fn reviewer_off_rotation_message(username: &str) -> String {
