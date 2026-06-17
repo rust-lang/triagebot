@@ -458,5 +458,64 @@ fn resolve() {
 fn merge() {
     let input = "@bot merge";
     let mut input = Input::new(input, vec!["bot"]);
-    assert_eq!(input.next(), Some(Command::Merge(Ok(merge::MergeCommand))));
+    assert_eq!(
+        input.next(),
+        Some(Command::Merge(Ok(merge::MergeCommand::Merge)))
+    );
+}
+
+#[test]
+fn delegate() {
+    let input = "@bot delegate=ghost";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert_eq!(
+        input.next(),
+        Some(Command::Merge(Ok(merge::MergeCommand::Delegate {
+            login: "ghost".to_string()
+        })))
+    );
+}
+
+#[test]
+fn delegate_author() {
+    let input = "@bot delegate+";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert_eq!(
+        input.next(),
+        Some(Command::Merge(Ok(merge::MergeCommand::DelegateToAuthor)))
+    );
+}
+
+#[test]
+fn delegate_author_2() {
+    let input = "@bot delegate";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert_eq!(
+        input.next(),
+        Some(Command::Merge(Ok(merge::MergeCommand::DelegateToAuthor)))
+    );
+}
+
+#[test]
+fn delegate_empty() {
+    let input = "@bot delegate=";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert_eq!(
+        input.next(),
+        Some(Command::Merge(Ok(merge::MergeCommand::Delegate {
+            login: "".to_string()
+        })))
+    );
+}
+
+#[test]
+fn delegate_with_at() {
+    let input = "@bot delegate=@ghost";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert_eq!(
+        input.next(),
+        Some(Command::Merge(Ok(merge::MergeCommand::Delegate {
+            login: "@ghost".to_string()
+        })))
+    );
 }
