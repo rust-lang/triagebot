@@ -377,8 +377,12 @@ async fn handle(
     label_to_add: Option<String>,
     new_proposal: bool,
 ) -> anyhow::Result<()> {
-    let github_req = label_to_add
-        .map(|label_to_add| issue.add_labels(&ctx.github, vec![Label { name: label_to_add }]));
+    if let Some(label_to_add) = label_to_add {
+        issue
+            .add_labels(&ctx.github, vec![Label { name: label_to_add }])
+            .await
+            .context("failed to add the major change label")?;
+    }
 
     let partial_issue = issue.to_zulip_github_reference();
     let zulip_topic = zulip_topic_from_issue(&partial_issue);
@@ -391,8 +395,13 @@ async fn handle(
         content: &zulip_msg,
     };
 
+    let zulip_response = zulip_req
+        .send(&ctx.zulip)
+        .await
+        .context("zulip post failed")?;
+
     if new_proposal {
-        let topic_url = zulip_req.url(&ctx.zulip);
+        let topic_url = zulip_response.url(&zulip_req.recipient, &ctx.zulip);
         let comment = format!(
             r"> [!IMPORTANT]
 > This issue is *not meant to be used for technical discussion*. There is a **Zulip [stream]** for that.
@@ -425,15 +434,6 @@ See documentation at [https://forge.rust-lang.org](https://forge.rust-lang.org/c
             .context("post major change comment")?;
     }
 
-    let zulip_req = zulip_req.send(&ctx.zulip);
-
-    if let Some(github_req) = github_req {
-        let (gh_res, zulip_res) = futures::join!(github_req, zulip_req);
-        zulip_res.context("zulip post failed")?;
-        gh_res.context("label setting failed")?;
-    } else {
-        zulip_req.await.context("zulip post failed")?;
-    }
     Ok(())
 }
 

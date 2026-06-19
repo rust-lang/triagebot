@@ -41,6 +41,17 @@ pub(crate) struct MessageApiResponse {
     pub(crate) message_id: u64,
 }
 
+impl MessageApiResponse {
+    pub fn url(&self, recipient: &Recipient<'_>, zulip: &ZulipClient) -> String {
+        format!(
+            "{}/#narrow/{}/with/{}",
+            zulip.instance_url(),
+            recipient.narrow(),
+            self.message_id
+        )
+    }
+}
+
 #[derive(Copy, Clone, serde::Serialize)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
