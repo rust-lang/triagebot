@@ -56,6 +56,7 @@ globset = { version = "0.4.18", default-features = false }
 tower_governor = { version = "0.8.0", default-features = false, features = ["axum", "tracing"] }
 http-body-util = "0.1.3"
 http = "1.4.0"
+memchr = "2.7.5"
 
 [dependencies.serde]
 version = "1"

@@ -23,6 +23,8 @@ use crate::github::{GithubCommit, GithubCompare};
 use crate::utils::is_known_and_public_repo;
 use crate::{errors::AppError, github, handlers::Context};
 
+mod bidi_unicode;
+
 static MARKER_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"@@ -[\d]+,[\d]+ [+][\d]+,[\d]+ @@").unwrap());
 
@@ -293,6 +295,15 @@ fn process_old_new(
     .spacer {{
       margin-bottom: 1rem;
     }}
+    .warning {{
+      background-color: #fff8c5;
+      border-color: #d4a72c66;
+      border-width: 1px;
+      border-style: solid;
+      white-space: break-spaces;
+      margin-top: 1rem;
+      padding: 1rem;
+    }}
     @media (prefers-color-scheme: dark) {{
       body {{
         background: #0C0C0C;
@@ -345,6 +356,10 @@ fn process_old_new(
       .line-added-before .word-removed {{
         color: black;
         background-color: rgb(255, 0, 0);
+      }}
+      .warning {{
+         background-color: #ae7c1426;
+         border-color: #ae7c1466;
       }}
     }}
     </style>
@@ -404,11 +419,19 @@ fn process_old_new(
             let after_href =
                 format_args!("https://github.com/{owner}/{repo}/blob/{newhead}/{filename}");
 
-            write!(html, r#"<details open=""><summary>{filename}"#)?;
             write!(
                 html,
-                r#" <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary><pre class="diff-content">{unified_diff}</pre>"#
+                r#"<details open=""><summary>{filename} <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary>"#
             )?;
+
+            if bidi_unicode::contains_text_flow_control_chars(&*new_patch) {
+                write!(
+                    html,
+                    r#"<div class="warning">⚠ <span>This file contains bidirectional or hidden Unicode text that may be interpreted or compiled differently than what appears below. To review, open the file in an editor that reveals hidden Unicode characters. <a href="https://github.co/hiddenchars" target="_blank" rel="noreferrer">Learn more about bidirectional Unicode characters</a></span></div>"#
+                )?;
+            }
+
+            write!(html, r#"<pre class="diff-content">{unified_diff}</pre>"#)?;
             writeln!(html, "</details>")?;
 
             diff_displayed += 1;
