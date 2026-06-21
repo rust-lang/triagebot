@@ -49,6 +49,7 @@ use tokio_postgres::Client as DbClient;
 use tracing as log;
 
 mod messages;
+pub(crate) mod release_inactive_assignments;
 
 #[cfg(test)]
 mod tests {
