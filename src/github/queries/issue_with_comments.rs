@@ -159,7 +159,7 @@ pub struct GitHubGraphQlReactionGroup {
 pub struct GitHubGraphQlReactionGroupReactors {
     #[serde(rename = "totalCount")]
     pub total_count: u32,
-    pub nodes: Vec<GitHubGraphQlReactionGroupReactor>,
+    pub nodes: Vec<Option<GitHubGraphQlReactionGroupReactor>>,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]

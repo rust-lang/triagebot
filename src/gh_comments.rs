@@ -925,6 +925,7 @@ fn write_reaction_groups_as_html(
                     .reactors
                     .nodes
                     .iter()
+                    .flatten()
                     .filter_map(|r| r.login.as_deref())
                     .collect::<Vec<_>>();
                 let left = total_count.saturating_sub(users.len() as u32);
