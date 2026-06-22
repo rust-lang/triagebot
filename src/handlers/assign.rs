@@ -60,6 +60,9 @@ mod tests {
 const GHOST_ACCOUNT: &str = "ghost";
 
 /// Key for the state in the database
+const ASSIGN_KEY: &str = "ASSIGN";
+
+/// Key for the state in the database
 const PREVIOUS_REVIEWERS_KEY: &str = "previous-reviewers";
 
 /// State stored in the database
@@ -893,7 +896,7 @@ pub(super) async fn handle_command(
     } else {
         let mut client = ctx.db.get().await;
         let mut e: EditIssueBody<'_, AssignData> =
-            EditIssueBody::load(&mut client, issue, "ASSIGN").await?;
+            EditIssueBody::load(&mut client, issue, ASSIGN_KEY).await?;
         let d = e.data_mut();
 
         let to_assign = match cmd {
