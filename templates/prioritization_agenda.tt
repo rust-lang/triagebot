@@ -45,10 +45,6 @@ note_id: xxx
 {{-issues::render(issues=beta_nominated_t_compiler, backport_branch=":beta: ", empty="No beta nominations for `T-compiler` this time.")}}
 {{-issues::render(issues=stable_nominated_t_compiler, backport_branch=":stable: ", empty="No stable nominations for `T-compiler` this time.")}}
 
-[T-types beta](https://github.com/rust-lang/rust/issues?q=is%3Apr+label%3Abeta-nominated+-label%3Abeta-accepted+label%3AT-types) / [T-types stable](https://github.com/rust-lang/rust/issues?q=is%3Apr+label%3Astable-nominated+-label%3Astable-accepted+label%3AT-types)
-{{-issues::render(issues=beta_nominated_t_types, backport_branch=":beta:", empty="No beta nominations for `T-types` this time.")}}
-{{-issues::render(issues=stable_nominated_t_types, backport_branch=":stable:", empty="No stable nominations for `T-types` this time.")}}
-
 ## PRs S-waiting-on-t-compiler
 
 [T-compiler](https://github.com/rust-lang/rust/pulls?q=is%3Aopen+label%3AS-waiting-on-t-compiler)
@@ -84,6 +80,8 @@ note_id: xxx
 {{-issues::render(issues=nightly_regressions_unassigned_p_high, empty="No unassigned `P-high` nightly regressions this time.")}}
 
 ## Performance logs
+
+(TIP): trim the positive perf. logs, leave the mixed and negative reports intact
 
 > [triage logs](https://github.com/rust-lang/rustc-perf/tree/master/triage/{{ now() | date(format="%Y") }})
 
