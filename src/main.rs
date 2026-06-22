@@ -4,7 +4,8 @@ use anyhow::Context as _;
 use axum::body::Body;
 use axum::error_handling::HandleErrorLayer;
 use axum::http::HeaderName;
-use axum::response::{Html, Response};
+use axum::middleware::{self, Next};
+use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{BoxError, Router};
 use hyper::{Request, StatusCode};
@@ -35,6 +36,8 @@ use triagebot::jobs::{
 use triagebot::team_data::TeamClient;
 use triagebot::zulip::client::ZulipClient;
 use triagebot::{db, github};
+
+const BANNED_USER_AGENTS: &[&str] = &["meta-webindexer/1.1", "Nexus 5 Build/MRA58N"];
 
 async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     let gh = github::GithubClient::new_from_env();
@@ -184,7 +187,8 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         )
         .layer(PropagateRequestIdLayer::new(X_REQUEST_ID))
         .layer(CompressionLayer::new())
-        .layer(CatchPanicLayer::new());
+        .layer(CatchPanicLayer::new())
+        .layer(middleware::from_fn(block_user_agents));
 
     let agenda = Router::new()
         .route("/", get(|| async { Html(triagebot::agenda::INDEX) }))
@@ -290,6 +294,20 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     .unwrap();
 
     Ok(())
+}
+
+/// Check if the request is coming from one of our banned UA, reject the request if that's the case
+async fn block_user_agents(req: Request<axum::body::Body>, next: Next) -> Response {
+    if let Some(user_agent_value) = req.headers().get(hyper::header::USER_AGENT)
+        && let Ok(ua) = user_agent_value.to_str()
+    {
+        if BANNED_USER_AGENTS.iter().any(|banned| ua.contains(banned)) {
+            // Reject immediately with a 403 Forbidden status
+            return (StatusCode::FORBIDDEN, "Access Denied: Banned User-Agent. If you think this a mistake, please open an issue at https://github.com/rust-lang/triagebot.").into_response();
+        }
+    }
+
+    next.run(req).await
 }
 
 /// Spawns a background tokio task which runs continuously to queue up jobs
