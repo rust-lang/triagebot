@@ -7,8 +7,8 @@
   - Authored by {{ issue.author }}
   - Voting [Zulip topic](#)
 <!--
-@**triagebot** backport {{ backport_branch | replace(from=":", to="") | trim() }} accept {{ issue.number }}
-@**triagebot** backport {{ backport_branch | replace(from=":", to="") | trim() }} decline {{ issue.number }}
+@**triagebot** backport accept {{ backport_branch | replace(from=":", to="") | trim() }} {{ issue.number }}
+@**triagebot** backport decline {{ backport_branch | replace(from=":", to="") | trim() }} {{ issue.number }}
 -->
 {%- endif -%}
 {% if issue.mcp_details.concerns %}{%- for concern in issue.mcp_details.concerns %}
