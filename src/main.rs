@@ -3,6 +3,7 @@
 use anyhow::Context as _;
 use axum::body::Body;
 use axum::error_handling::HandleErrorLayer;
+use axum::extract::State;
 use axum::http::HeaderName;
 use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Response};
@@ -237,7 +238,11 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             "/gh-comments/{owner}/{repo}/pull/{pr}",
             get(triagebot::gh_comments::gh_comments),
         )
-        .layer(GovernorLayer::new(ratelimit_config));
+        .layer(GovernorLayer::new(ratelimit_config))
+        .layer(middleware::from_fn_with_state(
+            ctx.clone(),
+            block_if_github_ratelimit_too_low,
+        ));
 
     let app = Router::new()
         .route("/", get(|| async { "Triagebot is awaiting triage." }))
@@ -305,6 +310,31 @@ async fn block_user_agents(req: Request<axum::body::Body>, next: Next) -> Respon
             // Reject immediately with a 403 Forbidden status
             return (StatusCode::FORBIDDEN, "Access Denied: Banned User-Agent. If you think this a mistake, please open an issue at https://github.com/rust-lang/triagebot.").into_response();
         }
+    }
+
+    next.run(req).await
+}
+
+/// Check if out GitHub rate limits are too low, reject the request if that's the case
+async fn block_if_github_ratelimit_too_low(
+    State(ctx): State<Arc<Context>>,
+    req: Request<axum::body::Body>,
+    next: Next,
+) -> Response {
+    let Ok(rl) = ctx.github.rate_limit().await else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Could not read GitHub rate limit",
+        )
+            .into_response();
+    };
+
+    if rl.graphql.remaining < 750 || rl.core.remaining < 750 {
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            "Low GitHub rate limit. Core functionality preserved; try again later.",
+        )
+            .into_response();
     }
 
     next.run(req).await
