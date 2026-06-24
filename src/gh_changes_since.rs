@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Context as _;
 use axum::{
     extract::{Path, State},
-    response::{IntoResponse, Redirect, Response},
+    response::{Html, IntoResponse, Redirect, Response},
 };
 use hyper::StatusCode;
 
@@ -46,6 +46,20 @@ pub async fn gh_changes_since(
 
     let newbase = &pr.base.as_ref().context("no base")?.sha;
     let newhead = &pr.head.as_ref().context("no head")?.sha;
+
+    // Did something changed, no?
+    if oldhead == newhead {
+        // Inform the user that nothing changed.
+        return Ok((StatusCode::OK, Html(format!(
+r##"<!DOCTYPE html>
+<title>Changes since for {owner}/{repo}#{pr_num}</title>
+<style>
+  :root {{ color-scheme: light dark; font-family: system-ui; margin: 2rem auto; max-width: 60ch; }}
+</style>
+<h1>No changes since this review.</h1>
+<p>Head back to the <a href="https://github.com/{owner}/{repo}/pull/{pr_num}/changes">latest changes here</a>.</p>
+"##))).into_response());
+    }
 
     // Has the base changed?
     if oldbase == newbase {
