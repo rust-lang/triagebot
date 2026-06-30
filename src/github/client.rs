@@ -7,6 +7,7 @@ use reqwest::Body;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
 use secrecy::{ExposeSecret, SecretString};
+use serde::{Deserialize, Deserializer};
 use std::time::{Duration, SystemTime};
 use tracing as log;
 
@@ -380,10 +381,31 @@ pub struct GraphQlErrors {
 pub struct GraphQlError {
     #[serde(default)]
     pub message: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_path")]
     pub path: Vec<String>,
     #[serde(default, rename = "type")]
     pub type_: String,
+}
+
+fn deserialize_path<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // Deserialize the field into a vector of generic JSON Values first
+    let raw_vector: Vec<serde_json::Value> = Vec::deserialize(deserializer)?;
+
+    // Map each JSON Value cleanly into a String
+    let string_vector = raw_vector
+        .into_iter()
+        .map(|value| match value {
+            serde_json::Value::String(s) => s,
+            serde_json::Value::Number(n) => n.to_string(),
+            serde_json::Value::Bool(b) => b.to_string(),
+            _ => value.to_string(),
+        })
+        .collect();
+
+    Ok(string_vector)
 }
 
 impl std::fmt::Display for GraphQlErrors {
