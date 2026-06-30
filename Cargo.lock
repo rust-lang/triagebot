@@ -581,6 +581,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
+name = "compiler-p-high"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "chrono",
+ "futures",
+ "http",
+ "http-body-util",
+ "itertools",
+ "octocrab",
+ "regex",
+ "reqwest",
+ "rust_team_data",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "tera",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
 name = "comrak"
 version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

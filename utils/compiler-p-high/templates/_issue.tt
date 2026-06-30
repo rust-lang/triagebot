@@ -1,0 +1,11 @@
+{# __tera_context #}
+{% macro render(issue) %}
+### "{{issue.title}}" [{{issue.repo_name}}#{{issue.number}}]({{issue.html_url}})
+Creation date: {{ issue.created_at_hts }}
+Update at: {{ issue.updated_at_hts }}
+Labels: {{ issue.labels | split(pat=",") }}
+Author: `{{ issue.author }}`
+Assignees: `{% if issue.assignees %}{{ issue.assignees | split(pat="`,`") }}{% else %}none{% endif %}`
+Working groups:
+Notes:
+{% endmacro %}

@@ -1,0 +1,24 @@
+{% import "_issues.tt" as issues %}
+
+---
+title: T-compiler P-high issues
+tags: p-high-issues
+---
+
+Issues snapshot collected on: {{ CURRENT_DATE }}
+
+## Table of contents:
+- [P-high T-compiler issues unassigned](#P-high-T-compiler-issues-unassigned) ({{ p_high_tcompiler_unassigned | length }})
+- [P-high T-compiler issues assigned](#P-high-T-compiler-issues-with-owner-WG-or-assignee) ({{ p_high_tcompiler_assigned | length }})
+- [P-high without a team label](#All-P-high-issues-missing-a-team-label) ({{ p_high_without_tlabel | length }})
+
+# 2026 Q2 T-compiler P-high Issue Review
+
+## P-high T-compiler issues unassigned
+{{-issues::render(issues=p_high_tcompiler_unassigned)}}
+
+## P-high T-compiler issues assigned
+{{-issues::render(issues=p_high_tcompiler_assigned)}}
+
+## P-high without a team label
+{{-issues::render(issues=p_high_without_tlabel)}}
