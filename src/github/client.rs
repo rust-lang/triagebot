@@ -14,6 +14,12 @@ use bytes::Bytes;
 
 use crate::jobs::Job;
 
+// TODO: Update to "2026-03-10" and see what breaks
+// current version 2022-11-28 (supported until March 2028)
+// Note: If you specify an API version that is no longer supported, you will receive a 410 Gone response.
+// see: https://docs.github.com/rest/about-the-rest-api/api-versions?apiVersion=2026-03-10
+const GITHUB_API_VERSION: &str = "2022-11-28";
+
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
 pub fn default_token_from_env() -> SecretString {
@@ -412,6 +418,7 @@ impl RequestSend for RequestBuilder {
         auth.set_sensitive(true);
         self.header(USER_AGENT, "rust-lang-triagebot")
             .header(AUTHORIZATION, &auth)
+            .header("X-GitHub-Api-Version", GITHUB_API_VERSION)
     }
 }
 
@@ -450,4 +457,29 @@ impl Job for GithubRateLimitLoggingJob {
 
         Ok(())
     }
+}
+
+#[test]
+fn gh_api_version() {
+    let c = GithubClient {
+        client: Client::new(),
+        token: String::new().into(),
+        api_url: String::new(),
+        graphql_url: "".to_string(),
+        raw_url: "".to_string(),
+        retry_rate_limit: false,
+    };
+
+    let headers = c
+        .get("http://www.example.com")
+        .configure(&c)
+        .build()
+        .unwrap();
+    let headers = headers
+        .headers()
+        .iter()
+        .filter(|h| h.0 == "x-github-api-version")
+        .map(|l| l.1)
+        .collect::<Vec<_>>();
+    assert_eq!(headers[0].to_str().unwrap(), "2022-11-28");
 }
