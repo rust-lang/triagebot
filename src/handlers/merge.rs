@@ -111,6 +111,19 @@ async fn merge_pr(
                     && error.path == &["enqueuePullRequest"]
                     && error.type_ == "UNPROCESSABLE"
                 {
+                    // Provide our own message in some specific cases, as the one given by GitHub
+                    // can be too technical and lead to confusion.
+                    if error
+                        .message
+                        .ends_with("required status checks are expected.")
+                    {
+                        // GitHub message: Pull request 3 of 4 required status checks are expected.
+                        // https://github.com/rust-lang/rust-clippy/pull/17330#issuecomment-4859026904
+                        return user_error!("All mandatory CI checks must be green before this PR can enter the merge queue.
+
+Please wait for all checks to pass, and if necessary resolve any failures, then retry the command.".to_string());
+                    }
+
                     return user_error!(error.message.to_string());
                 }
 
