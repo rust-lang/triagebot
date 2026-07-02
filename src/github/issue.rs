@@ -1,5 +1,6 @@
 use anyhow::Context;
 use chrono::Utc;
+use octocrab::models::pulls::MergeableState;
 use reqwest::StatusCode;
 use std::fmt;
 use std::sync::OnceLock;
@@ -87,6 +88,8 @@ pub struct Issue {
     pub milestone: Option<Milestone>,
     /// Whether a PR has merge conflicts.
     pub mergeable: Option<bool>,
+    /// The mergeable state (clean, blocked, unknown, ...)
+    pub mergeable_state: Option<MergeableState>,
 
     /// How the author is associated with the repository
     pub author_association: AuthorAssociation,
@@ -629,6 +632,26 @@ impl Issue {
                 }),
             )
             .await?;
+        Ok(())
+    }
+
+    /// Enable auto merge for this specific PR.
+    pub async fn enable_auto_merge(&self, client: &GithubClient) -> anyhow::Result<()> {
+        let pr_id = self.graphql_issue_id(client).await?;
+
+        client
+            .graphql_query(
+                "mutation ($pullRequestId: ID!) {
+                  enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId }) {
+                    clientMutationId
+                  }
+                }",
+                serde_json::json!({
+                    "pullRequestId": pr_id,
+                }),
+            )
+            .await?;
+
         Ok(())
     }
 
