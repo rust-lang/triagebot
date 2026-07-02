@@ -101,21 +101,59 @@ async fn merge_pr(
 ) -> anyhow::Result<()> {
     match config.type_ {
         crate::config::MergeType::MergeQueue => {
-            if let Err(err) = issue_comment
-                .issue
-                .enqueue_to_merge_queue(&ctx.github)
-                .await
-            {
-                if let Some(graphql_errors) = err.downcast_ref::<GraphQlErrors>()
-                    && let [error] = &*graphql_errors.errors
-                    && error.path == &["enqueuePullRequest"]
-                    && error.type_ == "UNPROCESSABLE"
-                {
-                    return user_error!(error.message.to_string());
-                }
+            merge_pr_with_merge_queue(ctx, issue_comment).await?;
+        }
+    }
 
-                anyhow::bail!(err);
+    Ok(())
+}
+
+async fn merge_pr_with_merge_queue(
+    ctx: &Context,
+    issue_comment: &IssueCommentEvent,
+) -> anyhow::Result<()> {
+    let pr = ctx
+        .github
+        .pull_request(issue_comment.issue.repository(), issue_comment.issue.number)
+        .await
+        .context("failed to fetch the PR to merge")?;
+
+    tracing::info!(
+        "pr mergeable status={:?} ({:?})",
+        &pr.mergeable,
+        &pr.mergeable_state
+    );
+
+    // Unless the mergeable state is "clean" we enable auto merge, if it's "clean"
+    // we can't use auto merge (GitHub blocks it), so let's enqueue the PR in the
+    // merge queue, since we know by the "clean" state that we can.
+    if pr.mergeable_state.as_deref() != Some("clean") {
+        if let Err(err) = issue_comment.issue.enable_auto_merge(&ctx.github).await {
+            if let Some(graphql_errors) = err.downcast_ref::<GraphQlErrors>()
+                && let [error] = &*graphql_errors.errors
+                && error.path == &["enablePullRequestAutoMerge"]
+                && error.type_ == "UNPROCESSABLE"
+            {
+                return user_error!(error.message.to_string());
             }
+
+            anyhow::bail!(err);
+        }
+    } else {
+        if let Err(err) = issue_comment
+            .issue
+            .enqueue_to_merge_queue(&ctx.github)
+            .await
+        {
+            if let Some(graphql_errors) = err.downcast_ref::<GraphQlErrors>()
+                && let [error] = &*graphql_errors.errors
+                && error.path == &["enqueuePullRequest"]
+                && error.type_ == "UNPROCESSABLE"
+            {
+                return user_error!(error.message.to_string());
+            }
+
+            anyhow::bail!(err);
         }
     }
 
