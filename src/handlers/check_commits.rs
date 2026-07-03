@@ -420,6 +420,7 @@ r#":warning: **Warning** :warning:
                 state: crate::github::IssueState::Open,
                 milestone: None,
                 mergeable: None,
+                mergeable_state: None,
                 author_association: octocrab::models::AuthorAssociation::Contributor.into(),
             },
             changes: None,
