@@ -187,35 +187,44 @@ impl crate::jobs::Job for AddReviewChangesSinceLinkJob {
     }
 
     async fn run(&self, ctx: &Context, metadata: &serde_json::Value) -> anyhow::Result<()> {
-        let args: AddReviewChangesSinceLinkJobArgs = serde_json::from_value(metadata.clone())
-            .with_context(|| {
+        let inner = async {
+            let args: AddReviewChangesSinceLinkJobArgs = serde_json::from_value(metadata.clone())
+                .with_context(|| {
                 format!("failed to deserialize the metadata {metadata:?} into args")
             })?;
 
-        let pr_repo = IssueRepository {
-            organization: args.org.clone(),
-            repository: args.repo.clone(),
+            let pr_repo = IssueRepository {
+                organization: args.org.clone(),
+                repository: args.repo.clone(),
+            };
+
+            let pr = ctx
+                .github
+                .pull_request(&pr_repo, args.pr_id)
+                .await
+                .context("failed to get the pr")?;
+
+            let review_comment = pr
+                .get_review_comment(&ctx.github, args.review_comment_id)
+                .await
+                .context("couldn't get the review comment")?;
+
+            let new_body = format!(
+                "{}\n\n*[View changes since the review]({})*",
+                review_comment.body, &args.link
+            );
+
+            pr.edit_review_comment(&ctx.github, args.review_comment_id, &new_body)
+                .await
+                .context("failed to update the review comment body")?;
+
+            anyhow::Ok(())
         };
 
-        let pr = ctx
-            .github
-            .pull_request(&pr_repo, args.pr_id)
-            .await
-            .context("failed to get the pr")?;
-
-        let review_comment = pr
-            .get_review_comment(&ctx.github, args.review_comment_id)
-            .await
-            .context("couldn't get the review comment")?;
-
-        let new_body = format!(
-            "{}\n\n*[View changes since the review]({})*",
-            review_comment.body, &args.link
-        );
-
-        pr.edit_review_comment(&ctx.github, args.review_comment_id, &new_body)
-            .await
-            .context("failed to update the review comment body")?;
+        // If the inner block fails, print the error but don't bubble it up
+        if let Err(err) = inner.await {
+            tracing::error!("{ADD_REVIEW_CHANGES_SINCE_LINK_JOB_NAME} failed (no retry): {err:#?}");
+        }
 
         Ok(())
     }
