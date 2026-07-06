@@ -186,22 +186,33 @@ async fn delegate_to(
         .await
         .context("Couldn't save the new delegations")?;
 
+    let mut comment_body = format!(
+        r#":v: @{delegatee}, you can now merge this pull request!
+
+If @{delegator} told you to merge after making some further change, then please make that change and post `@{bot_prefix} merge`."#,
+        delegatee = &delegatee.login,
+        bot_prefix = ctx.username,
+        delegator = &issue_comment.comment.user.login,
+    );
+
+    // Sometimes the base and head SHAs are missing, avoid panicking when that's the case.
+    //
+    // cf. https://rust-lang.zulipchat.com/#narrow/channel/224082-triagebot/topic/delegate.20twice.20causes.20merge.20crash/near/608542234
+    if let (Some(base), Some(head)) = (&issue_comment.issue.base, &issue_comment.issue.head) {
+        use std::fmt::Write;
+        let _ = writeln!(
+            comment_body,
+            "\n\n[View changes since this delegation](https://triagebot.infra.rust-lang.org/gh-changes-since/{org_repo}/{pr_num}/{base_sha}..{head_sha})",
+            org_repo = &issue_comment.repository.full_name,
+            pr_num = issue_comment.issue.number,
+            base_sha = &base.sha,
+            head_sha = &head.sha,
+        );
+    }
+
     issue_comment
         .issue
-        .post_comment(&ctx.github, &format!(r#":v: @{delegatee}, you can now merge this pull request!
-
-If @{delegator} told you to merge after making some further change, then please make that change and post `@{bot_prefix} merge`.
-
-[View changes since this delegation](https://triagebot.infra.rust-lang.org/gh-changes-since/{org_repo}/{pr_num}/{base_sha}..{head_sha}).
-"#,
-delegatee = &delegatee.login,
-bot_prefix = ctx.username,
-delegator = &issue_comment.comment.user.login,
-org_repo = &issue_comment.repository.full_name,
-pr_num = issue_comment.issue.number,
-base_sha = &issue_comment.issue.base.as_ref().context("no base sha")?.sha,
-head_sha = &issue_comment.issue.head.as_ref().context("no head sha")?.sha,
-))
+        .post_comment(&ctx.github, &comment_body)
         .await
         .context("Couldn't post the delegation confirmation comment")?;
 
