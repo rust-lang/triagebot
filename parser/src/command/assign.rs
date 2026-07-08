@@ -159,6 +159,14 @@ mod tests {
         assert_eq!(parse("claim @user"), Ok(Some(AssignCommand::Claim)),);
     }
 
+    #[test]
+    fn test_6() {
+        assert_eq!(
+            parse("claim does not start with @"),
+            Ok(Some(AssignCommand::Claim)),
+        );
+    }
+
     fn parse_review<'a>(input: &'a str) -> Result<Option<AssignCommand>, Error<'a>> {
         let mut toks = Tokenizer::new(input);
         Ok(AssignCommand::parse_review(&mut toks)?)
