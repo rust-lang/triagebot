@@ -154,6 +154,11 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_5() {
+        assert_eq!(parse("claim @user"), Ok(Some(AssignCommand::Claim)),);
+    }
+
     fn parse_review<'a>(input: &'a str) -> Result<Option<AssignCommand>, Error<'a>> {
         let mut toks = Tokenizer::new(input);
         Ok(AssignCommand::parse_review(&mut toks)?)
