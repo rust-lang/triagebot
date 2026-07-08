@@ -519,3 +519,20 @@ fn delegate_with_at() {
         })))
     );
 }
+
+#[test]
+fn test_follow_commands() {
+    let input = "@bot claim @bot label +bug";
+    let mut input = Input::new(input, vec!["bot"]);
+    assert_eq!(
+        input.next(),
+        Some(Command::Assign(Ok(assign::AssignCommand::Claim)))
+    );
+    assert_eq!(
+        input.next(),
+        Some(Command::Relabel(Ok(relabel::RelabelCommand(vec![
+            relabel::LabelDelta::Add(relabel::Label("bug".into()))
+        ]))))
+    );
+    assert_eq!(input.next(), None);
+}
