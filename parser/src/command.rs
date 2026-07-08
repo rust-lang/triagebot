@@ -526,7 +526,9 @@ fn test_follow_commands() {
     let mut input = Input::new(input, vec!["bot"]);
     assert_eq!(
         input.next(),
-        Some(Command::Assign(Ok(assign::AssignCommand::Claim)))
+        Some(Command::Assign(Ok(assign::AssignCommand::AssignUser {
+            username: "bot".to_string()
+        })))
     );
     assert_eq!(
         input.next(),
