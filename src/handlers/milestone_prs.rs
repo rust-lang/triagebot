@@ -22,7 +22,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    if !e.issue.merged {
+    if e.issue.merged_at.is_none() {
         log::trace!(
             "Ignoring closing of rust-lang/rust#{}: not merged",
             e.issue.number
