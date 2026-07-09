@@ -6,7 +6,10 @@ use hyper::{
     HeaderMap,
     header::{CACHE_CONTROL, CONTENT_TYPE},
 };
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 
 /// Pluralize (add an 's' sufix) to `text` based on `count`.
 pub fn pluralize(text: &str, count: usize) -> Cow<'_, str> {
@@ -80,4 +83,305 @@ pub(crate) fn immutable_headers(content_type: &'static str) -> HeaderMap {
     headers.insert(CONTENT_TYPE, HeaderValue::from_static(content_type));
 
     headers
+}
+
+pub(crate) fn modified_paths_matches(modified_paths: &[&Path], entry: &str) -> Vec<PathBuf> {
+    // Fast-path if entry has no glob components
+    if globset::escape(entry) == entry {
+        let path = Path::new(entry);
+
+        // Return paths that starts with entry
+        return modified_paths
+            .iter()
+            .filter(|p| p.starts_with(path))
+            .map(PathBuf::from)
+            .collect();
+    }
+
+    // Prepare the glob pattern from the entry.
+    //
+    // We first trim any excess `/` at the end of the pattern and then add an alternate
+    // to match on the path as is or in any sub-directories.
+    let pattern = entry.trim_end_matches('/');
+    let pattern = format!("{pattern}{{,/*}}");
+
+    // Create the glob pattern and log an error (should have already been reported to
+    // the user).
+    let pattern = match globset::GlobBuilder::new(&pattern)
+        .empty_alternates(true)
+        .build()
+    {
+        Ok(pattern) => pattern,
+        Err(err) => {
+            tracing::error!("invalid glob pattern for [mentions.\"{entry}\"]: {err}");
+            return Vec::new();
+        }
+    };
+
+    // Compile the glob pattern to a (Regex) matcher
+    let matcher = pattern.compile_matcher();
+
+    modified_paths
+        .iter()
+        .filter(|p| matcher.is_match(p))
+        .map(PathBuf::from)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn entry_not_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("library/Cargo.lock"),
+                    Path::new("library/Cargo.toml")
+                ],
+                "compiler/rustc_span/",
+            ),
+            Vec::<PathBuf>::new()
+        );
+    }
+
+    #[test]
+    fn entry_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("Cargo.lock"),
+                    Path::new("compiler/rustc_span/src/lib.rs"),
+                    Path::new("compiler/rustc_span/src/symbol.rs"),
+                ],
+                "compiler/rustc_span/",
+            ),
+            vec![
+                PathBuf::from("compiler/rustc_span/src/lib.rs"),
+                PathBuf::from("compiler/rustc_span/src/symbol.rs"),
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_filename_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("compiler/rustc_span/src/lib.rs"),
+                    Path::new("compiler/rustc_span/src/symbol.rs"),
+                ],
+                "compiler/rustc_span/src/lib.rs",
+            ),
+            vec![PathBuf::from("compiler/rustc_span/src/lib.rs")]
+        );
+    }
+
+    #[test]
+    fn entry_top_level_filename_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("Cargo.lock"),
+                    Path::new("Cargo.toml"),
+                    Path::new(".git/submodules"),
+                ],
+                "Cargo.lock",
+            ),
+            vec![PathBuf::from("Cargo.lock")]
+        );
+    }
+
+    #[test]
+    fn entry_modified_glob_either() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("Cargo.lock"),
+                    Path::new("Cargo.toml"),
+                    Path::new("library/dec2flt/lib.rs"),
+                    Path::new("library/flt2dec/lib.rs"),
+                ],
+                "library/{dec2flt,flt2dec}",
+            ),
+            vec![
+                PathBuf::from("library/dec2flt/lib.rs"),
+                PathBuf::from("library/flt2dec/lib.rs"),
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_modified_glob_star() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("Cargo.lock"),
+                    Path::new("Cargo.toml"),
+                    Path::new("library/dec2flt/lib.rs"),
+                    Path::new("library/flt2dec/lib.rs"),
+                ],
+                "library/dec2*",
+            ),
+            vec![PathBuf::from("library/dec2flt/lib.rs")]
+        );
+    }
+
+    #[test]
+    fn entry_modified_glob_star_middle() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("compiler/x86-64-none_eabi.rs"),
+                    Path::new("compiler/armv7-none_eabi-something.rs"),
+                    Path::new("compiler/armv7-none_eabi-something.txt"),
+                    Path::new("compiler/none_eabi.rs"),
+                ],
+                "compiler/*none_eabi*.rs",
+            ),
+            vec![
+                PathBuf::from("compiler/x86-64-none_eabi.rs"),
+                PathBuf::from("compiler/armv7-none_eabi-something.rs"),
+                PathBuf::from("compiler/none_eabi.rs"),
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_modified_glob_double_star() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("Cargo.lock"),
+                    Path::new("Cargo.toml"),
+                    Path::new("library/.empty"),
+                    Path::new("library/dec2flt/lib.rs"),
+                    Path::new("library/flt2dec/lib.rs"),
+                ],
+                "library/**",
+            ),
+            vec![
+                PathBuf::from("library/.empty"),
+                PathBuf::from("library/dec2flt/lib.rs"),
+                PathBuf::from("library/flt2dec/lib.rs"),
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_modified_glob_empty_alternates() {
+        assert_eq!(
+            modified_paths_matches(
+                &[Path::new("result.rs"), Path::new("result.rs.stdout")],
+                "result.rs{,.stdout}",
+            ),
+            vec![
+                PathBuf::from("result.rs"),
+                PathBuf::from("result.rs.stdout"),
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_submodule_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/tools/cargo"
+            ),
+            vec![PathBuf::from("src/tools/cargo")]
+        );
+    }
+
+    #[test]
+    fn entry_submodule_and_normal_dir_modified() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/tools/cargo{,test}"
+            ),
+            vec![
+                PathBuf::from("src/tools/cargo"),
+                PathBuf::from("src/tools/cargotest")
+            ]
+        );
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/tools/cargo*"
+            ),
+            vec![
+                PathBuf::from("src/tools/cargo"),
+                PathBuf::from("src/tools/cargotest")
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_submodule_modified_with_trailing_slash() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/tools/cargo/"
+            ),
+            vec![PathBuf::from("src/tools/cargo")]
+        );
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/tools/cargo//"
+            ),
+            vec![PathBuf::from("src/tools/cargo")]
+        );
+    }
+
+    #[test]
+    fn entry_submodule_modified_glob() {
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/*/cargo"
+            ),
+            vec![PathBuf::from("src/tools/cargo")]
+        );
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/*/cargo/"
+            ),
+            vec![PathBuf::from("src/tools/cargo")]
+        );
+        assert_eq!(
+            modified_paths_matches(
+                &[
+                    Path::new("src/tools/cargo"),
+                    Path::new("src/tools/cargotest")
+                ],
+                "src/*/cargo//"
+            ),
+            vec![PathBuf::from("src/tools/cargo")]
+        );
+    }
 }
