@@ -116,7 +116,7 @@ pub(super) async fn parse_input(
 
                 // Treat the following situations as a "pr merged":
                 // 1) PRs that were closed and have the merged status
-                let is_closed_as_merged = is_closed && event.issue.merged;
+                let is_closed_as_merged = is_closed && event.issue.merged_at.is_some();
 
                 #[expect(clippy::if_same_then_else, reason = "suggested code looks ugly")]
                 if cfg.new_pr && (is_opened_non_draft || is_ready_for_review) {

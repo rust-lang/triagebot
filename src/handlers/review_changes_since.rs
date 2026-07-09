@@ -42,7 +42,7 @@ pub(crate) async fn handle(
             issue:
                 Issue {
                     pull_request: Some(_),
-                    merged: false,
+                    merged_at: None,
                     ..
                 },
             comment:

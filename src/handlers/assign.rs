@@ -972,7 +972,7 @@ pub(super) async fn handle_comment(
             action: IssueCommentAction::Created,
             issue: Issue {
                 pull_request: Some(_),
-                merged: false,
+                merged_at: None,
                 draft: false,
                 ..
             },

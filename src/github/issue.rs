@@ -25,6 +25,8 @@ pub struct Issue {
     pub body: String,
     pub created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
+    #[serde(default)]
+    pub merged_at: Option<chrono::DateTime<Utc>>,
     /// The SHA for a merge commit.
     ///
     /// This field is complicated, see the [Pull Request
@@ -50,9 +52,7 @@ pub struct Issue {
     /// this does not always get filled in by GitHub, and must be manually
     /// populated (because some webhook events do not set it).
     pub pull_request: Option<PullRequestDetails>,
-    /// Whether or not the pull request was merged.
-    #[serde(default)]
-    pub merged: bool,
+
     #[serde(default)]
     pub draft: bool,
 

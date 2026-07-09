@@ -68,6 +68,8 @@ async fn add_rendered_link(
                 let head = e.issue.head.as_ref()?;
                 let base = e.issue.base.as_ref()?;
 
+                let is_merged = e.issue.merged_at.is_some();
+
                 // This URL should be stable while the PR is open, even if the
                 // user pushes new commits.
                 //
@@ -86,12 +88,12 @@ async fn add_rendered_link(
                 //  - if closed: `https://github.com/octocat/REPO/blob/SHA/FILEPATH`
                 Some(format!(
                     "[Rendered](https://github.com/{}/blob/{}/{})",
-                    if e.issue.merged || e.action == IssuesAction::Closed {
+                    if is_merged || e.action == IssuesAction::Closed {
                         &e.repository.full_name
                     } else {
                         &head.repo.as_ref()?.full_name
                     },
-                    if e.issue.merged {
+                    if is_merged {
                         &base.git_ref
                     } else if e.action == IssuesAction::Closed {
                         &head.sha
