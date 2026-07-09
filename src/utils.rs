@@ -2,14 +2,12 @@ use crate::handlers::Context;
 
 use anyhow::Context as _;
 use axum::http::HeaderValue;
+use globset::GlobSet;
 use hyper::{
     HeaderMap,
     header::{CACHE_CONTROL, CONTENT_TYPE},
 };
-use std::{
-    borrow::Cow,
-    path::{Path, PathBuf},
-};
+use std::{borrow::Cow, path::Path};
 
 /// Pluralize (add an 's' sufix) to `text` based on `count`.
 pub fn pluralize(text: &str, count: usize) -> Cow<'_, str> {
@@ -85,52 +83,105 @@ pub(crate) fn immutable_headers(content_type: &'static str) -> HeaderMap {
     headers
 }
 
-pub(crate) fn modified_paths_matches(modified_paths: &[&Path], entry: &str) -> Vec<PathBuf> {
-    // Fast-path if entry has no glob components
-    if globset::escape(entry) == entry {
-        let path = Path::new(entry);
+#[derive(Debug)]
+pub(crate) struct ModifiedPathMatcher {
+    prefixes: Vec<String>,
+    globs: GlobSet,
+}
 
-        // Return paths that starts with entry
-        return modified_paths
-            .iter()
-            .filter(|p| p.starts_with(path))
-            .map(PathBuf::from)
-            .collect();
+impl ModifiedPathMatcher {
+    /// Create a matcher against a set of prefixes (default) and globs (if the entry
+    /// contains wildcards).
+    pub fn new<'a, S>(entries: &[S]) -> Self
+    where
+        S: AsRef<str>,
+    {
+        let mut prefixes = Vec::new();
+        let mut globs = GlobSet::builder();
+
+        for entry in entries {
+            let entry = entry.as_ref();
+            if globset::escape(entry) == entry {
+                prefixes.push(entry.to_owned());
+                continue;
+            }
+
+            // Prepare the glob pattern from the entry.
+            //
+            // We first trim any excess `/` at the end of the pattern and then add an alternate
+            // to match on the path as is or in any sub-directories.
+            let pattern = entry.trim_end_matches('/');
+            let pattern = format!("{pattern}{{,/*}}");
+
+            // Create the glob pattern and log an error (should have already been reported to
+            // the user).
+            let glob = match globset::GlobBuilder::new(&pattern)
+                .empty_alternates(true)
+                .build()
+            {
+                Ok(pattern) => pattern,
+                Err(err) => {
+                    tracing::error!("invalid glob pattern for \"{entry}\": {err}");
+                    continue;
+                }
+            };
+
+            globs.add(glob);
+        }
+
+        let globs = match globs.build() {
+            Ok(globs) => globs,
+            Err(err) => {
+                // Shouldn't fail since the globs are already validated, but `globset` returns
+                // a `Result`.
+                tracing::error!("unable to build glob pattern: {err}");
+                GlobSet::empty()
+            }
+        };
+
+        Self { prefixes, globs }
     }
 
-    // Prepare the glob pattern from the entry.
-    //
-    // We first trim any excess `/` at the end of the pattern and then add an alternate
-    // to match on the path as is or in any sub-directories.
-    let pattern = entry.trim_end_matches('/');
-    let pattern = format!("{pattern}{{,/*}}");
+    /// Create a matcher against a single prefix or glob.
+    pub fn single(entry: &str) -> Self {
+        Self::new(&[entry])
+    }
 
-    // Create the glob pattern and log an error (should have already been reported to
-    // the user).
-    let pattern = match globset::GlobBuilder::new(&pattern)
-        .empty_alternates(true)
-        .build()
-    {
-        Ok(pattern) => pattern,
-        Err(err) => {
-            tracing::error!("invalid glob pattern for [mentions.\"{entry}\"]: {err}");
-            return Vec::new();
+    pub fn is_match(&self, path: impl AsRef<Path>) -> bool {
+        let path = path.as_ref();
+
+        if self.globs.is_match(path) {
+            return true;
         }
-    };
 
-    // Compile the glob pattern to a (Regex) matcher
-    let matcher = pattern.compile_matcher();
+        for pfx in &self.prefixes {
+            if path.starts_with(pfx) {
+                return true;
+            }
+        }
 
-    modified_paths
-        .iter()
-        .filter(|p| matcher.is_match(p))
-        .map(PathBuf::from)
-        .collect()
+        false
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
+
+    fn modified_paths_matches(modified_paths: &[&Path], entry: &str) -> Vec<PathBuf> {
+        modified_paths_matches_set(modified_paths, &[entry])
+    }
+
+    fn modified_paths_matches_set(modified_paths: &[&Path], entries: &[&str]) -> Vec<PathBuf> {
+        let matcher = ModifiedPathMatcher::new(entries);
+        modified_paths
+            .iter()
+            .filter(|p| matcher.is_match(p))
+            .map(PathBuf::from)
+            .collect()
+    }
 
     #[test]
     fn entry_not_modified() {
@@ -265,6 +316,48 @@ mod tests {
                 PathBuf::from("library/.empty"),
                 PathBuf::from("library/dec2flt/lib.rs"),
                 PathBuf::from("library/flt2dec/lib.rs"),
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_modified_glob_set() {
+        assert_eq!(
+            modified_paths_matches_set(
+                &[
+                    Path::new("Cargo.lock"),
+                    Path::new("Cargo.toml"),
+                    Path::new("library/.empty"),
+                    Path::new("library/dec2flt/lib.rs"),
+                    Path::new("library/flt2dec/lib.rs"),
+                    Path::new("a/foo/glob1.rs"),
+                    Path::new("b/glob1.rs"),
+                    Path::new("glob1.rs"),
+                    Path::new("pfx1"),
+                    Path::new("pfx1/foo.rs"),
+                    Path::new("pfx2.rs"),
+                    Path::new("pfx2/foo.rs"),
+                    Path::new("nomatch/pfx1"),
+                    Path::new("nomatch/pfx2")
+                ],
+                &[
+                    // Two globs, two prefixes
+                    "library/**",
+                    "*glob1*",
+                    "pfx1",
+                    "pfx2",
+                ]
+            ),
+            vec![
+                PathBuf::from("library/.empty"),
+                PathBuf::from("library/dec2flt/lib.rs"),
+                PathBuf::from("library/flt2dec/lib.rs"),
+                PathBuf::from("a/foo/glob1.rs"),
+                PathBuf::from("b/glob1.rs"),
+                PathBuf::from("glob1.rs"),
+                PathBuf::from("pfx1"),
+                PathBuf::from("pfx1/foo.rs"),
+                PathBuf::from("pfx2/foo.rs"),
             ]
         );
     }

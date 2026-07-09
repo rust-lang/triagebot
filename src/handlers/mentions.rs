@@ -7,7 +7,7 @@ use crate::{
     db::issue_data::IssueData,
     github::{IssuesAction, IssuesEvent},
     handlers::Context,
-    utils::modified_paths_matches,
+    utils::ModifiedPathMatcher,
 };
 use anyhow::Context as _;
 use itertools::Itertools;
@@ -89,7 +89,13 @@ pub(super) async fn parse_input(
             let relevant_file_paths: Vec<PathBuf> = match type_ {
                 MentionsEntryType::Filename => {
                     // Only mention matching paths.
-                    modified_paths_matches(&modified_paths, entry)
+                    let matcher = ModifiedPathMatcher::single(entry);
+                    modified_paths
+                        .iter()
+                        .copied()
+                        .filter(move |p| matcher.is_match(p))
+                        .map(|p| p.to_owned())
+                        .collect()
                 }
                 MentionsEntryType::Content => {
                     // Only mentions byte-for-byte matching content inside the patch.
