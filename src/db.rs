@@ -273,6 +273,7 @@ async fn handle_job(ctx: &Context, name: &str, metadata: &serde_json::Value) -> 
 // Important notes when adding migrations:
 // - Each DB change is an element in this array and must be a single SQL instruction
 // - The total # of items in this array must be equal to the value of `database_versions.migration_counter`
+// - Please respect the formatting to maintain a visual consistency
 static MIGRATIONS: &[&str] = &[
     "
 CREATE TABLE notifications (
@@ -331,7 +332,8 @@ CREATE table review_prefs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id BIGINT REFERENCES users(user_id),
     assigned_prs INT[] NOT NULL DEFAULT array[]::INT[]
-);",
+);
+",
     "
 CREATE EXTENSION IF NOT EXISTS intarray;",
     "
@@ -367,6 +369,26 @@ CREATE TABLE IF NOT EXISTS repo_review_prefs (
 INSERT INTO repo_review_prefs(user_id, repo, max_assigned_prs)
 SELECT user_id, 'rust-lang/rust', max_assigned_prs
 FROM review_prefs
-WHERE max_assigned_prs IS NOT NULL
+WHERE max_assigned_prs IS NOT NULL;
     "#,
+    "
+CREATE TABLE IF NOT EXISTS teams (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name VARCHAR(20) NOT NULL
+);
+",
+    "
+INSERT INTO teams (name) VALUES ('compiler'), ('libs'), ('lang'), ('rustdoc'), ('infra');
+",
+    "
+ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id UUID;
+",
+    "
+ALTER TABLE users DROP CONSTRAINT IF EXISTS team_fk;
+",
+    "
+ALTER TABLE users
+ADD CONSTRAINT team_fk
+FOREIGN KEY (team_id) REFERENCES teams(id);
+",
 ];
