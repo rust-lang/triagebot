@@ -150,20 +150,26 @@ pub(super) async fn handle_input(
                         }],
                     )
                     .await?;
-                if event.issue.author_association.is_probably_first_timer() {
-                    let mut welcome = messages::new_user_welcome_message_community_reviews(
+                let mut welcome = if event.issue.author_association.is_probably_first_timer() {
+                    messages::new_user_welcome_message_community_reviews(
                         community_reviews.minimum_approvals.get(),
-                    );
-                    if let Some(contrib) = &config.contributing_url {
-                        welcome.push_str("\n\n");
-                        welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
-                    }
-                    event
-                        .issue
-                        .post_comment(&ctx.github, &welcome)
-                        .await
-                        .context("couldn't post welcome message")?;
+                    )
+                } else {
+                    messages::returning_user_welcome_message_community_reviews(
+                        community_reviews.minimum_approvals.get(),
+                        event.issue.repository(),
+                        &community_reviews.label,
+                    )
+                };
+                if let Some(contrib) = &config.contributing_url {
+                    welcome.push_str("\n\n");
+                    welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
                 }
+                event
+                    .issue
+                    .post_comment(&ctx.github, &welcome)
+                    .await
+                    .context("couldn't post welcome message")?;
                 false
             } else {
                 // PR was opened normally, perform assignment if not assignees manually set
@@ -292,7 +298,7 @@ pub(super) async fn handle_input(
         } else if !from_comment {
             match &assignee {
                 Some(assignee) => Some(if config.community_reviews.is_some() {
-                    messages::returning_user_welcome_message_community_reviews(
+                    messages::returning_user_assigned_message_community_reviews(
                         &assignee.name,
                         &ctx.username,
                     )
