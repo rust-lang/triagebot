@@ -6,6 +6,7 @@ use crate::{
     config::RenderedLinkConfig,
     github::{Event, IssuesAction, IssuesEvent, PullRequestFileStatus},
     handlers::Context,
+    utils::ModifiedPathMatcher,
 };
 
 pub(super) async fn handle(
@@ -39,18 +40,13 @@ async fn add_rendered_link(
         || e.action == IssuesAction::Synchronize
     {
         let files = e.issue.files(&ctx.github).await?;
+        let trigger_matcher = ModifiedPathMatcher::new(&config.trigger_files);
+        let exclude_matcher = ModifiedPathMatcher::new(&config.exclude_files);
 
         let rendered_link = files
             .iter()
             .filter(|f| {
-                config
-                    .trigger_files
-                    .iter()
-                    .any(|tf| f.filename.starts_with(tf))
-                    && !config
-                        .exclude_files
-                        .iter()
-                        .any(|tf| f.filename.starts_with(tf))
+                trigger_matcher.is_match(&f.filename) && !exclude_matcher.is_match(&f.filename)
             })
             .filter(|f| match f.status {
                 PullRequestFileStatus::Added
