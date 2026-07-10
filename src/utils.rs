@@ -165,7 +165,10 @@ impl ModifiedPathMatcher {
 
     /// Check for invalid globs or absolute paths.
     pub fn validate_entry(entry: &str) -> Result<(), PathMatcherError> {
-        if let Err(e) = globset::Glob::new(entry) {
+        if let Err(e) = globset::GlobBuilder::new(entry)
+            .empty_alternates(true)
+            .build()
+        {
             return Err(PathMatcherError::Glob(e));
         }
 
