@@ -162,6 +162,25 @@ impl ModifiedPathMatcher {
 
         false
     }
+
+    /// Check for invalid globs or absolute paths.
+    pub fn validate_entry(entry: &str) -> Result<(), PathMatcherError> {
+        if let Err(e) = globset::Glob::new(entry) {
+            return Err(PathMatcherError::Glob(e));
+        }
+
+        if entry.starts_with('/') {
+            return Err(PathMatcherError::NonRelativePath);
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum PathMatcherError {
+    Glob(globset::Error),
+    NonRelativePath,
 }
 
 #[cfg(test)]

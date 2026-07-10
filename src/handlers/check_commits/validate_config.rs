@@ -2,9 +2,10 @@
 //! changes are a valid configuration file.
 
 use crate::{
-    config::{CONFIG_FILE_NAME, MentionsEntryConfig, MentionsEntryType},
+    config::{CONFIG_FILE_NAME, Config, MentionsEntryConfig, MentionsEntryType},
     github::FileDiff,
     handlers::{Context, IssuesEvent},
+    utils::{ModifiedPathMatcher, PathMatcherError},
 };
 use anyhow::{Context as _, bail};
 
@@ -55,43 +56,72 @@ pub(super) async fn validate_config(
                 `````",
             )))
         }
-        Ok(config) => {
-            // Error if `[assign.owners]` is not empty (ie auto-assign) and the custom welcome message for assignee isn't set.
-            if let Some(assign) = config.assign
-                && !assign.owners.is_empty()
-                && let Some(custom_messages) = &assign.custom_messages
-                && custom_messages.auto_assign_someone.is_none()
-            {
-                return Ok(Some(
+        Ok(config) => match validate_parsed_config(&config) {
+            Ok(()) => Ok(None),
+            Err(err) => Ok(Some(err)),
+        },
+    }
+}
+
+fn validate_parsed_config(config: &Config) -> Result<(), String> {
+    // Error if `[assign.owners]` is not empty (ie auto-assign) and the custom welcome message for assignee isn't set.
+    if let Some(assign) = &config.assign
+        && !assign.owners.is_empty()
+        && let Some(custom_messages) = &assign.custom_messages
+        && custom_messages.auto_assign_someone.is_none()
+    {
+        return Err("Invalid `triagebot.toml`:\n\
+            `[assign.owners]` is populated but `[assign.custom_messages.auto-assign-someone]` \
+            is not set!"
+            .to_string());
+    }
+
+    // Validate patterns everywhere we allow glob matching
+    let validate_pattern =
+        |pat: &str, location: &str| match ModifiedPathMatcher::validate_entry(&pat) {
+            Ok(()) => Ok(()),
+            Err(PathMatcherError::Glob(err)) => {
+                return Err(format!(
                     "Invalid `triagebot.toml`:\n\
-                    `[assign.owners]` is populated but `[assign.custom_messages.auto-assign-someone]` is not set!".to_string()
+                    {location} has an invalid glob syntax: {err}"
                 ));
             }
-
-            // Error if one the mentions entry is not a valid glob.
-            if let Some(mentions) = config.mentions {
-                for (entry, MentionsEntryConfig { type_, .. }) in mentions.entries {
-                    if type_ == MentionsEntryType::Filename {
-                        if let Err(err) = globset::Glob::new(&entry) {
-                            return Ok(Some(format!(
-                                "Invalid `triagebot.toml`:\n\
-                                `[mentions.\"{entry}\"]` has an invalid glob syntax: {err}"
-                            )));
-                        }
-
-                        if entry.starts_with('/') {
-                            return Ok(Some(format!(
-                                "Invalid `triagebot.toml`:\n\
-                                `[mentions.\"{entry}\"]` has an invalid pattern: path must be relative (remove the `/` at the start)"
-                            )));
-                        }
-                    }
-                }
+            Err(PathMatcherError::NonRelativePath) => {
+                return Err(format!(
+                    "Invalid `triagebot.toml`:\n\
+                    {location} has an invalid pattern: path must be \
+                      relative (remove the `/` at the start)"
+                ));
             }
+        };
 
-            Ok(None)
+    if let Some(mentions) = &config.mentions {
+        for (entry, MentionsEntryConfig { type_, .. }) in &mentions.entries {
+            if type_ == &MentionsEntryType::Filename {
+                validate_pattern(entry, &format!("`[mentions.\"{entry}\"]`"))?;
+            }
         }
     }
+
+    if let Some(autolabel) = &config.autolabel {
+        for (_label, cfg) in &autolabel.labels {
+            for pat in &cfg.trigger_files {
+                validate_pattern(pat, &format!("`autolabel.trigger_files` item `{pat}`"))?;
+            }
+        }
+    }
+
+    if let Some(rendered_link) = &config.rendered_link {
+        for pat in &rendered_link.trigger_files {
+            validate_pattern(pat, &format!("`rendered_link.trigger_files` item `{pat}`"))?;
+        }
+
+        for pat in &rendered_link.exclude_files {
+            validate_pattern(pat, &format!("`rendered_link.exclude_files` item `{pat}`"))?;
+        }
+    }
+
+    Ok(())
 }
 
 /// Helper to translate a toml span to a `(line_no, col_no)` (1-based).
