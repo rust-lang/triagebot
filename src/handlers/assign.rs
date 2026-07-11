@@ -87,8 +87,9 @@ fn get_repo_workqueue(ctx: &Context, repo: &str) -> Arc<RwLock<ReviewerWorkqueue
 #[derive(Debug)]
 pub(super) enum AssignInput {
     Opened { draft: bool },
+    Closed,
     ReadyForReview,
-    UnlabeledMinReviews { draft: bool },
+    UnlabeledMinReviews { draft: bool, open: bool },
 }
 
 /// Prepares the input when a new PR is opened.
@@ -109,6 +110,7 @@ pub(super) async fn parse_input(
         IssuesAction::Opened => Ok(Some(AssignInput::Opened {
             draft: event.issue.draft,
         })),
+        IssuesAction::Closed => Ok(Some(AssignInput::Closed)),
         IssuesAction::ReadyForReview => Ok(Some(AssignInput::ReadyForReview)),
         IssuesAction::Unlabeled { label: Some(label) }
             if config
@@ -118,6 +120,7 @@ pub(super) async fn parse_input(
         {
             Ok(Some(AssignInput::UnlabeledMinReviews {
                 draft: event.issue.draft,
+                open: event.issue.is_open(),
             }))
         }
         _ => Ok(None),
@@ -206,12 +209,35 @@ pub(super) async fn handle_input(
                 event.issue.assignees.is_empty()
             }
         }
-        AssignInput::UnlabeledMinReviews { draft: false } => {
-            // Minimum reviews label was removed and the PR is not in a draft state
-            // perform assignement if no current assignees
-            event.issue.assignees.is_empty()
+        AssignInput::Closed => {
+            if let Some(community_reviews) = &config.community_reviews {
+                // PR was closed (and maybe merged), remove community reviews label
+                // if still present. May happend if the PR is closed or merged while still
+                // waiting for a community review.
+                //
+                // cf. https://github.com/rust-lang/rust-clippy/pull/17397#issuecomment-4937153765
+                event
+                    .issue
+                    .remove_labels(
+                        &ctx.github,
+                        vec![github::Label {
+                            name: community_reviews.label.to_string(),
+                        }],
+                    )
+                    .await?;
+            }
+            // no assignment to do
+            false
         }
-        AssignInput::UnlabeledMinReviews { draft: true } => {
+        AssignInput::UnlabeledMinReviews { draft: false, open } => {
+            // Minimum reviews label was removed and the PR is not in a draft state
+            // perform assignment if no current assignees and still opened
+            event.issue.assignees.is_empty() && open
+        }
+        AssignInput::UnlabeledMinReviews {
+            draft: true,
+            open: _,
+        } => {
             // Minimum reviews label was removed, but PR is still in a draft state (should
             // only happened if someone manually edited the label), don't perform assignement
             false
