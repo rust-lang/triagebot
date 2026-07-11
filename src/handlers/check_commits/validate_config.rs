@@ -96,9 +96,22 @@ fn validate_parsed_config(config: &Config) -> Result<(), String> {
         };
 
     if let Some(mentions) = &config.mentions {
-        for (entry, MentionsEntryConfig { type_, .. }) in &mentions.entries {
+        for (entry, cfg @ MentionsEntryConfig { type_, .. }) in &mentions.entries {
             if type_ == &MentionsEntryType::Filename {
                 validate_pattern(entry, &format!("`[mentions.\"{entry}\"]`"))?;
+                if !cfg.trigger_files.is_empty() {
+                    return Err(format!(
+                        "Invalid `triagebot.toml`:\n\
+                        `[mentions.\"{entry}\"]` has `trigger_files` \
+                          which is only valid for `type = \"content\"`."
+                    ));
+                }
+            }
+            for file in &cfg.trigger_files {
+                validate_pattern(
+                    file,
+                    &format!("`[mentions.\"{entry}\"] trigger_files \"{file}\"`"),
+                )?;
             }
         }
     }

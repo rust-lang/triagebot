@@ -85,7 +85,7 @@ pub(super) async fn parse_input(
     let to_mention: Vec<_> = config
         .entries
         .iter()
-        .filter_map(|(entry, MentionsEntryConfig { cc, type_, .. })| {
+        .filter_map(|(entry, cfg @ MentionsEntryConfig { cc, type_, .. })| {
             let relevant_file_paths: Vec<PathBuf> = match type_ {
                 MentionsEntryType::Filename => {
                     // Only mention matching paths.
@@ -98,10 +98,17 @@ pub(super) async fn parse_input(
                         .collect()
                 }
                 MentionsEntryType::Content => {
+                    let file_matcher = ModifiedPathMatcher::new(&cfg.trigger_files);
+                    let file_match = |f| file_matcher.is_match(Path::new(f));
                     // Only mentions byte-for-byte matching content inside the patch.
                     modified_files
                         .iter()
-                        .filter(|f| patch_adds(&f.patch, entry))
+                        .filter(|f| {
+                            patch_adds(&f.patch, entry)
+                                && (cfg.trigger_files.is_empty()
+                                    || file_match(&f.filename)
+                                    || f.previous_filename.as_ref().is_some_and(|p| file_match(p)))
+                        })
                         .map(|f| PathBuf::from(&f.filename))
                         .collect()
                 }
