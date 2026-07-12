@@ -299,6 +299,9 @@ pub(crate) struct MentionsEntryConfig {
     #[serde(alias = "type")]
     #[serde(default)]
     pub(crate) type_: MentionsEntryType,
+    /// Additional path globs to filter; primarily useful for `type = "content"`
+    #[serde(default)]
+    pub(crate) trigger_files: Vec<String>,
     pub(crate) message: Option<String>,
     #[serde(default)]
     pub(crate) cc: Vec<String>,
@@ -951,6 +954,12 @@ mod tests {
             message = "This is a message."
             cc = ["@someone"]
 
+            [mentions."miri"]
+            type = "content"
+            trigger_files = ["library/1", "library/2"]
+            message = "This is a message."
+            cc = ["@someone"]
+
             [shortcut]
 
             [issue-links]
@@ -1048,6 +1057,7 @@ mod tests {
                             "src/".to_string(),
                             MentionsEntryConfig {
                                 type_: MentionsEntryType::Filename,
+                                trigger_files: vec![],
                                 message: None,
                                 cc: vec!["@someone".to_string()]
                             }
@@ -1056,6 +1066,7 @@ mod tests {
                             "target/".to_string(),
                             MentionsEntryConfig {
                                 type_: MentionsEntryType::Filename,
+                                trigger_files: vec![],
                                 message: Some("This is a message.".to_string()),
                                 cc: vec!["@someone".to_string()]
                             }
@@ -1064,10 +1075,23 @@ mod tests {
                             "#[rustc_attr]".to_string(),
                             MentionsEntryConfig {
                                 type_: MentionsEntryType::Content,
+                                trigger_files: vec![],
                                 message: Some("This is a message.".to_string()),
                                 cc: vec!["@someone".to_string()]
                             }
-                        )
+                        ),
+                        (
+                            "miri".to_string(),
+                            MentionsEntryConfig {
+                                type_: MentionsEntryType::Content,
+                                trigger_files: vec![
+                                    "library/1".to_string(),
+                                    "library/2".to_string()
+                                ],
+                                message: Some("This is a message.".to_string()),
+                                cc: vec!["@someone".to_string()]
+                            }
+                        ),
                     ])
                 }),
                 no_merges: None,
