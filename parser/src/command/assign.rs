@@ -5,7 +5,8 @@
 //! The grammar is as follows:
 //!
 //! ```text
-//! Command: `@bot claim`, `@bot release-assignment`, or `@bot assign @user`.
+//! Command: `@bot claim`, `@bot release-assignment`, `@bot assign @user`, or
+//! `@bot claim @user`
 //! ```
 
 use crate::error::Error;
@@ -18,7 +19,7 @@ pub enum AssignCommand {
     Claim,
     /// Corresponds to `@bot release-assignment` or `@bot unclaim`.
     ReleaseAssignment,
-    /// Corresponds to `@bot assign @user`.
+    /// Corresponds to `@bot assign @user` or `@bot claim @user`.
     AssignUser { username: String },
     /// Corresponds to `r? [@]user`.
     RequestReview { name: String },
@@ -55,6 +56,14 @@ impl AssignCommand {
         let mut toks = input.clone();
         if let Some(Token::Word("claim")) = toks.peek_token()? {
             toks.next_token()?;
+            if let Some(Token::Word(user)) = toks.peek_token()?
+                && user.starts_with('@')
+                && user.len() != 1
+            {
+                return Ok(Some(AssignCommand::AssignUser {
+                    username: user[1..].to_owned(),
+                }));
+            }
             if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
                 toks.next_token()?;
             }
@@ -151,6 +160,34 @@ mod tests {
                 .unwrap()
                 .downcast_ref(),
             Some(&ParseError::MentionUser),
+        );
+    }
+
+    #[test]
+    fn test_5() {
+        assert_eq!(
+            parse("claim @user"),
+            Ok(Some(AssignCommand::AssignUser {
+                username: "user".to_string()
+            })),
+        );
+    }
+
+    #[test]
+    fn test_6() {
+        assert_eq!(
+            parse("claim does not start with @"),
+            Ok(Some(AssignCommand::Claim)),
+        );
+    }
+
+    #[test]
+    fn test_7() {
+        assert_eq!(
+            parse("claim @triagebot"),
+            Ok(Some(AssignCommand::AssignUser {
+                username: "triagebot".to_string()
+            })),
         );
     }
 
