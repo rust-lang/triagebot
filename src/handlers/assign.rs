@@ -26,7 +26,9 @@ use crate::config::AssignCommunityReviewsConfig;
 use crate::db::issue_data::IssueData;
 use crate::db::review_prefs::{RotationMode, get_review_prefs_batch};
 use crate::errors::{self, AssignmentError, user_error};
+use crate::github::UserId;
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
+use crate::interactions::ErrorComment;
 use crate::{
     config::AssignConfig,
     github::{
@@ -200,8 +202,14 @@ pub(super) async fn handle_input(
                     false
                 } else {
                     // PR was converted from a draft and there are no current assignees,
-                    // but min reviews configured, perform assignment if enough reviews
-                    update_community_review_label(ctx, &community_reviews, &event.issue).await?
+                    // but min reviews configured, perform assignment if requested
+                    match update_community_review_assignment(ctx, &community_reviews, &event.issue)
+                        .await?
+                    {
+                        CommunityReviewUpdateStatus::NotEnoughApprovals
+                        | CommunityReviewUpdateStatus::AssignedLastReviewer => false,
+                        CommunityReviewUpdateStatus::RequestedAutoAssign => true,
+                    }
                 }
             } else {
                 // PR was converted from a draft, perform assignment if there are
@@ -446,38 +454,47 @@ fn is_self_assign(assignee: &str, pr_author: &str) -> bool {
     assignee.to_lowercase() == pr_author.to_lowercase()
 }
 
-/// Determine if the issue has enough community (review) approvals
-async fn has_enough_community_approvals(
+/// Status after updating the community review status
+enum CommunityReviewUpdateStatus {
+    /// Not enough review approvals
+    NotEnoughApprovals,
+    /// Enough review approvals, requested automatic assignment by removing the label.
+    ///
+    /// Can be shortcut by preemptively assigning someone.
+    RequestedAutoAssign,
+    /// Enough review approvals, removed the label and assigned the last reviewer.
+    AssignedLastReviewer,
+}
+
+/// Update the community reviews label on the PR and perform direct assignment if
+/// the last reviewer is a repo reviewer.
+async fn update_community_review_assignment(
     ctx: &Context,
     config: &AssignCommunityReviewsConfig,
     issue: &Issue,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<CommunityReviewUpdateStatus> {
     let reviews = issue
         .get_reviews(&ctx.github)
         .await
         .context("unable to fetch reviews for determining assignement")?;
 
-    let mut approval_reviews: HashSet<_> = reviews
-        .iter()
-        .filter(|c| c.pr_review_state == Some(PullRequestReviewState::Approved))
-        .map(|c| c.user.id)
-        .collect::<HashSet<_>>();
+    let approval_reviews: Vec<_> = {
+        // Filter duplicated approvals
+        let mut uniq = HashSet::<UserId>::new();
 
-    // GitHub doesn't allow PR authors to approve a PR them-selves but just
-    // in case let's remove the PR author.
-    approval_reviews.remove(&issue.user.id);
+        reviews
+            .iter()
+            .filter(|c| c.pr_review_state == Some(PullRequestReviewState::Approved))
+            // GitHub doesn't allow PR authors to approve a PR them-selves but just
+            // in case let's filter the PR author.
+            .filter(|c| c.user.id != issue.user.id)
+            // Only keep one approval by user
+            .filter(|c| uniq.insert(c.user.id))
+            .map(|c| &c.user)
+            .collect::<Vec<_>>()
+    };
 
-    Ok(approval_reviews.len() >= config.minimum_approvals.get().into())
-}
-
-/// Update the min community reviews label on the PR.
-/// Returns true if the PR already has enough community approvals.
-async fn update_community_review_label(
-    ctx: &Context,
-    config: &AssignCommunityReviewsConfig,
-    issue: &Issue,
-) -> anyhow::Result<bool> {
-    let enough_reviews = has_enough_community_approvals(ctx, config, issue).await?;
+    let enough_reviews = approval_reviews.len() >= config.minimum_approvals.get().into();
 
     if enough_reviews {
         issue
@@ -488,6 +505,41 @@ async fn update_community_review_label(
                 }],
             )
             .await?;
+
+        // Check if last approvee has write permissions on the repo (proxy for merging rights, not perfect)
+        if let Some(last) = approval_reviews.last()
+            && issue
+                .repository()
+                .collaborator_permission(&ctx.github, &last.login)
+                .await
+                .context("failed to determine the last approvee permissions on the repository")?
+                .permission
+                .has_write_permissions()
+        {
+            // They can merge, try to add them as assignee
+            if let Err(err) = issue.add_assignee(&ctx.github, &last.login).await {
+                // Failed to add the last reviewer as assignee, report an error
+                let msg = format!(
+                    "Failed to assign the last approvee (@{}): {err}, performing automatic assignment.",
+                    &last.login
+                );
+                ErrorComment::new(&issue, &msg)
+                    .post(&ctx.github)
+                    .await
+                    .context("failed to post assignement error comment")?;
+
+                // and request auto-assignment
+                Ok(CommunityReviewUpdateStatus::RequestedAutoAssign)
+            } else {
+                // Succesfully added them as assignee, report that so that we don't
+                // perform auto-assignment
+                Ok(CommunityReviewUpdateStatus::AssignedLastReviewer)
+            }
+        } else {
+            // Last approvee is not an official reviewer, request auto assign
+            // which has already been trigger when the removed the label above
+            Ok(CommunityReviewUpdateStatus::RequestedAutoAssign)
+        }
     } else {
         issue
             .add_labels(
@@ -497,9 +549,8 @@ async fn update_community_review_label(
                 }],
             )
             .await?;
+        Ok(CommunityReviewUpdateStatus::NotEnoughApprovals)
     }
-
-    Ok(enough_reviews)
 }
 
 /// Sets the assignee of a PR, alerting any errors.
@@ -1027,7 +1078,13 @@ pub(super) async fn handle_comment(
         name: min_reviews.label.to_string(),
     }) {
         // Let's update the status, but only if the label wasn't already removed.
-        update_community_review_label(ctx, min_reviews, &event.issue).await?;
+        match update_community_review_assignment(ctx, min_reviews, &event.issue).await? {
+            CommunityReviewUpdateStatus::NotEnoughApprovals => { /* nothing to do */ }
+            CommunityReviewUpdateStatus::AssignedLastReviewer => { /* nothing to do */ }
+            CommunityReviewUpdateStatus::RequestedAutoAssign => {
+                // the label was removed, will do auto-assignment with the removed label webhook
+            }
+        }
     }
 
     Ok(())
