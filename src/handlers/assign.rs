@@ -51,6 +51,7 @@ use tokio_postgres::Client as DbClient;
 use tracing as log;
 
 mod messages;
+pub(crate) mod release_inactive_assignments;
 
 #[cfg(test)]
 mod tests {
@@ -60,6 +61,9 @@ mod tests {
 
 // Special account that we use to prevent assignment.
 const GHOST_ACCOUNT: &str = "ghost";
+
+/// Key for the state in the database
+const ASSIGN_KEY: &str = "ASSIGN";
 
 /// Key for the state in the database
 const PREVIOUS_REVIEWERS_KEY: &str = "previous-reviewers";
@@ -976,7 +980,7 @@ pub(super) async fn handle_command(
     } else {
         let mut client = ctx.db.get().await;
         let mut e: EditIssueBody<'_, AssignData> =
-            EditIssueBody::load(&mut client, issue, "ASSIGN").await?;
+            EditIssueBody::load(&mut client, issue, ASSIGN_KEY).await?;
         let d = e.data_mut();
 
         let to_assign = match cmd {
