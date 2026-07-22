@@ -1,0 +1,9 @@
+{% import "_issue.tt" as issue %}
+
+{% macro render(issues, empty="No issues at this time.") %}
+{%- for issue in issues -%}
+{{ issue::render(issue=issue) }}
+{%- else -%}
+{{empty}}
+{%- endfor -%}
+{% endmacro %}
