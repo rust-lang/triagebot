@@ -930,6 +930,21 @@ pub struct GitObject {
     pub url: String,
 }
 
+impl GithubClient {
+    /// Retrieves a git reference for the given refname.
+    pub async fn get_reference(
+        &self,
+        org: &str,
+        repo: &str,
+        refname: &str,
+    ) -> anyhow::Result<GitReference> {
+        let url = format!("{}/repos/{org}/{repo}/git/ref/{refname}", self.api_url);
+        self.json(self.get(&url))
+            .await
+            .with_context(|| format!("{org}/{repo} failed to get git reference {refname}"))
+    }
+}
+
 impl Repository {
     /// Retrieves a git reference for the given refname.
     pub async fn get_reference(
@@ -937,11 +952,9 @@ impl Repository {
         client: &GithubClient,
         refname: &str,
     ) -> anyhow::Result<GitReference> {
-        let url = format!("{}/git/ref/{refname}", self.url(client));
         client
-            .json(client.get(&url))
+            .get_reference(self.owner(), self.name(), refname)
             .await
-            .with_context(|| format!("{} failed to get git reference {refname}", self.full_name))
     }
 
     /// Updates an existing git reference to a new SHA.
