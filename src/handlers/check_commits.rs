@@ -16,12 +16,16 @@ use crate::{
 use crate::github::GithubCommit;
 
 mod behind_upstream;
+mod branch_links;
 mod force_push_range_diff;
 mod issue_links;
 mod modified_submodule;
 mod no_merges;
 mod non_default_branch;
 mod validate_config;
+
+/// Starting message for merge commits
+const MERGE_IGNORE_LIST: [&str; 3] = ["Rollup merge of ", "Auto merge of ", "Merge pull request "];
 
 /// Key for the state in the database
 const CHECK_COMMITS_KEY: &str = "check-commits-warnings";
@@ -113,6 +117,7 @@ pub(super) async fn handle(
 
     if let Some(issue_links) = &config.issue_links {
         warnings.extend(issue_links::issue_links_in_commits(issue_links, &commits));
+        warnings.extend(branch_links::branch_links_in_commits(ctx, issue_links, &commits).await);
     }
 
     #[expect(

@@ -5,12 +5,11 @@ use regex::Regex;
 use crate::{
     config::{IssueLinksCheckCommitsConfig, IssueLinksConfig},
     github::GithubCommit,
+    handlers::check_commits::MERGE_IGNORE_LIST,
 };
 
 static LINKED_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\B(?P<org>[a-zA-Z-_]+/[a-zA-Z-_]+)?(#[0-9]+)\b").unwrap());
-
-const MERGE_IGNORE_LIST: [&str; 3] = ["Rollup merge of ", "Auto merge of ", "Merge pull request "];
 
 pub(super) fn issue_links_in_commits(
     conf: &IssueLinksConfig,
