@@ -191,10 +191,8 @@ pub enum StreamCommand {
 
 #[derive(clap::Parser, Debug, PartialEq, Clone)]
 pub struct PingGoalsArgs {
-    /// Number of days before an update is considered stale
+    /// Goals updated within this threshold (in days) will not be pinged.
     pub threshold: u64,
-    /// Date of next update
-    pub next_update: String,
 }
 
 /// Backport release channels

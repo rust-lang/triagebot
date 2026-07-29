@@ -638,7 +638,7 @@ async fn ping_goals_cmd(
     message: &Message,
     args: &PingGoalsArgs,
 ) -> anyhow::Result<Option<String>> {
-    if project_goals::check_project_goal_acl(&ctx.team, gh_id).await? {
+    if project_goals::is_goals_member(&ctx.team, gh_id).await? {
         let args = args.clone();
         let message = message.clone();
         tokio::spawn(async move {
@@ -648,7 +648,6 @@ async fn ping_goals_cmd(
                 &ctx.team,
                 false,
                 args.threshold as i64,
-                &format!("on {}", args.next_update),
             )
             .await;
 

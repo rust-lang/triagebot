@@ -10,11 +10,8 @@ struct Opt {
     #[arg(long)]
     dry_run: bool,
 
-    /// Goals with an updated within this threshold will not be pinged.
+    /// Goals updated within this threshold (in days) will not be pinged.
     days_threshold: i64,
-
-    /// A string like "on Sep-5" when the update blog post will be written.
-    next_meeting_date: String,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -32,7 +29,6 @@ async fn main() -> anyhow::Result<()> {
         &team_api,
         opt.dry_run,
         opt.days_threshold,
-        &opt.next_meeting_date,
     )
     .await?;
 
