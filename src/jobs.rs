@@ -78,6 +78,7 @@ pub fn jobs() -> Vec<Box<dyn Job + Send + Sync>> {
         Box::new(MajorChangeAcceptanceJob),
         Box::new(GithubRateLimitLoggingJob),
         Box::new(AddReviewChangesSinceLinkJob),
+        Box::new(ProjectGoalsUpdateJob),
     ]
 }
 
