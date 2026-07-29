@@ -497,17 +497,8 @@ async fn update_community_review_assignment(
     let enough_reviews = approval_reviews.len() >= config.minimum_approvals.get().into();
 
     if enough_reviews {
-        issue
-            .remove_labels(
-                &ctx.github,
-                vec![github::Label {
-                    name: config.label.to_string(),
-                }],
-            )
-            .await?;
-
         // Check if last approvee has write permissions on the repo (proxy for merging rights, not perfect)
-        if let Some(last) = approval_reviews.last()
+        let upd_status = if let Some(last) = approval_reviews.last()
             && issue
                 .repository()
                 .collaborator_permission(&ctx.github, &last.login)
@@ -529,17 +520,33 @@ async fn update_community_review_assignment(
                     .context("failed to post assignement error comment")?;
 
                 // and request auto-assignment
-                Ok(CommunityReviewUpdateStatus::RequestedAutoAssign)
+                CommunityReviewUpdateStatus::RequestedAutoAssign
             } else {
                 // Succesfully added them as assignee, report that so that we don't
                 // perform auto-assignment
-                Ok(CommunityReviewUpdateStatus::AssignedLastReviewer)
+                CommunityReviewUpdateStatus::AssignedLastReviewer
             }
         } else {
             // Last approvee is not an official reviewer, request auto assign
             // which has already been trigger when the removed the label above
-            Ok(CommunityReviewUpdateStatus::RequestedAutoAssign)
-        }
+            CommunityReviewUpdateStatus::RequestedAutoAssign
+        };
+
+        // Remove the community review label since there are enough approvals.
+        //
+        // Note: only after having potentially assigned someone, otherwise
+        // we risk having GitHub send the webhook without the yet to be do assignment.
+        issue
+            .remove_labels(
+                &ctx.github,
+                vec![github::Label {
+                    name: config.label.to_string(),
+                }],
+            )
+            .await
+            .context("failed to remove the community review label")?;
+
+        Ok(upd_status)
     } else {
         issue
             .add_labels(
