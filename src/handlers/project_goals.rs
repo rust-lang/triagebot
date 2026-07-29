@@ -18,6 +18,7 @@ const RUST_PROJECT_GOALS_REPO: &str = "rust-lang/rust-project-goals";
 const C_TRACKING_ISSUE: &str = "C-tracking-issue";
 
 const GOALS_STREAM: u64 = 435_869; // #project-goals
+const GOALS_META_STREAM: u64 = 478_266; // #project-goals/meta
 const TRIAGEBOT_TOPIC: &str = "Triagebot reports";
 const MAX_ZULIP_TOPIC: usize = 60;
 
@@ -616,7 +617,7 @@ async fn send_triagebot_topic(
 
     MessageApiRequest {
         recipient: Recipient::Stream {
-            id: GOALS_STREAM,
+            id: GOALS_META_STREAM,
             topic: TRIAGEBOT_TOPIC,
         },
         content,
