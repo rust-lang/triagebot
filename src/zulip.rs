@@ -642,14 +642,7 @@ async fn ping_goals_cmd(
         let args = args.clone();
         let message = message.clone();
         tokio::spawn(async move {
-            let res = ping_project_goals_owners(
-                &ctx.github,
-                &ctx.zulip,
-                &ctx.team,
-                false,
-                args.threshold as i64,
-            )
-            .await;
+            let res = ping_project_goals_owners(&ctx.github, &ctx.zulip, &ctx.team, false).await;
 
             let status = match res {
                 Ok(_res) => "OK".to_string(),

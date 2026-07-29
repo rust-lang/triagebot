@@ -500,18 +500,7 @@ Hi @*T-goals*!
     )
 }
 
-fn default_update_required(issue: &Issue, now: DateTime<Utc>, days_threshold: i64) -> bool {
-    let comments = issue.comments.unwrap_or(0);
-    let days_since_last_update = (now - issue.updated_at).num_days();
-
-    days_since_last_update >= days_threshold || comments <= 1
-}
-
-fn scheduled_update_required(
-    issue: &Issue,
-    now: DateTime<Utc>,
-    schedule: CustomSchedule,
-) -> bool {
+fn update_required(issue: &Issue, now: DateTime<Utc>, schedule: CustomSchedule) -> bool {
     let due_date = schedule.latest_due_date(now.date_naive());
     let has_real_update = issue.comments.unwrap_or(0) > 1;
     let updated_after_due_date = issue.updated_at.date_naive() >= due_date;
@@ -519,11 +508,7 @@ fn scheduled_update_required(
     !has_real_update || !updated_after_due_date
 }
 
-fn evaluate<'gh>(
-    issue: &'gh Issue,
-    now: DateTime<Utc>,
-    days_threshold: i64,
-) -> EvaluatedReminder<'gh> {
+fn evaluate<'gh>(issue: &'gh Issue, now: DateTime<Utc>) -> EvaluatedReminder<'gh> {
     let days_since_last_update = (now - issue.updated_at).num_days();
 
     log::debug!(
@@ -534,15 +519,11 @@ fn evaluate<'gh>(
     );
 
     let (requires_update, invalid_schedule_reason) = match Schedule::from_issue(issue) {
-        Schedule::Default => (
-            default_update_required(issue, now, days_threshold),
-            None,
-        ),
-        Schedule::Custom(schedule) => (scheduled_update_required(issue, now, schedule), None),
-        Schedule::Invalid { fallback, reason } => (
-            scheduled_update_required(issue, now, fallback),
-            Some(reason),
-        ),
+        Schedule::Default => (update_required(issue, now, CustomSchedule::Biweekly0), None),
+        Schedule::Custom(schedule) => (update_required(issue, now, schedule), None),
+        Schedule::Invalid { fallback, reason } => {
+            (update_required(issue, now, fallback), Some(reason))
+        }
     };
 
     EvaluatedReminder {
@@ -555,13 +536,12 @@ fn evaluate<'gh>(
 async fn build_plan<'gh>(
     issues: &'gh [Issue],
     team: &TeamClient,
-    days_threshold: i64,
 ) -> anyhow::Result<ReminderPlan<'gh>> {
     let now = Utc::now();
     let mut plan = ReminderPlan::default();
 
     for issue in issues {
-        let evaluation = evaluate(issue, now, days_threshold);
+        let evaluation = evaluate(issue, now);
 
         if let Some(reason) = evaluation.invalid_schedule_reason {
             plan.add_invalid_schedule(evaluation.reminder, reason);
@@ -703,10 +683,9 @@ pub async fn ping_project_goals_owners(
     zulip: &ZulipClient,
     team: &TeamClient,
     dry_run: bool,
-    days_threshold: i64,
 ) -> anyhow::Result<()> {
     let issues = tracking_issues(gh).await?;
-    let plan = build_plan(&issues, team, days_threshold).await?;
+    let plan = build_plan(&issues, team).await?;
     execute_plan(zulip, plan, dry_run).await
 }
 
@@ -719,10 +698,7 @@ impl Job for ProjectGoalsUpdateJob {
     }
 
     async fn run(&self, ctx: &Context, _metadata: &serde_json::Value) -> anyhow::Result<()> {
-        let now = Utc::now();
-        let days_threshold = i64::from(now.day() + 7);
-
-        ping_project_goals_owners(&ctx.github, &ctx.zulip, &ctx.team, false, days_threshold).await
+        ping_project_goals_owners(&ctx.github, &ctx.zulip, &ctx.team, false).await
     }
 }
 
