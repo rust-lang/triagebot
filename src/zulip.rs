@@ -14,14 +14,13 @@ use crate::github::{self, PullRequestNumber, Repository};
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
 use crate::handlers::pr_tracking::{ReviewerWorkqueue, get_assigned_prs};
-use crate::handlers::project_goals::{self, ping_project_goals_owners};
 use crate::interactions::ErrorComment;
 use crate::utils::pluralize;
 use crate::zulip::api::{MessageApiResponse, Recipient};
 use crate::zulip::client::ZulipClient;
 use crate::zulip::commands::{
-    BackportChannelArgs, BackportVerbArgs, ChatCommand, IssuePrio, LookupCmd, PingGoalsArgs,
-    StreamCommand, WorkqueueCmd, WorkqueueLimit, parse_cli,
+    BackportChannelArgs, BackportVerbArgs, ChatCommand, IssuePrio, LookupCmd, StreamCommand,
+    WorkqueueCmd, WorkqueueLimit, parse_cli,
 };
 use anyhow::{Context as _, format_err};
 use axum::Json;
@@ -266,9 +265,6 @@ async fn handle_command<'a>(
                 id,
             } => unlock_cmd(&ctx, gh_id, organization, repo, *id).await,
             ChatCommand::Work(cmd) => workqueue_commands(&ctx, gh_id, cmd).await,
-            ChatCommand::PingGoals(args) => {
-                ping_goals_cmd(ctx.clone(), gh_id, message_data, args).await
-            }
             ChatCommand::DocsUpdate => trigger_docs_update(&ctx.zulip, message_data),
             ChatCommand::UserInfo {
                 username,
@@ -357,9 +353,6 @@ async fn handle_command<'a>(
                     post_waiter(&ctx, message_data, WaitingMessage::start_reading())
                         .await
                         .map_err(|e| format_err!("Failed to await at this time: {e:?}"))
-                }
-                StreamCommand::PingGoals(args) => {
-                    ping_goals_cmd(ctx, gh_id, message_data, &args).await
                 }
                 StreamCommand::DocsUpdate => trigger_docs_update(&ctx.zulip, message_data),
                 StreamCommand::Backport {
@@ -630,48 +623,6 @@ async fn assign_issue_prio(
         .context(format!("failed to add labels to issue #{}", issue_num))?;
 
     Ok(None)
-}
-
-async fn ping_goals_cmd(
-    ctx: Arc<Context>,
-    gh_id: u64,
-    message: &Message,
-    args: &PingGoalsArgs,
-) -> anyhow::Result<Option<String>> {
-    if project_goals::is_goals_member(&ctx.team, gh_id).await? {
-        let args = args.clone();
-        let message = message.clone();
-        tokio::spawn(async move {
-            let res = ping_project_goals_owners(&ctx.github, &ctx.zulip, &ctx.team, false).await;
-
-            let status = match res {
-                Ok(_res) => "OK".to_string(),
-                Err(err) => {
-                    tracing::error!("ping_project_goals_owners: {err:?}");
-                    format!("ERROR\n\n```\n{err:#?}\n```\n")
-                }
-            };
-
-            let res = MessageApiRequest {
-                recipient: message.sender_to_recipient(),
-                content: &format!("End pinging project groups owners: {status}"),
-            }
-            .send(&ctx.zulip)
-            .await;
-
-            if let Err(err) = res {
-                tracing::error!(
-                    "error sending project goals ping reply: {err:?} for status: {status}"
-                );
-            }
-        });
-
-        Ok(Some("Started pinging project groups owners...".to_string()))
-    } else {
-        Err(format_err!(
-            "That command is only permitted for those running the project-goal program.",
-        ))
-    }
 }
 
 /// Unlock a specific issue in our managed repos.
@@ -1195,7 +1146,6 @@ enum ImpersonationMode {
 fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
     match cmd {
         ChatCommand::DocsUpdate
-        | ChatCommand::PingGoals(_)
         | ChatCommand::UserInfo { .. }
         | ChatCommand::TeamStats { .. }
         | ChatCommand::Unlock { .. }

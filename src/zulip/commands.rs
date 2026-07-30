@@ -27,8 +27,6 @@ pub enum ChatCommand {
         /// Issue or pull-request number to unlock.
         id: PullRequestNumber,
     },
-    /// Ping project goal owners.
-    PingGoals(PingGoalsArgs),
     /// Update docs
     DocsUpdate,
     /// Show recent GitHub activity of a user.
@@ -149,8 +147,6 @@ pub enum StreamCommand {
     EndMeeting,
     /// Read a document.
     Read,
-    /// Ping project goal owners.
-    PingGoals(PingGoalsArgs),
     /// Update docs.
     DocsUpdate,
     /// Accept or decline a backport.
@@ -187,12 +183,6 @@ pub enum StreamCommand {
         /// Issue or pull-request number to unlock.
         id: PullRequestNumber,
     },
-}
-
-#[derive(clap::Parser, Debug, PartialEq, Clone)]
-pub struct PingGoalsArgs {
-    /// Goals updated within this threshold (in days) will not be pinged.
-    pub threshold: u64,
 }
 
 /// Backport release channels
