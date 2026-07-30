@@ -83,7 +83,7 @@ pub async fn gh_comments(
             .github
             .issue_with_comments(&owner, &repo, issue_id)
             .await
-            .context("unable to fetch the issue/pull-request and it's comments")?;
+            .context("unable to fetch the issue/pull request and its comments")?;
 
         let duration = start.elapsed();
         let duration_secs = duration.as_secs_f64();
