@@ -111,8 +111,8 @@ pub fn default_jobs() -> Vec<JobSchedule> {
         },
         JobSchedule {
             name: ProjectGoalsUpdateJob.name(),
-            // Around 9am Pacific time on every Monday.
-            schedule: Schedule::from_str("0 00 17 * * Mon *").unwrap(),
+            // Around 6/7am Pacific time on every Thursday.
+            schedule: Schedule::from_str("0 00 14 * * Thu *").unwrap(),
             metadata: serde_json::Value::Null,
         },
     ]

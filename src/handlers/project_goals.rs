@@ -1,7 +1,7 @@
 use crate::{
     github::{
         self, Event, GithubClient, Issue, IssueCommentAction, IssueCommentEvent, IssuesAction,
-        IssuesEvent,
+        IssuesEvent, queries::open_goal_issues::GoalIssue,
     },
     handlers::Context,
     jobs::Job,
@@ -9,18 +9,33 @@ use crate::{
     zulip::{MessageApiRequest, api::Recipient, client::ZulipClient},
 };
 use async_trait::async_trait;
-use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc, Weekday};
 use itertools::Itertools;
 use std::collections::BTreeMap;
 use tracing as log;
 
 const RUST_PROJECT_GOALS_REPO: &str = "rust-lang/rust-project-goals";
-const C_TRACKING_ISSUE: &str = "C-tracking-issue";
+const GOALS_TEAM: &str = "goals";
+
+const FIRST_REPORT_GRACE_DAYS: i64 = 7;
+const REPORT_LABELS: &[(&str, Period)] = &[
+    ("R-every-week", Period::EveryWeek),
+    ("R-every-2-weeks", Period::Every2Weeks),
+    ("R-every-4-weeks", Period::Every4Weeks),
+];
 
 const GOALS_STREAM: u64 = 435_869; // #project-goals
 const GOALS_META_STREAM: u64 = 478_266; // #project-goals/meta
-const TRIAGEBOT_TOPIC: &str = "Triagebot reports";
+const TRIAGEBOT_TOPIC: &str = "triagebot reports";
 const MAX_ZULIP_TOPIC: usize = 60;
+
+// Keep these in sync with src/jobs.rs
+const JOB_WEEKDAY: Weekday = Weekday::Thu;
+const JOB_UTC_HOUR: u32 = 14;
+const JOB_UTC_MINUTE: u32 = 0;
+
+// Arbitrary date to keep cycles anchored.
+const EPOCH: NaiveDate = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 struct ZulipId(u64);
@@ -40,10 +55,10 @@ struct GhUsername<'gh>(&'gh str);
 
 impl<'gh> GhUsername<'gh> {
     fn link(self) -> String {
-        format!("[@{login}](https://github.com/{login})", login = self.0,)
+        format!("[@{login}](https://github.com/{login})", login = self.0)
     }
 
-    fn team_file_link(self) -> String {
+    fn team_link(self) -> String {
         format!(
             "[@{login}](https://github.com/rust-lang/team/tree/main/people/{login}.toml)",
             login = self.0,
@@ -52,51 +67,80 @@ impl<'gh> GhUsername<'gh> {
 }
 
 #[derive(Clone, Copy, Debug)]
+enum OwnerContact {
+    Reachable(ZulipId),
+    MissingZulipId,
+    MissingTeamEntry,
+}
+
+#[derive(Clone, Copy, Debug)]
 struct Owner<'gh> {
     github: GhUsername<'gh>,
-    zulip: Option<ZulipId>,
+    contact: OwnerContact,
 }
 
 impl<'gh> Owner<'gh> {
-    async fn resolve(
-        team: &TeamClient,
-        github_id: u64,
-        username: &'gh str,
-    ) -> anyhow::Result<Self> {
-        let zulip = team.github_to_zulip_id(github_id).await?.map(ZulipId);
+    async fn resolve_goal(team: &TeamClient, username: &'gh str) -> anyhow::Result<Self> {
         Ok(Self {
             github: GhUsername(username),
-            zulip,
+            contact: match team.get_gh_id_from_username(username).await? {
+                Some(gh_id) => match team.github_to_zulip_id(gh_id).await? {
+                    Some(zulip_id) => OwnerContact::Reachable(ZulipId(zulip_id)),
+                    None => OwnerContact::MissingZulipId,
+                },
+                None => OwnerContact::MissingTeamEntry,
+            },
+        })
+    }
+
+    async fn resolve_event(
+        team: &TeamClient,
+        gh_id: u64,
+        username: &'gh str,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
+            github: GhUsername(username),
+            contact: match team.github_to_zulip_id(gh_id).await? {
+                Some(zulip_id) => OwnerContact::Reachable(ZulipId(zulip_id)),
+                None => OwnerContact::MissingZulipId,
+            },
         })
     }
 
     fn display_mention(self, muted: bool) -> String {
-        match self.zulip {
-            Some(zulip_id) => zulip_id.mention(muted),
-            None => self.github.link(),
+        match self.contact {
+            OwnerContact::Reachable(zulip_id) => zulip_id.mention(muted),
+            OwnerContact::MissingZulipId | OwnerContact::MissingTeamEntry => self.github.link(),
         }
     }
 }
 
-#[derive(Clone, Debug)]
-struct Owners<'gh>(Vec<Owner<'gh>>);
-
-fn join_mentions(mentions: Vec<String>) -> String {
-    match mentions.as_slice() {
-        [] => "(none assigned)".to_owned(),
+fn join_mentions(mentions: Vec<String>) -> Option<String> {
+    let joined = match mentions.as_slice() {
+        [] => return None,
         [owner] => owner.clone(),
         [first, second] => format!("{first} and {second}"),
-        [rest @ .., last] => {
-            format!("{}, and {last}", rest.iter().join(", "))
-        }
-    }
+        [rest @ .., last] => format!("{}, and {last}", rest.iter().join(", ")),
+    };
+    Some(joined)
 }
 
+#[derive(Debug)]
+struct Owners<'gh>(Vec<Owner<'gh>>);
+
 impl<'gh> Owners<'gh> {
-    async fn resolve(team: &TeamClient, issue: &'gh Issue) -> anyhow::Result<Self> {
+    async fn resolve_goal(team: &TeamClient, issue: &'gh GoalIssue) -> anyhow::Result<Self> {
+        let mut owners = Vec::with_capacity(issue.assignees.len());
+        for username in &issue.assignees {
+            owners.push(Owner::resolve_goal(team, username).await?);
+        }
+        Ok(Self(owners))
+    }
+
+    async fn resolve_event(team: &TeamClient, issue: &'gh Issue) -> anyhow::Result<Self> {
         let mut owners = Vec::with_capacity(issue.assignees.len());
         for assignee in &issue.assignees {
-            owners.push(Owner::resolve(team, assignee.id, &assignee.login).await?);
+            owners.push(Owner::resolve_event(team, assignee.id, &assignee.login).await?);
         }
         Ok(Self(owners))
     }
@@ -109,217 +153,306 @@ impl<'gh> Owners<'gh> {
         self.0.len() > 1
     }
 
-    fn reachable(&self) -> impl Iterator<Item = ZulipId> + '_ {
-        self.0.iter().copied().filter_map(|owner| owner.zulip)
-    }
-
-    fn unreachable(&self) -> impl Iterator<Item = GhUsername<'gh>> + '_ {
+    fn has_missing_zulip_id(&self) -> bool {
         self.0
             .iter()
-            .copied()
-            .filter_map(|owner| owner.zulip.is_none().then_some(owner.github))
+            .any(|owner| matches!(owner.contact, OwnerContact::MissingZulipId))
     }
 
-    fn all_mentions(&self, muted: bool) -> String {
+    fn has_missing_team_entry(&self) -> bool {
+        self.0
+            .iter()
+            .any(|owner| matches!(owner.contact, OwnerContact::MissingTeamEntry))
+    }
+
+    fn has_problem(&self) -> bool {
+        self.has_multiple() || self.has_missing_zulip_id() || self.has_missing_team_entry()
+    }
+
+    fn reachable(&self) -> impl Iterator<Item = ZulipId> + '_ {
+        self.0.iter().filter_map(|owner| match owner.contact {
+            OwnerContact::Reachable(zulip_id) => Some(zulip_id),
+            OwnerContact::MissingZulipId | OwnerContact::MissingTeamEntry => None,
+        })
+    }
+
+    fn missing_zulip_ids(&self) -> impl Iterator<Item = GhUsername<'gh>> + '_ {
+        self.0.iter().filter_map(|owner| {
+            matches!(owner.contact, OwnerContact::MissingZulipId).then_some(owner.github)
+        })
+    }
+
+    fn missing_team_entries(&self) -> impl Iterator<Item = GhUsername<'gh>> + '_ {
+        self.0.iter().filter_map(|owner| {
+            matches!(owner.contact, OwnerContact::MissingTeamEntry).then_some(owner.github)
+        })
+    }
+
+    fn all_mentions(&self, muted: bool) -> Option<String> {
         join_mentions(
             self.0
                 .iter()
                 .copied()
-                .map(|o| o.display_mention(muted))
+                .map(|owner| owner.display_mention(muted))
                 .collect_vec(),
         )
     }
 
     fn reachable_mentions(&self) -> Option<String> {
-        let reachables = self.reachable().map(|id| id.mention(true)).collect_vec();
-        if reachables.is_empty() {
-            None
-        } else {
-            Some(join_mentions(reachables))
-        }
+        join_mentions(self.reachable().map(|id| id.mention(true)).collect_vec())
     }
 
-    fn unreachable_team_links(&self) -> String {
+    fn missing_zulip_team_links(&self) -> Option<String> {
         join_mentions(
-            self.unreachable()
-                .map(GhUsername::team_file_link)
+            self.missing_zulip_ids()
+                .map(GhUsername::team_link)
+                .collect_vec(),
+        )
+    }
+
+    fn missing_team_entry_links(&self) -> Option<String> {
+        join_mentions(
+            self.missing_team_entries()
+                .map(GhUsername::link)
                 .collect_vec(),
         )
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-enum LastUpdate {
-    Never,
-    DaysAgo(i64),
-}
-
-impl LastUpdate {
-    fn description(self) -> String {
-        match self {
-            Self::Never => "no updates so far".to_owned(),
-            Self::DaysAgo(days) => format!("last update was {days} days ago"),
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-struct Reminder<'gh> {
-    issue: u64,
-    title: &'gh str,
-    last_update: LastUpdate,
-}
-
-struct EvaluatedReminder<'gh> {
-    reminder: Reminder<'gh>,
-    requires_update: bool,
-    invalid_schedule_reason: Option<String>,
-}
-
-impl<'gh> Reminder<'gh> {
-    fn from_issue(issue: &'gh Issue, days_since_last_update: i64) -> Self {
-        let last_update = if issue.comments.unwrap_or(0) <= 1 {
-            LastUpdate::Never
-        } else {
-            LastUpdate::DaysAgo(days_since_last_update)
-        };
-        Self {
-            issue: issue.number,
-            title: &issue.title,
-            last_update,
-        }
-    }
-
-    fn list_item(&self) -> String {
-        format!(
-            "+ *{title}* (goals#{issue}) — {last_update}",
-            title = self.title,
-            issue = self.issue,
-            last_update = self.last_update.description(),
-        )
-    }
-
-    fn reference(&self) -> String {
-        format!(
-            "*{title}* (goals#{issue})",
-            title = self.title,
-            issue = self.issue,
-        )
-    }
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
-enum CustomSchedule {
-    /// Runs on every job invocation (every week).
-    Weekly = 0,
-    /// Runs during even-numbered ISO weeks.
-    Biweekly0 = 1,
-    /// Runs during odd-numbered ISO weeks.
-    Biweekly1 = 2,
-    /// Runs on the first job invocation of each month.
-    Monthly = 3,
+enum Period {
+    /// Start a new reporting period every week.
+    EveryWeek = 0,
+    /// Start a new reporting period every 2 weeks.
+    Every2Weeks = 1,
+    /// Start a new reporting period every 4 weeks.
+    Every4Weeks = 2,
 }
 
-#[derive(Clone, Debug)]
-enum Schedule {
-    Default,
-    Custom(CustomSchedule),
-    Invalid {
-        fallback: CustomSchedule,
-        reason: String,
-    },
+impl Period {
+    fn weeks(self) -> i64 {
+        match self {
+            Self::EveryWeek => 1,
+            Self::Every2Weeks => 2,
+            Self::Every4Weeks => 4,
+        }
+    }
+
+    fn adjective(self) -> &'static str {
+        match self {
+            Self::EveryWeek => "weekly",
+            Self::Every2Weeks => "biweekly",
+            Self::Every4Weeks => "4-week",
+        }
+    }
+
+    fn start(self, today: NaiveDate) -> NaiveDate {
+        let days_until_job =
+            (JOB_WEEKDAY.num_days_from_monday() + 7 - EPOCH.weekday().num_days_from_monday()) % 7;
+
+        let anchor = EPOCH + Duration::days(i64::from(days_until_job));
+
+        let weeks_since_anchor = today.signed_duration_since(anchor).num_weeks();
+        let period_weeks = self.weeks();
+        let periods_since_anchor = weeks_since_anchor.div_euclid(period_weeks);
+
+        anchor + Duration::weeks(periods_since_anchor * period_weeks)
+    }
+
+    fn next(self, period_start: NaiveDate) -> NaiveDate {
+        period_start + Duration::weeks(self.weeks())
+    }
+}
+
+#[derive(Debug)]
+struct Schedule {
+    period: Period,
+    conflict: Option<String>,
 }
 
 impl Schedule {
-    fn from_issue(issue: &Issue) -> Self {
-        const PING_FREQUENCY_LABELS: &[(&str, CustomSchedule)] = &[
-            ("P-weekly", CustomSchedule::Weekly),
-            ("P-biweekly-0", CustomSchedule::Biweekly0),
-            ("P-biweekly-1", CustomSchedule::Biweekly1),
-            ("P-monthly", CustomSchedule::Monthly),
-        ];
-
-        match PING_FREQUENCY_LABELS
+    fn from_issue(issue: &GoalIssue) -> Self {
+        let selected = REPORT_LABELS
             .iter()
-            .filter_map(|&(label, value)| {
+            .filter_map(|&(label, period)| {
                 issue
                     .labels
                     .iter()
-                    .any(|l| l.name == label)
-                    .then_some((label, value))
+                    .any(|issue_label| issue_label == label)
+                    .then_some((label, period))
             })
-            .collect::<Vec<_>>()
-            .as_slice()
-        {
-            [] => Self::Default,
-            [(_, frequency)] => Self::Custom(*frequency),
+            .collect_vec();
+
+        match selected.as_slice() {
+            [] => Self {
+                period: Period::Every4Weeks,
+                conflict: None,
+            },
+            [(_, period)] => Self {
+                period: *period,
+                conflict: None,
+            },
             multiple => {
-                let (fallback_label, fallback) = multiple
+                let (minimal_label, minimal) = multiple
                     .iter()
                     .copied()
-                    .min_by_key(|(_, schedule)| *schedule)
+                    .min_by_key(|(_, period)| *period)
                     .expect("multiple contains at least two schedules");
-
-                Self::Invalid {
-                    fallback,
-                    reason: format!(
-                        "multiple frequency labels are set: {}; falling back to `{fallback_label}`",
-                        multiple.iter().map(|&(label, _)| label).join(", "),
-                    ),
+                Self {
+                    period: minimal,
+                    conflict: Some(format!(
+                        "{} (`{minimal_label}` was used)",
+                        multiple
+                            .iter()
+                            .map(|(label, _)| format!("`{label}`"))
+                            .join(", "),
+                    )),
                 }
             }
         }
     }
 }
 
-fn latest_biweekly_due_date(today: NaiveDate, parity: bool) -> NaiveDate {
-    if today.iso_week().week() % 2 == parity as u32 {
-        today
-    } else {
-        today - Duration::weeks(1)
-    }
+#[derive(Clone, Copy, Debug)]
+struct Goal<'gh> {
+    issue: u64,
+    title: &'gh str,
+    created_at: DateTime<Utc>,
+    last_comment_at: Option<DateTime<Utc>>,
 }
 
-impl CustomSchedule {
-    fn latest_due_date(self, today: NaiveDate) -> NaiveDate {
-        match self {
-            Self::Weekly => today,
-            Self::Biweekly0 => latest_biweekly_due_date(today, false),
-            Self::Biweekly1 => latest_biweekly_due_date(today, true),
-            Self::Monthly => {
-                let weeks_since_first_run = today.day0() / 7;
-                today - Duration::weeks(i64::from(weeks_since_first_run))
+impl<'gh> Goal<'gh> {
+    fn from_issue(issue: &'gh GoalIssue) -> Self {
+        Self {
+            issue: issue.number,
+            title: &issue.title,
+            created_at: issue.created_at,
+            last_comment_at: issue.last_comment.as_ref().map(|c| c.created_at),
+        }
+    }
+
+    fn link(&self) -> String {
+        format!("goals#{number}", number = self.issue)
+    }
+
+    fn named_link(&self) -> String {
+        format!(
+            "**{title}** (goals#{number})",
+            title = self.title,
+            number = self.issue
+        )
+    }
+
+    fn latest_update(&self) -> String {
+        match self.last_comment_at {
+            None => format!(
+                "goal started: {} (no updates so far)",
+                display_datetime(self.created_at)
+            ),
+            Some(dt) => {
+                format!("latest update: {}", display_datetime(dt))
             }
         }
     }
 }
 
-#[derive(Clone, Debug)]
-struct MultipleOwners<'gh> {
-    goal: Reminder<'gh>,
+fn display_job_date(date: NaiveDate) -> String {
+    format!(
+        "<time:{}T{JOB_UTC_HOUR:02}:{JOB_UTC_MINUTE:02}+00:00>",
+        date.format("%Y-%m-%d"),
+    )
+}
+
+fn display_datetime(date: DateTime<Utc>) -> String {
+    format!("<time:{}>", date.format("%Y-%m-%dT%H:%M%:z"),)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Reminder<'gh> {
+    goal: Goal<'gh>,
+    period: Period,
+    period_start: NaiveDate,
+    next_deadline: NaiveDate,
+    _is_new_period: bool,
+}
+
+impl<'gh> Reminder<'gh> {
+    fn from_issue(issue: &'gh GoalIssue, now: DateTime<Utc>) -> (Self, Option<String>) {
+        let schedule = Schedule::from_issue(issue);
+        let today = now.date_naive();
+        let period_start = schedule.period.start(today);
+        (
+            Self {
+                goal: Goal::from_issue(issue),
+                period: schedule.period,
+                period_start,
+                next_deadline: schedule.period.next(period_start),
+                _is_new_period: period_start == today,
+            },
+            schedule.conflict,
+        )
+    }
+
+    fn is_required(&self, now: DateTime<Utc>) -> bool {
+        // Give new goals a grace period before reminders begin.
+        let grace_end = self.goal.created_at + Duration::days(FIRST_REPORT_GRACE_DAYS);
+
+        if now < grace_end {
+            return false;
+        }
+
+        self.goal
+            .last_comment_at
+            .is_none_or(|d| d.date_naive() < self.period_start)
+    }
+
+    fn list_item(&self) -> String {
+        format!(
+            "+ {goal}\n  - {latest}\n  - next *{period}* cycle starts {next}",
+            goal = self.goal.named_link(),
+            latest = self.goal.latest_update(),
+            next = display_job_date(self.next_deadline),
+            period = self.period.adjective(),
+        )
+    }
+}
+
+#[derive(Debug)]
+struct OwnershipProblem<'gh> {
+    goal: Goal<'gh>,
     owners: Owners<'gh>,
 }
 
-#[derive(Clone, Debug)]
-struct InvalidSchedule<'gh> {
-    goal: Reminder<'gh>,
+#[derive(Debug)]
+struct PeriodConflict<'gh> {
+    goal: Goal<'gh>,
     reason: String,
 }
 
 #[derive(Default)]
 struct ReminderErrors<'gh> {
-    unowned: Vec<Reminder<'gh>>,
-    multiply_owned: Vec<MultipleOwners<'gh>>,
-    missing_zulip: Vec<MultipleOwners<'gh>>,
-    invalid_schedules: Vec<InvalidSchedule<'gh>>,
+    unowned: Vec<Goal<'gh>>,
+    ownership: Vec<OwnershipProblem<'gh>>,
+    schedule: Vec<PeriodConflict<'gh>>,
 }
 
 impl ReminderErrors<'_> {
     fn is_empty(&self) -> bool {
-        self.unowned.is_empty()
-            && self.multiply_owned.is_empty()
-            && self.missing_zulip.is_empty()
-            && self.invalid_schedules.is_empty()
+        self.unowned.is_empty() && self.ownership.is_empty() && self.schedule.is_empty()
+    }
+
+    fn count(&self) -> usize {
+        self.unowned.len()
+            + self.schedule.len()
+            + self
+                .ownership
+                .iter()
+                .map(|problem| {
+                    problem.owners.has_multiple() as usize
+                        + problem.owners.has_missing_zulip_id() as usize
+                        + problem.owners.has_missing_team_entry() as usize
+                })
+                .sum::<usize>()
     }
 }
 
@@ -330,36 +463,25 @@ struct ReminderPlan<'gh> {
 }
 
 impl<'gh> ReminderPlan<'gh> {
-    fn add_invalid_schedule(&mut self, goal: Reminder<'gh>, reason: String) {
-        self.errors
-            .invalid_schedules
-            .push(InvalidSchedule { goal, reason });
+    fn add_conflicts(&mut self, goal: Goal<'gh>, reason: String) {
+        self.errors.schedule.push(PeriodConflict { goal, reason });
     }
 
-    fn add_goal(&mut self, goal: Reminder<'gh>, owners: Owners<'gh>) {
+    fn add_goal(&mut self, reminder: Reminder<'gh>, owners: Owners<'gh>) {
         if owners.is_empty() {
-            self.errors.unowned.push(goal);
+            self.errors.unowned.push(reminder.goal);
             return;
         }
 
-        let goal_with_owners = MultipleOwners {
-            goal: goal.clone(),
-            owners: owners.clone(),
-        };
-
-        if owners.has_multiple() {
-            self.errors.multiply_owned.push(goal_with_owners.clone());
-        }
-
-        if owners.unreachable().next().is_some() {
-            self.errors.missing_zulip.push(goal_with_owners);
-        }
-
         for owner in owners.reachable() {
-            self.goals_by_owner
-                .entry(owner)
-                .or_default()
-                .push(goal.clone());
+            self.goals_by_owner.entry(owner).or_default().push(reminder);
+        }
+
+        if owners.has_problem() {
+            self.errors.ownership.push(OwnershipProblem {
+                goal: reminder.goal,
+                owners,
+            });
         }
     }
 }
@@ -369,190 +491,206 @@ fn owner_message(owner: ZulipId, goals: &[Reminder<'_>]) -> String {
         r#"
 Hi {owner}!
 
-This is a reminder to post an update on your goals:
+This is your reminder to post updates for the following goals:
 
 {goals}
 
-Some questions to guide you (you don't have to follow this format):
+Some questions to guide you (you don't have to follow this):
 
 + What has happened since your last update?
 + Are there any relevant PRs, issues, docs, or discussions to link?
-+ Are you blocked on any issue, PR, teams?
++ Are you blocked on any issue, PR, or team?
 + Do you need help or feedback? Where should people look?
 + What do you plan to work on before the next update?
 
 Even if there's little to say, a brief message provides reassurance that the goal is still alive.
 
 Please leave your updates as comments on the tracking issues. Thanks! <3
+
+---
+
+*Note: Two- and four-week goals are pinged weekly until an update is posted for the current reporting period.*
+
+*By default, the reporting period is 4 weeks. If you'd like to post updates more often, you can override the period per goal by labeling the issue with `R-every-week`, `R-every-2-weeks`, or `R-every-4-weeks`.*
 "#,
         owner = owner.mention(false),
         goals = goals.iter().map(Reminder::list_item).join("\n"),
     )
 }
 
-fn unowned_errors(goals: &[Reminder<'_>]) -> String {
-    let goals = goals
-        .iter()
-        .map(|goal| format!("+ {goal}", goal = goal.reference()))
-        .join("\n");
-
+fn unowned_errors(goals: &[Goal<'_>]) -> String {
     format!(
         r#"
 The following goals have no owner assigned:
 
-{goals}
+{unowned}
 
 Please assign an owner and reach out to them!
-"#
+"#,
+        unowned = goals
+            .iter()
+            .map(|g| format!("+ {}", g.named_link()))
+            .join("\n")
     )
 }
 
-fn multiple_owner_errors(goals: &[MultipleOwners<'_>]) -> String {
-    let goals = goals
-        .iter()
-        .map(|entry| {
-            format!(
-                "+ {goal} — assigned to {owners}",
-                goal = entry.goal.reference(),
-                owners = entry.owners.all_mentions(true),
-            )
-        })
-        .join("\n");
-
+fn multiple_owner_warnings(problems: &[OwnershipProblem<'_>]) -> String {
     format!(
         r#"
 The following goals have more than one owner assigned:
 
-{goals}
+{multiple_owner}
 
 A goal should have exactly one owner. All owners with a Zulip account were still notified separately.
-"#
+"#,
+        multiple_owner = problems
+            .iter()
+            .filter(|p| p.owners.has_multiple())
+            .map(|p| {
+                format!(
+                    "+ {goal}: {owners}",
+                    goal = p.goal.link(),
+                    owners = p.owners.all_mentions(true).expect("has multiple"),
+                )
+            })
+            .join("\n")
     )
 }
 
-fn missing_zulip_errors(goals: &[MultipleOwners<'_>]) -> String {
-    let goals = goals
-        .iter()
-        .map(|entry| {
-            format!(
-                "+ {goal} — missing Zulip account: {unreachable}\n  {notified}",
-                goal = entry.goal.reference(),
-                unreachable = entry.owners.unreachable_team_links(),
-                notified = match entry.owners.reachable_mentions() {
-                    None => "No existing owner was notified on Zulip.".to_owned(),
-                    Some(owners) => format!("{owners} got notified on Zulip."),
-                }
-            )
-        })
-        .join("\n");
-
+fn missing_zulip_errors(problems: &[OwnershipProblem<'_>]) -> String {
     format!(
         r#"
 The following goal owners were not pinged because they don't have a Zulip account specified in the `team` repo:
 
-{goals}
+{missing_zulip}
 
 Please make sure to register their `zulip-id` and reach out to them!
-"#
+"#,
+        missing_zulip = problems
+            .iter()
+            .filter(|p| p.owners.has_missing_zulip_id())
+            .map(|p| {
+                format!(
+                    "+ {goal}: {unreachable}\n  - {notified}",
+                    goal = p.goal.link(),
+                    unreachable = p
+                        .owners
+                        .missing_zulip_team_links()
+                        .expect("has missing Zulip ID"),
+                    notified = match p.owners.reachable_mentions() {
+                        None => "Nobody was notified on Zulip.".to_owned(),
+                        Some(owners) => format!("{owners} got notified on Zulip."),
+                    }
+                )
+            })
+            .join("\n")
     )
 }
 
-fn invalid_schedule_errors(errors: &[InvalidSchedule<'_>]) -> String {
-    let errors = errors
-        .iter()
-        .map(|error| format!("+ {} — {}", error.goal.reference(), error.reason,))
-        .join("\n");
-
+fn missing_team_entry_warnings(problems: &[OwnershipProblem<'_>]) -> String {
     format!(
         r#"
-The following goals have invalid ping-schedule labels:
+The following assignees could not be found in the `team` repo, so Triagebot could not look up their Zulip accounts:
 
-{errors}
+{missing_team_entries}
 
-Use exactly one frequency label (`P-weekly`, `P-biweekly-0`, `P-biweekly-1`, or `P-monthly`).
-"#
+Please check the assignee usernames and their entries in the `team` repo.
+"#,
+        missing_team_entries = problems
+            .iter()
+            .filter(|p| p.owners.has_missing_team_entry())
+            .map(|p| {
+                format!(
+                    "+ {goal}: {owners}\n  - {notified}",
+                    goal = p.goal.link(),
+                    owners = p
+                        .owners
+                        .missing_team_entry_links()
+                        .expect("has missing team entry"),
+                    notified = match p.owners.reachable_mentions() {
+                        None => "Nobody was notified on Zulip.".to_owned(),
+                        Some(owners) => format!("{owners} got notified on Zulip."),
+                    },
+                )
+            })
+            .join("\n")
     )
 }
 
-fn error_message(errors: &ReminderErrors<'_>) -> String {
+fn schedule_warnings(conflicts: &[PeriodConflict<'_>]) -> String {
+    format!(
+        r#"
+The following goals have conflicting reporting period labels:
+
+{conflicts}
+
+Unlabeled goals use the default period of 4 weeks.
+"#,
+        conflicts = conflicts
+            .iter()
+            .map(|e| format!("+ {}: {}", e.goal.link(), e.reason))
+            .join("\n")
+    )
+}
+
+fn error_sections(errors: &ReminderErrors<'_>) -> String {
     let mut sections = Vec::new();
 
     if !errors.unowned.is_empty() {
         sections.push(unowned_errors(&errors.unowned));
     }
-    if !errors.multiply_owned.is_empty() {
-        sections.push(multiple_owner_errors(&errors.multiply_owned));
+    if errors.ownership.iter().any(|p| p.owners.has_multiple()) {
+        sections.push(multiple_owner_warnings(&errors.ownership));
     }
-    if !errors.missing_zulip.is_empty() {
-        sections.push(missing_zulip_errors(&errors.missing_zulip));
+    if errors
+        .ownership
+        .iter()
+        .any(|p| p.owners.has_missing_zulip_id())
+    {
+        sections.push(missing_zulip_errors(&errors.ownership));
     }
-    if !errors.invalid_schedules.is_empty() {
-        sections.push(invalid_schedule_errors(&errors.invalid_schedules));
+    if errors
+        .ownership
+        .iter()
+        .any(|p| p.owners.has_missing_team_entry())
+    {
+        sections.push(missing_team_entry_warnings(&errors.ownership));
+    }
+    if !errors.schedule.is_empty() {
+        sections.push(schedule_warnings(&errors.schedule));
     }
 
-    format!(
-        r#"
-Hi @*T-goals*!
-
-{}
-"#,
-        sections.iter().join("\n\n---\n\n"),
-    )
-}
-
-fn update_required(issue: &Issue, now: DateTime<Utc>, schedule: CustomSchedule) -> bool {
-    let due_date = schedule.latest_due_date(now.date_naive());
-    let has_real_update = issue.comments.unwrap_or(0) > 1;
-    let updated_after_due_date = issue.updated_at.date_naive() >= due_date;
-
-    !has_real_update || !updated_after_due_date
-}
-
-fn evaluate<'gh>(issue: &'gh Issue, now: DateTime<Utc>) -> EvaluatedReminder<'gh> {
-    let days_since_last_update = (now - issue.updated_at).num_days();
-
-    log::debug!(
-        "issue #{}: days_since_last_comment = {} days, comments = {}",
-        issue.number,
-        days_since_last_update,
-        issue.comments.unwrap_or(0),
-    );
-
-    let (requires_update, invalid_schedule_reason) = match Schedule::from_issue(issue) {
-        Schedule::Default => (update_required(issue, now, CustomSchedule::Biweekly0), None),
-        Schedule::Custom(schedule) => (update_required(issue, now, schedule), None),
-        Schedule::Invalid { fallback, reason } => {
-            (update_required(issue, now, fallback), Some(reason))
-        }
-    };
-
-    EvaluatedReminder {
-        reminder: Reminder::from_issue(issue, days_since_last_update),
-        requires_update,
-        invalid_schedule_reason,
-    }
+    sections.iter().join("\n\n---\n\n")
 }
 
 async fn build_plan<'gh>(
-    issues: &'gh [Issue],
+    issues: &'gh [GoalIssue],
     team: &TeamClient,
+    now: DateTime<Utc>,
 ) -> anyhow::Result<ReminderPlan<'gh>> {
-    let now = Utc::now();
     let mut plan = ReminderPlan::default();
 
     for issue in issues {
-        let evaluation = evaluate(issue, now);
+        let (reminder, conflict) = Reminder::from_issue(issue, now);
 
-        if let Some(reason) = evaluation.invalid_schedule_reason {
-            plan.add_invalid_schedule(evaluation.reminder, reason);
+        log::debug!(
+            "issue #{}: period_start = {}, next_deadline = {}, last_comment = {:?}",
+            issue.number,
+            reminder.period_start,
+            reminder.next_deadline,
+            issue.last_comment.as_ref().map(|c| c.created_at),
+        );
+
+        if let Some(conflict) = conflict {
+            plan.add_conflicts(reminder.goal, conflict);
         }
 
-        if !evaluation.requires_update {
+        if !reminder.is_required(now) {
             continue;
         }
 
-        let owners = Owners::resolve(team, issue).await?;
-        plan.add_goal(evaluation.reminder, owners);
+        let owners = Owners::resolve_goal(team, issue).await?;
+        plan.add_goal(reminder, owners);
     }
 
     Ok(plan)
@@ -565,7 +703,7 @@ async fn send_dm(
     dry_run: bool,
 ) -> anyhow::Result<()> {
     if dry_run {
-        log::debug!("(DRY) Would send DM to user {}: {}", owner.0, content,);
+        log::debug!("(DRY) Would send DM to user {}: {}", owner.0, content);
         return Ok(());
     }
 
@@ -589,7 +727,7 @@ async fn send_triagebot_topic(
 ) -> anyhow::Result<()> {
     if dry_run {
         log::debug!(
-            "(DRY) Would send to topic {GOALS_STREAM}>{TRIAGEBOT_TOPIC}: {}",
+            "(DRY) Would send to topic {GOALS_META_STREAM}>{TRIAGEBOT_TOPIC}: {}",
             content,
         );
         return Ok(());
@@ -608,74 +746,110 @@ async fn send_triagebot_topic(
     Ok(())
 }
 
+#[derive(Default)]
+struct PeriodCounts {
+    weekly: usize,
+    every_2_weeks: usize,
+    every_4_weeks: usize,
+}
+
+impl PeriodCounts {
+    fn from_reminders<'gh>(reminders: impl Iterator<Item = Reminder<'gh>>) -> Self {
+        let mut counts = Self::default();
+
+        for reminder in reminders {
+            match reminder.period {
+                Period::EveryWeek => counts.weekly += 1,
+                Period::Every2Weeks => counts.every_2_weeks += 1,
+                Period::Every4Weeks => counts.every_4_weeks += 1,
+            }
+        }
+
+        counts
+    }
+
+    fn total(&self) -> usize {
+        self.weekly + self.every_2_weeks + self.every_4_weeks
+    }
+}
+
+fn report(
+    errors: &ReminderErrors<'_>,
+    total_owners: usize,
+    counts: &PeriodCounts,
+    today: NaiveDate,
+) -> String {
+    let next_week = Period::EveryWeek.next(Period::EveryWeek.start(today));
+    let next_2_weeks = Period::Every2Weeks.next(Period::Every2Weeks.start(today));
+    let next_4_weeks = Period::Every4Weeks.next(Period::Every4Weeks.start(today));
+
+    let error_summary = if errors.is_empty() {
+        "No errors happened in the process.".to_owned()
+    } else {
+        format!(
+            "{count} errors happened in the process.\n\n---\n\n{details}",
+            count = errors.count(),
+            details = error_sections(errors),
+        )
+    };
+
+    format!(
+        r#"
+Hi @*T-goals*!
+
+Weekly run finished.
+
+{total_owners} owners were notified about {total_goals} goals:
++ Weekly reports: {weekly} (next cycle: {next_week})
++ Biweekly reports: {every_2_weeks} (next cycle: {next_2_weeks})
++ Four-week reports: {every_4_weeks} (next cycle: {next_4_weeks})
+
+{error_summary}
+
+Until next week! <3
+"#,
+        total_goals = counts.total(),
+        weekly = counts.weekly,
+        every_2_weeks = counts.every_2_weeks,
+        every_4_weeks = counts.every_4_weeks,
+        next_week = display_job_date(next_week),
+        next_2_weeks = display_job_date(next_2_weeks),
+        next_4_weeks = display_job_date(next_4_weeks),
+    )
+}
+
 async fn execute_plan(
     zulip: &ZulipClient,
     plan: ReminderPlan<'_>,
+    today: NaiveDate,
     dry_run: bool,
 ) -> anyhow::Result<()> {
-    let mut total_owners = 0;
-    let total_goals = plan
-        .goals_by_owner
-        .values()
-        .flatten()
-        .map(|goal| goal.issue)
-        .unique()
-        .count();
-    let mut total_errors = 0;
+    let ReminderPlan {
+        goals_by_owner,
+        errors,
+    } = plan;
 
-    for (owner, goals) in plan.goals_by_owner {
+    let total_owners = goals_by_owner.len();
+    let counts = PeriodCounts::from_reminders(
+        goals_by_owner
+            .values()
+            .flatten()
+            .copied()
+            .unique_by(|reminder| reminder.goal.issue),
+    );
+
+    for (owner, goals) in goals_by_owner {
         send_dm(zulip, owner, &owner_message(owner, &goals), dry_run).await?;
-        total_owners += 1;
-    }
-
-    if !plan.errors.is_empty() {
-        send_triagebot_topic(zulip, &error_message(&plan.errors), dry_run).await?;
-
-        total_errors += plan.errors.unowned.len()
-            + plan.errors.multiply_owned.len()
-            + plan.errors.missing_zulip.len()
-            + plan.errors.invalid_schedules.len();
     }
 
     send_triagebot_topic(
         zulip,
-        &format!(
-            r#"
-Weekly run finished.
-
-{total_owners} owners have been notified about {total_goals} goals.
-
-{total_errors} errors happened in the process.
-
-Until next week! <3
-        "#
-        ),
+        &report(&errors, total_owners, &counts, today),
         dry_run,
     )
     .await?;
 
     Ok(())
-}
-
-fn is_tracking_issue(issue: &Issue) -> bool {
-    issue
-        .labels
-        .iter()
-        .any(|label| label.name == C_TRACKING_ISSUE)
-}
-
-async fn tracking_issues(gh: &GithubClient) -> anyhow::Result<Vec<Issue>> {
-    gh.repository(RUST_PROJECT_GOALS_REPO)
-        .await?
-        .get_issues(
-            gh,
-            &github::issue_query::Query {
-                filters: vec![("state", "open"), ("is", "issue")],
-                include_labels: vec![C_TRACKING_ISSUE],
-                exclude_labels: vec![],
-            },
-        )
-        .await
 }
 
 pub async fn ping_project_goals_owners(
@@ -684,9 +858,10 @@ pub async fn ping_project_goals_owners(
     team: &TeamClient,
     dry_run: bool,
 ) -> anyhow::Result<()> {
-    let issues = tracking_issues(gh).await?;
-    let plan = build_plan(&issues, team).await?;
-    execute_plan(zulip, plan, dry_run).await
+    let now = Utc::now();
+    let issues = gh.open_goal_issues().await?;
+    let plan = build_plan(&issues, team, now).await?;
+    execute_plan(zulip, plan, now.date_naive(), dry_run).await
 }
 
 pub struct ProjectGoalsUpdateJob;
@@ -704,8 +879,6 @@ impl Job for ProjectGoalsUpdateJob {
 
 /// Returns true if the GitHub user is part of the Goals team.
 pub async fn is_goals_member(team_client: &TeamClient, github_id: u64) -> anyhow::Result<bool> {
-    const GOALS_TEAM: &str = "goals";
-
     let team = match team_client.get_team(GOALS_TEAM).await? {
         Some(team) => team,
         None => {
@@ -735,18 +908,27 @@ fn goal_zulip_topic(issue: &Issue) -> String {
     title
 }
 
+fn is_tracking_issue(issue: &Issue) -> bool {
+    issue
+        .labels
+        .iter()
+        .any(|label| label.name == "C-tracking-issue")
+}
+
 async fn create_goal_topic(issue: &Issue, ctx: &Context) -> anyhow::Result<()> {
     if !is_tracking_issue(issue) {
         return Ok(());
     }
 
-    let owners = Owners::resolve(&ctx.team, issue).await?;
+    let owners = Owners::resolve_event(&ctx.team, issue).await?;
     let topic = goal_zulip_topic(issue);
     let content = format!(
         "Goal *{title}* (goals#{number}) has been accepted. It's owned by {owners}.",
         title = issue.title,
         number = issue.number,
-        owners = owners.all_mentions(false),
+        owners = owners
+            .all_mentions(false)
+            .unwrap_or_else(|| "nobody (@*T-goals* should fix this)".to_owned()),
     );
 
     MessageApiRequest {
@@ -781,7 +963,7 @@ async fn echo_comment_to_zulip(
         return Ok(());
     }
 
-    let author = Owner::resolve(&ctx.team, comment.user.id, &comment.user.login).await?;
+    let author = Owner::resolve_event(&ctx.team, comment.user.id, &comment.user.login).await?;
     let text = &comment.body;
 
     let content = format!(
@@ -792,7 +974,7 @@ async fn echo_comment_to_zulip(
         url = comment.html_url,
         number = issue.number,
         author = author.display_mention(false),
-        ticks = quote_fence(&text),
+        ticks = quote_fence(text),
     );
 
     MessageApiRequest {
