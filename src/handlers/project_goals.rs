@@ -973,7 +973,7 @@ async fn echo_comment_to_zulip(
          {ticks}",
         url = comment.html_url,
         number = issue.number,
-        author = author.display_mention(false),
+        author = author.display_mention(true),
         ticks = quote_fence(text),
     );
 
