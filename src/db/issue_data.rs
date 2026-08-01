@@ -37,6 +37,15 @@ where
     ) -> Result<IssueData<'db, T>> {
         let repo = issue.repository().to_string();
         let issue_number = issue.number as i32;
+        Self::load_raw(db, repo, issue_number, key).await
+    }
+
+    pub async fn load_raw(
+        db: &'db mut DbClient,
+        repo: String,
+        issue_number: i32,
+        key: &str,
+    ) -> Result<IssueData<'db, T>> {
         let transaction = db.transaction().await?;
         transaction
             .execute("LOCK TABLE issue_data", &[])

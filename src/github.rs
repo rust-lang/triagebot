@@ -13,4 +13,5 @@ pub use webhook::event::*;
 pub use webhook::webhook;
 
 pub type UserId = u64;
+pub type IssueNumber = u64;
 pub type PullRequestNumber = u64;

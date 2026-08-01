@@ -55,7 +55,8 @@ use crate::{
     db::jobs::JobSchedule,
     github::client::GithubRateLimitLoggingJob,
     handlers::{
-        Context, docs_update::DocsUpdateJob, major_change::MajorChangeAcceptanceJob,
+        Context, assign::release_inactive_assignments::ReleaseInactiveAssignmentsJob,
+        docs_update::DocsUpdateJob, major_change::MajorChangeAcceptanceJob,
         review_changes_since::AddReviewChangesSinceLinkJob, rustc_commits::RustcCommitsJob,
     },
 };
@@ -77,6 +78,7 @@ pub fn jobs() -> Vec<Box<dyn Job + Send + Sync>> {
         Box::new(MajorChangeAcceptanceJob),
         Box::new(GithubRateLimitLoggingJob),
         Box::new(AddReviewChangesSinceLinkJob),
+        Box::new(ReleaseInactiveAssignmentsJob),
     ]
 }
 
@@ -105,6 +107,12 @@ pub fn default_jobs() -> Vec<JobSchedule> {
             name: GithubRateLimitLoggingJob.name(),
             // Every 15 minutes
             schedule: Schedule::from_str("* */15 * * * * *").unwrap(),
+            metadata: serde_json::Value::Null,
+        },
+        JobSchedule {
+            name: ReleaseInactiveAssignmentsJob.name(),
+            // Every day at 5am
+            schedule: Schedule::from_str("0 5 * * * * *").unwrap(),
             metadata: serde_json::Value::Null,
         },
     ]

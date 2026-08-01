@@ -1,4 +1,6 @@
+pub(crate) mod closing_issues_references;
 pub(crate) mod issue_with_comments;
+pub(crate) mod issues_assigned;
 pub(crate) mod user_comments_in_org;
 pub(crate) mod user_contributions;
 pub(crate) mod user_info;
