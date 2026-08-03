@@ -210,41 +210,12 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
         client: &'a GithubClient,
         _team_client: &'a TeamClient,
     ) -> anyhow::Result<Vec<crate::actions::IssueDecorator>> {
-        use cynic::QueryBuilder;
-        use github_graphql::queries;
-
         let repository_owner = repo.owner();
         let repository_name = repo.name();
 
-        let mut prs: Vec<queries::PullRequest> = vec![];
-
-        let mut args = queries::LeastRecentlyReviewedPullRequestsArguments {
-            repository_owner,
-            repository_name,
-            after: None,
-        };
-        loop {
-            let query = queries::LeastRecentlyReviewedPullRequests::build(args.clone());
-            let req = client.post(&client.graphql_url);
-            let req = req.json(&query);
-
-            let data: cynic::GraphQlResponse<queries::LeastRecentlyReviewedPullRequests> =
-                client.json(req).await?;
-            if let Some(errors) = data.errors {
-                anyhow::bail!("There were graphql errors. {errors:?}");
-            }
-            let repository = data
-                .data
-                .context("No data returned.")?
-                .repository
-                .context("No repository.")?;
-            prs.extend(repository.pull_requests.nodes);
-            let page_info = repository.pull_requests.page_info;
-            if !page_info.has_next_page || page_info.end_cursor.is_none() {
-                break;
-            }
-            args.after = page_info.end_cursor;
-        }
+        let prs = client
+            .least_recently_reviewed_prs(repository_owner, repository_name)
+            .await?;
 
         let mut prs: Vec<_> = prs
             .into_iter()
@@ -310,7 +281,7 @@ impl IssuesQuery for LeastRecentlyReviewedPullRequests {
                     updated_at,
                     pr.number as u64,
                     pr.title,
-                    pr.url.0,
+                    pr.url,
                     repository_name,
                     labels,
                     author.login,
