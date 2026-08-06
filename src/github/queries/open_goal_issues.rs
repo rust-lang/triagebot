@@ -17,7 +17,6 @@ pub struct GoalIssue {
 
 pub struct LastGoalComment {
     pub created_at: chrono::DateTime<chrono::Utc>,
-    pub author: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -65,7 +64,6 @@ struct GraphQlLabel {
 struct GraphQlComment {
     #[serde(rename = "createdAt")]
     created_at: chrono::DateTime<chrono::Utc>,
-    author: Option<GraphQlUser>,
 }
 
 impl From<GraphQlIssue> for GoalIssue {
@@ -98,7 +96,6 @@ impl From<GraphQlIssue> for GoalIssue {
             .next()
             .map(|comment| LastGoalComment {
                 created_at: comment.created_at,
-                author: comment.author.map(|author| author.login),
             });
 
         Self {
@@ -114,7 +111,7 @@ impl From<GraphQlIssue> for GoalIssue {
 
 impl GithubClient {
     /// Get every open tracking issue in `rust-lang/rust-project-goals`,
-    /// including the latest comment's date and author.
+    /// including the latest comment's date.
     pub async fn open_goal_issues(&self) -> anyhow::Result<Vec<GoalIssue>> {
         let mut cursor = None::<String>;
         let mut issues = Vec::new();
@@ -157,9 +154,6 @@ query (
         comments(last: 1) {
           nodes {
             createdAt
-            author {
-              login
-            }
           }
         }
       }

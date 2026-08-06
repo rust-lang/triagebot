@@ -29,12 +29,16 @@ const GOALS_META_STREAM: u64 = 478_266; // #project-goals/meta
 const TRIAGEBOT_TOPIC: &str = "triagebot reports";
 const MAX_ZULIP_TOPIC: usize = 60;
 
-// Keep these in sync with src/jobs.rs
+/// The weekday of the job execution (must match [`crate::jobs`]).
 const JOB_WEEKDAY: Weekday = Weekday::Thu;
+/// The UTC hour of the job execution (must match [`crate::jobs`]).
 const JOB_UTC_HOUR: u32 = 14;
+/// The UTC minute of the job execution (must match [`crate::jobs`]).
 const JOB_UTC_MINUTE: u32 = 0;
 
-// Arbitrary date to keep cycles anchored.
+/// An arbitrary date to keep reporting periods anchored.
+///
+/// The phase of the biweekly and 4-week periods depends on this day.
 const EPOCH: NaiveDate = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -80,7 +84,7 @@ struct Owner<'gh> {
 }
 
 impl<'gh> Owner<'gh> {
-    async fn resolve_goal(team: &TeamClient, username: &'gh str) -> anyhow::Result<Self> {
+    async fn from_username(team: &TeamClient, username: &'gh str) -> anyhow::Result<Self> {
         Ok(Self {
             github: GhUsername(username),
             contact: match team.get_gh_id_from_username(username).await? {
@@ -93,7 +97,7 @@ impl<'gh> Owner<'gh> {
         })
     }
 
-    async fn resolve_event(
+    async fn from_id_and_username(
         team: &TeamClient,
         gh_id: u64,
         username: &'gh str,
@@ -132,7 +136,7 @@ impl<'gh> Owners<'gh> {
     async fn resolve_goal(team: &TeamClient, issue: &'gh GoalIssue) -> anyhow::Result<Self> {
         let mut owners = Vec::with_capacity(issue.assignees.len());
         for username in &issue.assignees {
-            owners.push(Owner::resolve_goal(team, username).await?);
+            owners.push(Owner::from_username(team, username).await?);
         }
         Ok(Self(owners))
     }
@@ -140,7 +144,7 @@ impl<'gh> Owners<'gh> {
     async fn resolve_event(team: &TeamClient, issue: &'gh Issue) -> anyhow::Result<Self> {
         let mut owners = Vec::with_capacity(issue.assignees.len());
         for assignee in &issue.assignees {
-            owners.push(Owner::resolve_event(team, assignee.id, &assignee.login).await?);
+            owners.push(Owner::from_id_and_username(team, assignee.id, &assignee.login).await?);
         }
         Ok(Self(owners))
     }
@@ -219,6 +223,10 @@ impl<'gh> Owners<'gh> {
     }
 }
 
+/// Every goal has its own reporting schedule.
+/// This is how often the goal owner is prompted to author an update.
+///
+/// This is set via a label (see [`REPORT_LABELS`]) on the goal's tracking issue.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 enum Period {
     /// Start a new reporting period every week.
@@ -246,20 +254,37 @@ impl Period {
         }
     }
 
+    /// Returns the starting date of the period that includes this day.
+    ///
+    /// Every reporting period begins on a [`JOB_WEEKDAY`]
+    /// and lasts [`Period::weeks`], depending on the goal.
+    ///
+    /// Biweekly and 4-week cycles are aligned to [`EPOCH`].
     fn start(self, today: NaiveDate) -> NaiveDate {
-        let days_until_job =
-            (JOB_WEEKDAY.num_days_from_monday() + 7 - EPOCH.weekday().num_days_from_monday()) % 7;
+        // Depending on the chosen date, `EPOCH` may not fall on the `JOB_WEEKDAY`.
+        // `days_until_job` is needed to calculate an anchor from the `EPOCH` that
+        // falls on the `JOB_WEEKDAY` and can be used to compute the relevant dates.
+        let epoch_weekday = i64::from(EPOCH.weekday().num_days_from_monday());
+        let job_weekday = i64::from(JOB_WEEKDAY.num_days_from_monday());
+        let days_until_job = (job_weekday - epoch_weekday).rem_euclid(7);
 
-        let anchor = EPOCH + Duration::days(i64::from(days_until_job));
+        // Dates are computed relative to this date.
+        let anchor = EPOCH + Duration::days(days_until_job);
 
+        // The number of full weeks since the anchor.
         let weeks_since_anchor = today.signed_duration_since(anchor).num_weeks();
         let period_weeks = self.weeks();
+        // The number of full periods that passed since the anchor date.
         let periods_since_anchor = weeks_since_anchor.div_euclid(period_weeks);
+        // The number of weeks since the anchor, quantized to the period.
+        let weeks_since_anchor = periods_since_anchor * period_weeks;
 
-        anchor + Duration::weeks(periods_since_anchor * period_weeks)
+        anchor + Duration::weeks(weeks_since_anchor)
     }
 
-    fn next(self, period_start: NaiveDate) -> NaiveDate {
+    /// Returns the starting date of the next period,
+    /// i.e. this period's starting date plus the duration of a period.
+    fn next_start(self, period_start: NaiveDate) -> NaiveDate {
         period_start + Duration::weeks(self.weeks())
     }
 }
@@ -331,10 +356,13 @@ impl<'gh> Goal<'gh> {
         }
     }
 
+    /// Returns a string representing an issue in the `rust-lang/rust-project-goals` repo.
+    /// Zulip recognizes strings like `goals#123` and turns them into links.
     fn link(&self) -> String {
         format!("goals#{number}", number = self.issue)
     }
 
+    /// Same as [`Goal::link`], but also includes the goal title.
     fn named_link(&self) -> String {
         format!(
             "**{title}** (goals#{number})",
@@ -370,10 +398,14 @@ fn display_datetime(date: DateTime<Utc>) -> String {
 #[derive(Clone, Copy, Debug)]
 struct Reminder<'gh> {
     goal: Goal<'gh>,
+    /// The reporting period of this goal.
     period: Period,
+    /// The start date of this goal's current reporting period.
     period_start: NaiveDate,
-    next_deadline: NaiveDate,
-    _is_new_period: bool,
+    /// The start date of this goal's next reporting period.
+    ///
+    /// (This acts as a deadline for the current update.)
+    next_period_start: NaiveDate,
 }
 
 impl<'gh> Reminder<'gh> {
@@ -386,8 +418,7 @@ impl<'gh> Reminder<'gh> {
                 goal: Goal::from_issue(issue),
                 period: schedule.period,
                 period_start,
-                next_deadline: schedule.period.next(period_start),
-                _is_new_period: period_start == today,
+                next_period_start: schedule.period.next_start(period_start),
             },
             schedule.conflict,
         )
@@ -411,7 +442,7 @@ impl<'gh> Reminder<'gh> {
             "+ {goal}\n  - {latest}\n  - next *{period}* cycle starts {next}",
             goal = self.goal.named_link(),
             latest = self.goal.latest_update(),
-            next = display_job_date(self.next_deadline),
+            next = display_job_date(self.next_period_start),
             period = self.period.adjective(),
         )
     }
@@ -677,7 +708,7 @@ async fn build_plan<'gh>(
             "issue #{}: period_start = {}, next_deadline = {}, last_comment = {:?}",
             issue.number,
             reminder.period_start,
-            reminder.next_deadline,
+            reminder.next_period_start,
             issue.last_comment.as_ref().map(|c| c.created_at),
         );
 
@@ -696,28 +727,23 @@ async fn build_plan<'gh>(
     Ok(plan)
 }
 
-async fn send_dm(
-    zulip: &ZulipClient,
-    owner: ZulipId,
-    content: &str,
-    dry_run: bool,
-) -> anyhow::Result<()> {
+async fn send_dm(zulip: &ZulipClient, owner: ZulipId, content: &str, dry_run: bool) {
     if dry_run {
         log::debug!("(DRY) Would send DM to user {}: {}", owner.0, content);
-        return Ok(());
+        return;
     }
 
-    MessageApiRequest {
+    let req = MessageApiRequest {
         recipient: Recipient::Private {
             id: owner.0,
             email: "",
         },
         content,
-    }
-    .send(zulip)
-    .await?;
+    };
 
-    Ok(())
+    if let Err(err) = req.send(zulip).await {
+        log::error!("failed to send a DM on Zulip: {err}")
+    }
 }
 
 async fn send_triagebot_topic(
@@ -779,9 +805,9 @@ fn report(
     counts: &PeriodCounts,
     today: NaiveDate,
 ) -> String {
-    let next_week = Period::EveryWeek.next(Period::EveryWeek.start(today));
-    let next_2_weeks = Period::Every2Weeks.next(Period::Every2Weeks.start(today));
-    let next_4_weeks = Period::Every4Weeks.next(Period::Every4Weeks.start(today));
+    let next_week = Period::EveryWeek.next_start(Period::EveryWeek.start(today));
+    let next_2_weeks = Period::Every2Weeks.next_start(Period::Every2Weeks.start(today));
+    let next_4_weeks = Period::Every4Weeks.next_start(Period::Every4Weeks.start(today));
 
     let error_summary = if errors.is_empty() {
         "No errors happened in the process.".to_owned()
@@ -839,7 +865,7 @@ async fn execute_plan(
     );
 
     for (owner, goals) in goals_by_owner {
-        send_dm(zulip, owner, &owner_message(owner, &goals), dry_run).await?;
+        send_dm(zulip, owner, &owner_message(owner, &goals), dry_run).await;
     }
 
     send_triagebot_topic(
@@ -864,12 +890,12 @@ pub async fn ping_project_goals_owners(
     execute_plan(zulip, plan, now.date_naive(), dry_run).await
 }
 
-pub struct ProjectGoalsUpdateJob;
+pub struct PingProjectGoalsOwnersJob;
 
 #[async_trait]
-impl Job for ProjectGoalsUpdateJob {
+impl Job for PingProjectGoalsOwnersJob {
     fn name(&self) -> &'static str {
-        "project_goals_update_job"
+        "ping_project_goal_owners_job"
     }
 
     async fn run(&self, ctx: &Context, _metadata: &serde_json::Value) -> anyhow::Result<()> {
@@ -963,7 +989,8 @@ async fn echo_comment_to_zulip(
         return Ok(());
     }
 
-    let author = Owner::resolve_event(&ctx.team, comment.user.id, &comment.user.login).await?;
+    let author =
+        Owner::from_id_and_username(&ctx.team, comment.user.id, &comment.user.login).await?;
     let text = &comment.body;
 
     let content = format!(
