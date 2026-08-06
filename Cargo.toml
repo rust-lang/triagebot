@@ -33,11 +33,9 @@ x509-cert = { version = "0.2.5", features = ["pem"] }
 serde_path_to_error = "0.1.2"
 octocrab = { version = "0.44", features = ["stream"] }
 comrak = { version = "0.38", default-features = false }
-cynic = "3"
 itertools = "0.14.0"
 tower = { version = "0.5", features = ["util", "limit", "buffer", "load-shed"] }
 tower-http = { version = "0.6", features = ["compression-br", "compression-gzip", "request-id", "catch-panic"] }
-github-graphql = { path = "github-graphql" }
 rand = "0.8.5"
 ignore = "0.4.18"
 postgres-types = { version = "0.2.4", features = ["derive"] }
