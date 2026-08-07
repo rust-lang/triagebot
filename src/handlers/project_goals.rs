@@ -14,7 +14,7 @@ use itertools::Itertools;
 use std::collections::BTreeMap;
 use tracing as log;
 
-const RUST_PROJECT_GOALS_REPO: &str = "rust-lang/rust-project-goals";
+const RUST_PROJECT_GOALS_REPO: &str = "rust-lang/goals";
 const GOALS_TEAM: &str = "goals";
 
 const FIRST_REPORT_GRACE_DAYS: i64 = 7;
@@ -356,7 +356,7 @@ impl<'gh> Goal<'gh> {
         }
     }
 
-    /// Returns a string representing an issue in the `rust-lang/rust-project-goals` repo.
+    /// Returns a string representing an issue in the `rust-lang/goals` repo.
     /// Zulip recognizes strings like `goals#123` and turns them into links.
     fn link(&self) -> String {
         format!("goals#{number}", number = self.issue)
