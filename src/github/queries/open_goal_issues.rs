@@ -3,7 +3,7 @@ use anyhow::Context;
 use crate::github::GithubClient;
 
 const ORG: &str = "rust-lang";
-const REPO: &str = "rust-project-goals";
+const REPO: &str = "goals";
 const LABEL: &str = "C-tracking-issue";
 
 pub struct GoalIssue {
@@ -110,7 +110,7 @@ impl From<GraphQlIssue> for GoalIssue {
 }
 
 impl GithubClient {
-    /// Get every open tracking issue in `rust-lang/rust-project-goals`,
+    /// Get every open tracking issue in `rust-lang/goals`,
     /// including the latest comment's date.
     pub async fn open_goal_issues(&self) -> anyhow::Result<Vec<GoalIssue>> {
         let mut cursor = None::<String>;
