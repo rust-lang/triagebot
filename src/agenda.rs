@@ -29,7 +29,6 @@ pub fn prioritization() -> Box<dyn Action> {
                                 "final-comment-period",
                                 "major-change-accepted",
                                 "t-libs",
-                                "t-libs-api",
                                 "t-rustdoc",
                             ],
                         }),
@@ -46,7 +45,6 @@ pub fn prioritization() -> Box<dyn Action> {
                                 "finished-final-comment-period",
                                 "final-comment-period",
                                 "t-libs",
-                                "t-libs-api",
                                 "t-rustdoc",
                                 "S-waiting-on-author",
                             ],
@@ -58,7 +56,7 @@ pub fn prioritization() -> Box<dyn Action> {
                         query: Arc::new(IssueQuery {
                             filters: vec![("state", "open")],
                             include_labels: vec!["proposed-final-comment-period"],
-                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
+                            exclude_labels: vec!["t-libs", "t-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -67,7 +65,7 @@ pub fn prioritization() -> Box<dyn Action> {
                         query: Arc::new(IssueQuery {
                             filters: vec![("state", "open")],
                             include_labels: vec!["final-comment-period"],
-                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
+                            exclude_labels: vec!["t-libs", "t-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -76,7 +74,7 @@ pub fn prioritization() -> Box<dyn Action> {
                         query: Arc::new(IssueQuery {
                             filters: vec![("state", "all")],
                             include_labels: vec!["major-change-accepted", "to-announce"],
-                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
+                            exclude_labels: vec!["t-libs", "t-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -89,7 +87,7 @@ pub fn prioritization() -> Box<dyn Action> {
                                 "disposition-merge",
                                 "to-announce",
                             ],
-                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
+                            exclude_labels: vec!["t-libs", "t-rustdoc"],
                         }),
                     },
                 ],
@@ -111,7 +109,6 @@ pub fn prioritization() -> Box<dyn Action> {
                                 "S-waiting-on-t-lang",
                                 "S-waiting-on-t-libs",
                                 "T-libs",
-                                "T-libs-api",
                                 "T-rustdoc",
                             ],
                         }),
@@ -130,7 +127,6 @@ pub fn prioritization() -> Box<dyn Action> {
                                 "S-waiting-on-t-lang",
                                 "S-waiting-on-t-libs",
                                 "T-libs",
-                                "T-libs-api",
                                 "T-rustdoc",
                             ],
                         }),
@@ -147,7 +143,6 @@ pub fn prioritization() -> Box<dyn Action> {
                             ],
                             exclude_labels: vec![
                                 "t-libs",
-                                "t-libs-api",
                                 "t-rustdoc",
                                 "t-rustdoc-frontend",
                                 "t-lang",
@@ -171,7 +166,7 @@ pub fn prioritization() -> Box<dyn Action> {
                         query: Arc::new(IssueQuery {
                             filters: vec![("state", "open")],
                             include_labels: vec!["proposed-final-comment-period"],
-                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
+                            exclude_labels: vec!["t-libs", "t-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -180,7 +175,7 @@ pub fn prioritization() -> Box<dyn Action> {
                         query: Arc::new(IssueQuery {
                             filters: vec![("state", "open")],
                             include_labels: vec!["final-comment-period"],
-                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
+                            exclude_labels: vec!["t-libs", "t-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -193,7 +188,7 @@ pub fn prioritization() -> Box<dyn Action> {
                                 "disposition-merge",
                                 "to-announce",
                             ],
-                            exclude_labels: vec!["t-libs", "t-libs-api", "t-rustdoc"],
+                            exclude_labels: vec!["t-libs", "t-rustdoc"],
                         }),
                     },
                 ],
@@ -420,13 +415,7 @@ pub fn prioritization() -> Box<dyn Action> {
                         query: Arc::new(IssueQuery {
                             filters: vec![("state", "open")],
                             include_labels: vec!["regression-from-stable-to-beta", "P-high"],
-                            exclude_labels: vec![
-                                "T-infra",
-                                "T-libs",
-                                "T-libs-api",
-                                "T-release",
-                                "T-rustdoc",
-                            ],
+                            exclude_labels: vec!["T-infra", "T-libs", "T-release", "T-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -435,13 +424,7 @@ pub fn prioritization() -> Box<dyn Action> {
                         query: Arc::new(IssueQuery {
                             filters: vec![("state", "open"), ("no", "assignee")],
                             include_labels: vec!["regression-from-stable-to-nightly", "P-high"],
-                            exclude_labels: vec![
-                                "T-infra",
-                                "T-libs",
-                                "T-libs-api",
-                                "T-release",
-                                "T-rustdoc",
-                            ],
+                            exclude_labels: vec!["T-infra", "T-libs", "T-release", "T-rustdoc"],
                         }),
                     },
                     QueryMap {
@@ -557,7 +540,7 @@ pub fn compiler_backlog_bonanza() -> Box<dyn Action> {
                 query: Arc::new(IssueQuery {
                     filters: vec![("state", "open")],
                     include_labels: vec!["C-tracking-issue"],
-                    exclude_labels: vec!["T-libs-api", "T-libs", "T-lang", "T-rustdoc"],
+                    exclude_labels: vec!["T-libs", "T-lang", "T-rustdoc"],
                 }),
             }],
         }],

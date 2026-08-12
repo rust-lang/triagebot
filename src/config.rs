@@ -971,7 +971,7 @@ mod tests {
             days-threshold = 14
 
             [backport.teamRed]
-            required-pr-labels = ["T-libs", "T-libs-api"]
+            required-pr-labels = ["T-libs"]
             required-issue-label = "regression-from-stable-to-stable"
             add-labels = ["stable-nominated"]
 
@@ -1010,7 +1010,7 @@ mod tests {
         backport_configs.insert(
             "teamRed".into(),
             BackportRuleConfig {
-                required_pr_labels: vec!["T-libs".into(), "T-libs-api".into()],
+                required_pr_labels: vec!["T-libs".into()],
                 required_issue_label: "regression-from-stable-to-stable".into(),
                 add_labels: vec!["stable-nominated".into()],
             },
