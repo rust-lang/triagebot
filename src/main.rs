@@ -79,8 +79,8 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
                     }
                     Err(_) => {
                         tracing::error!(
-                        "Cannot load initial workqueue for {full_name}, timeouted after a minute"
-                    );
+                            "Cannot load initial workqueue for {full_name}, timeouted after a minute"
+                        );
                         ReviewerWorkqueue::default()
                     }
                 };
