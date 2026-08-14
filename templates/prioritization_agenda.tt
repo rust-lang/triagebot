@@ -13,7 +13,7 @@ note_id: xxx
 ## Announcements
 
 - (TIP) add here non-recurrent scheduled meetings, [check the schedule calendar](https://github.com/rust-lang/calendar)
-- (TIP) mention upcoming Rust stable releases, [check the release calendar](https://calendar.google.com/calendar/htmlembed?src=l1b1gkqvfbgunjs18nemq4c580%40group.calendar.google.com)
+- (TIP) mention upcoming Rust stable releases, [check the release calendar](https://rust-lang.github.io/calendar/release.ics)
 - Reminder: if you see a PR/issue that seems like there might be legal implications due to copyright/IP/etc, please let us know (or at least message @_**davidtwco** or @_**Boxy** so we can pass it along).
 
 ### Other WG meetings
@@ -24,18 +24,25 @@ note_id: xxx
 
 - New MCPs (take a look, see if you like them!)
 {{-issues::render(issues=mcp_new_not_seconded, indent="  ", empty="No new proposals this time.")}}
+
 - Old MCPs (stale MCP might be closed as per [MCP procedure](https://forge.rust-lang.org/compiler/mcp.html#when-should-major-change-proposals-be-closed))
   - None at this time
+
 - Old MCPs (not seconded, take a look)
 {{-issues::render(issues=mcp_old_not_seconded, indent="  ", with_age=true, empty="No old proposals this time.")}}
+
 - Pending FCP requests (check your boxes!)
 {{-issues_rfcbot::render(issues=in_pre_fcp, indent="  ", empty="No pending FCP requests this time.")}}
+
 - Things in FCP (make sure you're good with it)
 {{-issues_rfcbot::render(issues=in_fcp, indent="  ", empty="No FCP requests this time.")}}
+
 - Accepted MCPs
 {{-issues::render(issues=mcp_accepted, indent="  ", empty="No new accepted proposals this time.")}}
+
 - MCPs blocked on unresolved concerns
   - <Here group MCPs blocked on unresolved concerns>
+
 - Finalized FCPs (disposition merge)
 {{-issues::render(issues=fcp_finished_tcompiler, indent="  ", with_age=false, with_team_tag=true, empty="No new finished FCP (disposition merge) this time.")}}
 
