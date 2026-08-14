@@ -17,6 +17,7 @@ use tracing as log;
 const RUST_PROJECT_GOALS_REPO: &str = "rust-lang/goals";
 const GOALS_TEAM: &str = "goals";
 
+/// Give new goals a grace period before reminders begin.
 const FIRST_REPORT_GRACE_DAYS: i64 = 7;
 const REPORT_LABELS: &[(&str, Period)] = &[
     ("R-every-week", Period::EveryWeek),
@@ -424,17 +425,14 @@ impl<'gh> Reminder<'gh> {
         )
     }
 
-    fn is_required(&self, now: DateTime<Utc>) -> bool {
-        // Give new goals a grace period before reminders begin.
-        let grace_end = self.goal.created_at + Duration::days(FIRST_REPORT_GRACE_DAYS);
+    fn is_in_grace_period(&self, now: DateTime<Utc>) -> bool {
+        now < self.goal.created_at + Duration::days(FIRST_REPORT_GRACE_DAYS)
+    }
 
-        if now < grace_end {
-            return false;
-        }
-
+    fn has_current_update(&self) -> bool {
         self.goal
             .last_comment_at
-            .is_none_or(|d| d.date_naive() < self.period_start)
+            .is_some_and(|d| d.date_naive() >= self.period_start)
     }
 
     fn list_item(&self) -> String {
@@ -491,6 +489,7 @@ impl ReminderErrors<'_> {
 struct ReminderPlan<'gh> {
     goals_by_owner: BTreeMap<ZulipId, Vec<Reminder<'gh>>>,
     errors: ReminderErrors<'gh>,
+    counters: Counters,
 }
 
 impl<'gh> ReminderPlan<'gh> {
@@ -572,7 +571,7 @@ The following goals have more than one owner assigned:
 
 {multiple_owner}
 
-A goal should have exactly one owner. All owners with a Zulip account were still notified separately.
+A goal should have exactly one owner. Notification was attempted for all owners with a Zulip account.
 "#,
         multiple_owner = problems
             .iter()
@@ -610,7 +609,7 @@ Please make sure to register their `zulip-id` and reach out to them!
                         .expect("has missing Zulip ID"),
                     notified = match p.owners.reachable_mentions() {
                         None => "Nobody was notified on Zulip.".to_owned(),
-                        Some(owners) => format!("{owners} got notified on Zulip."),
+                        Some(owners) => format!("Notification was attempted for {owners}."),
                     }
                 )
             })
@@ -640,7 +639,7 @@ Please check the assignee usernames and their entries in the `team` repo.
                         .expect("has missing team entry"),
                     notified = match p.owners.reachable_mentions() {
                         None => "Nobody was notified on Zulip.".to_owned(),
-                        Some(owners) => format!("{owners} got notified on Zulip."),
+                        Some(owners) => format!("Notification was attempted for {owners}."),
                     },
                 )
             })
@@ -664,7 +663,23 @@ Unlabeled goals use the default period of 4 weeks.
     )
 }
 
-fn error_sections(errors: &ReminderErrors<'_>) -> String {
+fn failed_dm_errors(failed_dms: &[(ZulipId, String, String)]) -> String {
+    format!(
+        r#"
+These DMs could not be sent:
+
+{failed_dms}
+"#,
+        failed_dms = failed_dms
+            .iter()
+            .map(|(owner, goals, error)| {
+                format!("+ {owner} ({goals}): {error}", owner = owner.mention(true))
+            })
+            .join("\n")
+    )
+}
+
+fn error_sections(errors: &ReminderErrors<'_>, failed_dms: &[(ZulipId, String, String)]) -> String {
     let mut sections = Vec::new();
 
     if !errors.unowned.is_empty() {
@@ -689,6 +704,9 @@ fn error_sections(errors: &ReminderErrors<'_>) -> String {
     }
     if !errors.schedule.is_empty() {
         sections.push(schedule_warnings(&errors.schedule));
+    }
+    if !failed_dms.is_empty() {
+        sections.push(failed_dm_errors(failed_dms));
     }
 
     sections.iter().join("\n\n---\n\n")
@@ -716,34 +734,37 @@ async fn build_plan<'gh>(
             plan.add_conflicts(reminder.goal, conflict);
         }
 
-        if !reminder.is_required(now) {
-            continue;
+        if plan.counters.count(&reminder, now) {
+            let owners = Owners::resolve_goal(team, issue).await?;
+            plan.add_goal(reminder, owners);
         }
-
-        let owners = Owners::resolve_goal(team, issue).await?;
-        plan.add_goal(reminder, owners);
     }
 
     Ok(plan)
 }
 
-async fn send_dm(zulip: &ZulipClient, owner: ZulipId, content: &str, dry_run: bool) {
+async fn send_dm(
+    zulip: &ZulipClient,
+    owner: ZulipId,
+    content: &str,
+    dry_run: bool,
+) -> anyhow::Result<()> {
     if dry_run {
         log::debug!("(DRY) Would send DM to user {}: {}", owner.0, content);
-        return;
+        return Ok(());
     }
 
-    let req = MessageApiRequest {
+    MessageApiRequest {
         recipient: Recipient::Private {
             id: owner.0,
             email: "",
         },
         content,
-    };
-
-    if let Err(err) = req.send(zulip).await {
-        log::error!("failed to send a DM on Zulip: {err}")
     }
+    .send(zulip)
+    .await?;
+
+    Ok(())
 }
 
 async fn send_triagebot_topic(
@@ -773,51 +794,73 @@ async fn send_triagebot_topic(
 }
 
 #[derive(Default)]
-struct PeriodCounts {
-    weekly: usize,
-    every_2_weeks: usize,
-    every_4_weeks: usize,
+struct PeriodCounter {
+    due: usize,
+    updated: usize,
+    graced: usize,
 }
 
-impl PeriodCounts {
-    fn from_reminders<'gh>(reminders: impl Iterator<Item = Reminder<'gh>>) -> Self {
-        let mut counts = Self::default();
+impl PeriodCounter {
+    fn total(&self) -> usize {
+        self.due + self.updated + self.graced
+    }
+}
 
-        for reminder in reminders {
-            match reminder.period {
-                Period::EveryWeek => counts.weekly += 1,
-                Period::Every2Weeks => counts.every_2_weeks += 1,
-                Period::Every4Weeks => counts.every_4_weeks += 1,
-            }
+#[derive(Default)]
+struct Counters {
+    weekly: PeriodCounter,
+    biweekly: PeriodCounter,
+    four_week: PeriodCounter,
+}
+
+impl Counters {
+    /// Count the goal and return whether it is due for an update.
+    fn count(&mut self, reminder: &Reminder<'_>, now: DateTime<Utc>) -> bool {
+        let period = match reminder.period {
+            Period::EveryWeek => &mut self.weekly,
+            Period::Every2Weeks => &mut self.biweekly,
+            Period::Every4Weeks => &mut self.four_week,
+        };
+
+        if reminder.is_in_grace_period(now) {
+            period.graced += 1;
+            false
+        } else if reminder.has_current_update() {
+            period.updated += 1;
+            false
+        } else {
+            period.due += 1;
+            true
         }
-
-        counts
     }
 
     fn total(&self) -> usize {
-        self.weekly + self.every_2_weeks + self.every_4_weeks
+        self.weekly.total() + self.biweekly.total() + self.four_week.total()
     }
 }
 
 fn report(
     errors: &ReminderErrors<'_>,
-    total_owners: usize,
-    counts: &PeriodCounts,
+    failed_dms: &[(ZulipId, String, String)],
+    total_dms: usize,
+    reminded_goals: usize,
+    counters: &Counters,
     today: NaiveDate,
 ) -> String {
     let next_week = Period::EveryWeek.next_start(Period::EveryWeek.start(today));
     let next_2_weeks = Period::Every2Weeks.next_start(Period::Every2Weeks.start(today));
     let next_4_weeks = Period::Every4Weeks.next_start(Period::Every4Weeks.start(today));
 
-    let error_summary = if errors.is_empty() {
+    let error_summary = if errors.is_empty() && failed_dms.is_empty() {
         "No errors happened in the process.".to_owned()
     } else {
+        let error_count = errors.count() + failed_dms.len();
         format!(
-            "{count} errors happened in the process.\n\n---\n\n{details}",
-            count = errors.count(),
-            details = error_sections(errors),
+            "{error_count} errors happened in the process.\n\n---\n\n{details}",
+            details = error_sections(errors, failed_dms),
         )
     };
+    let ok_dms = total_dms - failed_dms.len();
 
     format!(
         r#"
@@ -825,19 +868,32 @@ Hi @*T-goals*!
 
 Weekly run finished.
 
-{total_owners} owners were notified about {total_goals} goals:
-+ Weekly reports: {weekly} (next cycle: {next_week})
-+ Biweekly reports: {every_2_weeks} (next cycle: {next_2_weeks})
-+ Four-week reports: {every_4_weeks} (next cycle: {next_4_weeks})
+There are {total} open goals:
++ Weekly reports: {weekly_due} due, {weekly_updated} updated, {weekly_graced} in grace period
+  - Next cycle starts {next_week}
++ Biweekly reports: {biweekly_due} due, {biweekly_updated} updated, {biweekly_graced} in grace period
+  - Next cycle starts {next_2_weeks}
++ Four-week reports: {four_week_due} due, {four_week_updated} updated, {four_week_graced} in grace period
+  - Next cycle starts {next_4_weeks}
+
+Reminders were prepared for {total_dms} owners about {reminded_goals} goals.
+
+{ok_dms} of {total_dms} reminders were sent.
 
 {error_summary}
 
 Until next week! <3
 "#,
-        total_goals = counts.total(),
-        weekly = counts.weekly,
-        every_2_weeks = counts.every_2_weeks,
-        every_4_weeks = counts.every_4_weeks,
+        total = counters.total(),
+        weekly_due = counters.weekly.due,
+        weekly_updated = counters.weekly.updated,
+        weekly_graced = counters.weekly.graced,
+        biweekly_due = counters.biweekly.due,
+        biweekly_updated = counters.biweekly.updated,
+        biweekly_graced = counters.biweekly.graced,
+        four_week_due = counters.four_week.due,
+        four_week_updated = counters.four_week.updated,
+        four_week_graced = counters.four_week.graced,
         next_week = display_job_date(next_week),
         next_2_weeks = display_job_date(next_2_weeks),
         next_4_weeks = display_job_date(next_4_weeks),
@@ -853,24 +909,35 @@ async fn execute_plan(
     let ReminderPlan {
         goals_by_owner,
         errors,
+        counters,
     } = plan;
 
     let total_owners = goals_by_owner.len();
-    let counts = PeriodCounts::from_reminders(
-        goals_by_owner
-            .values()
-            .flatten()
-            .copied()
-            .unique_by(|reminder| reminder.goal.issue),
-    );
+    let reminded_goals = goals_by_owner
+        .values()
+        .flatten()
+        .unique_by(|reminder| reminder.goal.issue)
+        .count();
 
+    let mut failed_dms = Vec::new();
     for (owner, goals) in goals_by_owner {
-        send_dm(zulip, owner, &owner_message(owner, &goals), dry_run).await;
+        if let Err(error) = send_dm(zulip, owner, &owner_message(owner, &goals), dry_run).await {
+            log::error!("failed to send a DM to Zulip user {}: {error}", owner.0);
+            let goals = goals.iter().map(|reminder| reminder.goal.link()).join(", ");
+            failed_dms.push((owner, goals, error.to_string()));
+        }
     }
 
     send_triagebot_topic(
         zulip,
-        &report(&errors, total_owners, &counts, today),
+        &report(
+            &errors,
+            &failed_dms,
+            total_owners,
+            reminded_goals,
+            &counters,
+            today,
+        ),
         dry_run,
     )
     .await?;
@@ -1004,7 +1071,7 @@ async fn echo_comment_to_zulip(
         ticks = quote_fence(text),
     );
 
-    MessageApiRequest {
+    let posted = MessageApiRequest {
         recipient: Recipient::Stream {
             id: GOALS_STREAM,
             topic: &goal_zulip_topic(issue),
@@ -1013,6 +1080,9 @@ async fn echo_comment_to_zulip(
     }
     .send(&ctx.zulip)
     .await?;
+
+    // Add a reaction (:book:) so it's easier to acknowledge the update.
+    ctx.zulip.add_reaction(posted.message_id, "book").await?;
 
     Ok(())
 }
