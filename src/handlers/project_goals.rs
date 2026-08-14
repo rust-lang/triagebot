@@ -794,61 +794,48 @@ async fn send_triagebot_topic(
 }
 
 #[derive(Default)]
+struct PeriodCounter {
+    due: usize,
+    updated: usize,
+    graced: usize,
+}
+
+impl PeriodCounter {
+    fn total(&self) -> usize {
+        self.due + self.updated + self.graced
+    }
+}
+
+#[derive(Default)]
 struct Counters {
-    weekly_due: usize,
-    weekly_updated: usize,
-    weekly_graced: usize,
-    biweekly_due: usize,
-    biweekly_updated: usize,
-    biweekly_graced: usize,
-    four_week_due: usize,
-    four_week_updated: usize,
-    four_week_graced: usize,
+    weekly: PeriodCounter,
+    biweekly: PeriodCounter,
+    four_week: PeriodCounter,
 }
 
 impl Counters {
     /// Count the goal and return whether it is due for an update.
     fn count(&mut self, reminder: &Reminder<'_>, now: DateTime<Utc>) -> bool {
-        let (due, updated, graced) = match reminder.period {
-            Period::EveryWeek => (
-                &mut self.weekly_due,
-                &mut self.weekly_updated,
-                &mut self.weekly_graced,
-            ),
-            Period::Every2Weeks => (
-                &mut self.biweekly_due,
-                &mut self.biweekly_updated,
-                &mut self.biweekly_graced,
-            ),
-            Period::Every4Weeks => (
-                &mut self.four_week_due,
-                &mut self.four_week_updated,
-                &mut self.four_week_graced,
-            ),
+        let period = match reminder.period {
+            Period::EveryWeek => &mut self.weekly,
+            Period::Every2Weeks => &mut self.biweekly,
+            Period::Every4Weeks => &mut self.four_week,
         };
 
         if reminder.is_in_grace_period(now) {
-            *graced += 1;
+            period.graced += 1;
             false
         } else if reminder.has_current_update() {
-            *updated += 1;
+            period.updated += 1;
             false
         } else {
-            *due += 1;
+            period.due += 1;
             true
         }
     }
 
     fn total(&self) -> usize {
-        self.weekly_due
-            + self.weekly_updated
-            + self.weekly_graced
-            + self.biweekly_due
-            + self.biweekly_updated
-            + self.biweekly_graced
-            + self.four_week_due
-            + self.four_week_updated
-            + self.four_week_graced
+        self.weekly.total() + self.biweekly.total() + self.four_week.total()
     }
 }
 
@@ -898,15 +885,15 @@ Reminders were prepared for {total_dms} owners about {reminded_goals} goals.
 Until next week! <3
 "#,
         total = counters.total(),
-        weekly_due = counters.weekly_due,
-        weekly_updated = counters.weekly_updated,
-        weekly_graced = counters.weekly_graced,
-        biweekly_due = counters.biweekly_due,
-        biweekly_updated = counters.biweekly_updated,
-        biweekly_graced = counters.biweekly_graced,
-        four_week_due = counters.four_week_due,
-        four_week_updated = counters.four_week_updated,
-        four_week_graced = counters.four_week_graced,
+        weekly_due = counters.weekly.due,
+        weekly_updated = counters.weekly.updated,
+        weekly_graced = counters.weekly.graced,
+        biweekly_due = counters.biweekly.due,
+        biweekly_updated = counters.biweekly.updated,
+        biweekly_graced = counters.biweekly.graced,
+        four_week_due = counters.four_week.due,
+        four_week_updated = counters.four_week.updated,
+        four_week_graced = counters.four_week.graced,
         next_week = display_job_date(next_week),
         next_2_weeks = display_job_date(next_2_weeks),
         next_4_weeks = display_job_date(next_4_weeks),
