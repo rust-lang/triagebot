@@ -1084,7 +1084,7 @@ async fn echo_comment_to_zulip(
         ticks = quote_fence(text),
     );
 
-    MessageApiRequest {
+    let posted = MessageApiRequest {
         recipient: Recipient::Stream {
             id: GOALS_STREAM,
             topic: &goal_zulip_topic(issue),
@@ -1093,6 +1093,8 @@ async fn echo_comment_to_zulip(
     }
     .send(&ctx.zulip)
     .await?;
+
+    ctx.zulip.add_reaction(posted.message_id, "book").await?;
 
     Ok(())
 }
