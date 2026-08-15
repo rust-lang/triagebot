@@ -11,10 +11,10 @@ use crate::{
 use async_trait::async_trait;
 use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc, Weekday};
 use itertools::Itertools;
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap};
 use tracing as log;
 
-const RUST_PROJECT_GOALS_REPO: &str = "rust-lang/goals";
+const GOALS_REPO: &str = "rust-lang/goals";
 const GOALS_TEAM: &str = "goals";
 
 /// Give new goals a grace period before reminders begin.
@@ -25,8 +25,8 @@ const REPORT_LABELS: &[(&str, Period)] = &[
     ("R-every-4-weeks", Period::Every4Weeks),
 ];
 
-const GOALS_STREAM: u64 = 435_869; // #project-goals
-const GOALS_META_STREAM: u64 = 478_266; // #project-goals/meta
+const GOALS_STREAM: u64 = 435_869; // #goals
+const GOALS_META_STREAM: u64 = 478_266; // #goals/meta
 const TRIAGEBOT_TOPIC: &str = "triagebot reports";
 const MAX_ZULIP_TOPIC: usize = 60;
 
@@ -1082,6 +1082,61 @@ fn quote_fence(text: &str) -> String {
     ticks
 }
 
+async fn zulipify_links_and_mentions<'comment>(
+    text: &'comment str,
+    team: &TeamClient,
+) -> Cow<'comment, str> {
+    let mut replacements = Vec::<(&str, String)>::new();
+
+    for github_mention in parser::get_mentions(text) {
+        if replacements
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case(github_mention))
+        {
+            continue;
+        }
+
+        let zulip_mention = if let Some((org, github_team)) = github_mention.split_once('/') {
+            match team.get_zulip_group_by_github_name(org, github_team).await {
+                Ok(Some(group)) => format!("@*{group}*"),
+                Ok(None) => continue,
+                Err(error) => {
+                    log::warn!("failed to resolve Zulip group for @{github_mention}: {error}");
+                    continue;
+                }
+            }
+        } else {
+            match team.get_gh_id_from_username(github_mention).await {
+                Ok(Some(github_id)) => match team.github_to_zulip_id(github_id).await {
+                    Ok(Some(zulip_id)) => ZulipId(zulip_id).mention(true),
+                    Ok(None) => continue,
+                    Err(error) => {
+                        log::warn!("failed to resolve Zulip user for @{github_mention}: {error}");
+                        continue;
+                    }
+                },
+                Ok(None) => continue,
+                Err(error) => {
+                    log::warn!("failed to resolve GitHub user @{github_mention}: {error}");
+                    continue;
+                }
+            }
+        };
+
+        replacements.push((github_mention, zulip_mention));
+    }
+
+    parser::zulipify_github_links_and_mentions(text, GOALS_REPO, |mention| {
+        replacements
+            .iter()
+            .find_map(|(github_mention, zulip_mention)| {
+                mention
+                    .eq_ignore_ascii_case(github_mention)
+                    .then_some(zulip_mention.as_str())
+            })
+    })
+}
+
 async fn echo_comment_to_zulip(
     issue: &Issue,
     comment: &github::Comment,
@@ -1093,7 +1148,7 @@ async fn echo_comment_to_zulip(
 
     let author =
         Owner::from_id_and_username(&ctx.team, comment.user.id, &comment.user.login).await?;
-    let text = &comment.body;
+    let text = zulipify_links_and_mentions(&comment.body, &ctx.team).await;
 
     let content = format!(
         "[Comment posted]({url}) on goals#{number} by {author}:\n\
@@ -1103,7 +1158,7 @@ async fn echo_comment_to_zulip(
         url = comment.html_url,
         number = issue.number,
         author = author.display_mention(true),
-        ticks = quote_fence(text),
+        ticks = quote_fence(&text),
     );
 
     let posted = MessageApiRequest {
@@ -1123,7 +1178,7 @@ async fn echo_comment_to_zulip(
 }
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
-    if event.repo().full_name != RUST_PROJECT_GOALS_REPO {
+    if event.repo().full_name != GOALS_REPO {
         return Ok(());
     }
 
