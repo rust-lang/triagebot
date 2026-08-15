@@ -1,5 +1,5 @@
 use reqwest::Client;
-use rust_team_data::v1::{BASE_URL, Crates, People, Repos, Teams, ZulipMapping};
+use rust_team_data::v1::{BASE_URL, Crates, People, Repos, Teams, ZulipGroups, ZulipMapping};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -12,6 +12,7 @@ pub struct TeamClient {
     teams: CachedTeamItem<Teams>,
     repos: CachedTeamItem<Repos>,
     people: CachedTeamItem<People>,
+    zulip_groups: CachedTeamItem<ZulipGroups>,
     zulip_mapping: CachedTeamItem<ZulipMapping>,
     crate_map: CachedTeamItem<Crates>,
 }
@@ -29,6 +30,7 @@ impl TeamClient {
             teams: CachedTeamItem::new("/teams.json"),
             repos: CachedTeamItem::new("/repos.json"),
             people: CachedTeamItem::new("/people.json"),
+            zulip_groups: CachedTeamItem::new("/zulip-groups.json"),
             zulip_mapping: CachedTeamItem::new("/zulip-map.json"),
             crate_map: CachedTeamItem::new("/crates.json"),
         }
@@ -106,13 +108,57 @@ impl TeamClient {
         for rust_team in teams.teams.into_values() {
             if let Some(github) = &rust_team.github {
                 for gh_team in &github.teams {
-                    if gh_team.org == org && gh_team.name == team {
+                    if gh_team.org.eq_ignore_ascii_case(org)
+                        && gh_team.name.eq_ignore_ascii_case(team)
+                    {
                         return Ok(Some(rust_team));
                     }
                 }
             }
         }
         Ok(None)
+    }
+
+    /// Fetches a Zulip group name via its GitHub team name.
+    ///
+    /// Note: The team API doesn't expose the mapping between teams and groups,
+    /// so this only handles cases where the group name is the same as the team's
+    /// or is prefixed with `T-` or `WG-` (e.g., not `mods`, which is `T-moderation`).
+    pub async fn get_zulip_group_by_github_name(
+        &self,
+        org: &str,
+        github_team: &str,
+    ) -> anyhow::Result<Option<String>> {
+        const PREFIXES: &[&str] = &["T-", "WG-"];
+
+        let Some(team) = self.get_team_by_github_name(org, github_team).await? else {
+            return Ok(None);
+        };
+
+        let groups = self.zulip_groups().await?;
+
+        let group = groups
+            .groups
+            .values()
+            // either match exactly...
+            .find(|group| group.name.eq_ignore_ascii_case(&team.name))
+            .or_else(|| {
+                // ...or try with prefixes
+                groups.groups.values().find(|group| {
+                    PREFIXES.iter().any(|prefix| {
+                        group
+                            .name
+                            .strip_prefix(prefix)
+                            .is_some_and(|name| name.eq_ignore_ascii_case(&team.name))
+                    })
+                })
+            })
+            .map(|group| group.name.as_str());
+        Ok(group.map(str::to_owned))
+    }
+
+    pub async fn zulip_groups(&self) -> anyhow::Result<ZulipGroups> {
+        self.zulip_groups.get(&self.client, &self.base_url).await
     }
 
     pub async fn zulip_map(&self) -> anyhow::Result<ZulipMapping> {
