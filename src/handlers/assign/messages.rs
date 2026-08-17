@@ -8,8 +8,8 @@ use crate::github::IssueRepository;
 pub fn new_user_welcome_message(reviewer: &str) -> String {
     format!(
         "Thanks for the pull request, and welcome! \
-The Rust Project is excited to review your changes, and you should hear from {reviewer} \
-some time within the next two weeks."
+The Rust Project has assigned {reviewer} for review, you should hear from them (or someone else) \
+within the next two weeks."
     )
 }
 
@@ -36,13 +36,7 @@ In the meantime, we would highly appreciate if you could try to review any of [P
 pub fn contribution_message(contributing_url: &str, bot: &str) -> String {
     format!(
         "Please see [the contribution \
-instructions]({contributing_url}) for more information. Namely, in order to ensure the \
-minimum review times lag, PR authors and assigned reviewers should ensure that the review \
-label (`S-waiting-on-review` and `S-waiting-on-author`) stays updated, invoking these commands \
-when appropriate:
-
-- `@{bot} author`: the review is finished, PR author should check the comments and take action accordingly
-- `@{bot} review`: the author is ready for a review, this PR will be queued again in the reviewer's queue"
+         instructions]({contributing_url}) for more information."
     )
 }
 
