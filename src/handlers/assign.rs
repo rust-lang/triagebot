@@ -155,10 +155,15 @@ pub(super) async fn handle_input(
                         }],
                     )
                     .await?;
-                let mut welcome = if event.issue.author_association.is_probably_first_timer() {
-                    messages::new_user_welcome_message_community_reviews(
+                let welcome = if event.issue.author_association.is_probably_first_timer() {
+                    let mut welcome = messages::new_user_welcome_message_community_reviews(
                         community_reviews.minimum_approvals.get(),
-                    )
+                    );
+                    if let Some(contrib) = &config.contributing_url {
+                        welcome.push_str("\n\n");
+                        welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
+                    }
+                    welcome
                 } else {
                     messages::returning_user_welcome_message_community_reviews(
                         community_reviews.minimum_approvals.get(),
@@ -166,10 +171,6 @@ pub(super) async fn handle_input(
                         &community_reviews.label,
                     )
                 };
-                if let Some(contrib) = &config.contributing_url {
-                    welcome.push_str("\n\n");
-                    welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
-                }
                 event
                     .issue
                     .post_comment(&ctx.github, &welcome)
