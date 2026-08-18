@@ -587,23 +587,14 @@ async fn set_assignee(
             issue.global_id(),
             reviewer.name,
         );
-        if let Err(e) = issue
-            .post_comment(
-                &ctx.github,
-                &format!(
-                    "Failed to set assignee to `{}`: {err}\n\
-                     \n\
-                     > **Note**: Only org members with at least the repository \"read\" role, \
-                       users with write permissions, or people who have commented on the PR may \
-                       be assigned.",
-                    reviewer.name
-                ),
-            )
-            .await
-        {
-            log::warn!("failed to post error comment: {e}");
-            return Err(e);
-        }
+        return user_error!(format!(
+            "Failed to set assignee to `{}`: {err}\n\
+             \n\
+             > **Note**: Only org members with at least the repository \"read\" role, \
+               users with write permissions, or people who have commented on the PR may \
+               be assigned.",
+            reviewer.name
+        ));
     } else {
         // If an error was suppressed, post a warning on the PR.
         if let Some(suppressed_error) = &reviewer.suppressed_error {
