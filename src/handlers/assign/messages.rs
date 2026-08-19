@@ -8,7 +8,7 @@ use crate::github::IssueRepository;
 pub fn new_user_welcome_message(reviewer: &str) -> String {
     format!(
         "Thanks for the pull request, and welcome! \
-The Rust Project has assigned {reviewer} for review, you should hear from them (or someone else) \
+The Rust Project has assigned {reviewer} to review your changes, you should hear from them (or someone else) \
 within the next two weeks."
     )
 }
