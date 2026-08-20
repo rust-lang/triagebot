@@ -21,7 +21,6 @@ pub(crate) struct ZulipUser {
     pub(crate) user_id: u64,
     #[serde(rename = "full_name")]
     pub(crate) name: String,
-    pub(crate) email: String,
     #[serde(default)]
     pub(crate) profile_data: HashMap<String, ProfileValue>,
 }
@@ -52,21 +51,12 @@ impl MessageApiResponse {
     }
 }
 
-#[derive(Copy, Clone, serde::Serialize)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
+#[derive(Copy, Clone)]
 pub(crate) enum Recipient<'a> {
-    Stream {
-        #[serde(rename = "to")]
-        id: u64,
-        topic: &'a str,
-    },
-    Private {
-        #[serde(skip)]
-        id: u64,
-        #[serde(rename = "to")]
-        email: &'a str,
-    },
+    /// Send a message to a Zulip stream.
+    Stream { id: u64, topic: &'a str },
+    /// Send a direct message.
+    DirectMessage { id: u64 },
 }
 
 impl Recipient<'_> {
@@ -95,7 +85,7 @@ impl Recipient<'_> {
                 }
                 format!("stream/{id}-xxx/topic/{encoded_topic}")
             }
-            Recipient::Private { id, .. } => format!("pm-with/{id}-xxx"),
+            Recipient::DirectMessage { id, .. } => format!("pm-with/{id}-xxx"),
         }
     }
 

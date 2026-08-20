@@ -755,10 +755,7 @@ async fn send_dm(
     }
 
     MessageApiRequest {
-        recipient: Recipient::Private {
-            id: owner.0,
-            email: "",
-        },
+        recipient: Recipient::DirectMessage { id: owner.0 },
         content,
     }
     .send(zulip)

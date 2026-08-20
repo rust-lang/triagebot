@@ -79,7 +79,6 @@ struct Message {
     #[allow(unused)]
     recipient_id: u64,
     sender_full_name: String,
-    sender_email: String,
     /// The ID of the stream.
     ///
     /// `None` if it is a private message.
@@ -106,10 +105,7 @@ impl Message {
                     .as_ref()
                     .expect("stream messages should have a topic"),
             },
-            None => Recipient::Private {
-                id: self.sender_id,
-                email: &self.sender_email,
-            },
+            None => Recipient::DirectMessage { id: self.sender_id },
         }
     }
 }
@@ -299,10 +295,7 @@ async fn handle_command<'a>(
             );
 
             MessageApiRequest {
-                recipient: Recipient::Private {
-                    id: user.user_id,
-                    email: &user.email,
-                },
+                recipient: Recipient::DirectMessage { id: user.user_id },
                 content: &message,
             }
             .send(&ctx.zulip)
@@ -1524,7 +1517,6 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
     ))
 }
 
-#[derive(serde::Serialize)]
 pub(crate) struct MessageApiRequest<'a> {
     /// The recipient of the message. Could be DM or a Stream
     pub(crate) recipient: Recipient<'a>,
