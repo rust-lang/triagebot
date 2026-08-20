@@ -161,7 +161,7 @@ pub(super) async fn handle_input(
                     );
                     if let Some(contrib) = &config.contributing_url {
                         welcome.push_str("\n\n");
-                        welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
+                        welcome.push_str(&messages::contribution_message(contrib));
                     }
                     welcome
                 } else {
@@ -301,7 +301,7 @@ pub(super) async fn handle_input(
                     && event.issue.author_association.is_probably_first_timer()
                 {
                     welcome.push_str("\n\n");
-                    welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
+                    welcome.push_str(&messages::contribution_message(contrib));
                 }
                 welcome
             }
@@ -324,7 +324,7 @@ pub(super) async fn handle_input(
                 let mut welcome = messages::new_user_welcome_message(&assignee_text);
                 if let Some(contrib) = &config.contributing_url {
                     welcome.push_str("\n\n");
-                    welcome.push_str(&messages::contribution_message(contrib, &ctx.username));
+                    welcome.push_str(&messages::contribution_message(contrib));
                 }
                 Some(welcome)
             } else {
