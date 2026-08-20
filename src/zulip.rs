@@ -105,7 +105,7 @@ impl Message {
                     .as_ref()
                     .expect("stream messages should have a topic"),
             },
-            None => Recipient::Private { id: self.sender_id },
+            None => Recipient::DirectMessage { id: self.sender_id },
         }
     }
 }
@@ -295,7 +295,7 @@ async fn handle_command<'a>(
             );
 
             MessageApiRequest {
-                recipient: Recipient::Private { id: user.user_id },
+                recipient: Recipient::DirectMessage { id: user.user_id },
                 content: &message,
             }
             .send(&ctx.zulip)

@@ -76,15 +76,15 @@ impl ZulipClient {
             .form(&SerializedApi {
                 type_: match recipient {
                     Recipient::Stream { .. } => "stream",
-                    Recipient::Private { .. } => "private",
+                    Recipient::DirectMessage { .. } => "direct",
                 },
                 to: match recipient {
                     Recipient::Stream { id, .. } => id.to_string(),
-                    Recipient::Private { id, .. } => id.to_string(),
+                    Recipient::DirectMessage { id, .. } => id.to_string(),
                 },
                 topic: match recipient {
                     Recipient::Stream { topic, .. } => Some(topic),
-                    Recipient::Private { .. } => None,
+                    Recipient::DirectMessage { .. } => None,
                 },
                 content,
             })

@@ -53,8 +53,10 @@ impl MessageApiResponse {
 
 #[derive(Copy, Clone)]
 pub(crate) enum Recipient<'a> {
+    /// Send a message to a Zulip stream.
     Stream { id: u64, topic: &'a str },
-    Private { id: u64 },
+    /// Send a direct message.
+    DirectMessage { id: u64 },
 }
 
 impl Recipient<'_> {
@@ -83,7 +85,7 @@ impl Recipient<'_> {
                 }
                 format!("stream/{id}-xxx/topic/{encoded_topic}")
             }
-            Recipient::Private { id, .. } => format!("pm-with/{id}-xxx"),
+            Recipient::DirectMessage { id, .. } => format!("pm-with/{id}-xxx"),
         }
     }
 
