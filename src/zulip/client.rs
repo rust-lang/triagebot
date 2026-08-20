@@ -80,7 +80,7 @@ impl ZulipClient {
                 },
                 to: match recipient {
                     Recipient::Stream { id, .. } => id.to_string(),
-                    Recipient::Private { email, .. } => email.to_string(),
+                    Recipient::Private { id, .. } => id.to_string(),
                 },
                 topic: match recipient {
                     Recipient::Stream { topic, .. } => Some(topic),

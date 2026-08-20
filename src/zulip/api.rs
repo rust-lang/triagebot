@@ -21,7 +21,6 @@ pub(crate) struct ZulipUser {
     pub(crate) user_id: u64,
     #[serde(rename = "full_name")]
     pub(crate) name: String,
-    pub(crate) email: String,
     #[serde(default)]
     pub(crate) profile_data: HashMap<String, ProfileValue>,
 }
@@ -55,7 +54,7 @@ impl MessageApiResponse {
 #[derive(Copy, Clone)]
 pub(crate) enum Recipient<'a> {
     Stream { id: u64, topic: &'a str },
-    Private { id: u64, email: &'a str },
+    Private { id: u64 },
 }
 
 impl Recipient<'_> {
