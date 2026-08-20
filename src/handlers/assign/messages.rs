@@ -33,7 +33,7 @@ In the meantime, we would highly appreciate if you could try to review any of [P
     )
 }
 
-pub fn contribution_message(contributing_url: &str, bot: &str) -> String {
+pub fn contribution_message(contributing_url: &str) -> String {
     format!(
         "Please see [the contribution \
          instructions]({contributing_url}) for more information."
