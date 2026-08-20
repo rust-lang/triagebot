@@ -52,21 +52,10 @@ impl MessageApiResponse {
     }
 }
 
-#[derive(Copy, Clone, serde::Serialize)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
+#[derive(Copy, Clone)]
 pub(crate) enum Recipient<'a> {
-    Stream {
-        #[serde(rename = "to")]
-        id: u64,
-        topic: &'a str,
-    },
-    Private {
-        #[serde(skip)]
-        id: u64,
-        #[serde(rename = "to")]
-        email: &'a str,
-    },
+    Stream { id: u64, topic: &'a str },
+    Private { id: u64, email: &'a str },
 }
 
 impl Recipient<'_> {

@@ -1524,7 +1524,6 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
     ))
 }
 
-#[derive(serde::Serialize)]
 pub(crate) struct MessageApiRequest<'a> {
     /// The recipient of the message. Could be DM or a Stream
     pub(crate) recipient: Recipient<'a>,
