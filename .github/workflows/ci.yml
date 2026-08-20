@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_DB_URL: postgres://postgres:postgres@localhost:5432/postgres
+      RUSTFLAGS: "-D warnings"
     services:
       postgres:
         image: postgres:14
@@ -30,7 +31,7 @@ jobs:
       - run: rustup toolchain install stable --profile minimal
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
-        run: cargo test --workspace --all-targets
+        run: cargo test --locked --workspace --all-targets
       - name: Check formatting
         run: cargo fmt --all --check
 
