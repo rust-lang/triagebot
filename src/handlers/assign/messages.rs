@@ -33,11 +33,28 @@ In the meantime, we would highly appreciate if you could try to review any of [P
     )
 }
 
-pub fn contribution_message(contributing_url: &str) -> String {
-    format!(
-        "Please see [the contribution \
-         instructions]({contributing_url}) for more information."
-    )
+/// Add contribution instructions and/or LLM policy URLs to the given `message`, if configured.
+pub fn add_contribution_urls(
+    message: &mut String,
+    contributing_url: Option<&str>,
+    llm_policy: Option<&str>,
+) {
+    let msg = match (contributing_url, llm_policy) {
+        (Some(contrib), Some(llm)) => Some(format!(
+            "Please see [the contribution instructions]({contrib}) and our [LLM policy]({llm}) for more information."
+        )),
+        (Some(contrib), None) => Some(format!(
+            "Please see [the contribution instructions]({contrib}) for more information."
+        )),
+        (None, Some(llm)) => Some(format!(
+            "Please see our [LLM policy]({llm}) for more information."
+        )),
+        (None, None) => None,
+    };
+    if let Some(msg) = msg {
+        message.push_str("\n\n");
+        message.push_str(&msg);
+    }
 }
 
 pub fn welcome_with_reviewer(assignee: &str) -> String {
