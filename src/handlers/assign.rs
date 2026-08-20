@@ -27,6 +27,7 @@ use crate::db::issue_data::IssueData;
 use crate::db::review_prefs::{RotationMode, get_review_prefs_batch};
 use crate::errors::{self, AssignmentError, user_error};
 use crate::github::UserId;
+use crate::handlers::assign::messages::add_contribution_urls;
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::interactions::ErrorComment;
 use crate::{
@@ -159,10 +160,11 @@ pub(super) async fn handle_input(
                     let mut welcome = messages::new_user_welcome_message_community_reviews(
                         community_reviews.minimum_approvals.get(),
                     );
-                    if let Some(contrib) = &config.contributing_url {
-                        welcome.push_str("\n\n");
-                        welcome.push_str(&messages::contribution_message(contrib));
-                    }
+                    add_contribution_urls(
+                        &mut welcome,
+                        config.contributing_url.as_deref(),
+                        config.llm_policy_url.as_deref(),
+                    );
                     welcome
                 } else {
                     messages::returning_user_welcome_message_community_reviews(
@@ -297,11 +299,13 @@ pub(super) async fn handle_input(
                 };
 
                 if let Some(ref mut welcome) = welcome
-                    && let Some(contrib) = &config.contributing_url
                     && event.issue.author_association.is_probably_first_timer()
                 {
-                    welcome.push_str("\n\n");
-                    welcome.push_str(&messages::contribution_message(contrib));
+                    add_contribution_urls(
+                        welcome,
+                        config.contributing_url.as_deref(),
+                        config.llm_policy_url.as_deref(),
+                    );
                 }
                 welcome
             }
@@ -322,10 +326,11 @@ pub(super) async fn handle_input(
             };
             if let Some(assignee_text) = assignee_text {
                 let mut welcome = messages::new_user_welcome_message(&assignee_text);
-                if let Some(contrib) = &config.contributing_url {
-                    welcome.push_str("\n\n");
-                    welcome.push_str(&messages::contribution_message(contrib));
-                }
+                add_contribution_urls(
+                    &mut welcome,
+                    config.contributing_url.as_deref(),
+                    config.llm_policy_url.as_deref(),
+                );
                 Some(welcome)
             } else {
                 None

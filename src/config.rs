@@ -160,8 +160,10 @@ pub(crate) struct AssignConfig {
     /// different branch than the default (usually master or main).
     #[serde(default)]
     pub(crate) warn_non_default_branch: WarnNonDefaultBranchConfig,
-    /// A URL to include in the welcome message.
+    /// A contributing URL to include in the welcome message.
     pub(crate) contributing_url: Option<String>,
+    /// A URL to a LLM policy for this repository, to include in the welcome message.
+    pub(crate) llm_policy_url: Option<String>,
     /// Community reviews before auto-assignement
     #[serde(default)]
     pub(crate) community_reviews: Option<AssignCommunityReviewsConfig>,
@@ -1029,6 +1031,7 @@ mod tests {
                 assign: Some(AssignConfig {
                     warn_non_default_branch: WarnNonDefaultBranchConfig::Simple(false),
                     contributing_url: None,
+                    llm_policy_url: None,
                     adhoc_groups: HashMap::new(),
                     owners: HashMap::new(),
                     users_on_vacation: HashSet::from(["jyn514".into()]),
@@ -1176,6 +1179,7 @@ mod tests {
                             .to_string()
                     }),
                     contributing_url: None,
+                    llm_policy_url: None,
                     adhoc_groups: HashMap::new(),
                     owners: HashMap::new(),
                     users_on_vacation: HashSet::new(),
