@@ -5,7 +5,7 @@ on:
   # We only run this on push to the default branch to prime CI cache
   push:
     branches:
-      - master
+      - main
 
 env:
   AWS_ACCESS_KEY_ID: AKIA46X5W6CZEAQSMRH7
