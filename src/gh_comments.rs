@@ -32,7 +32,7 @@ use crate::{
 pub const STYLE_URL: &str = "/gh-comments/style@0.0.10.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260616.css";
 pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.3.js";
-pub const RELATIVE_TIME_ELEMENT_URL: &str = "/gh-comments/relative-time-element@5.0.0.js";
+pub const RELATIVE_TIME_ELEMENT_URL: &str = "/gh-comments/relative-time-element@5.3.1.js";
 
 pub const GH_COMMENTS_CACHE_CAPACITY_BYTES: usize = 35 * 1024 * 1024; // 35 Mb
 
@@ -526,7 +526,7 @@ pub async fn self_contained_js() -> impl IntoResponse {
 
 pub async fn relative_time_element_js() -> impl IntoResponse {
     const RELATIVE_TIME_ELEMENT_JS: &str =
-        include_str!("gh_comments/relative-time-element@5.0.0.js");
+        include_str!("gh_comments/relative-time-element@5.3.1.js");
 
     (
         immutable_headers("text/javascript; charset=utf-8"),
