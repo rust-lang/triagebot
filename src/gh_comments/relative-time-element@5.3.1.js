@@ -3,6 +3,96 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
+// dist/intl-cache.js
+var __classPrivateFieldGet = function(receiver, state, kind, f) {
+  if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
+  if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
+  return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
+};
+var _LRUCache_map;
+var LRUCache = class {
+  static {
+    __name(this, "LRUCache");
+  }
+  constructor(max = 100) {
+    this.max = max;
+    _LRUCache_map.set(this, /* @__PURE__ */ new Map());
+  }
+  get(key) {
+    const value = __classPrivateFieldGet(this, _LRUCache_map, "f").get(key);
+    if (value !== void 0) {
+      __classPrivateFieldGet(this, _LRUCache_map, "f").delete(key);
+      __classPrivateFieldGet(this, _LRUCache_map, "f").set(key, value);
+    }
+    return value;
+  }
+  set(key, value) {
+    __classPrivateFieldGet(this, _LRUCache_map, "f").delete(key);
+    __classPrivateFieldGet(this, _LRUCache_map, "f").set(key, value);
+    if (__classPrivateFieldGet(this, _LRUCache_map, "f").size > this.max) {
+      __classPrivateFieldGet(this, _LRUCache_map, "f").delete(__classPrivateFieldGet(this, _LRUCache_map, "f").keys().next().value);
+    }
+  }
+  clear() {
+    __classPrivateFieldGet(this, _LRUCache_map, "f").clear();
+  }
+};
+_LRUCache_map = /* @__PURE__ */ new WeakMap();
+var registeredCaches = [];
+function createCache(max) {
+  const cache = new LRUCache(max);
+  registeredCaches.push(cache);
+  return cache;
+}
+__name(createCache, "createCache");
+function clearIntlCache() {
+  for (const cache of registeredCaches)
+    cache.clear();
+}
+__name(clearIntlCache, "clearIntlCache");
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  window.addEventListener("languagechange", clearIntlCache);
+}
+function cacheKey(locale, options) {
+  return `${locale}\0${options ? JSON.stringify(options) : ""}`;
+}
+__name(cacheKey, "cacheKey");
+var dateTimeFormats = createCache();
+function dateTimeFormat(locale, options) {
+  const key = cacheKey(locale, options);
+  let format = dateTimeFormats.get(key);
+  if (!format)
+    dateTimeFormats.set(key, format = new Intl.DateTimeFormat(locale, options));
+  return format;
+}
+__name(dateTimeFormat, "dateTimeFormat");
+var relativeTimeFormats = createCache();
+function relativeTimeFormat(locale, options) {
+  const key = cacheKey(locale, options);
+  let format = relativeTimeFormats.get(key);
+  if (!format)
+    relativeTimeFormats.set(key, format = new Intl.RelativeTimeFormat(locale, options));
+  return format;
+}
+__name(relativeTimeFormat, "relativeTimeFormat");
+var numberFormats = createCache();
+function numberFormat(locale, options) {
+  const key = cacheKey(locale, options);
+  let format = numberFormats.get(key);
+  if (!format)
+    numberFormats.set(key, format = new Intl.NumberFormat(locale, options));
+  return format;
+}
+__name(numberFormat, "numberFormat");
+var locales = createCache();
+function getLocale(tag) {
+  let value = locales.get(tag);
+  if (!value)
+    locales.set(tag, value = new Intl.Locale(tag));
+  return value;
+}
+__name(getLocale, "getLocale");
+
 // dist/duration-format-ponyfill.js
 var __classPrivateFieldSet = function(receiver, state, value, kind, f) {
   if (kind === "m") throw new TypeError("Private method is not writable");
@@ -10,7 +100,7 @@ var __classPrivateFieldSet = function(receiver, state, value, kind, f) {
   if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
   return kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value), value;
 };
-var __classPrivateFieldGet = function(receiver, state, kind, f) {
+var __classPrivateFieldGet2 = function(receiver, state, kind, f) {
   if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
   if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
   return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
@@ -30,6 +120,15 @@ var ListFormatPonyFill = class {
   }
 };
 var ListFormat = typeof Intl !== "undefined" && Intl.ListFormat || ListFormatPonyFill;
+var listFormats = createCache();
+function listFormat(locale, options) {
+  const key = `${locale}\0${JSON.stringify(options)}`;
+  let format = listFormats.get(key);
+  if (!format)
+    listFormats.set(key, format = new ListFormat(locale, options));
+  return format;
+}
+__name(listFormat, "listFormat");
 var partsTable = [
   ["years", "year"],
   ["months", "month"],
@@ -80,11 +179,11 @@ var DurationFormat = class {
     }, "f");
   }
   resolvedOptions() {
-    return __classPrivateFieldGet(this, _DurationFormat_options, "f");
+    return __classPrivateFieldGet2(this, _DurationFormat_options, "f");
   }
   formatToParts(duration) {
     const list = [];
-    const options = __classPrivateFieldGet(this, _DurationFormat_options, "f");
+    const options = __classPrivateFieldGet2(this, _DurationFormat_options, "f");
     const style = options.style;
     const locale = options.locale;
     for (const [unit, nfUnit] of partsTable) {
@@ -93,13 +192,13 @@ var DurationFormat = class {
         continue;
       const unitStyle = options[unit];
       const nfOpts = unitStyle === "2-digit" ? twoDigitFormatOptions : unitStyle === "numeric" ? {} : { style: "unit", unit: nfUnit, unitDisplay: unitStyle };
-      let formattedValue = new Intl.NumberFormat(locale, nfOpts).format(value);
+      let formattedValue = numberFormat(locale, nfOpts).format(value);
       if (unit === "months" && (unitStyle === "narrow" || style === "narrow" && formattedValue.endsWith("m"))) {
         formattedValue = formattedValue.replace(/(\d+)m$/, "$1mo");
       }
       list.push(formattedValue);
     }
-    return new ListFormat(locale, {
+    return listFormat(locale, {
       type: "unit",
       style: style === "digital" ? "short" : style
     }).formatToParts(list);
@@ -112,6 +211,35 @@ _DurationFormat_options = /* @__PURE__ */ new WeakMap();
 
 // dist/duration.js
 var durationRe = /^[-+]?P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/;
+var durationFormats = createCache();
+var durationFormatOptionFields = [
+  "style",
+  "years",
+  "yearsDisplay",
+  "months",
+  "monthsDisplay",
+  "weeks",
+  "weeksDisplay",
+  "days",
+  "daysDisplay",
+  "hours",
+  "hoursDisplay",
+  "minutes",
+  "minutesDisplay",
+  "seconds",
+  "secondsDisplay",
+  "milliseconds",
+  "millisecondsDisplay"
+];
+function durationFormatKey(locale, opts) {
+  var _a;
+  let key = locale;
+  for (const field of durationFormatOptionFields) {
+    key += `\0${(_a = opts[field]) !== null && _a !== void 0 ? _a : ""}`;
+  }
+  return key;
+}
+__name(durationFormatKey, "durationFormatKey");
 var unitNames = ["year", "month", "week", "day", "hour", "minute", "second", "millisecond"];
 var isDuration = /* @__PURE__ */ __name((str) => durationRe.test(str), "isDuration");
 var Duration = class _Duration {
@@ -170,7 +298,11 @@ var Duration = class _Duration {
     return oneApplied > twoApplied ? -1 : oneApplied < twoApplied ? 1 : 0;
   }
   toLocaleString(locale, opts) {
-    return new DurationFormat(locale, opts).format(this);
+    const key = durationFormatKey(locale, opts);
+    let format = durationFormats.get(key);
+    if (!format)
+      durationFormats.set(key, format = new DurationFormat(locale, opts));
+    return format.format(this);
   }
 };
 function applyDuration(date, duration) {
@@ -205,7 +337,7 @@ function elapsedTime(date, precision = "second", now = Date.now()) {
   const day = Math.floor(hr / 24);
   const month = Math.floor(day / 30);
   const year = Math.floor(month / 12);
-  const i = unitNames.indexOf(precision) || unitNames.length;
+  const i = unitNames.indexOf(precision);
   return new Duration(i >= 0 ? year * sign : 0, i >= 1 ? (month - year * 12) * sign : 0, 0, i >= 3 ? (day - month * 30) * sign : 0, i >= 4 ? (hr - day * 24) * sign : 0, i >= 5 ? (min - hr * 60) * sign : 0, i >= 6 ? (sec - min * 60) * sign : 0, i >= 7 ? (ms - sec * 1e3) * sign : 0);
 }
 __name(elapsedTime, "elapsedTime");
@@ -306,7 +438,7 @@ function getRelativeTimeUnit(duration, opts) {
 __name(getRelativeTimeUnit, "getRelativeTimeUnit");
 
 // dist/relative-time-element.js
-var __classPrivateFieldGet2 = function(receiver, state, kind, f) {
+var __classPrivateFieldGet3 = function(receiver, state, kind, f) {
   if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
   if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
   return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
@@ -323,7 +455,10 @@ var _RelativeTimeElement_updating;
 var _RelativeTimeElement_lang_get;
 var _RelativeTimeElement_renderRoot;
 var _RelativeTimeElement_getFormattedTitle;
+var _RelativeTimeElement_getExplicitThreshold;
 var _RelativeTimeElement_resolveFormat;
+var _RelativeTimeElement_getMicroDuration;
+var _RelativeTimeElement_getMicroRelativeFormat;
 var _RelativeTimeElement_getDurationFormat;
 var _RelativeTimeElement_getRelativeFormat;
 var _RelativeTimeElement_getDateTimeFormat;
@@ -349,8 +484,10 @@ var RelativeTimeUpdatedEvent = class extends Event {
   }
 };
 function getUnitFactor(el) {
-  if (!el.date)
+  const date = el.date;
+  if (!date)
     return Infinity;
+  const now = Date.now();
   if (el.format === "duration" || el.format === "elapsed") {
     const precision = el.precision;
     if (precision === "second") {
@@ -359,29 +496,67 @@ function getUnitFactor(el) {
       return 60 * 1e3;
     }
   }
-  const ms = Math.abs(Date.now() - el.date.getTime());
-  if (ms < 60 * 1e3)
-    return 1e3;
-  if (ms < 60 * 60 * 1e3)
-    return 60 * 1e3;
-  return 60 * 60 * 1e3;
+  const ms = Math.abs(now - date.getTime());
+  let factor = 60 * 60 * 1e3;
+  if (ms < 60 * 1e3) {
+    factor = 1e3;
+  } else if (ms < 60 * 60 * 1e3) {
+    factor = 60 * 1e3;
+  }
+  const threshold = getExplicitThreshold(el);
+  if (el.format === "micro" && threshold) {
+    const thresholdDuration = Duration.from(threshold);
+    const signedThresholdDuration = date.getTime() > now ? negateDuration(thresholdDuration) : thresholdDuration;
+    const thresholdTime = applyDuration(date, signedThresholdDuration).getTime();
+    const msUntilThreshold = thresholdTime - now;
+    if (msUntilThreshold > 0)
+      factor = Math.min(factor, msUntilThreshold);
+  }
+  return factor;
 }
 __name(getUnitFactor, "getUnitFactor");
+function negateDuration(duration) {
+  return new Duration(-duration.years, -duration.months, -duration.weeks, -duration.days, -duration.hours, -duration.minutes, -duration.seconds, -duration.milliseconds);
+}
+__name(negateDuration, "negateDuration");
+function getExplicitThreshold(el) {
+  const threshold = el.getAttribute("threshold");
+  return threshold && isDuration(threshold) ? threshold : null;
+}
+__name(getExplicitThreshold, "getExplicitThreshold");
+var browser12hCycle;
+function isBrowser12hCycle() {
+  if (browser12hCycle === void 0) {
+    try {
+      browser12hCycle = new Intl.DateTimeFormat([], { hour: "numeric" }).resolvedOptions().hour12 === true;
+    } catch (_a) {
+      browser12hCycle = false;
+    }
+  }
+  return browser12hCycle;
+}
+__name(isBrowser12hCycle, "isBrowser12hCycle");
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  window.addEventListener("languagechange", () => {
+    browser12hCycle = void 0;
+  });
+}
 var dateObserver = new class {
   constructor() {
     this.elements = /* @__PURE__ */ new Set();
     this.time = Infinity;
+    this.updating = false;
     this.timer = -1;
   }
   observe(element) {
-    if (this.elements.has(element))
-      return;
     this.elements.add(element);
+    if (this.updating)
+      return;
     const date = element.date;
     if (date && date.getTime()) {
       const ms = getUnitFactor(element);
       const time = Date.now() + ms;
-      if (time < this.time) {
+      if (time < this.time || this.time <= Date.now()) {
         clearTimeout(this.timer);
         this.timer = setTimeout(() => this.update(), ms);
         this.time = time;
@@ -398,9 +573,14 @@ var dateObserver = new class {
     if (!this.elements.size)
       return;
     let nearestDistance = Infinity;
-    for (const timeEl of this.elements) {
-      nearestDistance = Math.min(nearestDistance, getUnitFactor(timeEl));
-      timeEl.update();
+    this.updating = true;
+    try {
+      for (const timeEl of this.elements) {
+        nearestDistance = Math.min(nearestDistance, getUnitFactor(timeEl));
+        timeEl.update();
+      }
+    } finally {
+      this.updating = false;
     }
     this.time = Math.min(60 * 60 * 1e3, nearestDistance);
     this.timer = setTimeout(() => this.update(), this.time);
@@ -428,6 +608,13 @@ var RelativeTimeElement = class extends HTMLElement {
     const tz = ((_a = this.closest("[time-zone]")) === null || _a === void 0 ? void 0 : _a.getAttribute("time-zone")) || this.ownerDocument.documentElement.getAttribute("time-zone");
     return tz || void 0;
   }
+  get hourCycle() {
+    var _a;
+    const hc = ((_a = this.closest("[hour-cycle]")) === null || _a === void 0 ? void 0 : _a.getAttribute("hour-cycle")) || this.ownerDocument.documentElement.getAttribute("hour-cycle");
+    if (hc === "h11" || hc === "h12" || hc === "h23" || hc === "h24")
+      return hc;
+    return isBrowser12hCycle() ? "h12" : "h23";
+  }
   static get observedAttributes() {
     return [
       "second",
@@ -449,15 +636,16 @@ var RelativeTimeElement = class extends HTMLElement {
       "lang",
       "title",
       "aria-hidden",
-      "time-zone"
+      "time-zone",
+      "hour-cycle"
     ];
   }
   get onRelativeTimeUpdated() {
-    return __classPrivateFieldGet2(this, _RelativeTimeElement_onRelativeTimeUpdated, "f");
+    return __classPrivateFieldGet3(this, _RelativeTimeElement_onRelativeTimeUpdated, "f");
   }
   set onRelativeTimeUpdated(listener) {
-    if (__classPrivateFieldGet2(this, _RelativeTimeElement_onRelativeTimeUpdated, "f")) {
-      this.removeEventListener("relative-time-updated", __classPrivateFieldGet2(this, _RelativeTimeElement_onRelativeTimeUpdated, "f"));
+    if (__classPrivateFieldGet3(this, _RelativeTimeElement_onRelativeTimeUpdated, "f")) {
+      this.removeEventListener("relative-time-updated", __classPrivateFieldGet3(this, _RelativeTimeElement_onRelativeTimeUpdated, "f"));
     }
     __classPrivateFieldSet2(this, _RelativeTimeElement_onRelativeTimeUpdated, typeof listener === "object" || typeof listener === "function" ? listener : null, "f");
     if (typeof listener === "function") {
@@ -642,9 +830,9 @@ var RelativeTimeElement = class extends HTMLElement {
     if (oldValue === newValue)
       return;
     if (attrName === "title") {
-      __classPrivateFieldSet2(this, _RelativeTimeElement_customTitle, newValue !== null && (this.date && __classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getFormattedTitle).call(this, this.date)) !== newValue, "f");
+      __classPrivateFieldSet2(this, _RelativeTimeElement_customTitle, newValue !== null && (this.date && __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getFormattedTitle).call(this, this.date, __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get), this.timeZone, this.hourCycle)) !== newValue, "f");
     }
-    if (!__classPrivateFieldGet2(this, _RelativeTimeElement_updating, "f") && !(attrName === "title" && __classPrivateFieldGet2(this, _RelativeTimeElement_customTitle, "f"))) {
+    if (!__classPrivateFieldGet3(this, _RelativeTimeElement_updating, "f") && !(attrName === "title" && __classPrivateFieldGet3(this, _RelativeTimeElement_customTitle, "f"))) {
       __classPrivateFieldSet2(this, _RelativeTimeElement_updating, (async () => {
         await Promise.resolve();
         this.update();
@@ -653,44 +841,51 @@ var RelativeTimeElement = class extends HTMLElement {
     }
   }
   update() {
-    const oldText = __classPrivateFieldGet2(this, _RelativeTimeElement_renderRoot, "f").textContent || this.textContent || "";
+    const oldText = __classPrivateFieldGet3(this, _RelativeTimeElement_renderRoot, "f").textContent || this.textContent || "";
     const oldTitle = this.getAttribute("title") || "";
     let newTitle = oldTitle;
     const date = this.date;
     if (typeof Intl === "undefined" || !Intl.DateTimeFormat || !date) {
-      __classPrivateFieldGet2(this, _RelativeTimeElement_renderRoot, "f").textContent = oldText;
+      __classPrivateFieldGet3(this, _RelativeTimeElement_renderRoot, "f").textContent = oldText;
       return;
     }
     const now = Date.now();
-    if (!__classPrivateFieldGet2(this, _RelativeTimeElement_customTitle, "f")) {
-      newTitle = __classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getFormattedTitle).call(this, date) || "";
-      if (newTitle && !this.noTitle)
+    const locale = __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get);
+    const timeZone = this.timeZone;
+    const hourCycle = this.hourCycle;
+    if (!__classPrivateFieldGet3(this, _RelativeTimeElement_customTitle, "f")) {
+      newTitle = __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getFormattedTitle).call(this, date, locale, timeZone, hourCycle) || "";
+      if (newTitle && !this.noTitle && newTitle !== oldTitle)
         this.setAttribute("title", newTitle);
     }
     const duration = elapsedTime(date, this.precision, now);
-    const format = __classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_resolveFormat).call(this, duration);
+    const format = __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_resolveFormat).call(this, duration, elapsedTime(date, "millisecond", now));
     let newText = oldText;
-    const displayUserPreferredAbsoluteTime = __classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_shouldDisplayUserPreferredAbsoluteTime).call(this, format);
+    const displayUserPreferredAbsoluteTime = __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_shouldDisplayUserPreferredAbsoluteTime).call(this, format);
     if (displayUserPreferredAbsoluteTime) {
-      newText = __classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getUserPreferredAbsoluteTimeFormat).call(this, date);
+      newText = __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getUserPreferredAbsoluteTimeFormat).call(this, date, locale, timeZone, hourCycle);
     } else {
       if (format === "duration") {
-        newText = __classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getDurationFormat).call(this, duration);
+        if (this.format === "micro" && this.tense !== "auto" && Intl.RelativeTimeFormat) {
+          newText = __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getMicroRelativeFormat).call(this, duration, locale);
+        } else {
+          newText = __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getDurationFormat).call(this, duration, locale);
+        }
       } else if (format === "relative") {
-        newText = __classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getRelativeFormat).call(this, duration);
+        newText = __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getRelativeFormat).call(this, duration, locale);
       } else {
-        newText = __classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getDateTimeFormat).call(this, date);
+        newText = __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getDateTimeFormat).call(this, date, locale, timeZone, hourCycle);
       }
     }
     if (newText) {
-      __classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_updateRenderRootContent).call(this, newText);
-    } else if (this.shadowRoot === __classPrivateFieldGet2(this, _RelativeTimeElement_renderRoot, "f") && this.textContent) {
-      __classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_updateRenderRootContent).call(this, this.textContent);
+      __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_updateRenderRootContent).call(this, newText);
+    } else if (this.shadowRoot === __classPrivateFieldGet3(this, _RelativeTimeElement_renderRoot, "f") && this.textContent) {
+      __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_updateRenderRootContent).call(this, this.textContent);
     }
     if (newText !== oldText || newTitle !== oldTitle) {
       this.dispatchEvent(new RelativeTimeUpdatedEvent(oldText, newText, oldTitle, newTitle));
     }
-    const shouldObserve = format === "relative" || format === "duration" || displayUserPreferredAbsoluteTime && (__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_isToday).call(this, date) || __classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_isCurrentYear).call(this, date));
+    const shouldObserve = !displayUserPreferredAbsoluteTime && (format === "relative" || format === "duration") || this.format === "micro" && Boolean(__classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getExplicitThreshold).call(this)) && date.getTime() > now || displayUserPreferredAbsoluteTime && (__classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_isToday).call(this, date, locale, timeZone) || __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_isCurrentYear).call(this, date, locale, timeZone));
     if (shouldObserve) {
       dateObserver.observe(this);
     } else {
@@ -701,22 +896,27 @@ var RelativeTimeElement = class extends HTMLElement {
 _RelativeTimeElement_customTitle = /* @__PURE__ */ new WeakMap(), _RelativeTimeElement_updating = /* @__PURE__ */ new WeakMap(), _RelativeTimeElement_renderRoot = /* @__PURE__ */ new WeakMap(), _RelativeTimeElement_onRelativeTimeUpdated = /* @__PURE__ */ new WeakMap(), _RelativeTimeElement_instances = /* @__PURE__ */ new WeakSet(), _RelativeTimeElement_lang_get = /* @__PURE__ */ __name(function _RelativeTimeElement_lang_get2() {
   var _a;
   const lang = ((_a = this.closest("[lang]")) === null || _a === void 0 ? void 0 : _a.getAttribute("lang")) || this.ownerDocument.documentElement.getAttribute("lang");
+  if (!lang)
+    return "default";
   try {
-    return new Intl.Locale(lang !== null && lang !== void 0 ? lang : "").toString();
+    return getLocale(lang).toString();
   } catch (_b) {
     return "default";
   }
-}, "_RelativeTimeElement_lang_get"), _RelativeTimeElement_getFormattedTitle = /* @__PURE__ */ __name(function _RelativeTimeElement_getFormattedTitle2(date) {
-  return new Intl.DateTimeFormat(__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get), {
+}, "_RelativeTimeElement_lang_get"), _RelativeTimeElement_getFormattedTitle = /* @__PURE__ */ __name(function _RelativeTimeElement_getFormattedTitle2(date, locale, timeZone, hourCycle) {
+  return dateTimeFormat(locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
     timeZoneName: "short",
-    timeZone: this.timeZone
+    timeZone,
+    hourCycle
   }).format(date);
-}, "_RelativeTimeElement_getFormattedTitle"), _RelativeTimeElement_resolveFormat = /* @__PURE__ */ __name(function _RelativeTimeElement_resolveFormat2(duration) {
+}, "_RelativeTimeElement_getFormattedTitle"), _RelativeTimeElement_getExplicitThreshold = /* @__PURE__ */ __name(function _RelativeTimeElement_getExplicitThreshold2() {
+  return getExplicitThreshold(this);
+}, "_RelativeTimeElement_getExplicitThreshold"), _RelativeTimeElement_resolveFormat = /* @__PURE__ */ __name(function _RelativeTimeElement_resolveFormat2(duration, thresholdDuration = duration) {
   const format = this.format;
   if (format === "datetime")
     return "datetime";
@@ -724,8 +924,12 @@ _RelativeTimeElement_customTitle = /* @__PURE__ */ new WeakMap(), _RelativeTimeE
     return "duration";
   if (format === "elapsed")
     return "duration";
-  if (format === "micro")
+  if (format === "micro") {
+    const threshold = __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getExplicitThreshold).call(this);
+    if (threshold && Duration.compare(thresholdDuration, threshold) === -1)
+      return "datetime";
     return "duration";
+  }
   if ((format === "auto" || format === "relative") && typeof Intl !== "undefined" && Intl.RelativeTimeFormat) {
     const tense = this.tense;
     if (tense === "past" || tense === "future")
@@ -734,18 +938,28 @@ _RelativeTimeElement_customTitle = /* @__PURE__ */ new WeakMap(), _RelativeTimeE
       return "relative";
   }
   return "datetime";
-}, "_RelativeTimeElement_resolveFormat"), _RelativeTimeElement_getDurationFormat = /* @__PURE__ */ __name(function _RelativeTimeElement_getDurationFormat2(duration) {
-  const locale = __classPrivateFieldGet2(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get);
+}, "_RelativeTimeElement_resolveFormat"), _RelativeTimeElement_getMicroDuration = /* @__PURE__ */ __name(function _RelativeTimeElement_getMicroDuration2(duration) {
+  duration = roundToSingleUnit(duration);
+  if (duration.months === 0 && (this.tense === "past" && duration.sign !== -1 || this.tense === "future" && duration.sign !== 1)) {
+    return microEmptyDuration;
+  }
+  return duration;
+}, "_RelativeTimeElement_getMicroDuration"), _RelativeTimeElement_getMicroRelativeFormat = /* @__PURE__ */ __name(function _RelativeTimeElement_getMicroRelativeFormat2(duration, locale) {
+  const relativeFormat = relativeTimeFormat(locale, {
+    numeric: "always",
+    style: "narrow"
+  });
+  duration = __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getMicroDuration).call(this, duration);
+  const [int, unit] = getRelativeTimeUnit(duration.blank ? microEmptyDuration : duration);
+  return relativeFormat.format(Math.abs(int) * (this.tense === "past" ? -1 : 1), unit);
+}, "_RelativeTimeElement_getMicroRelativeFormat"), _RelativeTimeElement_getDurationFormat = /* @__PURE__ */ __name(function _RelativeTimeElement_getDurationFormat2(duration, locale) {
   const format = this.format;
   const style = this.formatStyle;
   const tense = this.tense;
   let empty = emptyDuration;
   if (format === "micro") {
-    duration = roundToSingleUnit(duration);
+    duration = __classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_getMicroDuration).call(this, duration);
     empty = microEmptyDuration;
-    if (duration.months === 0 && (this.tense === "past" && duration.sign !== -1 || this.tense === "future" && duration.sign !== 1)) {
-      duration = microEmptyDuration;
-    }
   } else if (tense === "past" && duration.sign !== -1 || tense === "future" && duration.sign !== 1) {
     duration = empty;
   }
@@ -754,8 +968,8 @@ _RelativeTimeElement_customTitle = /* @__PURE__ */ new WeakMap(), _RelativeTimeE
     return empty.toLocaleString(locale, { style, [display]: "always" });
   }
   return duration.abs().toLocaleString(locale, { style });
-}, "_RelativeTimeElement_getDurationFormat"), _RelativeTimeElement_getRelativeFormat = /* @__PURE__ */ __name(function _RelativeTimeElement_getRelativeFormat2(duration) {
-  const relativeFormat = new Intl.RelativeTimeFormat(__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get), {
+}, "_RelativeTimeElement_getDurationFormat"), _RelativeTimeElement_getRelativeFormat = /* @__PURE__ */ __name(function _RelativeTimeElement_getRelativeFormat2(duration, locale) {
+  const relativeFormat = relativeTimeFormat(locale, {
     numeric: "auto",
     style: this.formatStyle
   });
@@ -769,8 +983,8 @@ _RelativeTimeElement_customTitle = /* @__PURE__ */ new WeakMap(), _RelativeTimeE
     return relativeFormat.format(0, this.precision === "millisecond" ? "second" : this.precision);
   }
   return relativeFormat.format(int, unit);
-}, "_RelativeTimeElement_getRelativeFormat"), _RelativeTimeElement_getDateTimeFormat = /* @__PURE__ */ __name(function _RelativeTimeElement_getDateTimeFormat2(date) {
-  const formatter = new Intl.DateTimeFormat(__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get), {
+}, "_RelativeTimeElement_getRelativeFormat"), _RelativeTimeElement_getDateTimeFormat = /* @__PURE__ */ __name(function _RelativeTimeElement_getDateTimeFormat2(date, locale, timeZone, hourCycle) {
+  const formatter = dateTimeFormat(locale, {
     second: this.second,
     minute: this.minute,
     hour: this.hour,
@@ -779,56 +993,67 @@ _RelativeTimeElement_customTitle = /* @__PURE__ */ new WeakMap(), _RelativeTimeE
     month: this.month,
     year: this.year,
     timeZoneName: this.timeZoneName,
-    timeZone: this.timeZone
+    timeZone,
+    hourCycle
   });
   return `${this.prefix} ${formatter.format(date)}`.trim();
-}, "_RelativeTimeElement_getDateTimeFormat"), _RelativeTimeElement_isToday = /* @__PURE__ */ __name(function _RelativeTimeElement_isToday2(date) {
+}, "_RelativeTimeElement_getDateTimeFormat"), _RelativeTimeElement_isToday = /* @__PURE__ */ __name(function _RelativeTimeElement_isToday2(date, locale, timeZone) {
   const now = /* @__PURE__ */ new Date();
-  const formatter = new Intl.DateTimeFormat(__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get), {
-    timeZone: this.timeZone,
+  const formatter = dateTimeFormat(locale, {
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit"
   });
   return formatter.format(now) === formatter.format(date);
-}, "_RelativeTimeElement_isToday"), _RelativeTimeElement_isCurrentYear = /* @__PURE__ */ __name(function _RelativeTimeElement_isCurrentYear2(date) {
+}, "_RelativeTimeElement_isToday"), _RelativeTimeElement_isCurrentYear = /* @__PURE__ */ __name(function _RelativeTimeElement_isCurrentYear2(date, locale, timeZone) {
   const now = /* @__PURE__ */ new Date();
-  const formatter = new Intl.DateTimeFormat(__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get), {
-    timeZone: this.timeZone,
+  const formatter = dateTimeFormat(locale, {
+    timeZone,
     year: "numeric"
   });
   return formatter.format(now) === formatter.format(date);
-}, "_RelativeTimeElement_isCurrentYear"), _RelativeTimeElement_getUserPreferredAbsoluteTimeFormat = /* @__PURE__ */ __name(function _RelativeTimeElement_getUserPreferredAbsoluteTimeFormat2(date) {
+}, "_RelativeTimeElement_isCurrentYear"), _RelativeTimeElement_getUserPreferredAbsoluteTimeFormat = /* @__PURE__ */ __name(function _RelativeTimeElement_getUserPreferredAbsoluteTimeFormat2(date, locale, timeZone, hourCycle) {
   const timeOnlyOptions = {
     hour: "numeric",
     minute: "2-digit",
     timeZoneName: "short",
-    timeZone: this.timeZone
+    timeZone,
+    hourCycle
   };
-  if (__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_isToday).call(this, date)) {
-    const relativeFormatter = new Intl.RelativeTimeFormat(__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get), { numeric: "auto" });
+  if (__classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_isToday).call(this, date, locale, timeZone)) {
+    const relativeFormatter = relativeTimeFormat(locale, { numeric: "auto" });
     let todayText = relativeFormatter.format(0, "day");
-    todayText = todayText.charAt(0).toLocaleUpperCase(__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get)) + todayText.slice(1);
-    const timeOnly = new Intl.DateTimeFormat(__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get), timeOnlyOptions).format(date);
+    todayText = todayText.charAt(0).toLocaleUpperCase(locale) + todayText.slice(1);
+    const timeOnly = dateTimeFormat(locale, timeOnlyOptions).format(date);
     return `${todayText} ${timeOnly}`;
   }
   const timeAndDateOptions = Object.assign(Object.assign({}, timeOnlyOptions), { day: "numeric", month: "short" });
-  if (__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_isCurrentYear).call(this, date)) {
-    return new Intl.DateTimeFormat(__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get), timeAndDateOptions).format(date);
+  if (__classPrivateFieldGet3(this, _RelativeTimeElement_instances, "m", _RelativeTimeElement_isCurrentYear).call(this, date, locale, timeZone)) {
+    return dateTimeFormat(locale, timeAndDateOptions).format(date);
   }
-  return new Intl.DateTimeFormat(__classPrivateFieldGet2(this, _RelativeTimeElement_instances, "a", _RelativeTimeElement_lang_get), Object.assign(Object.assign({}, timeAndDateOptions), { year: "numeric" })).format(date);
+  return dateTimeFormat(locale, Object.assign(Object.assign({}, timeAndDateOptions), { year: "numeric" })).format(date);
 }, "_RelativeTimeElement_getUserPreferredAbsoluteTimeFormat"), _RelativeTimeElement_updateRenderRootContent = /* @__PURE__ */ __name(function _RelativeTimeElement_updateRenderRootContent2(content) {
-  if (this.hasAttribute("aria-hidden") && this.getAttribute("aria-hidden") === "true") {
-    const span = document.createElement("span");
-    span.setAttribute("aria-hidden", "true");
+  const root2 = __classPrivateFieldGet3(this, _RelativeTimeElement_renderRoot, "f");
+  const ariaHidden = this.hasAttribute("aria-hidden") && this.getAttribute("aria-hidden") === "true";
+  let span = root2.firstElementChild;
+  if (!span || span.getAttribute("part") !== "root" || root2.childNodes.length !== 1) {
+    span = document.createElement("span");
+    span.setAttribute("part", "root");
+    root2.replaceChildren(span);
+  }
+  if (ariaHidden) {
+    if (span.getAttribute("aria-hidden") !== "true")
+      span.setAttribute("aria-hidden", "true");
+  } else if (span.hasAttribute("aria-hidden")) {
+    span.removeAttribute("aria-hidden");
+  }
+  if (span.textContent !== content) {
     span.textContent = content;
-    __classPrivateFieldGet2(this, _RelativeTimeElement_renderRoot, "f").replaceChildren(span);
-  } else {
-    __classPrivateFieldGet2(this, _RelativeTimeElement_renderRoot, "f").textContent = content;
   }
 }, "_RelativeTimeElement_updateRenderRootContent"), _RelativeTimeElement_shouldDisplayUserPreferredAbsoluteTime = /* @__PURE__ */ __name(function _RelativeTimeElement_shouldDisplayUserPreferredAbsoluteTime2(format) {
   var _a;
-  if (format === "duration")
+  if (format === "duration" && this.format !== "micro")
     return false;
   return this.ownerDocument.documentElement.getAttribute("data-prefers-absolute-time") === "true" || ((_a = this.ownerDocument.body) === null || _a === void 0 ? void 0 : _a.getAttribute("data-prefers-absolute-time")) === "true";
 }, "_RelativeTimeElement_shouldDisplayUserPreferredAbsoluteTime");
