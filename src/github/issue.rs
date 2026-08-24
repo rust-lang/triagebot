@@ -710,7 +710,7 @@ impl Issue {
 
     pub async fn get_reviews(&self, client: &GithubClient) -> anyhow::Result<Vec<Comment>> {
         let review_url = format!(
-            "{}/pulls/{}/reviews",
+            "{}/pulls/{}/reviews?per_page=100",
             self.repository().url(client),
             self.number,
         );
