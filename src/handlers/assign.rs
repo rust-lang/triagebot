@@ -479,26 +479,31 @@ async fn update_community_review_assignment(
     config: &AssignCommunityReviewsConfig,
     issue: &Issue,
 ) -> anyhow::Result<CommunityReviewUpdateStatus> {
-    let reviews = issue
-        .get_reviews(&ctx.github)
-        .await
-        .context("unable to fetch reviews for determining assignement")?;
+    use futures::StreamExt;
 
-    let approval_reviews: Vec<_> = {
-        // Filter duplicated approvals
-        let mut uniq = HashSet::<UserId>::new();
+    let review_stream = issue.get_all_reviews(&ctx.github);
+    tokio::pin!(review_stream);
 
-        reviews
-            .iter()
-            .filter(|c| c.pr_review_state == Some(PullRequestReviewState::Approved))
-            // GitHub doesn't allow PR authors to approve a PR them-selves but just
-            // in case let's filter the PR author.
-            .filter(|c| c.user.id != issue.user.id)
-            // Only keep one approval by user
-            .filter(|c| uniq.insert(c.user.id))
-            .map(|c| &c.user)
-            .collect::<Vec<_>>()
-    };
+    let mut approval_reviews = Vec::new();
+    let mut uniq = HashSet::<UserId>::new();
+
+    while approval_reviews.len() < config.minimum_approvals.get().into()
+        && let Some(reviews) = review_stream.next().await
+    {
+        let reviews = reviews.context("failed to fetch reviews for determining assignement")?;
+
+        for review in reviews {
+            if review.pr_review_state == Some(PullRequestReviewState::Approved)
+                // GitHub doesn't allow PR authors to approve a PR them-selves but just
+                // in case let's filter the PR author.
+                && review.user.id != issue.user.id
+                // Only keep one approval by user
+                && uniq.insert(review.user.id)
+            {
+                approval_reviews.push(review.user);
+            }
+        }
+    }
 
     let enough_reviews = approval_reviews.len() >= config.minimum_approvals.get().into();
 

@@ -674,7 +674,11 @@ impl Issue {
 
         Ok(())
     }
+}
 
+const REVIEWS_PAGE_SIZE: usize = 100;
+
+impl Issue {
     pub async fn get_review(
         &self,
         client: &GithubClient,
@@ -708,9 +712,13 @@ impl Issue {
         Ok(review)
     }
 
-    pub async fn get_reviews(&self, client: &GithubClient) -> anyhow::Result<Vec<Comment>> {
+    pub async fn get_reviews(
+        &self,
+        client: &GithubClient,
+        page: u32,
+    ) -> anyhow::Result<Vec<Comment>> {
         let review_url = format!(
-            "{}/pulls/{}/reviews?per_page=100",
+            "{}/pulls/{}/reviews?per_page={REVIEWS_PAGE_SIZE}&page={page}",
             self.repository().url(client),
             self.number,
         );
@@ -719,6 +727,28 @@ impl Issue {
             .await
             .with_context(|| format!("unable to fetch reviews for {}", self.number))?;
         Ok(reviews)
+    }
+
+    pub fn get_all_reviews(
+        &self,
+        client: &GithubClient,
+    ) -> impl futures::Stream<Item = anyhow::Result<Vec<Comment>>> {
+        futures::stream::unfold(Some(1), move |page_state| async move {
+            let current_page = page_state?;
+
+            match self.get_reviews(client, current_page).await {
+                Ok(reviews) => {
+                    let next_state = if reviews.len() >= REVIEWS_PAGE_SIZE {
+                        Some(current_page + 1)
+                    } else {
+                        None
+                    };
+
+                    Some((Ok(reviews), next_state))
+                }
+                Err(e) => Some((Err(e), None)), // Stop on error
+            }
+        })
     }
 }
 
