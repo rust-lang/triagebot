@@ -263,7 +263,7 @@ async fn handle_command<'a>(
             } => unlock_cmd(&ctx, gh_id, organization, repo, *id).await,
             ChatCommand::Work(cmd) => workqueue_commands(&ctx, gh_id, cmd).await,
             ChatCommand::DocsUpdate => trigger_docs_update(&ctx.zulip, message_data),
-            ChatCommand::GoalsPingOwners => Ok(Some(goals_ping_owners(&ctx).await)),
+            ChatCommand::GoalsPingOwners => Ok(Some(goals_ping_owners(ctx.clone()))),
             ChatCommand::UserInfo {
                 username,
                 organization,
@@ -1652,11 +1652,14 @@ async fn post_waiter(
     Ok(None)
 }
 
-async fn goals_ping_owners(ctx: &Context) -> String {
-    match goals::ping_owners(&ctx.github, &ctx.zulip, &ctx.team, false).await {
-        Ok(()) => "Goal owner pings finished.".to_string(),
-        Err(error) => format!("Goal owner pings failed: {error:#}"),
-    }
+fn goals_ping_owners(ctx: Arc<Context>) -> String {
+    tokio::task::spawn(async move {
+        match goals::ping_owners(&ctx.github, &ctx.zulip, &ctx.team, false).await {
+            Ok(()) => log::info!("Goal owner pings finished."),
+            Err(error) => log::error!("Goal owner pings failed: {error:#}"),
+        }
+    });
+    "Goal owner pings started.".to_string()
 }
 
 fn trigger_docs_update(zulip: &ZulipClient, message: &Message) -> anyhow::Result<Option<String>> {
