@@ -263,7 +263,7 @@ async fn handle_command<'a>(
             } => unlock_cmd(&ctx, gh_id, organization, repo, *id).await,
             ChatCommand::Work(cmd) => workqueue_commands(&ctx, gh_id, cmd).await,
             ChatCommand::DocsUpdate => trigger_docs_update(&ctx.zulip, message_data),
-            ChatCommand::GoalsPingOwners => Ok(Some(goals_ping_owners(ctx.clone()))),
+            ChatCommand::GoalsPingOwners => Ok(Some(goals_ping_owners(ctx.clone(), message_data))),
             ChatCommand::UserInfo {
                 username,
                 organization,
@@ -1652,11 +1652,19 @@ async fn post_waiter(
     Ok(None)
 }
 
-fn goals_ping_owners(ctx: Arc<Context>) -> String {
+fn goals_ping_owners(ctx: Arc<Context>, message: &Message) -> String {
+    let message = message.clone();
     tokio::task::spawn(async move {
-        match goals::ping_owners(&ctx.github, &ctx.zulip, &ctx.team, false).await {
-            Ok(()) => log::info!("Goal owner pings finished."),
-            Err(error) => log::error!("Goal owner pings failed: {error:#}"),
+        let response = match goals::ping_owners(&ctx.github, &ctx.zulip, &ctx.team, false).await {
+            Ok(()) => "Goal owner pings finished.".to_string(),
+            Err(e) => format!("Goal owner pings failed: {e:#}"),
+        };
+        let message = MessageApiRequest {
+            recipient: message.sender_to_recipient(),
+            content: &response,
+        };
+        if let Err(e) = message.send(&ctx.zulip).await {
+            log::error!("failed to send Zulip response: {e:?}\nresponse was:\n{response}");
         }
     });
     "Goal owner pings started.".to_string()
