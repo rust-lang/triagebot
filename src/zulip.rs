@@ -375,10 +375,19 @@ async fn handle_command<'a>(
                 StreamCommand::AssignPriority { issue_num, prio } => {
                     let _ = match assign_issue_prio(&ctx, message_data, issue_num, prio).await {
                         // give user feedback
-                        Ok(_) => ctx.zulip.add_reaction(message_data.id, "check").await,
+                        Ok(_) => {
+                            // emoji reaction for the triagebot command
+                            ctx.zulip.add_reaction(message_data.id, "check").await?;
+                            // resolve the Zulip topic
+                            if let Some(ref topic) = message_data.subject {
+                                ctx.zulip.resolve_topic(message_data.id, &topic).await?;
+                            } else {
+                                log::warn!("Zulip topic has empty subject");
+                            }
+                        }
                         Err(err) => {
                             log::error!("Could not assign priority to #{}: {:?}", issue_num, err);
-                            ctx.zulip.add_reaction(message_data.id, "scream").await
+                            ctx.zulip.add_reaction(message_data.id, "scream").await?;
                         }
                     };
                     Ok(None)
