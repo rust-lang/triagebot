@@ -13,6 +13,7 @@ use crate::github::queries::user_prs::UserPullRequest;
 use crate::github::{self, PullRequestNumber, Repository};
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
+use crate::handlers::goals;
 use crate::handlers::pr_tracking::{ReviewerWorkqueue, get_assigned_prs};
 use crate::interactions::ErrorComment;
 use crate::utils::pluralize;
@@ -262,6 +263,7 @@ async fn handle_command<'a>(
             } => unlock_cmd(&ctx, gh_id, organization, repo, *id).await,
             ChatCommand::Work(cmd) => workqueue_commands(&ctx, gh_id, cmd).await,
             ChatCommand::DocsUpdate => trigger_docs_update(&ctx.zulip, message_data),
+            ChatCommand::GoalsPingOwners => Ok(Some(goals_ping_owners(&ctx).await)),
             ChatCommand::UserInfo {
                 username,
                 organization,
@@ -1139,6 +1141,7 @@ enum ImpersonationMode {
 fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
     match cmd {
         ChatCommand::DocsUpdate
+        | ChatCommand::GoalsPingOwners
         | ChatCommand::UserInfo { .. }
         | ChatCommand::TeamStats { .. }
         | ChatCommand::Unlock { .. }
@@ -1647,6 +1650,13 @@ async fn post_waiter(
     }
 
     Ok(None)
+}
+
+async fn goals_ping_owners(ctx: &Context) -> String {
+    match goals::ping_owners(&ctx.github, &ctx.zulip, &ctx.team, false).await {
+        Ok(()) => "Goal owner pings finished.".to_string(),
+        Err(error) => format!("Goal owner pings failed: {error:#}"),
+    }
 }
 
 fn trigger_docs_update(zulip: &ZulipClient, message: &Message) -> anyhow::Result<Option<String>> {

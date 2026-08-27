@@ -50,7 +50,7 @@ use std::str::FromStr;
 use async_trait::async_trait;
 use cron::Schedule;
 
-use crate::handlers::project_goals::PingProjectGoalsOwnersJob;
+use crate::handlers::goals;
 use crate::handlers::pull_requests_assignment_update::PullRequestAssignmentUpdate;
 use crate::{
     db::jobs::JobSchedule,
@@ -78,7 +78,7 @@ pub fn jobs() -> Vec<Box<dyn Job + Send + Sync>> {
         Box::new(MajorChangeAcceptanceJob),
         Box::new(GithubRateLimitLoggingJob),
         Box::new(AddReviewChangesSinceLinkJob),
-        Box::new(PingProjectGoalsOwnersJob),
+        Box::new(goals::PingOwnersJob),
     ]
 }
 
@@ -110,7 +110,7 @@ pub fn default_jobs() -> Vec<JobSchedule> {
             metadata: serde_json::Value::Null,
         },
         JobSchedule {
-            name: PingProjectGoalsOwnersJob.name(),
+            name: goals::PingOwnersJob.name(),
             // Around 6/7am Pacific time on every Thursday.
             schedule: Schedule::from_str("0 00 14 * * Thu *").unwrap(),
             metadata: serde_json::Value::Null,

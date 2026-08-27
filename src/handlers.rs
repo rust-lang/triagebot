@@ -20,6 +20,7 @@ mod close;
 mod concern;
 pub mod docs_update;
 mod github_releases;
+pub mod goals;
 mod issue_links;
 mod lock;
 pub(crate) mod major_change;
@@ -33,7 +34,6 @@ mod notify_zulip;
 mod ping;
 pub mod pr_tracking;
 mod prioritize;
-pub mod project_goals;
 pub mod pull_requests_assignment_update;
 mod relabel;
 mod relnotes;
@@ -120,10 +120,10 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         }
     };
 
-    let project_goals = async {
-        project_goals::handle(ctx, event)
+    let goals = async {
+        goals::handle(ctx, event)
             .await
-            .map_err(|e| HandlerError::Other(e.context("project_goals handler failed")))
+            .map_err(|e| HandlerError::Other(e.context("goals handler failed")))
     };
 
     let rustc_commits = async {
@@ -245,7 +245,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         prune_gh_comments,
         assign_comments,
         check_commits,
-        project_goals,
+        goals,
         rustc_commits,
         milestone_prs,
         rendered_link,
@@ -260,7 +260,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         prune_gh_comments,
         assign_comments,
         check_commits,
-        project_goals,
+        goals,
         rustc_commits,
         milestone_prs,
         rendered_link,
@@ -277,7 +277,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         prune_gh_comments,
         assign_comments,
         check_commits,
-        project_goals,
+        goals,
         rustc_commits,
         milestone_prs,
         rendered_link,
