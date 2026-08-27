@@ -80,7 +80,14 @@ impl ZulipClient {
                 },
                 to: match recipient {
                     Recipient::Stream { id, .. } => id.to_string(),
-                    Recipient::DirectMessage { id, .. } => id.to_string(),
+                    // Zulip requires us to send a "list of numbers" when sending DMs
+                    // (see https://zulip.com/api/send-message).
+                    // So we have to send for example `to=[1]`.
+                    // However, the serde-urlencoded crate, which is used by `reqwest`'s form
+                    // method, does not support serializing sequences as struct values.
+                    // So we have to "pre-serialize" it into a string, so that it can be sent, and
+                    // Zulip interprets it as a list of numbers.
+                    Recipient::DirectMessage { id, .. } => format!("[{id}]"),
                 },
                 topic: match recipient {
                     Recipient::Stream { topic, .. } => Some(topic),
