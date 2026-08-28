@@ -263,7 +263,9 @@ async fn handle_command<'a>(
             } => unlock_cmd(&ctx, gh_id, organization, repo, *id).await,
             ChatCommand::Work(cmd) => workqueue_commands(&ctx, gh_id, cmd).await,
             ChatCommand::DocsUpdate => trigger_docs_update(&ctx.zulip, message_data),
-            ChatCommand::GoalsPingOwners => Ok(Some(goals_ping_owners(ctx.clone(), message_data))),
+            ChatCommand::GoalsPingOwners => goals_ping_owners(ctx.clone(), message_data, gh_id)
+                .await
+                .map(Some),
             ChatCommand::UserInfo {
                 username,
                 organization,
@@ -1652,7 +1654,15 @@ async fn post_waiter(
     Ok(None)
 }
 
-fn goals_ping_owners(ctx: Arc<Context>, message: &Message) -> String {
+async fn goals_ping_owners(
+    ctx: Arc<Context>,
+    message: &Message,
+    gh_id: u64,
+) -> anyhow::Result<String> {
+    if !goals::is_goals_member(&ctx.team, gh_id).await? {
+        return Ok("Only @*T-goals* members can run this command.".to_string());
+    }
+
     let message = message.clone();
     tokio::task::spawn(async move {
         let response = match goals::ping_owners(&ctx.github, &ctx.zulip, &ctx.team, false).await {
@@ -1667,7 +1677,7 @@ fn goals_ping_owners(ctx: Arc<Context>, message: &Message) -> String {
             log::error!("failed to send Zulip response: {e:?}\nresponse was:\n{response}");
         }
     });
-    "Goal owner pings started.".to_string()
+    Ok("Goal owner pings started.".to_string())
 }
 
 fn trigger_docs_update(zulip: &ZulipClient, message: &Message) -> anyhow::Result<Option<String>> {
