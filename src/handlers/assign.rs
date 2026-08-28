@@ -90,6 +90,7 @@ fn get_repo_workqueue(ctx: &Context, repo: &str) -> Arc<RwLock<ReviewerWorkqueue
 #[derive(Debug)]
 pub(super) enum AssignInput {
     Opened { draft: bool },
+    Reopened { draft: bool },
     Closed,
     ReadyForReview,
     UnlabeledMinReviews { draft: bool, open: bool },
@@ -111,6 +112,9 @@ pub(super) async fn parse_input(
 
     match &event.action {
         IssuesAction::Opened => Ok(Some(AssignInput::Opened {
+            draft: event.issue.draft,
+        })),
+        IssuesAction::Reopened => Ok(Some(AssignInput::Reopened {
             draft: event.issue.draft,
         })),
         IssuesAction::Closed => Ok(Some(AssignInput::Closed)),
@@ -190,6 +194,40 @@ pub(super) async fn handle_input(
             // perform assignment". So in that case, we skip the assignment and only perform it once
             // the PR has been marked as being ready for review.
             assign_command.as_ref().is_some_and(|a| a != GHOST_ACCOUNT)
+        }
+        AssignInput::Reopened { draft: false } => {
+            if let Some(community_reviews) = &config.community_reviews
+                && assign_command.is_none()
+            {
+                // There are no current assignees, add the community review label
+                //
+                // No need to worry about approvals that may have happend between
+                // the time the PR was closed and this re-opening as GitHub doesn't
+                // allow approving a closed PR.
+                if !event.issue.assignees.is_empty() {
+                    event
+                        .issue
+                        .add_labels(
+                            &ctx.github,
+                            vec![github::Label {
+                                name: community_reviews.label.to_string(),
+                            }],
+                        )
+                        .await?;
+                }
+                false
+            } else {
+                // We have historically done nothing to do for normal PRs, even if there
+                // are no current assignee
+                false
+            }
+        }
+        AssignInput::Reopened { draft: true } => {
+            // We have historically done nothing for non-community reviewed PR, so continue to do nothing.
+            //
+            // As for community reviewed PRs they are only handled when the PR is not in draft (handled by
+            // ready for review below)
+            false
         }
         AssignInput::ReadyForReview => {
             if let Some(community_reviews) = &config.community_reviews
