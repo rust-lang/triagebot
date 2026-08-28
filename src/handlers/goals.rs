@@ -1116,8 +1116,8 @@ async fn echo_comment_to_zulip(
     .send(&ctx.zulip)
     .await?;
 
-    // Add a reaction (:book:) so it's easier to acknowledge the update.
-    ctx.zulip.add_reaction(posted.message_id, "book").await?;
+    // Add a reaction so it's easier to acknowledge the update.
+    ctx.zulip.add_reaction(posted.message_id, "ferris").await?;
 
     Ok(())
 }
