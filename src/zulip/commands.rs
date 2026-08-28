@@ -29,6 +29,8 @@ pub enum ChatCommand {
     },
     /// Update docs
     DocsUpdate,
+    /// Ping goal owners for updates.
+    GoalsPingOwners,
     /// Show recent GitHub activity of a user.
     ///
     /// It also shows scoped information in a selected organization.
@@ -394,6 +396,14 @@ mod tests {
     fn end_meeting_command() {
         assert_eq!(parse_stream(&["end-meeting"]), StreamCommand::EndMeeting);
         assert_eq!(parse_stream(&["await"]), StreamCommand::EndTopic);
+    }
+
+    #[test]
+    fn goals_ping_owners_command() {
+        assert_eq!(
+            parse_chat(&["goals-ping-owners"]),
+            ChatCommand::GoalsPingOwners
+        );
     }
 
     #[test]

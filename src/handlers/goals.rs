@@ -942,7 +942,7 @@ async fn execute_plan(
     Ok(())
 }
 
-pub async fn ping_project_goals_owners(
+pub async fn ping_owners(
     gh: &GithubClient,
     zulip: &ZulipClient,
     team: &TeamClient,
@@ -954,16 +954,16 @@ pub async fn ping_project_goals_owners(
     execute_plan(zulip, plan, now.date_naive(), dry_run).await
 }
 
-pub struct PingProjectGoalsOwnersJob;
+pub struct PingOwnersJob;
 
 #[async_trait]
-impl Job for PingProjectGoalsOwnersJob {
+impl Job for PingOwnersJob {
     fn name(&self) -> &'static str {
         "ping_project_goal_owners_job"
     }
 
     async fn run(&self, ctx: &Context, _metadata: &serde_json::Value) -> anyhow::Result<()> {
-        ping_project_goals_owners(&ctx.github, &ctx.zulip, &ctx.team, false).await
+        ping_owners(&ctx.github, &ctx.zulip, &ctx.team, false).await
     }
 }
 

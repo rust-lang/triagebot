@@ -13,6 +13,7 @@ use crate::github::queries::user_prs::UserPullRequest;
 use crate::github::{self, PullRequestNumber, Repository};
 use crate::handlers::Context;
 use crate::handlers::docs_update::docs_update;
+use crate::handlers::goals;
 use crate::handlers::pr_tracking::{ReviewerWorkqueue, get_assigned_prs};
 use crate::interactions::ErrorComment;
 use crate::utils::pluralize;
@@ -262,6 +263,9 @@ async fn handle_command<'a>(
             } => unlock_cmd(&ctx, gh_id, organization, repo, *id).await,
             ChatCommand::Work(cmd) => workqueue_commands(&ctx, gh_id, cmd).await,
             ChatCommand::DocsUpdate => trigger_docs_update(&ctx.zulip, message_data),
+            ChatCommand::GoalsPingOwners => goals_ping_owners(ctx.clone(), message_data, gh_id)
+                .await
+                .map(Some),
             ChatCommand::UserInfo {
                 username,
                 organization,
@@ -1139,6 +1143,7 @@ enum ImpersonationMode {
 fn get_cmd_impersonation_mode(cmd: &ChatCommand) -> ImpersonationMode {
     match cmd {
         ChatCommand::DocsUpdate
+        | ChatCommand::GoalsPingOwners
         | ChatCommand::UserInfo { .. }
         | ChatCommand::TeamStats { .. }
         | ChatCommand::Unlock { .. }
@@ -1647,6 +1652,32 @@ async fn post_waiter(
     }
 
     Ok(None)
+}
+
+async fn goals_ping_owners(
+    ctx: Arc<Context>,
+    message: &Message,
+    gh_id: u64,
+) -> anyhow::Result<String> {
+    if !goals::is_goals_member(&ctx.team, gh_id).await? {
+        return Ok("Only @*T-goals* members can run this command.".to_string());
+    }
+
+    let message = message.clone();
+    tokio::task::spawn(async move {
+        let response = match goals::ping_owners(&ctx.github, &ctx.zulip, &ctx.team, false).await {
+            Ok(()) => "Goal owner pings finished.".to_string(),
+            Err(e) => format!("Goal owner pings failed: {e:#}"),
+        };
+        let message = MessageApiRequest {
+            recipient: message.sender_to_recipient(),
+            content: &response,
+        };
+        if let Err(e) = message.send(&ctx.zulip).await {
+            log::error!("failed to send Zulip response: {e:?}\nresponse was:\n{response}");
+        }
+    });
+    Ok("Goal owner pings started.".to_string())
 }
 
 fn trigger_docs_update(zulip: &ZulipClient, message: &Message) -> anyhow::Result<Option<String>> {
