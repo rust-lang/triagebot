@@ -30,17 +30,28 @@ const GOALS_META_STREAM: u64 = 478_266; // #project-goals/meta
 const TRIAGEBOT_TOPIC: &str = "triagebot reports";
 const MAX_ZULIP_TOPIC: usize = 60;
 
-/// The weekday of the job execution (must match [`crate::jobs`]).
-const JOB_WEEKDAY: Weekday = Weekday::Thu;
-/// The UTC hour of the job execution (must match [`crate::jobs`]).
-const JOB_UTC_HOUR: u32 = 14;
-/// The UTC minute of the job execution (must match [`crate::jobs`]).
-const JOB_UTC_MINUTE: u32 = 0;
+/// The weekday of the reporting reminders (must match [`crate::jobs`]).
+const REMINDER_WEEKDAY: Weekday = Weekday::Thu;
+/// The UTC hour of the reminders (must match [`crate::jobs`]).
+const REMINDER_HOUR: u32 = 14;
+/// The UTC minute of the reminders (must match [`crate::jobs`]).
+const REMINDER_MINUTE: u32 = 0;
 
-/// An arbitrary date to keep reporting periods anchored.
+/// The weekday of the reporting period start.
+const PERIOD_WEEKDAY: Weekday = Weekday::Mon;
+/// The UTC hour of the period start.
+const PERIOD_HOUR: u32 = REMINDER_HOUR;
+/// The UTC minute of the period start.
+const PERIOD_MINUTE: u32 = REMINDER_MINUTE;
+
+/// An arbitrary moment to keep reporting periods anchored.
 ///
 /// The phase of the biweekly and 4-week periods depends on this day.
-const EPOCH: NaiveDate = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+const EPOCH: DateTime<Utc> = NaiveDate::from_ymd_opt(1970, 1, 1)
+    .unwrap()
+    .and_hms_opt(PERIOD_HOUR, PERIOD_MINUTE, 0)
+    .unwrap()
+    .and_utc();
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 struct ZulipId(u64);
@@ -255,38 +266,66 @@ impl Period {
         }
     }
 
-    /// Returns the starting date of the period that includes this day.
+    /// Returns the starting moment of the period that includes now.
     ///
-    /// Every reporting period begins on a [`JOB_WEEKDAY`]
-    /// and lasts [`Period::weeks`], depending on the goal.
+    /// Every reporting period starts on a [`PERIOD_WEEKDAY`]
+    /// at the [`PERIOD_UTC_HOUR`] hour and [`PERIOD_UTC_MINUTE`] minute,
+    /// lasting [`Period::weeks`] (depending on the goal).
     ///
     /// Biweekly and 4-week cycles are aligned to [`EPOCH`].
-    fn start(self, today: NaiveDate) -> NaiveDate {
-        // Depending on the chosen date, `EPOCH` may not fall on the `JOB_WEEKDAY`.
-        // `days_until_job` is needed to calculate an anchor from the `EPOCH` that
-        // falls on the `JOB_WEEKDAY` and can be used to compute the relevant dates.
-        let epoch_weekday = i64::from(EPOCH.weekday().num_days_from_monday());
-        let job_weekday = i64::from(JOB_WEEKDAY.num_days_from_monday());
-        let days_until_job = (job_weekday - epoch_weekday).rem_euclid(7);
+    fn start(self, now: DateTime<Utc>) -> DateTime<Utc> {
+        // Depending on the chosen date, `EPOCH` may not fall on the `PERIOD_WEEKDAY`.
+        // `weekdays_until_period` is needed to calculate an anchor from the `EPOCH` that
+        // falls on the `PERIOD_WEEKDAY` and can be used to compute the relevant moments.
+        let weekdays_until_period = PERIOD_WEEKDAY.days_since(EPOCH.weekday());
 
-        // Dates are computed relative to this date.
-        let anchor = EPOCH + Duration::days(days_until_job);
+        // Moments are computed relative to this moment.
+        let anchor = EPOCH + Duration::days(i64::from(weekdays_until_period));
 
         // The number of full weeks since the anchor.
-        let weeks_since_anchor = today.signed_duration_since(anchor).num_weeks();
+        let weeks_since_anchor = now.signed_duration_since(anchor).num_weeks();
         let period_weeks = self.weeks();
-        // The number of full periods that passed since the anchor date.
+
+        // The number of full periods that passed since the anchor moment.
         let periods_since_anchor = weeks_since_anchor.div_euclid(period_weeks);
+
         // The number of weeks since the anchor, quantized to the period.
         let weeks_since_anchor = periods_since_anchor * period_weeks;
 
         anchor + Duration::weeks(weeks_since_anchor)
     }
 
-    /// Returns the starting date of the next period,
-    /// i.e. this period's starting date plus the duration of a period.
-    fn next_start(self, period_start: NaiveDate) -> NaiveDate {
+    /// Returns the starting moment of the next period,
+    /// i.e. this period's starting moment plus the duration of a period.
+    fn next_start(self, period_start: DateTime<Utc>) -> DateTime<Utc> {
         period_start + Duration::weeks(self.weeks())
+    }
+}
+
+/// Returns the moment of the first scheduled reminder strictly after now.
+fn next_reminder(now: DateTime<Utc>) -> DateTime<Utc> {
+    let days_until_reminder = REMINDER_WEEKDAY.days_since(now.weekday());
+
+    // Find the nearest reminder date on or after today
+    // and replace its time with the scheduled time.
+    let reminder = now
+        .date_naive()
+        .checked_add_signed(Duration::days(i64::from(days_until_reminder)))
+        .and_then(|date| date.and_hms_opt(REMINDER_HOUR, REMINDER_MINUTE, 0))
+        .unwrap()
+        .and_utc();
+
+    if reminder > now {
+        // This is reached by manual runs before the scheduled day,
+        // e.g., for reminders scheduled on Thursdays, manual runs
+        // on Wednesdays or Fridays will end up here.
+        reminder
+    } else {
+        // The nearest reminder moment has been reached, so return next week's.
+        //
+        // This is reached by scheduled runs and
+        // manual runs after the scheduled time that day.
+        reminder + Duration::weeks(1)
     }
 }
 
@@ -385,15 +424,8 @@ impl<'gh> Goal<'gh> {
     }
 }
 
-fn display_job_date(date: NaiveDate) -> String {
-    format!(
-        "<time:{}T{JOB_UTC_HOUR:02}:{JOB_UTC_MINUTE:02}+00:00>",
-        date.format("%Y-%m-%d"),
-    )
-}
-
-fn display_datetime(date: DateTime<Utc>) -> String {
-    format!("<time:{}>", date.format("%Y-%m-%dT%H:%M%:z"),)
+fn display_datetime(datetime: DateTime<Utc>) -> String {
+    format!("<time:{}>", datetime.format("%Y-%m-%dT%H:%M%:z"),)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -401,19 +433,16 @@ struct Reminder<'gh> {
     goal: Goal<'gh>,
     /// The reporting period of this goal.
     period: Period,
-    /// The start date of this goal's current reporting period.
-    period_start: NaiveDate,
-    /// The start date of this goal's next reporting period.
-    ///
-    /// (This acts as a deadline for the current update.)
-    next_period_start: NaiveDate,
+    /// The start of this goal's current reporting period.
+    period_start: DateTime<Utc>,
+    /// The start of this goal's next reporting period.
+    next_period_start: DateTime<Utc>,
 }
 
 impl<'gh> Reminder<'gh> {
     fn from_issue(issue: &'gh GoalIssue, now: DateTime<Utc>) -> (Self, Option<String>) {
         let schedule = Schedule::from_issue(issue);
-        let today = now.date_naive();
-        let period_start = schedule.period.start(today);
+        let period_start = schedule.period.start(now);
         (
             Self {
                 goal: Goal::from_issue(issue),
@@ -432,16 +461,17 @@ impl<'gh> Reminder<'gh> {
     fn has_current_update(&self) -> bool {
         self.goal
             .last_comment_at
-            .is_some_and(|d| d.date_naive() >= self.period_start)
+            .is_some_and(|d| d >= self.period_start)
     }
 
     fn list_item(&self) -> String {
         format!(
-            "+ {goal}\n  - {latest}\n  - next *{period}* cycle starts {next}",
+            "+ {goal}\n  - {latest}\n  - this *{period}* cycle started {start}\n  - next cycle starts {next}",
             goal = self.goal.named_link(),
             latest = self.goal.latest_update(),
-            next = display_job_date(self.next_period_start),
             period = self.period.adjective(),
+            start = display_datetime(self.period_start),
+            next = display_datetime(self.next_period_start),
         )
     }
 }
@@ -489,7 +519,7 @@ impl ReminderErrors<'_> {
 struct ReminderPlan<'gh> {
     goals_by_owner: BTreeMap<ZulipId, Vec<Reminder<'gh>>>,
     errors: ReminderErrors<'gh>,
-    counters: Counters,
+    counters: GoalCounts,
 }
 
 impl<'gh> ReminderPlan<'gh> {
@@ -539,9 +569,9 @@ Please leave your updates as comments on the tracking issues. Thanks! <3
 
 ---
 
-*Note: Two- and four-week goals are pinged weekly until an update is posted for the current reporting period.*
+*Reporting periods start on Mondays. If any updates for the previous period are still outstanding on Thursday, reminders are sent weekly until they're posted.*
 
-*By default, the reporting period is 4 weeks. If you'd like to post updates more often, you can override the period per goal by labeling the issue with `R-every-week`, `R-every-2-weeks`, or `R-every-4-weeks`.*
+*By default, the reporting period is 4 weeks. If you'd like to post updates more often, you can override the period per goal by labeling the tracking issue with `R-every-week`, `R-every-2-weeks`, or `R-every-4-weeks`.*
 "#,
         owner = owner.mention(false),
         goals = goals.iter().map(Reminder::list_item).join("\n"),
@@ -804,13 +834,13 @@ impl PeriodCounter {
 }
 
 #[derive(Default)]
-struct Counters {
+struct GoalCounts {
     weekly: PeriodCounter,
     biweekly: PeriodCounter,
     four_week: PeriodCounter,
 }
 
-impl Counters {
+impl GoalCounts {
     /// Count the goal and return whether it is due for an update.
     fn count(&mut self, reminder: &Reminder<'_>, now: DateTime<Utc>) -> bool {
         let period = match reminder.period {
@@ -841,12 +871,16 @@ fn report(
     failed_dms: &[(ZulipId, String, String)],
     total_dms: usize,
     reminded_goals: usize,
-    counters: &Counters,
-    today: NaiveDate,
+    goals: &GoalCounts,
+    now: DateTime<Utc>,
 ) -> String {
-    let next_week = Period::EveryWeek.next_start(Period::EveryWeek.start(today));
-    let next_2_weeks = Period::Every2Weeks.next_start(Period::Every2Weeks.start(today));
-    let next_4_weeks = Period::Every4Weeks.next_start(Period::Every4Weeks.start(today));
+    let weekly_start = Period::EveryWeek.start(now);
+    let biweekly_start = Period::Every2Weeks.start(now);
+    let four_week_start = Period::Every4Weeks.start(now);
+    let weekly_next = Period::EveryWeek.next_start(weekly_start);
+    let biweekly_next = Period::Every2Weeks.next_start(biweekly_start);
+    let four_week_next = Period::Every4Weeks.next_start(four_week_start);
+    let next_reminder = next_reminder(now);
 
     let error_summary = if errors.is_empty() && failed_dms.is_empty() {
         "No errors happened in the process.".to_owned()
@@ -863,44 +897,48 @@ fn report(
         r#"
 Hi @*T-goals*!
 
-Weekly run finished.
+Reminder run finished.
 
-There are {total} open goals:
+There are {total_goals} open goals:
 + Weekly reports: {weekly_due} due, {weekly_updated} updated, {weekly_graced} in grace period
-  - Next cycle starts {next_week}
+  - This cycle started {weekly_start}; next one starts {weekly_next}
 + Biweekly reports: {biweekly_due} due, {biweekly_updated} updated, {biweekly_graced} in grace period
-  - Next cycle starts {next_2_weeks}
+  - This cycle started {biweekly_start}; next one starts {biweekly_next}
 + Four-week reports: {four_week_due} due, {four_week_updated} updated, {four_week_graced} in grace period
-  - Next cycle starts {next_4_weeks}
+  - This cycle started {four_week_start}; next one starts {four_week_next}
 
-Reminders were prepared for {total_dms} owners about {reminded_goals} goals.
+Reminders were prepared for {total_dms} @_*goal-owners* about {reminded_goals} goals.
 
 {ok_dms} of {total_dms} reminders were sent.
 
 {error_summary}
 
-Until next week! <3
+Until next week at {next_reminder}! <3
 "#,
-        total = counters.total(),
-        weekly_due = counters.weekly.due,
-        weekly_updated = counters.weekly.updated,
-        weekly_graced = counters.weekly.graced,
-        biweekly_due = counters.biweekly.due,
-        biweekly_updated = counters.biweekly.updated,
-        biweekly_graced = counters.biweekly.graced,
-        four_week_due = counters.four_week.due,
-        four_week_updated = counters.four_week.updated,
-        four_week_graced = counters.four_week.graced,
-        next_week = display_job_date(next_week),
-        next_2_weeks = display_job_date(next_2_weeks),
-        next_4_weeks = display_job_date(next_4_weeks),
+        total_goals = goals.total(),
+        weekly_due = goals.weekly.due,
+        weekly_updated = goals.weekly.updated,
+        weekly_graced = goals.weekly.graced,
+        biweekly_due = goals.biweekly.due,
+        biweekly_updated = goals.biweekly.updated,
+        biweekly_graced = goals.biweekly.graced,
+        four_week_due = goals.four_week.due,
+        four_week_updated = goals.four_week.updated,
+        four_week_graced = goals.four_week.graced,
+        weekly_start = display_datetime(weekly_start),
+        biweekly_start = display_datetime(biweekly_start),
+        four_week_start = display_datetime(four_week_start),
+        weekly_next = display_datetime(weekly_next),
+        biweekly_next = display_datetime(biweekly_next),
+        four_week_next = display_datetime(four_week_next),
+        next_reminder = display_datetime(next_reminder),
     )
 }
 
 async fn execute_plan(
     zulip: &ZulipClient,
     plan: ReminderPlan<'_>,
-    today: NaiveDate,
+    now: DateTime<Utc>,
     dry_run: bool,
 ) -> anyhow::Result<()> {
     let ReminderPlan {
@@ -933,7 +971,7 @@ async fn execute_plan(
             total_owners,
             reminded_goals,
             &counters,
-            today,
+            now,
         ),
         dry_run,
     )
@@ -951,7 +989,7 @@ pub async fn ping_owners(
     let now = Utc::now();
     let issues = gh.open_goal_issues().await?;
     let plan = build_plan(&issues, team, now).await?;
-    execute_plan(zulip, plan, now.date_naive(), dry_run).await
+    execute_plan(zulip, plan, now, dry_run).await
 }
 
 pub struct PingOwnersJob;
@@ -1078,8 +1116,8 @@ async fn echo_comment_to_zulip(
     .send(&ctx.zulip)
     .await?;
 
-    // Add a reaction (:book:) so it's easier to acknowledge the update.
-    ctx.zulip.add_reaction(posted.message_id, "book").await?;
+    // Add a reaction so it's easier to acknowledge the update.
+    ctx.zulip.add_reaction(posted.message_id, "ferris").await?;
 
     Ok(())
 }
