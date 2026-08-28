@@ -30,17 +30,20 @@ const GOALS_META_STREAM: u64 = 478_266; // #project-goals/meta
 const TRIAGEBOT_TOPIC: &str = "triagebot reports";
 const MAX_ZULIP_TOPIC: usize = 60;
 
+/// An arbitrary date to keep reporting periods anchored.
+///
+/// The phase of the biweekly and 4-week periods depends on this day.
+const EPOCH: NaiveDate = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+
+/// Reporting periods begin on Mondays, while the reminder job runs on Thursdays.
+const PERIOD_START_WEEKDAY: Weekday = Weekday::Mon;
+
 /// The weekday of the job execution (must match [`crate::jobs`]).
 const JOB_WEEKDAY: Weekday = Weekday::Thu;
 /// The UTC hour of the job execution (must match [`crate::jobs`]).
 const JOB_UTC_HOUR: u32 = 14;
 /// The UTC minute of the job execution (must match [`crate::jobs`]).
 const JOB_UTC_MINUTE: u32 = 0;
-
-/// An arbitrary date to keep reporting periods anchored.
-///
-/// The phase of the biweekly and 4-week periods depends on this day.
-const EPOCH: NaiveDate = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 struct ZulipId(u64);
@@ -257,26 +260,26 @@ impl Period {
 
     /// Returns the starting date of the period that includes this day.
     ///
-    /// Every reporting period begins on a [`JOB_WEEKDAY`]
+    /// Every reporting period begins on a [`PERIOD_START_WEEKDAY`]
     /// and lasts [`Period::weeks`], depending on the goal.
     ///
     /// Biweekly and 4-week cycles are aligned to [`EPOCH`].
     fn start(self, today: NaiveDate) -> NaiveDate {
-        // Depending on the chosen date, `EPOCH` may not fall on the `JOB_WEEKDAY`.
-        // `days_until_job` is needed to calculate an anchor from the `EPOCH` that
-        // falls on the `JOB_WEEKDAY` and can be used to compute the relevant dates.
-        let epoch_weekday = i64::from(EPOCH.weekday().num_days_from_monday());
-        let job_weekday = i64::from(JOB_WEEKDAY.num_days_from_monday());
-        let days_until_job = (job_weekday - epoch_weekday).rem_euclid(7);
+        // Depending on the chosen date, `EPOCH` may not fall on the `PERIOD_START_WEEKDAY`.
+        // `weekdays_until_period` is needed to calculate an anchor from the `EPOCH` that
+        // falls on the `PERIOD_START_WEEKDAY` and can be used to compute the relevant dates.
+        let weekdays_until_period = PERIOD_START_WEEKDAY.days_since(EPOCH.weekday());
 
         // Dates are computed relative to this date.
-        let anchor = EPOCH + Duration::days(days_until_job);
+        let anchor = EPOCH + Duration::days(i64::from(weekdays_until_period));
 
         // The number of full weeks since the anchor.
         let weeks_since_anchor = today.signed_duration_since(anchor).num_weeks();
         let period_weeks = self.weeks();
+
         // The number of full periods that passed since the anchor date.
         let periods_since_anchor = weeks_since_anchor.div_euclid(period_weeks);
+
         // The number of weeks since the anchor, quantized to the period.
         let weeks_since_anchor = periods_since_anchor * period_weeks;
 
@@ -288,6 +291,14 @@ impl Period {
     fn next_start(self, period_start: NaiveDate) -> NaiveDate {
         period_start + Duration::weeks(self.weeks())
     }
+}
+
+fn next_job_date(today: NaiveDate) -> NaiveDate {
+    today
+        + match JOB_WEEKDAY.days_since(today.weekday()) {
+            0 => Duration::weeks(1),
+            days => Duration::days(i64::from(days)),
+        }
 }
 
 #[derive(Debug)]
@@ -385,15 +396,16 @@ impl<'gh> Goal<'gh> {
     }
 }
 
-fn display_job_date(date: NaiveDate) -> String {
-    format!(
-        "<time:{}T{JOB_UTC_HOUR:02}:{JOB_UTC_MINUTE:02}+00:00>",
-        date.format("%Y-%m-%d"),
-    )
-}
-
 fn display_datetime(date: DateTime<Utc>) -> String {
     format!("<time:{}>", date.format("%Y-%m-%dT%H:%M%:z"),)
+}
+
+fn display_period_date(date: NaiveDate) -> String {
+    display_datetime(
+        date.and_hms_opt(JOB_UTC_HOUR, JOB_UTC_MINUTE, 0)
+            .unwrap()
+            .and_utc(),
+    )
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -437,11 +449,12 @@ impl<'gh> Reminder<'gh> {
 
     fn list_item(&self) -> String {
         format!(
-            "+ {goal}\n  - {latest}\n  - next *{period}* cycle starts {next}",
+            "+ {goal}\n  - {latest}\n  - current *{period}* cycle started {start}\n  - next cycle starts {next}",
             goal = self.goal.named_link(),
             latest = self.goal.latest_update(),
-            next = display_job_date(self.next_period_start),
             period = self.period.adjective(),
+            start = display_period_date(self.period_start),
+            next = display_period_date(self.next_period_start),
         )
     }
 }
@@ -489,7 +502,7 @@ impl ReminderErrors<'_> {
 struct ReminderPlan<'gh> {
     goals_by_owner: BTreeMap<ZulipId, Vec<Reminder<'gh>>>,
     errors: ReminderErrors<'gh>,
-    counters: Counters,
+    counters: GoalCounts,
 }
 
 impl<'gh> ReminderPlan<'gh> {
@@ -539,9 +552,9 @@ Please leave your updates as comments on the tracking issues. Thanks! <3
 
 ---
 
-*Note: Two- and four-week goals are pinged weekly until an update is posted for the current reporting period.*
+*Reporting periods start on Mondays. If any updates for the previous period are still outstanding on Thursday, reminders are sent weekly until they're posted.*
 
-*By default, the reporting period is 4 weeks. If you'd like to post updates more often, you can override the period per goal by labeling the issue with `R-every-week`, `R-every-2-weeks`, or `R-every-4-weeks`.*
+*By default, the reporting period is 4 weeks. If you'd like to post updates more often, you can override the period per goal by labeling the tracking issue with `R-every-week`, `R-every-2-weeks`, or `R-every-4-weeks`.*
 "#,
         owner = owner.mention(false),
         goals = goals.iter().map(Reminder::list_item).join("\n"),
@@ -804,13 +817,13 @@ impl PeriodCounter {
 }
 
 #[derive(Default)]
-struct Counters {
+struct GoalCounts {
     weekly: PeriodCounter,
     biweekly: PeriodCounter,
     four_week: PeriodCounter,
 }
 
-impl Counters {
+impl GoalCounts {
     /// Count the goal and return whether it is due for an update.
     fn count(&mut self, reminder: &Reminder<'_>, now: DateTime<Utc>) -> bool {
         let period = match reminder.period {
@@ -841,12 +854,16 @@ fn report(
     failed_dms: &[(ZulipId, String, String)],
     total_dms: usize,
     reminded_goals: usize,
-    counters: &Counters,
+    goals: &GoalCounts,
     today: NaiveDate,
 ) -> String {
-    let next_week = Period::EveryWeek.next_start(Period::EveryWeek.start(today));
-    let next_2_weeks = Period::Every2Weeks.next_start(Period::Every2Weeks.start(today));
-    let next_4_weeks = Period::Every4Weeks.next_start(Period::Every4Weeks.start(today));
+    let weekly_start = Period::EveryWeek.start(today);
+    let biweekly_start = Period::Every2Weeks.start(today);
+    let four_week_start = Period::Every4Weeks.start(today);
+    let weekly_next = Period::EveryWeek.next_start(weekly_start);
+    let biweekly_next = Period::Every2Weeks.next_start(biweekly_start);
+    let four_week_next = Period::Every4Weeks.next_start(four_week_start);
+    let next_reminder = next_job_date(today);
 
     let error_summary = if errors.is_empty() && failed_dms.is_empty() {
         "No errors happened in the process.".to_owned()
@@ -865,13 +882,13 @@ Hi @*T-goals*!
 
 Weekly run finished.
 
-There are {total} open goals:
+There are {total_goals} open goals:
 + Weekly reports: {weekly_due} due, {weekly_updated} updated, {weekly_graced} in grace period
-  - Next cycle starts {next_week}
+  - Current cycle started {weekly_start}; next one starts {weekly_next}
 + Biweekly reports: {biweekly_due} due, {biweekly_updated} updated, {biweekly_graced} in grace period
-  - Next cycle starts {next_2_weeks}
+  - Current cycle started {biweekly_start}; next one starts {biweekly_next}
 + Four-week reports: {four_week_due} due, {four_week_updated} updated, {four_week_graced} in grace period
-  - Next cycle starts {next_4_weeks}
+  - Current cycle started {four_week_start}; next one starts {four_week_next}
 
 Reminders were prepared for {total_dms} owners about {reminded_goals} goals.
 
@@ -879,21 +896,25 @@ Reminders were prepared for {total_dms} owners about {reminded_goals} goals.
 
 {error_summary}
 
-Until next week! <3
+Until next week at {next_reminder}! <3
 "#,
-        total = counters.total(),
-        weekly_due = counters.weekly.due,
-        weekly_updated = counters.weekly.updated,
-        weekly_graced = counters.weekly.graced,
-        biweekly_due = counters.biweekly.due,
-        biweekly_updated = counters.biweekly.updated,
-        biweekly_graced = counters.biweekly.graced,
-        four_week_due = counters.four_week.due,
-        four_week_updated = counters.four_week.updated,
-        four_week_graced = counters.four_week.graced,
-        next_week = display_job_date(next_week),
-        next_2_weeks = display_job_date(next_2_weeks),
-        next_4_weeks = display_job_date(next_4_weeks),
+        total_goals = goals.total(),
+        weekly_due = goals.weekly.due,
+        weekly_updated = goals.weekly.updated,
+        weekly_graced = goals.weekly.graced,
+        biweekly_due = goals.biweekly.due,
+        biweekly_updated = goals.biweekly.updated,
+        biweekly_graced = goals.biweekly.graced,
+        four_week_due = goals.four_week.due,
+        four_week_updated = goals.four_week.updated,
+        four_week_graced = goals.four_week.graced,
+        weekly_start = display_period_date(weekly_start),
+        biweekly_start = display_period_date(biweekly_start),
+        four_week_start = display_period_date(four_week_start),
+        weekly_next = display_period_date(weekly_next),
+        biweekly_next = display_period_date(biweekly_next),
+        four_week_next = display_period_date(four_week_next),
+        next_reminder = display_period_date(next_reminder),
     )
 }
 

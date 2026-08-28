@@ -112,6 +112,8 @@ pub fn default_jobs() -> Vec<JobSchedule> {
         JobSchedule {
             name: goals::PingOwnersJob.name(),
             // Around 6/7am Pacific time on every Thursday.
+            //
+            // Propagate changes to the schedule to the JOB_* constants in goals.rs.
             schedule: Schedule::from_str("0 00 14 * * Thu *").unwrap(),
             metadata: serde_json::Value::Null,
         },
