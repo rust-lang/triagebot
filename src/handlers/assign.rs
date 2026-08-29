@@ -26,7 +26,7 @@ use crate::config::AssignCommunityReviewsConfig;
 use crate::db::issue_data::IssueData;
 use crate::db::review_prefs::{RotationMode, get_review_prefs_batch};
 use crate::errors::{self, AssignmentError, user_error};
-use crate::github::UserId;
+use crate::github::{GitHubUser, UserId};
 use crate::handlers::assign::messages::add_contribution_urls;
 use crate::handlers::pr_tracking::ReviewerWorkqueue;
 use crate::interactions::ErrorComment;
@@ -196,15 +196,24 @@ pub(super) async fn handle_input(
             assign_command.as_ref().is_some_and(|a| a != GHOST_ACCOUNT)
         }
         AssignInput::Reopened { draft: false } => {
-            if let Some(community_reviews) = &config.community_reviews
-                && assign_command.is_none()
+            if assign_command.is_none()
+                && event.issue.assignees.is_empty()
+                && let Some(community_reviews) = &config.community_reviews
             {
-                // There are no current assignees, add the community review label
+                // There are no assignees for this PR and we are under community reviews.
                 //
-                // No need to worry about approvals that may have happend between
-                // the time the PR was closed and this re-opening as GitHub doesn't
-                // allow approving a closed PR.
-                if !event.issue.assignees.is_empty() {
+                // Let's check if there are enough community review approvals, if there are
+                // that means we already previously reached the threshold (as GitHub doesn't
+                // allow approving a closed PR) and since then the assignees have been unassigned.
+                // Nothing to do in that case.
+                //
+                // But if the threshold was not reached before it was closed, let's re-add the
+                // community review label, so we can continue to monitor the PR and assign a reviewer
+                // in due time.
+                if let HasEnoughReviewApprovals::No =
+                    has_enough_community_review_approvals(ctx, community_reviews, &event.issue)
+                        .await?
+                {
                     event
                         .issue
                         .add_labels(
@@ -498,25 +507,16 @@ fn is_self_assign(assignee: &str, pr_author: &str) -> bool {
     assignee.to_lowercase() == pr_author.to_lowercase()
 }
 
-/// Status after updating the community review status
-enum CommunityReviewUpdateStatus {
-    /// Not enough review approvals
-    NotEnoughApprovals,
-    /// Enough review approvals, requested automatic assignment by removing the label.
-    ///
-    /// Can be shortcut by preemptively assigning someone.
-    RequestedAutoAssign,
-    /// Enough review approvals, removed the label and assigned the last reviewer.
-    AssignedLastReviewer,
+enum HasEnoughReviewApprovals {
+    Yes { last_review_user: GitHubUser },
+    No,
 }
 
-/// Update the community reviews label on the PR and perform direct assignment if
-/// the last reviewer is a repo reviewer.
-async fn update_community_review_assignment(
+async fn has_enough_community_review_approvals(
     ctx: &Context,
     config: &AssignCommunityReviewsConfig,
     issue: &Issue,
-) -> anyhow::Result<CommunityReviewUpdateStatus> {
+) -> anyhow::Result<HasEnoughReviewApprovals> {
     use futures::StreamExt;
 
     let review_stream = issue.get_all_reviews(&ctx.github);
@@ -543,25 +543,57 @@ async fn update_community_review_assignment(
         }
     }
 
-    let enough_reviews = approval_reviews.len() >= config.minimum_approvals.get().into();
+    if approval_reviews.len() >= config.minimum_approvals.get().into()
+        && let Some(last) = approval_reviews.pop()
+    {
+        Ok(HasEnoughReviewApprovals::Yes {
+            last_review_user: last,
+        })
+    } else {
+        Ok(HasEnoughReviewApprovals::No)
+    }
+}
 
-    if enough_reviews {
+/// Status after updating the community review status
+enum CommunityReviewUpdateStatus {
+    /// Not enough review approvals
+    NotEnoughApprovals,
+    /// Enough review approvals, requested automatic assignment by removing the label.
+    ///
+    /// Can be shortcut by preemptively assigning someone.
+    RequestedAutoAssign,
+    /// Enough review approvals, removed the label and assigned the last reviewer.
+    AssignedLastReviewer,
+}
+
+/// Update the community reviews label on the PR and perform direct assignment if
+/// the last reviewer is a repo reviewer.
+async fn update_community_review_assignment(
+    ctx: &Context,
+    config: &AssignCommunityReviewsConfig,
+    issue: &Issue,
+) -> anyhow::Result<CommunityReviewUpdateStatus> {
+    let enough_reviews = has_enough_community_review_approvals(ctx, config, issue).await?;
+
+    if let HasEnoughReviewApprovals::Yes { last_review_user } = enough_reviews {
         // Check if last approvee has write permissions on the repo (proxy for merging rights, not perfect)
-        let upd_status = if let Some(last) = approval_reviews.last()
-            && issue
-                .repository()
-                .collaborator_permission(&ctx.github, &last.login)
-                .await
-                .context("failed to determine the last approvee permissions on the repository")?
-                .permission
-                .has_write_permissions()
+        let upd_status = if issue
+            .repository()
+            .collaborator_permission(&ctx.github, &last_review_user.login)
+            .await
+            .context("failed to determine the last approvee permissions on the repository")?
+            .permission
+            .has_write_permissions()
         {
             // They can merge, try to add them as assignee
-            if let Err(err) = issue.add_assignee(&ctx.github, &last.login).await {
+            if let Err(err) = issue
+                .add_assignee(&ctx.github, &last_review_user.login)
+                .await
+            {
                 // Failed to add the last reviewer as assignee, report an error
                 let msg = format!(
                     "Failed to assign the last approvee (@{}): {err}, performing automatic assignment.",
-                    &last.login
+                    &last_review_user.login
                 );
                 ErrorComment::new(&issue, &msg)
                     .post(&ctx.github)
