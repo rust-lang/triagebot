@@ -196,15 +196,24 @@ pub(super) async fn handle_input(
             assign_command.as_ref().is_some_and(|a| a != GHOST_ACCOUNT)
         }
         AssignInput::Reopened { draft: false } => {
-            if let Some(community_reviews) = &config.community_reviews
-                && assign_command.is_none()
+            if assign_command.is_none()
+                && !event.issue.assignees.is_empty()
+                && let Some(community_reviews) = &config.community_reviews
             {
-                // There are no current assignees, add the community review label
+                // There are no assignees for this PR and we are under community reviews.
                 //
-                // No need to worry about approvals that may have happend between
-                // the time the PR was closed and this re-opening as GitHub doesn't
-                // allow approving a closed PR.
-                if !event.issue.assignees.is_empty() {
+                // Let's check if there are enough community review approvals, if there are
+                // that means we already previously reached the threshold (as GitHub doesn't
+                // allow approving a closed PR) and since then the assignees have been unassigned.
+                // Nothing to do in that case.
+                //
+                // But if the threshold was not reached before it was closed, let's re-add the
+                // community review label, so we can continue to monitor the PR and assign a reviewer
+                // in due time.
+                if let HasEnoughReviewApprovals::No =
+                    has_enough_community_review_approvals(ctx, community_reviews, &event.issue)
+                        .await?
+                {
                     event
                         .issue
                         .add_labels(
