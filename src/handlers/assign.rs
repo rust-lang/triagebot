@@ -197,7 +197,7 @@ pub(super) async fn handle_input(
         }
         AssignInput::Reopened { draft: false } => {
             if assign_command.is_none()
-                && !event.issue.assignees.is_empty()
+                && event.issue.assignees.is_empty()
                 && let Some(community_reviews) = &config.community_reviews
             {
                 // There are no assignees for this PR and we are under community reviews.
