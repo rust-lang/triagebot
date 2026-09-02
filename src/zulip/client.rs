@@ -208,6 +208,53 @@ impl ZulipClient {
                 .into()
         })
     }
+
+    // https://zulip.com/api/update-message#parameter-topic
+    pub(crate) async fn resolve_topic(
+        &self,
+        message_id: u64,
+        message_topic: &str,
+    ) -> anyhow::Result<()> {
+        #[derive(serde::Serialize)]
+        struct ResolveTopic<'a> {
+            topic: &'a str,
+            propagate_mode: &'a str,
+            send_notification_to_old_thread: bool,
+            send_notification_to_new_thread: bool,
+        }
+
+        let mut topic = message_topic.replacen("", "✔ ", 1);
+        // Maximum 60, minus the elipsis
+        let mut chars = topic.char_indices().skip(60 - 1);
+        if let Some((len, _)) = chars.next()
+            && chars.next().is_some()
+        {
+            topic = format!("{}…", &topic[..len]);
+        }
+
+        let resp = self
+            .make_request(Method::PATCH, &format!("messages/{message_id}"))
+            .form(&ResolveTopic {
+                topic: &topic,
+                propagate_mode: "change_all",
+                send_notification_to_old_thread: false,
+                send_notification_to_new_thread: false,
+            })
+            .send()
+            .await
+            .context("failed to add resolve Zulip topic")?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp
+                .text()
+                .await
+                .context("fail receiving Zulip API response (when resolving topic)")?;
+            anyhow::bail!(body)
+        }
+
+        Ok(())
+    }
 }
 
 async fn deserialize_response<T>(response: Response) -> anyhow::Result<T>
