@@ -203,7 +203,11 @@ impl ZulipClient {
     }
 
     // https://zulip.com/api/update-message#parameter-topic
-    pub(crate) async fn resolve_topic(&self, message_id: u64, topic: &str) -> anyhow::Result<()> {
+    pub(crate) async fn resolve_topic(
+        &self,
+        message_id: u64,
+        message_topic: &str,
+    ) -> anyhow::Result<()> {
         #[derive(serde::Serialize)]
         struct ResolveTopic<'a> {
             topic: &'a str,
@@ -212,10 +216,19 @@ impl ZulipClient {
             send_notification_to_new_thread: bool,
         }
 
+        let mut topic = message_topic.replacen("", "✔ ", 1);
+        // Maximum 60, minus the elipsis
+        let mut chars = topic.char_indices().skip(60 - 1);
+        if let Some((len, _)) = chars.next()
+            && chars.next().is_some()
+        {
+            topic = format!("{}…", &topic[..len]);
+        }
+
         let resp = self
             .make_request(Method::PATCH, &format!("messages/{message_id}"))
             .form(&ResolveTopic {
-                topic: &topic.replacen("", "✔ ", 1),
+                topic: &topic,
                 propagate_mode: "change_all",
                 send_notification_to_old_thread: false,
                 send_notification_to_new_thread: false,
