@@ -1462,16 +1462,8 @@ async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::
 
     Ok(format!(
         "{}'s GitHub profile is [{github_username}](https://github.com/{github_username}).",
-        render_zulip_username(zulip_user.user_id)
+        format_zulip_username(zulip_user.user_id, PingMode::Silent)
     ))
-}
-
-pub fn render_zulip_username(zulip_id: u64) -> String {
-    // Rendering the username directly was running into some encoding issues, so we use
-    // the special `|<user-id>` syntax instead.
-    // @**|<zulip-id>** is Zulip syntax that will render as the username (and a link) of the user
-    // with the given Zulip ID.
-    format!("@**|{zulip_id}**")
 }
 
 /// Tries to find a Zulip username from a GitHub username.
@@ -1527,7 +1519,7 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
     };
     Ok(format!(
         "The GitHub user `{gh_username}` has the following Zulip account: {}",
-        render_zulip_username(zulip_id)
+        format_zulip_username(zulip_id, PingMode::Silent)
     ))
 }
 
@@ -1555,7 +1547,8 @@ async fn yank_crate_cmd(
         .context("Cannot yank crate")?;
 
     Ok(Some(format!(
-        "Crate {krate}@{version} was successfully yanked"
+        "Crate {krate}@{version} was successfully yanked by {}",
+        format_zulip_username(message_data.sender_id, PingMode::Silent)
     )))
 }
 
@@ -1583,7 +1576,8 @@ async fn unyank_crate_cmd(
         .context("Cannot unyank crate")?;
 
     Ok(Some(format!(
-        "Crate {krate}@{version} was successfully unyanked"
+        "Crate {krate}@{version} was successfully unyanked by {}",
+        format_zulip_username(message_data.sender_id, PingMode::Silent)
     )))
 }
 
@@ -1866,6 +1860,26 @@ pub fn format_user_pr(pr: &UserPullRequest) -> String {
             PullRequestState::Merged => ":purple_circle:",
         }
     )
+}
+
+/// Ping mode for @<user> mentions on Zulip.
+pub enum PingMode {
+    /// Do not ping the person
+    Silent,
+    /// Ping the person
+    Ping,
+}
+
+pub fn format_zulip_username(zulip_id: u64, ping_mode: PingMode) -> String {
+    // Rendering the username directly was running into some encoding issues, so we use
+    // the special `|<user-id>` syntax instead.
+    // @**|<zulip-id>** is Zulip syntax that will render as the username (and a link) of the user
+    // with the given Zulip ID.
+    let prefix = match ping_mode {
+        PingMode::Silent => "_",
+        PingMode::Ping => "",
+    };
+    format!("@{prefix}**|{zulip_id}**")
 }
 
 fn format_date(date: Option<DateTime<Utc>>) -> String {
