@@ -161,7 +161,10 @@ pub async fn webhook(
 }
 
 pub fn get_token_from_env() -> Result<SecretString, anyhow::Error> {
-    #[expect(clippy::bind_instead_of_map, reason = "`.map_err` is suggested, but we don't really map the error")]
+    #[expect(
+        clippy::bind_instead_of_map,
+        reason = "`.map_err` is suggested, but we don't really map the error"
+    )]
     // ZULIP_WEBHOOK_SECRET is preferred, ZULIP_TOKEN is kept for retrocompatibility but will be deprecated
     std::env::var("ZULIP_WEBHOOK_SECRET")
         .or_else(|_| std::env::var("ZULIP_TOKEN"))
@@ -392,6 +395,12 @@ async fn handle_command<'a>(
                     repo,
                     id,
                 } => unlock_cmd(&ctx, gh_id, &organization, &repo, id).await,
+                StreamCommand::Yank { krate, version } => {
+                    yank_crate_cmd(&ctx, gh_id, &krate, &version, message_data).await
+                }
+                StreamCommand::Unyank { krate, version } => {
+                    unyank_crate_cmd(&ctx, gh_id, &krate, &version, message_data).await
+                }
             };
         }
 
@@ -1520,6 +1529,116 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
         "The GitHub user `{gh_username}` has the following Zulip account: {}",
         render_zulip_username(zulip_id)
     ))
+}
+
+/// Yank a crate on crates.io, if the user has permissions for it.
+async fn yank_crate_cmd(
+    ctx: &Context,
+    gh_id: u64,
+    krate: &str,
+    version: &str,
+    message_data: &Message,
+) -> anyhow::Result<Option<String>> {
+    if let Err(error) = check_yank_stream(message_data) {
+        return Ok(Some(error));
+    }
+
+    if !owns_crate(ctx, gh_id, krate).await? {
+        return Ok(Some(
+            "You do not have permissions to yank this crate".to_string(),
+        ));
+    }
+
+    ctx.crates_io
+        .yank_crate(krate, version)
+        .await
+        .context("Cannot yank crate")?;
+
+    Ok(Some(format!(
+        "Crate {krate}@{version} was successfully yanked"
+    )))
+}
+
+/// Unyank a crate on crates.io, if the user has permissions for it.
+async fn unyank_crate_cmd(
+    ctx: &Context,
+    gh_id: u64,
+    krate: &str,
+    version: &str,
+    message_data: &Message,
+) -> anyhow::Result<Option<String>> {
+    if let Err(error) = check_yank_stream(message_data) {
+        return Ok(Some(error));
+    }
+
+    if !owns_crate(ctx, gh_id, krate).await? {
+        return Ok(Some(
+            "You do not have permissions to unyank this crate".to_string(),
+        ));
+    }
+
+    ctx.crates_io
+        .unyank_crate(krate, version)
+        .await
+        .context("Cannot unyank crate")?;
+
+    Ok(Some(format!(
+        "Crate {krate}@{version} was successfully unyanked"
+    )))
+}
+
+/// Checks if the message was sent to a stream that is allowed to yank/unyank crates.
+/// If not, returns an error message.
+fn check_yank_stream(message: &Message) -> Result<(), String> {
+    let Some(stream_id) = message.stream_id else {
+        return Err("Message was not sent to a channel".to_string());
+    };
+    let Some(topic) = &message.subject else {
+        return Err("Message was not sent to a topic".to_string());
+    };
+
+    // #t-libs/crates
+    const STREAM_ID: u64 = 351149;
+    const TOPIC: &str = "crate yanking and unyanking";
+
+    if stream_id != STREAM_ID || topic != TOPIC {
+        Err(format!(
+            "Yanking and unyanking can only be performed in the #t-libs/crates#{TOPIC} topic"
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+/// Returns Ok(true) if user with the given GitHub id is a member of a team that owns `krate`
+/// in the team database (and thus on crates.io).
+async fn owns_crate(ctx: &Context, gh_id: u64, krate: &str) -> anyhow::Result<bool> {
+    let crate_map = ctx
+        .team
+        .crate_map()
+        .await
+        .context("Cannot load crate map")?;
+    let Some(krate) = crate_map.crates.get(krate) else {
+        return Err(anyhow::anyhow!(
+            "Crate {krate} is not managed in the team database"
+        ));
+    };
+    let teams = ctx.team.teams().await?;
+    for team in &krate.teams {
+        let Some(team) = teams.teams.get(team.as_str()) else {
+            continue;
+        };
+        if team
+            .members
+            .iter()
+            .find(|member| member.github_id == gh_id)
+            .is_some()
+        {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 pub(crate) struct MessageApiRequest<'a> {

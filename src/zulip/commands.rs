@@ -185,6 +185,24 @@ pub enum StreamCommand {
         /// Issue or pull-request number to unlock.
         id: PullRequestNumber,
     },
+    /// Yank a specific crate version from crates.io.
+    /// Can only be performed by members of teams that own the crate.
+    Yank {
+        /// Crate to yank.
+        #[arg(name = "crate")]
+        krate: String,
+        /// Version of the crate to yank
+        version: String,
+    },
+    /// Unynk a specific crate version from crates.io.
+    /// Can only be performed by members of teams that own the crate.
+    Unyank {
+        /// Crate to unyank.
+        #[arg(name = "crate")]
+        krate: String,
+        /// Version of the crate to unyank
+        version: String,
+    },
 }
 
 /// Backport release channels
@@ -458,6 +476,24 @@ mod tests {
             ChatCommand::UserInfo {
                 username: "foobar".to_string(),
                 organization: "rust-lang-nursery".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn yank_unyank_command() {
+        assert_eq!(
+            parse_stream(&["yank", "foo", "1.2.3"]),
+            StreamCommand::Yank {
+                krate: "foo".to_string(),
+                version: "1.2.3".to_string(),
+            }
+        );
+        assert_eq!(
+            parse_stream(&["unyank", "bar", "1.4.3"]),
+            StreamCommand::Unyank {
+                krate: "bar".to_string(),
+                version: "1.4.3".to_string(),
             }
         );
     }

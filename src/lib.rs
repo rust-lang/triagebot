@@ -6,6 +6,7 @@ pub mod bors;
 mod cache;
 mod changelogs;
 mod config;
+pub mod crates_io;
 pub mod db;
 mod errors;
 pub mod gh_changes_since;
