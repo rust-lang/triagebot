@@ -1581,6 +1581,13 @@ async fn unyank_crate_cmd(
     )))
 }
 
+/// Stream that has to be used for yanking/unyanking of crates.
+/// #t-libs/crates
+const YANK_STREAM_ID: u64 = 351149;
+
+/// Topic in `YANK_STREAM_ID` that has to be used for yanking/unyanking of crates.
+const YANK_TOPIC: &str = "crate yanking and unyanking";
+
 /// Checks if the message was sent to a stream that is allowed to yank/unyank crates.
 /// If not, returns an error message.
 fn check_yank_stream(message: &Message) -> Result<(), String> {
@@ -1591,13 +1598,9 @@ fn check_yank_stream(message: &Message) -> Result<(), String> {
         return Err("Message was not sent to a topic".to_string());
     };
 
-    // #t-libs/crates
-    const STREAM_ID: u64 = 351149;
-    const TOPIC: &str = "crate yanking and unyanking";
-
-    if stream_id != STREAM_ID || topic != TOPIC {
+    if stream_id != YANK_STREAM_ID || topic != YANK_TOPIC {
         Err(format!(
-            "Yanking and unyanking can only be performed in the #t-libs/crates#{TOPIC} topic"
+            "Yanking and unyanking can only be performed in the #t-libs/crates > {YANK_TOPIC} topic"
         ))
     } else {
         Ok(())
