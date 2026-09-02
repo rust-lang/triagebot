@@ -1,3 +1,4 @@
+use crate::crates_io::CratesIoApi;
 use crate::db;
 use crate::db::users::record_username;
 use crate::db::{ClientPool, PooledClient, make_client};
@@ -80,6 +81,7 @@ impl TestContext {
             github,
             zulip,
             team: team_api,
+            crates_io: CratesIoApi::new(),
             db: pool,
             username: "triagebot-test".to_string(),
             octocrab,
