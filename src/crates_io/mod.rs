@@ -5,6 +5,7 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::Serialize;
 use std::env;
 use std::sync::OnceLock;
+use url::Url;
 
 // OpenAPI spec: https://crates.io/api/openapi.json
 const CRATES_IO_BASE_URL: &str = "https://crates.io/api/v1";
@@ -43,10 +44,10 @@ impl CratesIoApi {
     }
 
     /// Yanks a crate from crates.io.
-    pub(crate) async fn yank_crate(&self, krate: &str, version: &str) -> anyhow::Result<()> {
+    pub async fn yank_crate(&self, krate: &str, version: &str) -> anyhow::Result<()> {
         self.req::<()>(
             reqwest::Method::DELETE,
-            &format!("/crates/{krate}/{version}/yank"),
+            self.url(&["crates", krate, version, "yank"]),
         )
         .await?
         .error_for_status()?;
@@ -55,10 +56,10 @@ impl CratesIoApi {
     }
 
     /// Unyanks a crate from crates.io.
-    pub(crate) async fn unyank_crate(&self, krate: &str, version: &str) -> anyhow::Result<()> {
+    pub async fn unyank_crate(&self, krate: &str, version: &str) -> anyhow::Result<()> {
         self.req::<()>(
             reqwest::Method::PUT,
-            &format!("/crates/{krate}/{version}/unyank"),
+            self.url(&["crates", krate, version, "unyank"]),
         )
         .await?
         .error_for_status()?;
@@ -66,18 +67,31 @@ impl CratesIoApi {
         Ok(())
     }
 
-    /// Perform a request against the crates.io API
+    /// Performs a request against the crates.io API
     async fn req<T: Serialize>(
         &self,
         method: reqwest::Method,
-        path: &str,
+        url: Url,
     ) -> anyhow::Result<reqwest::Response> {
         let token = self.get_api_token();
         let req = self
             .client
-            .request(method, format!("{CRATES_IO_BASE_URL}{path}"))
+            .request(method, url)
             .bearer_auth(token.expose_secret());
 
         Ok(req.send().await?)
+    }
+
+    /// We construct the URL from individual segments, to avoid possible "URL injection" by using
+    /// segments like "../<path>", which could overwrite other segments of the URL.
+    fn url(&self, segments: &[&str]) -> Url {
+        let mut url = Url::parse(CRATES_IO_BASE_URL).unwrap();
+        {
+            let mut url_segments = url.path_segments_mut().unwrap();
+            for segment in segments {
+                url_segments.push(segment);
+            }
+        }
+        url
     }
 }
