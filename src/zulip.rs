@@ -1528,13 +1528,13 @@ async fn yank_crate_cmd(
     ctx: &Context,
     gh_id: u64,
     krate: &str,
-    version: &str,
+    version: &semver::Version,
     message_data: &Message,
 ) -> anyhow::Result<Option<String>> {
     if let Err(error) = check_yank_stream(message_data) {
         return Ok(Some(error));
     }
-    if let Err(error) = check_crate_info(krate, version) {
+    if let Err(error) = check_crate_info(krate) {
         return Ok(Some(error));
     }
 
@@ -1550,7 +1550,7 @@ async fn yank_crate_cmd(
         .context("Cannot yank crate")?;
 
     Ok(Some(format!(
-        "Crate {krate}@{version} was successfully yanked by {}",
+        "Crate `{krate}@{version}` was successfully yanked by {}",
         format_zulip_username(message_data.sender_id, PingMode::Silent)
     )))
 }
@@ -1560,13 +1560,13 @@ async fn unyank_crate_cmd(
     ctx: &Context,
     gh_id: u64,
     krate: &str,
-    version: &str,
+    version: &semver::Version,
     message_data: &Message,
 ) -> anyhow::Result<Option<String>> {
     if let Err(error) = check_yank_stream(message_data) {
         return Ok(Some(error));
     }
-    if let Err(error) = check_crate_info(krate, version) {
+    if let Err(error) = check_crate_info(krate) {
         return Ok(Some(error));
     }
 
@@ -1582,30 +1582,19 @@ async fn unyank_crate_cmd(
         .context("Cannot unyank crate")?;
 
     Ok(Some(format!(
-        "Crate {krate}@{version} was successfully unyanked by {}",
+        "Crate `{krate}@{version}` was successfully unyanked by {}",
         format_zulip_username(message_data.sender_id, PingMode::Silent)
     )))
 }
 
-/// Checks whether the krate name and version look correct, i.e. do not contain any suspicious
-/// characters, and whether the version is in a correct semver format.
-///
-/// It is important to call this function, because we pass the crate name and version to a
-/// crates.io API request.
-fn check_crate_info(krate: &str, version: &str) -> Result<(), String> {
+/// Checks whether the krate name look correct, i.e. do not contain any suspicious
+/// characters.
+fn check_crate_info(krate: &str) -> Result<(), String> {
     if !krate
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
     {
         return Err("Crate name contains invalid characters".to_string());
-    }
-    if let Err(error) = semver::Version::parse(version) {
-        return Err(format!(
-            "Crate version is not a valid semver version: {error}"
-        ));
-    }
-    if version.contains("..") || version.contains("/") {
-        return Err("Crate version contains invalid characters".to_string());
     }
 
     Ok(())
@@ -1647,7 +1636,7 @@ async fn owns_crate(ctx: &Context, gh_id: u64, krate: &str) -> anyhow::Result<bo
         .context("Cannot load crate map")?;
     let Some(krate) = crate_map.crates.get(krate) else {
         return Err(anyhow::anyhow!(
-            "Crate {krate} is not managed in the team database"
+            "Couldn't find {krate} in the team database"
         ));
     };
     let teams = ctx.team.teams().await?;

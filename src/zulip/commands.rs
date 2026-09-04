@@ -192,7 +192,7 @@ pub enum StreamCommand {
         #[arg(name = "crate")]
         krate: String,
         /// Version of the crate to yank
-        version: String,
+        version: semver::Version,
     },
     /// Unynk a specific crate version from crates.io.
     /// Can only be performed by members of teams that own the crate.
@@ -201,7 +201,7 @@ pub enum StreamCommand {
         #[arg(name = "crate")]
         krate: String,
         /// Version of the crate to unyank
-        version: String,
+        version: semver::Version,
     },
 }
 
@@ -486,14 +486,14 @@ mod tests {
             parse_stream(&["yank", "foo", "1.2.3"]),
             StreamCommand::Yank {
                 krate: "foo".to_string(),
-                version: "1.2.3".to_string(),
+                version: semver::Version::parse("1.2.3").unwrap(),
             }
         );
         assert_eq!(
             parse_stream(&["unyank", "bar", "1.4.3"]),
             StreamCommand::Unyank {
                 krate: "bar".to_string(),
-                version: "1.4.3".to_string(),
+                version: semver::Version::parse("1.4.3").unwrap(),
             }
         );
     }

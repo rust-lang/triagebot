@@ -5,6 +5,7 @@ use secrecy::{ExposeSecret, SecretString};
 use serde::Serialize;
 use std::env;
 use std::sync::OnceLock;
+use tracing::instrument;
 use url::Url;
 
 // OpenAPI spec: https://crates.io/api/openapi.json
@@ -44,10 +45,11 @@ impl CratesIoApi {
     }
 
     /// Yanks a crate from crates.io.
-    pub async fn yank_crate(&self, krate: &str, version: &str) -> anyhow::Result<()> {
+    #[instrument(level = "info", skip(self))]
+    pub async fn yank_crate(&self, krate: &str, version: &semver::Version) -> anyhow::Result<()> {
         self.req::<()>(
             reqwest::Method::DELETE,
-            self.url(&["crates", krate, version, "yank"]),
+            self.url(&["crates", krate, &version.to_string(), "yank"]),
         )
         .await?
         .error_for_status()?;
@@ -56,10 +58,11 @@ impl CratesIoApi {
     }
 
     /// Unyanks a crate from crates.io.
-    pub async fn unyank_crate(&self, krate: &str, version: &str) -> anyhow::Result<()> {
+    #[instrument(level = "info", skip(self))]
+    pub async fn unyank_crate(&self, krate: &str, version: &semver::Version) -> anyhow::Result<()> {
         self.req::<()>(
             reqwest::Method::PUT,
-            self.url(&["crates", krate, version, "unyank"]),
+            self.url(&["crates", krate, &version.to_string(), "unyank"]),
         )
         .await?
         .error_for_status()?;
