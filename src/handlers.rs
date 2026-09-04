@@ -1,4 +1,5 @@
 use crate::config::{self, Config, ConfigurationError};
+use crate::crates_io::CratesIoApi;
 use crate::gh_comments::GitHubCommentsCache;
 use crate::gha_logs::GitHubActionLogsCache;
 use crate::github::{Event, GithubClient, IssueCommentAction, IssuesAction, IssuesEvent};
@@ -53,6 +54,7 @@ pub struct Context {
     pub github: GithubClient,
     pub zulip: ZulipClient,
     pub team: TeamClient,
+    pub crates_io: CratesIoApi,
     pub db: crate::db::ClientPool,
     pub username: String,
     pub octocrab: Octocrab,

@@ -2250,7 +2250,7 @@ dependencies = [
 [[package]]
 name = "rust_team_data"
 version = "1.0.0"
-source = "git+https://github.com/rust-lang/team#99a209f68462354a2e69bfbe938741036c731cdb"
+source = "git+https://github.com/rust-lang/team#11f22ac016e874152e3c520f2f3e211baaaba7cd"
 dependencies = [
  "indexmap",
  "serde",
@@ -2390,6 +2390,12 @@ dependencies = [
  "core-foundation-sys",
  "libc",
 ]
+
+[[package]]
+name = "semver"
+version = "1.0.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
 
 [[package]]
 name = "serde"
@@ -3125,6 +3131,7 @@ dependencies = [
  "reqwest",
  "rust_team_data",
  "secrecy",
+ "semver",
  "serde",
  "serde_json",
  "serde_path_to_error",

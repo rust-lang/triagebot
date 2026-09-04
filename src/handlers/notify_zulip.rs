@@ -5,7 +5,7 @@
 
 use crate::github::GitHubUser;
 use crate::zulip::api::Recipient;
-use crate::zulip::render_zulip_username;
+use crate::zulip::{PingMode, format_zulip_username};
 use crate::{
     config::{NotifyZulipConfig, NotifyZulipLabelConfig, NotifyZulipTablesConfig},
     github::{Issue, IssuesAction, IssuesEvent, Label},
@@ -283,7 +283,7 @@ async fn get_zulip_ids(ctx: &Context, recipients: &[GitHubUser]) -> String {
             if let Ok(id2) = x.as_ref()
                 && let Some(id) = *id2
             {
-                Some(render_zulip_username(id))
+                Some(format_zulip_username(id, PingMode::Ping))
             } else {
                 None
             }

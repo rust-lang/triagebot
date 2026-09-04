@@ -25,6 +25,7 @@ use tower_http::compression::CompressionLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{self as log, info_span};
+use triagebot::crates_io::CratesIoApi;
 use triagebot::gh_comments::{GH_COMMENTS_CACHE_CAPACITY_BYTES, GitHubCommentsCache};
 use triagebot::gha_logs::{GHA_LOGS_CACHE_CAPACITY_BYTES, GitHubActionLogsCache};
 use triagebot::handlers::Context;
@@ -126,6 +127,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             GH_COMMENTS_CACHE_CAPACITY_BYTES,
         ))),
         zulip,
+        crates_io: CratesIoApi::new(),
     });
 
     // Run all jobs that have a schedule (recurring jobs)

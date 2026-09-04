@@ -161,7 +161,10 @@ pub async fn webhook(
 }
 
 pub fn get_token_from_env() -> Result<SecretString, anyhow::Error> {
-    #[expect(clippy::bind_instead_of_map, reason = "`.map_err` is suggested, but we don't really map the error")]
+    #[expect(
+        clippy::bind_instead_of_map,
+        reason = "`.map_err` is suggested, but we don't really map the error"
+    )]
     // ZULIP_WEBHOOK_SECRET is preferred, ZULIP_TOKEN is kept for retrocompatibility but will be deprecated
     std::env::var("ZULIP_WEBHOOK_SECRET")
         .or_else(|_| std::env::var("ZULIP_TOKEN"))
@@ -401,6 +404,12 @@ async fn handle_command<'a>(
                     repo,
                     id,
                 } => unlock_cmd(&ctx, gh_id, &organization, &repo, id).await,
+                StreamCommand::Yank { krate, version } => {
+                    yank_crate_cmd(&ctx, gh_id, &krate, &version, message_data).await
+                }
+                StreamCommand::Unyank { krate, version } => {
+                    unyank_crate_cmd(&ctx, gh_id, &krate, &version, message_data).await
+                }
             };
         }
 
@@ -1462,16 +1471,8 @@ async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::
 
     Ok(format!(
         "{}'s GitHub profile is [{github_username}](https://github.com/{github_username}).",
-        render_zulip_username(zulip_user.user_id)
+        format_zulip_username(zulip_user.user_id, PingMode::Silent)
     ))
-}
-
-pub fn render_zulip_username(zulip_id: u64) -> String {
-    // Rendering the username directly was running into some encoding issues, so we use
-    // the special `|<user-id>` syntax instead.
-    // @**|<zulip-id>** is Zulip syntax that will render as the username (and a link) of the user
-    // with the given Zulip ID.
-    format!("@**|{zulip_id}**")
 }
 
 /// Tries to find a Zulip username from a GitHub username.
@@ -1527,8 +1528,142 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
     };
     Ok(format!(
         "The GitHub user `{gh_username}` has the following Zulip account: {}",
-        render_zulip_username(zulip_id)
+        format_zulip_username(zulip_id, PingMode::Silent)
     ))
+}
+
+/// Yank a crate on crates.io, if the user has permissions for it.
+async fn yank_crate_cmd(
+    ctx: &Context,
+    gh_id: u64,
+    krate: &str,
+    version: &semver::Version,
+    message_data: &Message,
+) -> anyhow::Result<Option<String>> {
+    if let Err(error) = check_yank_stream(message_data) {
+        return Ok(Some(error));
+    }
+    if let Err(error) = check_crate_info(krate) {
+        return Ok(Some(error));
+    }
+
+    if !owns_crate(ctx, gh_id, krate).await? {
+        return Ok(Some(
+            "You do not have permissions to yank this crate".to_string(),
+        ));
+    }
+
+    ctx.crates_io
+        .yank_crate(krate, version)
+        .await
+        .context("Cannot yank crate")?;
+
+    Ok(Some(format!(
+        "Crate `{krate}@{version}` was successfully yanked by {}",
+        format_zulip_username(message_data.sender_id, PingMode::Silent)
+    )))
+}
+
+/// Unyank a crate on crates.io, if the user has permissions for it.
+async fn unyank_crate_cmd(
+    ctx: &Context,
+    gh_id: u64,
+    krate: &str,
+    version: &semver::Version,
+    message_data: &Message,
+) -> anyhow::Result<Option<String>> {
+    if let Err(error) = check_yank_stream(message_data) {
+        return Ok(Some(error));
+    }
+    if let Err(error) = check_crate_info(krate) {
+        return Ok(Some(error));
+    }
+
+    if !owns_crate(ctx, gh_id, krate).await? {
+        return Ok(Some(
+            "You do not have permissions to unyank this crate".to_string(),
+        ));
+    }
+
+    ctx.crates_io
+        .unyank_crate(krate, version)
+        .await
+        .context("Cannot unyank crate")?;
+
+    Ok(Some(format!(
+        "Crate `{krate}@{version}` was successfully unyanked by {}",
+        format_zulip_username(message_data.sender_id, PingMode::Silent)
+    )))
+}
+
+/// Checks whether the krate name look correct, i.e. do not contain any suspicious
+/// characters.
+fn check_crate_info(krate: &str) -> Result<(), String> {
+    if !krate
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        return Err("Crate name contains invalid characters".to_string());
+    }
+
+    Ok(())
+}
+
+/// Stream that has to be used for yanking/unyanking of crates.
+/// Corresponds to the #t-infra channel.
+const YANK_CHANNEL_ID: u64 = 242791;
+
+/// Topic in `YANK_STREAM_ID` that has to be used for yanking/unyanking of crates.
+const YANK_TOPIC: &str = "Crate yanking/unyanking";
+
+/// Checks if the message was sent to a stream that is allowed to yank/unyank crates.
+/// If not, returns an error message.
+fn check_yank_stream(message: &Message) -> Result<(), String> {
+    let Some(stream_id) = message.stream_id else {
+        return Err("Message was not sent to a channel".to_string());
+    };
+    let Some(topic) = &message.subject else {
+        return Err("Message was not sent to a topic".to_string());
+    };
+
+    if stream_id != YANK_CHANNEL_ID || topic != YANK_TOPIC {
+        Err(format!(
+            "Yanking and unyanking can only be performed in the #t-libs/crates > {YANK_TOPIC} topic"
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+/// Returns Ok(true) if user with the given GitHub id is a member of a team that owns `krate`
+/// in the team database (and thus on crates.io).
+async fn owns_crate(ctx: &Context, gh_id: u64, krate: &str) -> anyhow::Result<bool> {
+    let crate_map = ctx
+        .team
+        .crate_map()
+        .await
+        .context("Cannot load crate map")?;
+    let Some(krate) = crate_map.crates.get(krate) else {
+        return Err(anyhow::anyhow!(
+            "Couldn't find {krate} in the team database"
+        ));
+    };
+    let teams = ctx.team.teams().await?;
+    for team in &krate.teams {
+        let Some(team) = teams.teams.get(team.as_str()) else {
+            continue;
+        };
+        if team
+            .members
+            .iter()
+            .find(|member| member.github_id == gh_id)
+            .is_some()
+        {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 pub(crate) struct MessageApiRequest<'a> {
@@ -1756,6 +1891,26 @@ pub fn format_user_pr(pr: &UserPullRequest) -> String {
             PullRequestState::Merged => ":purple_circle:",
         }
     )
+}
+
+/// Ping mode for @<user> mentions on Zulip.
+pub enum PingMode {
+    /// Do not ping the person
+    Silent,
+    /// Ping the person
+    Ping,
+}
+
+pub fn format_zulip_username(zulip_id: u64, ping_mode: PingMode) -> String {
+    // Rendering the username directly was running into some encoding issues, so we use
+    // the special `|<user-id>` syntax instead.
+    // @**|<zulip-id>** is Zulip syntax that will render as the username (and a link) of the user
+    // with the given Zulip ID.
+    let prefix = match ping_mode {
+        PingMode::Silent => "_",
+        PingMode::Ping => "",
+    };
+    format!("@{prefix}**|{zulip_id}**")
 }
 
 fn format_date(date: Option<DateTime<Utc>>) -> String {
