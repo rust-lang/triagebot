@@ -1611,6 +1611,9 @@ fn check_crate_info(krate: &str) -> Result<(), String> {
 
 /// Stream that has to be used for yanking/unyanking of crates.
 /// Corresponds to the #t-infra channel.
+///
+/// Note: if you change this ID, do not forget to update the channel name in
+/// `check_yank_stream`.
 const YANK_CHANNEL_ID: u64 = 242791;
 
 /// Topic in `YANK_STREAM_ID` that has to be used for yanking/unyanking of crates.
@@ -1628,7 +1631,7 @@ fn check_yank_stream(message: &Message) -> Result<(), String> {
 
     if stream_id != YANK_CHANNEL_ID || topic != YANK_TOPIC {
         Err(format!(
-            "Yanking and unyanking can only be performed in the #t-libs/crates > {YANK_TOPIC} topic"
+            "Yanking and unyanking can only be performed in the #t-infra > {YANK_TOPIC} topic"
         ))
     } else {
         Ok(())
