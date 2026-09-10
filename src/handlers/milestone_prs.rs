@@ -3,6 +3,7 @@ use crate::{
     handlers::Context,
 };
 use anyhow::Context as _;
+use futures::stream::{self, StreamExt};
 use regex::Regex;
 use reqwest::StatusCode;
 use tracing as log;
@@ -58,6 +59,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     e.issue.set_milestone(&ctx.github, &version).await?;
 
     milestone_submodules(&ctx.github, e, &version).await?;
+    milestone_rustfmt(&ctx.github, e, &version).await?;
 
     Ok(())
 }
@@ -187,6 +189,103 @@ async fn milestone_submodule(
         log::info!("setting submodule {submodule} milestone {milestone:?} for {pr_num}");
         submodule_repo.set_milestone(gh, &milestone, pr_num).await?;
     }
+
+    Ok(())
+}
+
+/// Try to sync milestones from rust-lang/rust to rust-lang/rustfmt.
+///
+/// Because rust-lang/rustfmt is a git subtree of rust-lang/rust we're able to use a combination
+/// of commit SHAs and GitHub merge queue commit messages to determine which PRs to assign
+/// milestones to.
+async fn milestone_rustfmt(
+    gh: &GithubClient,
+    event: &IssuesEvent,
+    milestone_version: &str,
+) -> anyhow::Result<()> {
+    if !event.issue.contains_label(&"T-rustfmt".into()) {
+        // This PR doesn't touch rustfmt so we can skip it.
+        return Ok(());
+    }
+
+    let Ok(Some(event_diff)) = event.issue.compare(&gh).await else {
+        log::error!(
+            "failed to fetch the event comparision for {:#?}",
+            event.issue
+        );
+        return Ok(());
+    };
+
+    let commits = event_diff.commits.clone();
+    let mv = milestone_version.to_owned();
+    let gh = gh.clone();
+
+    tokio::task::spawn(async move {
+        let Ok(subtree) = gh.repository("rust-lang/rustfmt").await else {
+            log::error!("failed to fetch repository details for rust-lang/rustfmt");
+            return;
+        };
+
+        let Ok(milestone) = subtree.get_or_create_milestone(&gh, &mv, "open").await else {
+            log::error!("failed to get or create milestone {mv} for rust-lang/rustfmt");
+            return;
+        };
+
+        let merge_re = Regex::new(r"Merge pull request #([0-9]+)").unwrap();
+        let merge_commits = stream::iter(
+            commits
+                .iter()
+                .filter(|commit| {
+                    // A merge commit will have two parents
+                    commit.parents.len() == 2
+                })
+                .filter_map(|commit| {
+                    let commit_title = commit.commit.message.lines().next().unwrap_or_default();
+                    merge_re.captures(commit_title).map(|cap| {
+                        let pr_number = cap
+                            .get(1)
+                            .unwrap()
+                            .as_str()
+                            .parse::<u64>()
+                            .expect("digits only");
+                        (pr_number, commit)
+                    })
+                }),
+        );
+
+        let pr_numbers = merge_commits
+            .filter_map(async |(pr_number, merge_commit)| {
+                let Ok(subtree_commit) = subtree.github_commit(&gh, &merge_commit.sha).await else {
+                    log::error!("failed to fetch the github commit in rust-lang/rustfmt");
+                    return None;
+                };
+
+                if subtree_commit.parents.len() != 2 {
+                    return None;
+                }
+
+                if subtree_commit.sha == merge_commit.sha
+                    && subtree_commit.parents[0].sha == merge_commit.parents[0].sha
+                    && subtree_commit.parents[1].sha == merge_commit.parents[1].sha
+                {
+                    Some(pr_number)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .await;
+
+        for pr_number in pr_numbers {
+            if let Err(e) = subtree.set_milestone(&gh, &milestone, pr_number).await {
+                log::error!(
+                    "failed to set rust-lang/rustfmt subtree milestone {:?} for {}: {e:?}",
+                    milestone,
+                    pr_number
+                );
+            };
+        }
+    });
 
     Ok(())
 }

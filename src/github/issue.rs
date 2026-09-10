@@ -100,6 +100,15 @@ pub struct Label {
     pub name: String,
 }
 
+impl<T> From<T> for Label
+where
+    T: Into<String>,
+{
+    fn from(value: T) -> Self {
+        Self { name: value.into() }
+    }
+}
+
 #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum IssueState {
