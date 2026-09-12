@@ -520,7 +520,7 @@ impl Issue {
         Ok(self.compare(client).await?.map(|c| c.files.as_ref()))
     }
 
-    /// Returns the comparison of this event.
+    /// Returns the comparison of this event (up to 300 files and a 1000 commits).
     ///
     /// Returns `None` if the issue is not a PR.
     pub async fn compare(&self, client: &GithubClient) -> anyhow::Result<Option<&GithubCompare>> {
@@ -536,8 +536,10 @@ impl Issue {
         let compare = pr
             .compare
             .get_or_try_init::<anyhow::Error, _, _>(|| async move {
+                // Note: the `per_page` here only applies to commits, not the
+                // files, which is hard capted (by GitHub) at 300 total.
                 let req = client.get(&format!(
-                    "{}/compare/{before}...{after}",
+                    "{}/compare/{before}...{after}?per_page=1000",
                     self.repository().url(client)
                 ));
                 client.json(req).await
