@@ -92,7 +92,7 @@ pub(crate) struct ModifiedPathMatcher {
 impl ModifiedPathMatcher {
     /// Create a matcher against a set of prefixes (default) and globs (if the entry
     /// contains wildcards).
-    pub fn new<'a, S>(entries: &[S]) -> Self
+    pub fn new<S>(entries: &[S]) -> Self
     where
         S: AsRef<str>,
     {

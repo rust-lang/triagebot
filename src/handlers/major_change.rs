@@ -280,7 +280,7 @@ pub(super) async fn handle_command(
     let already_seconded = issue
         .labels()
         .iter()
-        .any(|l| &l.name == &config.second_label);
+        .any(|l| l.name == config.second_label);
 
     let zulip_ping = &config.zulip_ping;
     let issue_number = issue.number;
@@ -738,7 +738,7 @@ async fn try_accept_mcp(
 > [!NOTE]
 > Further progress is now tracked over at {}#{}.
 ",
-                    &issue_repo, tracking_issue.number
+                    issue_repo, tracking_issue.number
                 )
             } else {
                 String::new()
@@ -754,7 +754,7 @@ As the automated representative, I want to express gratitude to the author for t
 
 *If you think this major change shouldn't have been accepted, feel free to remove the `{}` label and reopen this issue.*
 {tracking_issue_text}",
-                    &config.accept_label,
+                    config.accept_label,
                 ),
             )
             .await

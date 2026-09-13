@@ -78,20 +78,20 @@ fn validate_parsed_config(config: &Config) -> Result<(), String> {
 
     // Validate patterns everywhere we allow glob matching
     let validate_pattern =
-        |pat: &str, location: &str| match ModifiedPathMatcher::validate_entry(&pat) {
+        |pat: &str, location: &str| match ModifiedPathMatcher::validate_entry(pat) {
             Ok(()) => Ok(()),
             Err(PathMatcherError::Glob(err)) => {
-                return Err(format!(
+                Err(format!(
                     "Invalid `triagebot.toml`:\n\
                     {location} has an invalid glob syntax: {err}"
-                ));
+                ))
             }
             Err(PathMatcherError::NonRelativePath) => {
-                return Err(format!(
+                Err(format!(
                     "Invalid `triagebot.toml`:\n\
                     {location} has an invalid pattern: path must be \
                       relative (remove the `/` at the start)"
-                ));
+                ))
             }
         };
 
@@ -117,7 +117,7 @@ fn validate_parsed_config(config: &Config) -> Result<(), String> {
     }
 
     if let Some(autolabel) = &config.autolabel {
-        for (_label, cfg) in &autolabel.labels {
+        for cfg in autolabel.labels.values() {
             for pat in &cfg.trigger_files {
                 validate_pattern(pat, &format!("`autolabel.trigger_files` item `{pat}`"))?;
             }

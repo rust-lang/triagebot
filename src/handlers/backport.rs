@@ -71,9 +71,9 @@ pub(super) async fn parse_input(
 
     let pr_labels: Vec<&str> = pr.labels.iter().map(|l| l.name.as_str()).collect();
 
-    if let IssuesAction::Labeled { label } = &event.action {
-        if (label.name == "beta-nominated" && contains_any(&pr_labels, &["beta-accepted"]))
-            || (label.name == "stable-nominated" && contains_any(&pr_labels, &["stable-accepted"]))
+    if let IssuesAction::Labeled { label } = &event.action
+        && ((label.name == "beta-nominated" && contains_any(&pr_labels, &["beta-accepted"]))
+            || (label.name == "stable-nominated" && contains_any(&pr_labels, &["stable-accepted"])))
         {
             log::debug!(
                 "Will not nominate for backport, PR #{} is already backport accepted (found labels: {:?})",
@@ -90,7 +90,6 @@ pub(super) async fn parse_input(
                 .context("failed to remove labels from the issue");
             return Ok(None);
         }
-    }
 
     // Retrieve backport config for this PR, based on its team label(s)
     // If the PR has no team label matching any [backport.*.required-pr-labels] config, the backport labelling will be skipped

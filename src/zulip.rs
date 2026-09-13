@@ -380,14 +380,14 @@ async fn handle_command<'a>(
                     .await
                     .map(Some),
                 StreamCommand::AssignPriority { issue_num, prio } => {
-                    let _ = match assign_issue_prio(&ctx, message_data, issue_num, prio).await {
+                    match assign_issue_prio(&ctx, message_data, issue_num, prio).await {
                         // give user feedback
                         Ok(_) => {
                             // emoji reaction for the triagebot command
                             ctx.zulip.add_reaction(message_data.id, "check").await?;
                             // resolve the Zulip topic
                             if let Some(ref topic) = message_data.subject {
-                                ctx.zulip.resolve_topic(message_data.id, &topic).await?;
+                                ctx.zulip.resolve_topic(message_data.id, topic).await?;
                             } else {
                                 log::warn!("Zulip topic has empty subject");
                             }
@@ -495,7 +495,7 @@ async fn accept_decline_backport(
     if !nominated {
         return Ok(Some(format!(
             "Can't approve backport: #{} was not {} nominated",
-            &pr_num, channel,
+            pr_num, channel,
         )));
     }
 
@@ -507,11 +507,11 @@ async fn accept_decline_backport(
         | BackportVerbArgs::Accepted
         | BackportVerbArgs::Approve
         | BackportVerbArgs::Approved => (
-            get_text_backport_approved(&channel, &verb, team_name, &zulip_link),
+            get_text_backport_approved(&channel, verb, team_name, &zulip_link),
             true,
         ),
         BackportVerbArgs::Decline | BackportVerbArgs::Declined => (
-            get_text_backport_declined(&channel, &verb, team_name, &zulip_link),
+            get_text_backport_declined(&channel, verb, team_name, &zulip_link),
             false,
         ),
     };
@@ -804,9 +804,9 @@ async fn user_info_cmd(
     let recent_contributions_days = recent_contributions_days.num_days() as u64;
 
     let mut message = format!(
-        r#"# User {username} activity
+        r#"# User [{username}](https://github.com/{username}) activity
 
-- Account created at: {date} ({ago})
+- Account created at: {date} (`{days_ago}` days ago)
 - Public repository count: {repos}
 - Repositories created in past {recent_days} days: `{recent_repo_count}` ({recent_forks} of those are forks)
 
@@ -830,9 +830,8 @@ The user opened `{org_recent_pr_count}{org_more_prs}` PRs ({recent_org_pr_rate} 
 - {org_merged_prs} were merged
 - {org_closed_prs} were closed
 "#,
-        username = format!("[{username}](https://github.com/{username})"),
         date = format_date(Some(user.created_at)),
-        ago = format!("`{}` days ago", (Utc::now() - user.created_at).num_days()),
+        days_ago = (Utc::now() - user.created_at).num_days(),
         repos = user.public_repos,
         recent_pr_count = all_prs_stats.recent_pr_count,
         recent_pr_rate = rate(all_prs_stats.recent_pr_count, recent_days),
@@ -960,14 +959,11 @@ async fn team_status_cmd(
         let config = crate::config::get(&ctx.github, &repo)
             .await
             .context("failed to get triagebot configuration")?;
-        if let Some(adhoc_group) = config
+        config
             .assign
             .as_ref()
-            .and_then(|a| a.adhoc_groups.get(team_name))
-        {
-            Some(
-                adhoc_group
-                    .into_iter()
+            .and_then(|a| a.adhoc_groups.get(team_name)).map(|adhoc_group| adhoc_group
+                    .iter()
                     .map(|reviewer| {
                         // Adhoc groups reviewers are by convention prefixed with `@`, let's
                         // strip it to avoid issues with unprefixed GitHub handles.
@@ -979,11 +975,7 @@ async fn team_status_cmd(
                             .unwrap_or(reviewer)
                             .to_lowercase()
                     })
-                    .collect(),
-            )
-        } else {
-            None
-        }
+                    .collect())
     };
 
     let workqueue_arc = ctx
@@ -1261,12 +1253,12 @@ async fn workqueue_commands(
             response
         }
         WorkqueueCmd::SetPrLimit { limit, repo } => {
-            let repo = normalize_repo(&ctx, repo).await?;
+            let repo = normalize_repo(ctx, repo).await?;
             let max_assigned_prs = match limit {
                 WorkqueueLimit::Unlimited => None,
                 WorkqueueLimit::Limit(limit) => Some(*limit),
             };
-            upsert_repo_review_prefs(&db_client, user.into(), &repo, max_assigned_prs)
+            upsert_repo_review_prefs(&db_client, user, &repo, max_assigned_prs)
                 .await
                 .context("Error occurred while setting review preferences.")?;
             tracing::info!(
@@ -1282,7 +1274,7 @@ async fn workqueue_commands(
         }
         WorkqueueCmd::SetRotationMode { rotation_mode } => {
             let rotation_mode = rotation_mode.0;
-            upsert_user_review_prefs(&db_client, user.into(), rotation_mode)
+            upsert_user_review_prefs(&db_client, user, rotation_mode)
                 .await
                 .context("Error occurred while setting review preferences.")?;
             tracing::info!("Setting rotation mode `{gh_username}` to {rotation_mode:?}");
@@ -1302,7 +1294,7 @@ async fn workqueue_commands(
                 ));
             }
             let rotation_mode = rotation_mode.0;
-            upsert_team_review_prefs(&db_client, user.into(), team, rotation_mode)
+            upsert_team_review_prefs(&db_client, user, team, rotation_mode)
                 .await
                 .context("Error occurred while setting team review preferences.")?;
             tracing::info!(

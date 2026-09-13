@@ -79,7 +79,7 @@ pub(super) async fn parse_input(
         modified_files
             .iter()
             .filter_map(|fd| fd.previous_filename.as_ref())
-            .map(|filename| Path::new(filename)),
+            .map(Path::new),
     );
 
     let to_mention: Vec<_> = config
@@ -107,7 +107,7 @@ pub(super) async fn parse_input(
                             patch_adds(&f.patch, entry)
                                 && (cfg.trigger_files.is_empty()
                                     || file_match(&f.filename)
-                                    || f.previous_filename.as_ref().is_some_and(|p| file_match(p)))
+                                    || f.previous_filename.as_ref().is_some_and(&file_match))
                         })
                         .map(|f| PathBuf::from(&f.filename))
                         .collect()

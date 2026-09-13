@@ -51,7 +51,7 @@ pub(super) async fn handle_command(
     match cmd {
         MergeCommand::Merge => {
             if !has_write_permissions {
-                let has_delegation_rights = was_delegated_to_commenter(ctx, &issue_comment)
+                let has_delegation_rights = was_delegated_to_commenter(ctx, issue_comment)
                     .await
                     .context(
                     "Couldn't determine if the user has merge rights via delegation",
@@ -132,7 +132,7 @@ async fn merge_pr_with_merge_queue(
         if let Err(err) = issue_comment.issue.enable_auto_merge(&ctx.github).await {
             if let Some(graphql_errors) = err.downcast_ref::<GraphQlErrors>()
                 && let [error] = &*graphql_errors.errors
-                && error.path == &["enablePullRequestAutoMerge"]
+                && error.path == ["enablePullRequestAutoMerge"]
                 && error.type_ == "UNPROCESSABLE"
             {
                 return user_error!(error.message.to_string());
@@ -148,7 +148,7 @@ async fn merge_pr_with_merge_queue(
         {
             if let Some(graphql_errors) = err.downcast_ref::<GraphQlErrors>()
                 && let [error] = &*graphql_errors.errors
-                && error.path == &["enqueuePullRequest"]
+                && error.path == ["enqueuePullRequest"]
                 && error.type_ == "UNPROCESSABLE"
             {
                 return user_error!(error.message.to_string());
@@ -190,9 +190,9 @@ async fn delegate_to(
         r#":v: @{delegatee}, you can now merge this pull request!
 
 If @{delegator} told you to merge after making some further change, then please make that change and post `@{bot_prefix} merge`."#,
-        delegatee = &delegatee.login,
+        delegatee = delegatee.login,
         bot_prefix = ctx.username,
-        delegator = &issue_comment.comment.user.login,
+        delegator = issue_comment.comment.user.login,
     );
 
     // Sometimes the base and head SHAs are missing, avoid panicking when that's the case.
@@ -203,10 +203,10 @@ If @{delegator} told you to merge after making some further change, then please 
         let _ = writeln!(
             comment_body,
             "\n\n[View changes since this delegation](https://triagebot.infra.rust-lang.org/gh-changes-since/{org_repo}/{pr_num}/{base_sha}..{head_sha})",
-            org_repo = &issue_comment.repository.full_name,
+            org_repo = issue_comment.repository.full_name,
             pr_num = issue_comment.issue.number,
-            base_sha = &base.sha,
-            head_sha = &head.sha,
+            base_sha = base.sha,
+            head_sha = head.sha,
         );
     }
 

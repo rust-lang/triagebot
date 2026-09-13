@@ -34,7 +34,7 @@ pub(crate) async fn remind_author_of_bot_ready(
     if state.data.reminder_comment.is_none() {
         let comment_body = format!(
             "Reminder, once the PR becomes ready for a review, use `@{bot} ready`.",
-            bot = &ctx.username,
+            bot = ctx.username,
         );
         let comment = issue
             .post_comment(&ctx.github, comment_body.as_str())

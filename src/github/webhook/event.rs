@@ -69,11 +69,11 @@ impl Event {
             Event::Issue(e) => e
                 .changes
                 .as_ref()
-                .map_or(false, |changes| changes.has_comment_changed(&e.issue)),
+                .is_some_and(|changes| changes.has_comment_changed(&e.issue)),
             Event::IssueComment(e) => e
                 .changes
                 .as_ref()
-                .map_or(false, |changes| changes.has_comment_changed(&e.issue)),
+                .is_some_and(|changes| changes.has_comment_changed(&e.issue)),
             Event::Push(_) => false,
         }
     }
@@ -285,7 +285,7 @@ impl Changes {
             // title and body are both updated at the same time from the API (as it's not possible via the Web UI).
             //
             // https://rust-lang.zulipchat.com/#narrow/channel/224082-triagebot/topic/separate.20title.20and.20description
-            if body.from == "" && !issue.is_pr() {
+            if body.from.is_empty() && !issue.is_pr() {
                 self.title.is_none()
             } else {
                 true

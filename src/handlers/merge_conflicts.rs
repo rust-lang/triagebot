@@ -128,7 +128,7 @@ async fn handle_branch_push(
 
     // Spawn since this can trigger a lot of work.
     spawn_scan_for(
-        format!("{full_name}/{branch_name}", full_name = &repo.full_name),
+        format!("{full_name}/{branch_name}", full_name = repo.full_name),
         async move {
             if let Err(e) = scan_prs(&gh, db, &config, repo, &branch_name, &push_sha).await {
                 log::error!("failed to scan PRs for merge conflicts: {e:?}");
@@ -163,7 +163,7 @@ async fn handle_pr(
             let config = config.clone();
             let gh = ctx.github.clone();
             spawn_scan_for(
-                format!("{full_name}/{pr_number}", full_name = &repo.full_name),
+                format!("{full_name}/{pr_number}", full_name = repo.full_name),
                 async move {
                     // See module note about locking.
                     tokio::time::sleep(UNKNOWN_RESCAN_DELAY).await;
@@ -258,7 +258,7 @@ async fn scan_prs(
     if !unknowns.is_empty() {
         // See module note about locking.
         tokio::time::sleep(UNKNOWN_RESCAN_DELAY).await;
-        if let Err(e) = scan_unknowns(&gh, db, &config, &repo, &unknowns, reason).await {
+        if let Err(e) = scan_unknowns(gh, db, config, &repo, &unknowns, reason).await {
             log::error!("failed to scan unknown PRs for merge conflicts: {e:?}");
         }
     }

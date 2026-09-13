@@ -186,7 +186,7 @@ pub async fn gha_logs(
 
     let job_name = {
         let mut name = String::new();
-        pulldown_cmark_escape::escape_html_body_text(&mut name, &*job.name)?;
+        pulldown_cmark_escape::escape_html_body_text(&mut name, &job.name)?;
         name
     };
 

@@ -253,7 +253,7 @@ pub(super) async fn handle_input(
                 } else {
                     // PR was converted from a draft and there are no current assignees,
                     // but min reviews configured, perform assignment if requested
-                    match update_community_review_assignment(ctx, &community_reviews, &event.issue)
+                    match update_community_review_assignment(ctx, community_reviews, &event.issue)
                         .await?
                     {
                         CommunityReviewUpdateStatus::NotEnoughApprovals
@@ -442,20 +442,20 @@ pub(super) async fn handle_input(
                     let msg = match step {
                         SelectionStep::SelfAssign => "Self-assignment".to_string(),
                         SelectionStep::RandomlySelectedFrom(candidates) => {
-                            format!("Random selection from {}", format_candidates(&candidates))
+                            format!("Random selection from {}", format_candidates(candidates))
                         }
                         SelectionStep::Fallback(group) => {
-                            format!("Fallback group: {}", format_candidates(&group))
+                            format!("Fallback group: {}", format_candidates(group))
                         }
                         SelectionStep::FileDiff(candidates) => format!(
                             "Owners of files modified in this PR: {}",
-                            format_candidates(&candidates)
+                            format_candidates(candidates)
                         ),
                         SelectionStep::Expansion { from, to } => {
                             format!(
                                 "{} expanded to {}",
-                                format_candidates(&from),
-                                format_candidates(&to)
+                                format_candidates(from),
+                                format_candidates(to)
                             )
                         }
                     };
@@ -593,9 +593,9 @@ async fn update_community_review_assignment(
                 // Failed to add the last reviewer as assignee, report an error
                 let msg = format!(
                     "Failed to assign the last approvee (@{}): {err}, performing automatic assignment.",
-                    &last_review_user.login
+                    last_review_user.login
                 );
-                ErrorComment::new(&issue, &msg)
+                ErrorComment::new(issue, &msg)
                     .post(&ctx.github)
                     .await
                     .context("failed to post assignement error comment")?;
@@ -1033,7 +1033,7 @@ pub(super) async fn handle_command(
             config,
             issue,
             &event.user().login,
-            &[assignee.to_string()],
+            &[assignee],
         )
         .await
         {
@@ -1085,7 +1085,7 @@ pub(super) async fn handle_command(
             AssignCommand::RequestReview { .. } => {
                 return user_error!("r? is only allowed on PRs.");
             }
-            AssignCommand::Reroll { .. } => {
+            AssignCommand::Reroll => {
                 return user_error!("reroll is only allowed on PRs.");
             }
         };

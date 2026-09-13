@@ -319,7 +319,7 @@ pub async fn retrieve_pull_request_assignments(
             }
         }
     }
-    assignments.sort_by(|a, b| a.0.id.cmp(&b.0.id));
+    assignments.sort_by_key(|a| a.0.id);
 
     Ok(assignments)
 }

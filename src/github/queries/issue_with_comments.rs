@@ -493,25 +493,22 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             }
 
             // Only accumulate if cursor actually advanced (new page of data)
-            if comments_cursor_changed {
-                if let Some(comments_array) = issue_json["comments"]["nodes"].as_array_mut() {
+            if comments_cursor_changed
+                && let Some(comments_array) = issue_json["comments"]["nodes"].as_array_mut() {
                     all_comments.append(comments_array);
                 }
-            }
 
             // Only accumulate review threads if cursor advanced (only for PullRequest)
-            if review_threads_cursor_changed {
-                if let Some(threads_array) = issue_json["reviewThreads"]["nodes"].as_array_mut() {
+            if review_threads_cursor_changed
+                && let Some(threads_array) = issue_json["reviewThreads"]["nodes"].as_array_mut() {
                     all_review_threads.append(threads_array);
                 }
-            }
 
             // Only accumulate reviews if cursor advanced (only for PullRequest)
-            if reviews_cursor_changed {
-                if let Some(reviews_array) = issue_json["reviews"]["nodes"].as_array_mut() {
+            if reviews_cursor_changed
+                && let Some(reviews_array) = issue_json["reviews"]["nodes"].as_array_mut() {
                     all_reviews.append(reviews_array);
                 }
-            }
 
             // Continue if any field has more pages
             if !comments_has_next && !review_threads_has_next && !reviews_has_next {

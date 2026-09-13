@@ -307,12 +307,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 async fn block_user_agents(req: Request<axum::body::Body>, next: Next) -> Response {
     if let Some(user_agent_value) = req.headers().get(hyper::header::USER_AGENT)
         && let Ok(ua) = user_agent_value.to_str()
-    {
-        if BANNED_USER_AGENTS.iter().any(|banned| ua.contains(banned)) {
+        && BANNED_USER_AGENTS.iter().any(|banned| ua.contains(banned)) {
             // Reject immediately with a 403 Forbidden status
             return (StatusCode::FORBIDDEN, "Access Denied: Banned User-Agent. If you think this a mistake, please open an issue at https://github.com/rust-lang/triagebot.").into_response();
         }
-    }
 
     next.run(req).await
 }

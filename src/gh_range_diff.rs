@@ -461,7 +461,7 @@ fn process_old_new(
                 r#"<details open=""><summary>{escaped_filename} <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary>"#
             )?;
 
-            if bidi_unicode::contains_text_flow_control_chars(&*new_patch) {
+            if bidi_unicode::contains_text_flow_control_chars(&new_patch) {
                 write!(
                     html,
                     r#"<div class="warning">⚠ <span>This file contains bidirectional or hidden Unicode text that may be interpreted or compiled differently than what appears below. To review, open the file in an editor that reveals hidden Unicode characters. <a href="https://github.co/hiddenchars" target="_blank" rel="noreferrer">Learn more about bidirectional Unicode characters</a></span></div>"#
@@ -567,8 +567,7 @@ fn process_old_new(
                 &mut first_line,
                 new_commit
                     .or(old_commit)
-                    .map(|c| c.commit.message.lines().next())
-                    .flatten()
+                    .and_then(|c| c.commit.message.lines().next())
                     .unwrap_or(""),
             )?;
             first_line
@@ -661,7 +660,6 @@ enum HtmlDiffPrinterMode {
 }
 
 impl HtmlDiffPrinter<'_> {
-    #[expect(clippy::unused_self, reason = "might use it later")]
     fn handle_hunk_line<'a>(
         &self,
         mut f: impl fmt::Write,
@@ -825,11 +823,10 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
             }
 
             // Add potentially missing new-line after the last before diff line
-            if let Some(&last) = before.last() {
-                if !self.interner[last].ends_with('\n') {
+            if let Some(&last) = before.last()
+                && !self.interner[last].ends_with('\n') {
                     writeln!(f)?;
                 }
-            }
 
             // Then process all after lines
             for (diff, input, force_hightlight) in &diffs_and_inputs {
@@ -846,11 +843,10 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
             }
 
             // Add potentially missing new-line after the last after diff line
-            if let Some(&last) = after.last() {
-                if !self.interner[last].ends_with('\n') {
+            if let Some(&last) = after.last()
+                && !self.interner[last].ends_with('\n') {
                     writeln!(f)?;
                 }
-            }
         } else {
             // Can't do word-highlighting, simply print each line.
 

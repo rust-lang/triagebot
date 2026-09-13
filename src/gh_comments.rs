@@ -57,7 +57,7 @@ pub async fn gh_comments(
     Path(ref key @ (ref owner, ref repo, issue_id)): Path<(String, String, u64)>,
     State(ctx): State<Arc<Context>>,
 ) -> axum::response::Result<Response, AppError> {
-    if !is_known_and_public_repo(&ctx, &owner, &repo).await? {
+    if !is_known_and_public_repo(&ctx, owner, repo).await? {
         return Ok((
             StatusCode::UNAUTHORIZED,
             format!("repository `{owner}/{repo}` is not part of the Rust Project team repos"),
@@ -70,7 +70,7 @@ pub async fn gh_comments(
         duration_secs,
         issue_with_comments,
     } = &*'comments: {
-        if let Some(logs) = ctx.gh_comments.write().await.get(&key) {
+        if let Some(logs) = ctx.gh_comments.write().await.get(key) {
             tracing::info!("gh_comments: cache hit for issue #{issue_id}");
             break 'comments logs;
         }
@@ -81,7 +81,7 @@ pub async fn gh_comments(
 
         let mut issue_with_comments = ctx
             .github
-            .issue_with_comments(&owner, &repo, issue_id)
+            .issue_with_comments(owner, repo, issue_id)
             .await
             .context("unable to fetch the issue/pull request and its comments")?;
 
@@ -240,7 +240,7 @@ pub async fn gh_comments(
         )?;
 
         for (number, rt) in review_threads.nodes.iter().enumerate() {
-            let Some(first_comment) = rt.comments.nodes.get(0) else {
+            let Some(first_comment) = rt.comments.nodes.first() else {
                 continue;
             };
             let id = extract_id_from_github_link(&first_comment.url);
@@ -437,7 +437,7 @@ pub async fn gh_comments(
                     // Try to print the associated review threads
                     for review_thread in review_threads.nodes.iter().filter(|rt| {
                         matches!(
-                            rt.comments.nodes.get(0),
+                            rt.comments.nodes.first(),
                             Some(first_comment) if first_comment.pull_request_review.id == review.id
                         )
                     }) {
@@ -534,6 +534,7 @@ pub async fn relative_time_element_js() -> impl IntoResponse {
     )
 }
 
+#[expect(clippy::too_many_arguments)]
 fn write_comment_as_html(
     buffer: &mut String,
     body_html: &str,
@@ -560,7 +561,7 @@ fn write_comment_as_html(
       <a href="{author_url}" target="_blank" class="desktop">
         <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar {author_avatar_extra_class}">
       </a>
-      
+
       <details id="{id}" class="comment">
         <summary class="comment-header">
           <div class="author-info desktop">
@@ -637,6 +638,7 @@ fn write_comment_as_html(
     Ok(())
 }
 
+#[expect(clippy::too_many_arguments)]
 fn write_review_as_html(
     buffer: &mut String,
     body_html: &str,
@@ -694,7 +696,7 @@ fn write_review_as_html(
       <a href="{author_url}" target="_blank">
         <img src="{author_avatar_url}" alt="{author_login} Avatar" class="avatar {author_avatar_extra_class}">
       </a>
-      
+
       <div class="review-header">
         <div class="review-badge {badge_color}">{badge_svg}</div>
         <div class="author-info">
@@ -765,6 +767,7 @@ fn write_review_as_html(
     Ok(())
 }
 
+#[expect(clippy::too_many_arguments)]
 fn write_review_thread_as_html(
     buffer: &mut String,
     path: &str,
@@ -776,7 +779,7 @@ fn write_review_thread_as_html(
     comments: &[GitHubGraphQlReviewThreadComment],
 ) -> anyhow::Result<()> {
     let mut path_html = String::new();
-    pulldown_cmark_escape::escape_html(&mut path_html, &path)?;
+    pulldown_cmark_escape::escape_html(&mut path_html, path)?;
 
     let open = if is_collapsed { "" } else { "open" };
     let default_open = !is_collapsed;
@@ -793,7 +796,7 @@ fn write_review_thread_as_html(
         r###"
       <details class="review-thread" data-expandable="{default_open}" {open}>
         <summary class="review-thread-header">
-            <span><span class="indicator"></span>{path_html}{status}</span><span class="fold-indicator"></span> 
+            <span><span class="indicator"></span>{path_html}{status}</span><span class="fold-indicator"></span>
         </summary>
 
         <div class="review-thread-comments">
@@ -836,7 +839,7 @@ fn write_review_thread_as_html(
             </div>
             <a href="{comment_url}" target="_blank" class="github-link">View on GitHub</a>
           </div>
-          
+
           <div class="review-thread-comment-body markdown-body">
             {body_html}
           </div>

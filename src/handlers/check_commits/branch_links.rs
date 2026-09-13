@@ -24,7 +24,7 @@ pub(super) async fn branch_links_in_commits(
             })
             .map(|c| async {
                 let mapping = super::super::issue_links::collect_branch_sha_links_mapping(
-                    &ctx,
+                    ctx,
                     &c.commit.message,
                 )
                 .await;

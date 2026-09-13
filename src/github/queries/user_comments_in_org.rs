@@ -142,7 +142,7 @@ query($query: String!, $issueLimit: Int!, $commentLimit: Int!) {
         }
 
         // Sort by creation date (most recent first) and take the limit
-        all_comments.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        all_comments.sort_by_key(|a| std::cmp::Reverse(a.created_at));
         all_comments.truncate(limit);
 
         Ok(all_comments)

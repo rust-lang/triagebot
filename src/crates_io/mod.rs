@@ -2,7 +2,6 @@ use reqwest::Client;
 use reqwest::header;
 use reqwest::header::{HeaderMap, HeaderValue};
 use secrecy::{ExposeSecret, SecretString};
-use serde::Serialize;
 use std::env;
 use std::sync::OnceLock;
 use tracing::instrument;
@@ -47,7 +46,7 @@ impl CratesIoApi {
     /// Yanks a crate from crates.io.
     #[instrument(level = "info", skip(self))]
     pub async fn yank_crate(&self, krate: &str, version: &semver::Version) -> anyhow::Result<()> {
-        self.req::<()>(
+        self.req(
             reqwest::Method::DELETE,
             self.url(&["crates", krate, &version.to_string(), "yank"]),
         )
@@ -60,7 +59,7 @@ impl CratesIoApi {
     /// Unyanks a crate from crates.io.
     #[instrument(level = "info", skip(self))]
     pub async fn unyank_crate(&self, krate: &str, version: &semver::Version) -> anyhow::Result<()> {
-        self.req::<()>(
+        self.req(
             reqwest::Method::PUT,
             self.url(&["crates", krate, &version.to_string(), "unyank"]),
         )
@@ -71,11 +70,7 @@ impl CratesIoApi {
     }
 
     /// Performs a request against the crates.io API
-    async fn req<T: Serialize>(
-        &self,
-        method: reqwest::Method,
-        url: Url,
-    ) -> anyhow::Result<reqwest::Response> {
+    async fn req(&self, method: reqwest::Method, url: Url) -> anyhow::Result<reqwest::Response> {
         let token = self.get_api_token();
         let req = self
             .client

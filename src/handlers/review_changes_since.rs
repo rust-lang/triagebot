@@ -76,7 +76,7 @@ pub(crate) async fn handle(
                 // when the review comments webhook arrives (a few milliseconds after)
                 let cache_key = format!(
                     "{}/{}/{}",
-                    &event.repository.full_name, event.issue.number, event.comment.id
+                    event.repository.full_name, event.issue.number, event.comment.id
                 );
                 REVIEW_BODY_CACHE.lock().await.put(
                     cache_key,
@@ -112,9 +112,9 @@ pub(crate) async fn handle(
             let review_body_state = {
                 let cache_key = format!(
                     "{}/{}/{}",
-                    &event.repository.full_name, event.issue.number, review_id
+                    event.repository.full_name, event.issue.number, review_id
                 );
-                match { REVIEW_BODY_CACHE.lock().await.get(&cache_key) } {
+                match REVIEW_BODY_CACHE.lock().await.get(&cache_key) {
                     Some(state) => *state,
                     None => {
                         let review = event
@@ -211,7 +211,7 @@ impl crate::jobs::Job for AddReviewChangesSinceLinkJob {
 
             let new_body = format!(
                 "{}\n\n*[View changes since the review]({})*",
-                review_comment.body, &args.link
+                review_comment.body, args.link
             );
 
             pr.edit_review_comment(&ctx.github, args.review_comment_id, &new_body)

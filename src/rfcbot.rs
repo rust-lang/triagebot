@@ -35,7 +35,6 @@ pub struct Concern {
     pub reviewer: Reviewer,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[expect(clippy::upper_case_acronyms, reason = "see reason on `FCP`")]
 pub struct FCPIssue {
     pub id: u32,
     pub number: u32,
@@ -66,7 +65,6 @@ pub struct StatusComment {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[expect(clippy::upper_case_acronyms, reason = "see reason on `FCP`")]
 pub struct FullFCP {
     pub fcp: FCP,
     pub reviews: Vec<Review>,
