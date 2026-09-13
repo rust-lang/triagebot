@@ -30,7 +30,7 @@ static MARKER_RE: LazyLock<Regex> =
 
 /// Compute and renders an emulated `git range-diff` between two pushes (old and new).
 ///
-/// `basehead` is `OLDHEAD..NEWHEAD`, both `OLDHEAD` and `NEWHEAD` must be SHAs or branch names.
+/// `basehead` is `OLDHEAD..NEWHEAD`, both `OLDHEAD` and `NEWHEAD` must be SHAs.
 pub async fn gh_range_diff(
     Path((owner, repo, basehead)): Path<(String, String, String)>,
     State(ctx): State<Arc<Context>>,
@@ -42,6 +42,14 @@ pub async fn gh_range_diff(
             format!("`{basehead}` is not in the form `base..head`"),
         ));
     };
+
+    if !looks_like_a_git_sha(oldhead) || !looks_like_a_git_sha(newhead) {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            HeaderMap::new(),
+            format!("`{oldhead}` and `{newhead}` must be valid git SHAs"),
+        ));
+    }
 
     if !is_known_and_public_repo(&ctx, &owner, &repo).await? {
         return Ok((
@@ -150,6 +158,18 @@ pub async fn gh_ranges_diff(
             format!("`{newbasehead}` is not in the form `base..head`"),
         ));
     };
+
+    if !looks_like_a_git_sha(oldbase)
+        || !looks_like_a_git_sha(oldhead)
+        || !looks_like_a_git_sha(newbase)
+        || !looks_like_a_git_sha(newhead)
+    {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            HeaderMap::new(),
+            format!("`{oldbase}`, `{oldhead}`, `{newbase}` and `{newhead}` must be valid git SHAs"),
+        ));
+    }
 
     if !is_known_and_public_repo(&ctx, &owner, &repo).await? {
         return Ok((
@@ -960,4 +980,8 @@ fn a_github_commit(class: &str, owner: &str, repo: &str, sha: &str) -> String {
         r#"<a href="https://github.com/{owner}/{repo}/commit/{sha}" class="{class}">{sha_6}</a>"#,
         sha_6 = &sha[..sha.len().min(7)],
     )
+}
+
+fn looks_like_a_git_sha(sha: &str) -> bool {
+    sha.chars().all(|c| c.is_ascii_hexdigit()) && sha.len() >= 6
 }
