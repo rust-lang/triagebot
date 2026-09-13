@@ -30,7 +30,7 @@ static MARKER_RE: LazyLock<Regex> =
 
 /// Compute and renders an emulated `git range-diff` between two pushes (old and new).
 ///
-/// `basehead` is `OLDHEAD..NEWHEAD`, both `OLDHEAD` and `NEWHEAD` must be SHAs or branch names.
+/// `basehead` is `OLDHEAD..NEWHEAD`, both `OLDHEAD` and `NEWHEAD` must be SHAs.
 pub async fn gh_range_diff(
     Path((owner, repo, basehead)): Path<(String, String, String)>,
     State(ctx): State<Arc<Context>>,
@@ -42,6 +42,14 @@ pub async fn gh_range_diff(
             format!("`{basehead}` is not in the form `base..head`"),
         ));
     };
+
+    if !looks_like_a_git_sha(oldhead) || !looks_like_a_git_sha(newhead) {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            HeaderMap::new(),
+            format!("`{oldhead}` and `{newhead}` must be valid git SHAs"),
+        ));
+    }
 
     if !is_known_and_public_repo(&ctx, &owner, &repo).await? {
         return Ok((
@@ -150,6 +158,18 @@ pub async fn gh_ranges_diff(
             format!("`{newbasehead}` is not in the form `base..head`"),
         ));
     };
+
+    if !looks_like_a_git_sha(oldbase)
+        || !looks_like_a_git_sha(oldhead)
+        || !looks_like_a_git_sha(newbase)
+        || !looks_like_a_git_sha(newhead)
+    {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            HeaderMap::new(),
+            format!("`{oldbase}`, `{oldhead}`, `{newbase}` and `{newhead}` must be valid git SHAs"),
+        ));
+    }
 
     if !is_known_and_public_repo(&ctx, &owner, &repo).await? {
         return Ok((
@@ -414,14 +434,31 @@ fn process_old_new(
                 after: &input.after,
             };
 
-            let before_href =
-                format_args!("https://github.com/{owner}/{repo}/blob/{oldhead}/{filename}");
-            let after_href =
-                format_args!("https://github.com/{owner}/{repo}/blob/{newhead}/{filename}");
+            let before_href = {
+                let mut buffer = String::new();
+                pulldown_cmark_escape::escape_href(
+                    &mut buffer,
+                    &format!("https://github.com/{owner}/{repo}/blob/{oldhead}/{filename}"),
+                )?;
+                buffer
+            };
+            let after_href = {
+                let mut buffer = String::new();
+                pulldown_cmark_escape::escape_href(
+                    &mut buffer,
+                    &format!("https://github.com/{owner}/{repo}/blob/{newhead}/{filename}"),
+                )?;
+                buffer
+            };
+            let escaped_filename = {
+                let mut buffer = String::new();
+                pulldown_cmark_escape::escape_html_body_text(&mut buffer, filename)?;
+                buffer
+            };
 
             write!(
                 html,
-                r#"<details open=""><summary>{filename} <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary>"#
+                r#"<details open=""><summary>{escaped_filename} <a href="{before_href}">before</a> <a href="{after_href}">after</a></summary>"#
             )?;
 
             if bidi_unicode::contains_text_flow_control_chars(&*new_patch) {
@@ -514,7 +551,7 @@ fn process_old_new(
             .map(commit_content_as_txt)
             .unwrap_or_else(|| "".to_string());
 
-        // Prepare the
+        // Prepare the SHAs
         let old_sha = old_commit
             .map(|c| a_github_commit("", owner, repo, &c.sha))
             .unwrap_or_else(|| ".......".to_string());
@@ -523,11 +560,19 @@ fn process_old_new(
             .map(|c| a_github_commit("", owner, repo, &c.sha))
             .unwrap_or_else(|| ".......".to_string());
 
-        let first_line_message = new_commit
-            .or(old_commit)
-            .map(|c| c.commit.message.lines().next())
-            .flatten()
-            .unwrap_or("");
+        // Prepare the first line of the message (aka commit title)
+        let first_line_message = {
+            let mut first_line = String::new();
+            pulldown_cmark_escape::escape_html_body_text(
+                &mut first_line,
+                new_commit
+                    .or(old_commit)
+                    .map(|c| c.commit.message.lines().next())
+                    .flatten()
+                    .unwrap_or(""),
+            )?;
+            first_line
+        };
 
         // Compute the diff
         let input: InternedInput<&str> = InternedInput::new(&*old_content, &*new_content);
@@ -560,8 +605,10 @@ fn process_old_new(
         } else {
             writeln!(
                 html,
-                r#"<details><summary><span>{commit_number}: {old_sha} -- {new_sha} {first_line_message}</span></summary><pre style="margin-left: 4ch">{new_content}</pre></details>"#,
+                r#"<details><summary><span>{commit_number}: {old_sha} -- {new_sha} {first_line_message}</span></summary><pre style="margin-left: 4ch">"#
             )?;
+            pulldown_cmark_escape::escape_html_body_text(&mut html, &new_content)?;
+            writeln!(html, r#"</pre></details>"#)?;
         }
     }
 
@@ -694,8 +741,10 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
         if let Some(filename) = &self.filename {
             write!(
                 f,
-                r#"<span class="filename-line"> <span class="filename-block">@@</span> <b>{filename}</b>{NEW_LINE}</span>"#,
+                r#"<span class="filename-line"> <span class="filename-block">@@</span> <b>"#
             )?;
+            pulldown_cmark_escape::escape_html_body_text(FmtWriter(&mut f), filename)?;
+            write!(f, r#"</b>{NEW_LINE}</span>"#)?;
         }
         Ok(())
     }
@@ -703,7 +752,7 @@ impl UnifiedDiffPrinter for HtmlDiffPrinter<'_> {
     fn display_context_token(&self, mut f: impl fmt::Write, token: Token) -> fmt::Result {
         let token = self.interner[token];
         write!(f, "    ")?;
-        pulldown_cmark_escape::escape_html(FmtWriter(&mut f), token)?;
+        pulldown_cmark_escape::escape_html_body_text(FmtWriter(&mut f), token)?;
         if !token.ends_with('\n') {
             writeln!(f)?;
         }
@@ -960,4 +1009,8 @@ fn a_github_commit(class: &str, owner: &str, repo: &str, sha: &str) -> String {
         r#"<a href="https://github.com/{owner}/{repo}/commit/{sha}" class="{class}">{sha_6}</a>"#,
         sha_6 = &sha[..sha.len().min(7)],
     )
+}
+
+fn looks_like_a_git_sha(sha: &str) -> bool {
+    sha.chars().all(|c| c.is_ascii_hexdigit()) && sha.len() >= 6
 }
