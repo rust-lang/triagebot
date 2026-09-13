@@ -181,9 +181,14 @@ pub async fn gha_logs(
     };
 
     let nonce = Uuid::new_v4().to_hyphenated().to_string();
-    let job_name = &*job.name;
     let sha = &*job.head_sha;
     let short_sha = &job.head_sha[..7];
+
+    let job_name = {
+        let mut name = String::new();
+        pulldown_cmark_escape::escape_html_body_text(&mut name, &*job.name)?;
+        name
+    };
 
     let icon_status = match job.conclusion {
         Some(github::JobConclusion::Failure | github::JobConclusion::TimedOut) => {
