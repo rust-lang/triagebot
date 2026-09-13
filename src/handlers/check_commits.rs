@@ -22,6 +22,7 @@ mod issue_links;
 mod modified_submodule;
 mod no_merges;
 mod non_default_branch;
+mod skipped_workflow_runs;
 mod validate_config;
 
 /// Starting message for merge commits
@@ -143,6 +144,13 @@ pub(super) async fn handle(
         {
             warnings.push(warning);
         }
+    }
+
+    // Check for instructions that bypass workflows and warn about them
+    if let Some(config) = &config.skipped_workflow_runs {
+        warnings.extend(skipped_workflow_runs::skipped_workflow_runs(
+            config, &commits,
+        ));
     }
 
     // Check if this is a force-push with rebase and if it is emit comment
