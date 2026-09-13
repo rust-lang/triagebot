@@ -50,22 +50,22 @@ impl<K: PartialEq<K>, V: EstimatedSize> LeastRecentlyUsedCache<K, V> {
     pub(crate) fn put(&mut self, key: K, value: Arc<V>) -> Arc<V> {
         let estimated_size = value.estimated_size();
 
-        if estimated_size > self.capacity {
+        // Always remove an existing entry with the same key
+        self.prune(&key);
+
+        if estimated_size >= self.capacity / 2 {
             // Entry is too large, don't cache, return as is
             return value;
         }
 
-        // Remove duplicate or last entry when necessary
-        let removed = if let Some(pos) = self.entries.iter().position(|(k, _)| k == &key) {
-            self.entries.remove(pos)
-        } else if self.size + estimated_size >= self.capacity {
-            self.entries.pop_back()
-        } else {
-            None
-        };
-        if let Some(removed) = removed {
+        // Continuously evict LRU entries until there is enough capacity
+        while !self.entries.is_empty()
+            && self.size + estimated_size > self.capacity
+            && let Some(removed) = self.entries.pop_back()
+        {
             self.size -= removed.1.estimated_size();
         }
+        debug_assert!(self.size + estimated_size <= self.capacity);
 
         // Add entry the front of the list and return it
         self.size += estimated_size;
@@ -82,5 +82,99 @@ impl<K: PartialEq<K>, V: EstimatedSize> LeastRecentlyUsedCache<K, V> {
         } else {
             false
         }
+    }
+
+    /// Current size
+    #[cfg(test)]
+    fn size(&self) -> usize {
+        self.size
+    }
+}
+
+#[cfg(test)]
+mod lru_tests {
+    use super::*;
+
+    struct Blob(usize);
+
+    impl EstimatedSize for Blob {
+        fn estimated_size(&self) -> usize {
+            self.0
+        }
+    }
+
+    #[test]
+    fn mixed() {
+        const CAPACITY: usize = 100usize;
+
+        let mut cache = LeastRecentlyUsedCache::new(CAPACITY);
+
+        cache.put("large-1".to_string(), Arc::new(Blob(40)));
+        for index in 1..=5 {
+            cache.put(format!("small-{index}"), Arc::new(Blob(10)));
+        }
+        cache.put("large-2".to_string(), Arc::new(Blob(40)));
+
+        assert!(
+            cache.size() <= CAPACITY,
+            "cache size ({}) bigger than capacity ({CAPACITY})",
+            cache.size()
+        );
+    }
+
+    #[test]
+    fn small_than_large() {
+        const CAPACITY: usize = 100usize;
+
+        let mut cache = LeastRecentlyUsedCache::new(CAPACITY);
+
+        for index in 1..=5 {
+            cache.put(format!("small-{index}"), Arc::new(Blob(10)));
+        }
+        cache.put("large-1".to_string(), Arc::new(Blob(40)));
+        cache.put("large-2".to_string(), Arc::new(Blob(40)));
+
+        assert!(
+            cache.size() <= CAPACITY,
+            "cache size ({}) bigger than capacity ({CAPACITY})",
+            cache.size()
+        );
+    }
+
+    #[test]
+    fn larger_and_larger() {
+        const CAPACITY: usize = 100usize;
+
+        let mut cache = LeastRecentlyUsedCache::new(CAPACITY);
+
+        for index in 1..=25 {
+            let size = index * 2;
+            cache.put(format!("blob-{size}"), Arc::new(Blob(size)));
+            assert!(
+                cache.size() <= CAPACITY,
+                "cache size ({}) bigger than capacity ({CAPACITY})",
+                cache.size()
+            );
+        }
+    }
+
+    #[test]
+    fn more_than_half_capacity() {
+        let mut cache = LeastRecentlyUsedCache::new(100);
+
+        cache.put("large-1".to_string(), Arc::new(Blob(55)));
+        cache.put("large-2".to_string(), Arc::new(Blob(50)));
+
+        assert_eq!(cache.size(), 0);
+    }
+
+    #[test]
+    fn small_than_more_than_half_capacity() {
+        let mut cache = LeastRecentlyUsedCache::new(100);
+
+        cache.put("blob".to_string(), Arc::new(Blob(10)));
+        cache.put("blob".to_string(), Arc::new(Blob(50)));
+
+        assert_eq!(cache.size(), 0);
     }
 }
