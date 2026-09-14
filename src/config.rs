@@ -91,6 +91,7 @@ define_config! {
     #[serde(alias = "canonicalize-issue-links")]
     issue_links: IssueLinksConfig,
     behind_upstream: BehindUpstreamConfig,
+    skipped_workflow_runs: SkippedWorkflowRunsConfig,
     backport: BackportConfig,
     range_diff: RangeDiffConfig,
     review_changes_since: ReviewChangesSinceConfig,
@@ -723,6 +724,12 @@ pub(crate) struct BehindUpstreamConfig {
     pub(crate) days_threshold: Option<usize>,
 }
 
+/// Configuration for PR skipped workflows runs commits checks
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SkippedWorkflowRunsConfig {}
+
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 pub(crate) struct BackportConfig {
     // Config identifier -> labels
@@ -971,6 +978,8 @@ mod tests {
 
             [behind-upstream]
             days-threshold = 14
+            
+            [skipped-workflow-runs]
 
             [backport.teamRed]
             required-pr-labels = ["T-libs"]
@@ -1112,6 +1121,7 @@ mod tests {
                 behind_upstream: Some(BehindUpstreamConfig {
                     days_threshold: Some(14),
                 }),
+                skipped_workflow_runs: Some(SkippedWorkflowRunsConfig {}),
                 concern: Some(ConcernConfig {
                     labels: vec!["has-concerns".to_string()],
                 }),
@@ -1213,6 +1223,7 @@ mod tests {
                 behind_upstream: Some(BehindUpstreamConfig {
                     days_threshold: Some(7),
                 }),
+                skipped_workflow_runs: None,
                 backport: None,
                 range_diff: None,
                 review_changes_since: None,
