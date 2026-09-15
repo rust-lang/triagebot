@@ -18,7 +18,7 @@ pub const ANSI_UP_URL: &str = "/gha_logs/ansi_up@0.0.1-custom.js";
 pub const SUCCESS_URL: &str = "/gha_logs/success@1.svg";
 pub const FAILURE_URL: &str = "/gha_logs/failure@1.svg";
 
-pub const GHA_LOGS_CACHE_CAPACITY_BYTES: usize = 50 * 1024 * 1024; // 50 Mb
+pub const GHA_LOGS_CACHE_CAPACITY_BYTES: usize = 150 * 1024 * 1024; // 150 Mb
 
 pub type GitHubActionLogsCache = cache::LeastRecentlyUsedCache<String, CachedLog>;
 
