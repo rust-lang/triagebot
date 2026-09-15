@@ -34,7 +34,7 @@ pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260616.css";
 pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.3.js";
 pub const RELATIVE_TIME_ELEMENT_URL: &str = "/gh-comments/relative-time-element@5.3.1.js";
 
-pub const GH_COMMENTS_CACHE_CAPACITY_BYTES: usize = 35 * 1024 * 1024; // 35 Mb
+pub const GH_COMMENTS_CACHE_CAPACITY_BYTES: usize = 500 * 1024 * 1024; // 500 Mb
 
 pub type GitHubCommentsCache = cache::LeastRecentlyUsedCache<(String, String, u64), CachedComments>;
 
