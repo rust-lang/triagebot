@@ -264,23 +264,12 @@ async fn milestone_rustfmt(
 
         let pr_numbers = merge_commits
             .filter_map(async |(pr_number, merge_commit)| {
-                let Ok(subtree_commit) = subtree.github_commit(&gh, &merge_commit.sha).await else {
-                    log::error!("failed to fetch the github commit in rust-lang/rustfmt");
-                    return None;
-                };
-
-                if subtree_commit.parents.len() != 2 {
-                    return None;
-                }
-
-                if subtree_commit.sha == merge_commit.sha
-                    && subtree_commit.parents[0].sha == merge_commit.parents[0].sha
-                    && subtree_commit.parents[1].sha == merge_commit.parents[1].sha
-                {
-                    Some(pr_number)
-                } else {
-                    None
-                }
+                // Check that the merge commit exists on the git subtree
+                subtree
+                    .github_commit(&gh, &merge_commit.sha)
+                    .await
+                    .ok()
+                    .map(|_| pr_number)
             })
             .collect::<Vec<_>>()
             .await;
