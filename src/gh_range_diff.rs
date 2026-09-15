@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt::{self, Write};
 use std::iter;
@@ -19,7 +20,7 @@ use pulldown_cmark_escape::FmtWriter;
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::github::{GithubCommit, GithubCompare};
+use crate::github::{FileDiff, GithubCommit, GithubCompare};
 use crate::utils::is_known_and_public_repo;
 use crate::{errors::AppError, github, handlers::Context};
 
@@ -394,11 +395,15 @@ fn process_old_new(
 
     let mut diff_displayed = 0;
 
-    let mut process_diffs = |filename, old_patch, new_patch| -> anyhow::Result<()> {
+    let mut process_diffs = |filename,
+                             old_patch: Cow<'_, str>,
+                             new_patch: Cow<'_, str>|
+     -> anyhow::Result<()> {
         // Removes diff markers to avoid false-positives
         let new_marker = format!("@@ {filename}:");
-        let old_patch = MARKER_RE.replace_all(old_patch, &*new_marker);
-        let new_patch = MARKER_RE.replace_all(new_patch, &*new_marker);
+
+        let old_patch = MARKER_RE.replace_all(&*old_patch, &*new_marker);
+        let new_patch = MARKER_RE.replace_all(&*new_patch, &*new_marker);
 
         // Prepare input
         let input: InternedInput<&str> = InternedInput::new(&*old_patch, &*new_patch);
@@ -476,6 +481,19 @@ fn process_old_new(
         Ok(())
     };
 
+    // Returns the file diff with an added renamed line if the filediff mentions a rename
+    fn file_diff_with_metadata<'a>(file_diff: &'a FileDiff) -> Cow<'a, str> {
+        if let Some(previous_filename) = &file_diff.previous_filename {
+            format!(
+                "+ @@ {previous_filename} -> {} @@\n{}",
+                &file_diff.filename, &file_diff.patch
+            )
+            .into()
+        } else {
+            Cow::Borrowed(&file_diff.patch)
+        }
+    }
+
     let mut seen_files = HashSet::<&str>::new();
 
     // Process the old files
@@ -486,12 +504,12 @@ fn process_old_new(
             .files
             .iter()
             .find(|f| f.filename == filename)
-            .map(|f| &*f.patch)
+            .map(|f| file_diff_with_metadata(f))
             .unwrap_or_default();
 
         seen_files.insert(filename);
 
-        process_diffs(filename, &*old_file.patch, new_file_patch)?;
+        process_diffs(filename, file_diff_with_metadata(&old_file), new_file_patch)?;
     }
 
     // Process the not yet seen new files
@@ -502,7 +520,11 @@ fn process_old_new(
             continue;
         }
 
-        process_diffs(filename, "", &*new_file.patch)?;
+        process_diffs(
+            filename,
+            Cow::Borrowed(""),
+            file_diff_with_metadata(&new_file),
+        )?;
     }
 
     // Print message when there aren't any differences
