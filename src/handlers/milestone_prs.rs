@@ -285,6 +285,8 @@ async fn milestone_rustfmt(
             .collect::<Vec<_>>()
             .await;
 
+        log::info!("milestoning rustfmt PRs: {:?}", &pr_numbers);
+
         for pr_number in pr_numbers {
             if let Err(e) = subtree.set_milestone(&gh, &milestone, pr_number).await {
                 log::error!(
