@@ -207,11 +207,6 @@ async fn milestone_rustfmt(
     event: &IssuesEvent,
     milestone_version: &str,
 ) -> anyhow::Result<()> {
-    if !event.issue.contains_label(&"T-rustfmt".into()) {
-        // This PR doesn't touch rustfmt so we can skip it.
-        return Ok(());
-    }
-
     let Ok(Some(event_diff)) = event.issue.compare(&gh).await else {
         log::error!(
             "failed to fetch the event comparision for {:#?}",
@@ -219,6 +214,15 @@ async fn milestone_rustfmt(
         );
         return Ok(());
     };
+
+    if !event_diff
+        .files
+        .iter()
+        .any(|fd| fd.filename.starts_with("src/tools/rustfmt"))
+    {
+        // This PR doesn't touch rustfmt so we can skip it.
+        return Ok(());
+    }
 
     let commits = event_diff.commits.clone();
     let mv = milestone_version.to_owned();
