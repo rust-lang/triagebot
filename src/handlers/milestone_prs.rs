@@ -6,7 +6,11 @@ use anyhow::Context as _;
 use futures::stream::{self, StreamExt};
 use regex::Regex;
 use reqwest::StatusCode;
+use std::sync::LazyLock;
 use tracing as log;
+
+static MERGE_QUEUE_COMMIT_TITLE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^Merge pull request #([0-9]+)").unwrap());
 
 pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let Event::Issue(e) = event else {
@@ -231,7 +235,6 @@ async fn milestone_rustfmt(
             return;
         };
 
-        let merge_re = Regex::new(r"Merge pull request #([0-9]+)").unwrap();
         let merge_commits = stream::iter(
             commits
                 .iter()
@@ -241,15 +244,17 @@ async fn milestone_rustfmt(
                 })
                 .filter_map(|commit| {
                     let commit_title = commit.commit.message.lines().next().unwrap_or_default();
-                    merge_re.captures(commit_title).map(|cap| {
-                        let pr_number = cap
-                            .get(1)
-                            .unwrap()
-                            .as_str()
-                            .parse::<u64>()
-                            .expect("digits only");
-                        (pr_number, commit)
-                    })
+                    MERGE_QUEUE_COMMIT_TITLE_RE
+                        .captures(commit_title)
+                        .map(|cap| {
+                            let pr_number = cap
+                                .get(1)
+                                .unwrap()
+                                .as_str()
+                                .parse::<u64>()
+                                .expect("digits only");
+                            (pr_number, commit)
+                        })
                 }),
         );
 
@@ -288,4 +293,15 @@ async fn milestone_rustfmt(
     });
 
     Ok(())
+}
+
+#[test]
+fn test_merge_queue_commit_title_re() {
+    let merge_commit_message = "Merge pull request #9999 from user/branch";
+    assert!(MERGE_QUEUE_COMMIT_TITLE_RE.is_match(merge_commit_message));
+    assert!(
+        MERGE_QUEUE_COMMIT_TITLE_RE
+            .captures(merge_commit_message)
+            .is_some_and(|c| c.get(1).unwrap().as_str() == "9999")
+    );
 }
