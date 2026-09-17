@@ -92,6 +92,7 @@ define_config! {
     issue_links: IssueLinksConfig,
     behind_upstream: BehindUpstreamConfig,
     skipped_workflow_runs: SkippedWorkflowRunsConfig,
+    llm_assisted: LlmAssistedConfig,
     backport: BackportConfig,
     range_diff: RangeDiffConfig,
     review_changes_since: ReviewChangesSinceConfig,
@@ -731,6 +732,24 @@ pub(crate) struct BehindUpstreamConfig {
 pub(crate) struct SkippedWorkflowRunsConfig {}
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LlmAssistedConfig {
+    /// Set these labels on the PR when LLM-assisted commits are detected.
+    #[serde(default = "LlmAssistedConfig::default_labels")]
+    pub(crate) labels: Vec<String>,
+    /// A URL to the LLM policy.
+    #[serde(default)]
+    pub(crate) policy_url: Option<String>,
+}
+
+impl LlmAssistedConfig {
+    fn default_labels() -> Vec<String> {
+        vec!["llm-assisted".to_string()]
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 pub(crate) struct BackportConfig {
     // Config identifier -> labels
     #[serde(flatten)]
@@ -981,6 +1000,8 @@ mod tests {
             
             [skipped-workflow-runs]
 
+            [llm-assisted]
+
             [backport.teamRed]
             required-pr-labels = ["T-libs"]
             required-issue-label = "regression-from-stable-to-stable"
@@ -1122,6 +1143,10 @@ mod tests {
                     days_threshold: Some(14),
                 }),
                 skipped_workflow_runs: Some(SkippedWorkflowRunsConfig {}),
+                llm_assisted: Some(LlmAssistedConfig {
+                    labels: vec!["llm-assisted".to_string()],
+                    policy_url: None
+                }),
                 concern: Some(ConcernConfig {
                     labels: vec!["has-concerns".to_string()],
                 }),
@@ -1224,6 +1249,7 @@ mod tests {
                     days_threshold: Some(7),
                 }),
                 skipped_workflow_runs: None,
+                llm_assisted: None,
                 backport: None,
                 range_diff: None,
                 review_changes_since: None,
