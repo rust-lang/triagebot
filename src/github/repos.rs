@@ -1084,7 +1084,7 @@ impl Repository {
 
 // Commits
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct GithubCommit {
     pub sha: String,
     pub commit: GithubCommitCommitField,
@@ -1092,7 +1092,7 @@ pub struct GithubCommit {
     pub html_url: String,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct GithubCommitCommitField {
     pub author: GitUser,
     pub message: String,
@@ -1107,7 +1107,7 @@ pub struct GitCommit {
     pub tree: GitCommitTree,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct GitCommitTree {
     pub sha: String,
 }
@@ -1117,14 +1117,14 @@ pub struct GitTreeObject {
     pub sha: String,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct GitUser {
     pub date: DateTime<FixedOffset>,
     pub name: Option<String>,
     pub email: Option<String>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct Parent {
     pub sha: String,
 }

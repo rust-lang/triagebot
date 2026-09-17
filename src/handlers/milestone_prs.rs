@@ -3,9 +3,14 @@ use crate::{
     handlers::Context,
 };
 use anyhow::Context as _;
+use futures::stream::{self, StreamExt};
 use regex::Regex;
 use reqwest::StatusCode;
+use std::sync::LazyLock;
 use tracing as log;
+
+static MERGE_QUEUE_COMMIT_TITLE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^Merge pull request #([0-9]+)").unwrap());
 
 pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     let Event::Issue(e) = event else {
@@ -58,6 +63,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     e.issue.set_milestone(&ctx.github, &version).await?;
 
     milestone_submodules(&ctx.github, e, &version).await?;
+    milestone_git_subtrees(&ctx.github, e, &version).await?;
 
     Ok(())
 }
@@ -189,4 +195,124 @@ async fn milestone_submodule(
     }
 
     Ok(())
+}
+
+async fn milestone_git_subtrees(
+    gh: &GithubClient,
+    event: &IssuesEvent,
+    milestone_version: &str,
+) -> anyhow::Result<()> {
+    let Ok(Some(event_diff)) = event.issue.compare(&gh).await else {
+        log::error!(
+            "failed to fetch the event comparision for git subtee milestones {:#?}",
+            event.issue
+        );
+        return Ok(());
+    };
+
+    for (repo, subtree) in [("rust-lang/rustfmt", "src/tools/rustfmt")] {
+        if event_diff
+            .files
+            .iter()
+            .any(|fd| fd.filename.starts_with(subtree))
+        {
+            // This PR touches the subtree so we'll try to assign milestones
+            let commits = event_diff.commits.clone();
+            let mv = milestone_version.to_owned();
+            let gh = gh.clone();
+            tokio::task::spawn(async move {
+                if let Err(e) = milestone_git_subtree(&gh, repo, commits, mv).await {
+                    log::error!("failed to milestone {subtree}: {e:?}");
+                }
+            });
+        }
+    }
+
+    Ok(())
+}
+
+/// Try to sync milestones from rust-lang/rust to one of it's git subtrees.
+async fn milestone_git_subtree(
+    gh: &GithubClient,
+    repo_name: &str,
+    commits: Vec<crate::github::GithubCommit>,
+    milestone_version: String,
+) -> anyhow::Result<()> {
+    let Ok(subtree) = gh.repository(repo_name).await else {
+        log::error!("failed to fetch repository details for {repo_name}");
+        return Ok(());
+    };
+
+    let Ok(milestone) = subtree
+        .get_or_create_milestone(&gh, &milestone_version, "open")
+        .await
+    else {
+        log::error!(
+            "failed to get or create milestone {} for {}",
+            &milestone_version,
+            repo_name
+        );
+        return Ok(());
+    };
+
+    let merge_commits = stream::iter(
+        commits
+            .iter()
+            .filter(|commit| {
+                // A merge commit will have two parents
+                commit.parents.len() == 2
+            })
+            .filter_map(|commit| {
+                let commit_title = commit.commit.message.lines().next().unwrap_or_default();
+                MERGE_QUEUE_COMMIT_TITLE_RE
+                    .captures(commit_title)
+                    .map(|cap| {
+                        let pr_number = cap
+                            .get(1)
+                            .unwrap()
+                            .as_str()
+                            .parse::<u64>()
+                            .expect("digits only");
+                        (pr_number, commit)
+                    })
+            }),
+    );
+
+    let pr_numbers = merge_commits
+        .filter_map(async |(pr_number, merge_commit)| {
+            // Check that the merge commit exists on the git subtree
+            subtree
+                .github_commit(&gh, &merge_commit.sha)
+                .await
+                .ok()
+                .map(|_| pr_number)
+        })
+        .collect::<Vec<_>>()
+        .await;
+
+    log::info!("milestoning {repo_name} PRs: {pr_numbers:?}");
+
+    for pr_number in pr_numbers {
+        if let Err(e) = subtree.set_milestone(&gh, &milestone, pr_number).await {
+            log::error!(
+                "failed to set {} subtree milestone {:?} for {}: {e:?}",
+                repo_name,
+                milestone,
+                pr_number
+            );
+        };
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_merge_queue_commit_title_re() {
+    let merge_commit_message = "Merge pull request #9999 from user/branch";
+    assert!(MERGE_QUEUE_COMMIT_TITLE_RE.is_match(merge_commit_message));
+    assert!(
+        MERGE_QUEUE_COMMIT_TITLE_RE
+            .captures(merge_commit_message)
+            .is_some_and(|c| c.get(1).unwrap().as_str() == "9999")
+    );
 }
