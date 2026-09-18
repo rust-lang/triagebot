@@ -319,7 +319,9 @@ async fn handle_command<'a>(
             let words: Vec<&str> = line.split_whitespace().collect();
 
             // Try to find the ping, continue to the next line if we don't find it here.
-            let Some(cmd_index) = words.iter().position(|w| *w == "@**triagebot**") else {
+            let Some(cmd_index) = words.iter().position(|w| {
+                *w == "@**triagebot**" || *w == "@**triagebot|261224**" || *w == "@**|261224**"
+            }) else {
                 continue;
             };
 
