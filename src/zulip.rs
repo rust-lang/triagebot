@@ -381,6 +381,7 @@ async fn handle_command<'a>(
                 } => user_info_cmd(&ctx, gh_id, &username, &organization)
                     .await
                     .map(Some),
+                StreamCommand::Lookup(cmd) => lookup_cmd(&ctx, &cmd).await,
                 StreamCommand::AssignPriority { issue_num, prio } => {
                     let _ = match assign_issue_prio(&ctx, message_data, issue_num, prio).await {
                         // give user feedback

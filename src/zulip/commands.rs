@@ -169,6 +169,9 @@ pub enum StreamCommand {
         #[arg(long = "org", default_value_t = get_default_org())]
         organization: String,
     },
+    /// Perform lookup of GitHub or Zulip username.
+    #[clap(subcommand)]
+    Lookup(LookupCmd),
     /// Label assignment: add one of `P-{low,medium,high,critical}` and remove `I-prioritize`
     AssignPriority {
         /// Issue target of the prioritization
