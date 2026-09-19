@@ -60,6 +60,7 @@ pub enum LookupCmd {
         github_username: String,
     },
     ///  Try to find the GitHub username of a user with the provided Zulip name.
+    #[clap(name = "github")]
     GitHub {
         /// Zulip name to lookup the GitHub username from.
         // Zulip usernames could contain spaces, so take everything to the end of the input
@@ -337,11 +338,21 @@ mod tests {
     }
 
     #[test]
-    fn lookup_command() {
+    fn lookup_zulip_command() {
         assert_eq!(
             parse_chat(&["lookup", "zulip", "username"]),
             ChatCommand::Lookup(LookupCmd::Zulip {
                 github_username: "username".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn lookup_github_command() {
+        assert_eq!(
+            parse_chat(&["lookup", "github", "username", "lastname"]),
+            ChatCommand::Lookup(LookupCmd::GitHub {
+                zulip_username: vec!["username".to_string(), "lastname".to_string()],
             })
         );
     }
