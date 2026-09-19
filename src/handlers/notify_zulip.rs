@@ -69,7 +69,7 @@ fn parse_label_change_input(
     let mut include_config_names: Vec<String> = vec![];
 
     for (name, label_config) in &config.subtables {
-        if has_all_required_labels(&event.issue, label_config) {
+        if has_valid_label_config(&event.issue, label_config) {
             match event.action {
                 IssuesAction::Labeled { .. } if !label_config.messages_on_add.is_empty() => {
                     include_config_names.push(name.to_string());
@@ -121,7 +121,7 @@ fn parse_open_close_reopen_input(
             let mut include_config_names: Vec<String> = vec![];
 
             for (name, label_config) in &config.subtables {
-                if has_all_required_labels(&event.issue, label_config) {
+                if has_valid_label_config(&event.issue, label_config) {
                     match event.action {
                         IssuesAction::Opened if !label_config.messages_on_add.is_empty() => {
                             include_config_names.push(name.to_string());
@@ -164,8 +164,14 @@ fn parse_open_close_reopen_input(
         .collect()
 }
 
-fn has_all_required_labels(issue: &Issue, config: &NotifyZulipLabelConfig) -> bool {
+fn has_valid_label_config(issue: &Issue, config: &NotifyZulipLabelConfig) -> bool {
     for req_label in &config.required_labels {
+        let mut req_label = &**req_label;
+        let mut expected = true;
+        if req_label.starts_with("!") {
+            expected = false;
+            req_label = &req_label[1..];
+        }
         let pattern = match globset::Glob::new(req_label) {
             Ok(pattern) => pattern,
             Err(err) => {
@@ -174,7 +180,7 @@ fn has_all_required_labels(issue: &Issue, config: &NotifyZulipLabelConfig) -> bo
             }
         };
         let matcher = pattern.compile_matcher();
-        if !issue.labels().iter().any(|l| matcher.is_match(&l.name)) {
+        if expected != issue.labels().iter().any(|l| matcher.is_match(&l.name)) {
             return false;
         }
     }
