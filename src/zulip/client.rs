@@ -47,10 +47,7 @@ impl ZulipClient {
 
     // Taken from https://github.com/kobzol/team/blob/0f68ffc8b0d438d88ef4573deb54446d57e1eae6/src/api/zulip.rs#L45
     pub(crate) async fn get_zulip_users(&self) -> anyhow::Result<Vec<ZulipUser>> {
-        let resp = self
-            .make_request(Method::GET, "users?include_custom_profile_fields=true")
-            .send()
-            .await?;
+        let resp = self.make_request(Method::GET, "users").send().await?;
         deserialize_response::<ZulipUsers>(resp)
             .await
             .map(|users| users.members)

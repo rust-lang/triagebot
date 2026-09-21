@@ -381,6 +381,7 @@ async fn handle_command<'a>(
                 } => user_info_cmd(&ctx, gh_id, &username, &organization)
                     .await
                     .map(Some),
+                StreamCommand::Lookup(cmd) => lookup_cmd(&ctx, &cmd).await,
                 StreamCommand::AssignPriority { issue_num, prio } => {
                     let _ = match assign_issue_prio(&ctx, message_data, issue_num, prio).await {
                         // give user feedback
@@ -1443,61 +1444,60 @@ async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::
         .get_zulip_users()
         .await
         .context("Cannot get Zulip users")?;
-    let Some(zulip_user) = users
+
+    let matched_users = users
         .iter()
-        .find(|user| user.name.to_lowercase() == username_lowercase)
-    else {
-        return Ok(format!(
-            "Zulip user {zulip_username} was not found on Zulip"
-        ));
-    };
+        .filter(|user| user.name.to_lowercase() == username_lowercase)
+        .collect::<Vec<_>>();
 
-    // Prefer what is configured on Zulip. If there is nothing, try to lookup the GitHub username
-    // from the team database.
-    let github_username = if let Some(name) = zulip_user.get_github_username() {
-        name.to_string()
-    } else {
-        let zulip_id = zulip_user.user_id;
+    // Multiple Zulip users can have the same display name
+    // So gather results for all of them
+    let mut user_results = vec![];
+    for matched_user in matched_users {
+        // Note: anyone can configure arbitrary GitHub username on their Zulip profile.
+        // So we do not trust what is on Zulip (which could be extracted out of custom profile values)
+        // and instead take the team database as the ground truth.
+        let zulip_id = matched_user.user_id;
         let Some(gh_id) = ctx.team.zulip_to_github_id(zulip_id).await? else {
-            return Ok(format!(
-                "Zulip user {zulip_username} was not found in team Zulip mapping. Maybe they do not have zulip-id configured in team."
-            ));
+            user_results.push(format!("{} was not found in team Zulip mapping. Maybe they do not have zulip-id configured in team.", format_zulip_username(matched_user.user_id, PingMode::Silent)));
+            continue;
         };
-        let Some(username) = ctx.team.username_from_gh_id(gh_id).await? else {
-            return Ok(format!(
-                "Zulip user {zulip_username} was not found in the team database."
+        let Some(github_username) = ctx.team.username_from_gh_id(gh_id).await? else {
+            user_results.push(format!(
+                "{} was not found in the team database.",
+                format_zulip_username(matched_user.user_id, PingMode::Silent)
             ));
+            continue;
         };
-        username
-    };
+        user_results.push(format!(
+            "{}'s GitHub profile is [{github_username}](https://github.com/{github_username}).",
+            format_zulip_username(matched_user.user_id, PingMode::Silent)
+        ));
+    }
 
-    Ok(format!(
-        "{}'s GitHub profile is [{github_username}](https://github.com/{github_username}).",
-        format_zulip_username(zulip_user.user_id, PingMode::Silent)
-    ))
+    match user_results.as_slice() {
+        [] => Ok(format!(
+            "Zulip user {zulip_username} was not found on Zulip",
+        )),
+        [msg] => Ok(msg.clone()),
+        messages => {
+            let mut result = format!(
+                "Found {} users matching username {zulip_username}\n\n",
+                messages.len()
+            );
+            for msg in messages {
+                writeln!(result, "- {msg}",).unwrap();
+            }
+            Ok(result)
+        }
+    }
 }
 
 /// Tries to find a Zulip username from a GitHub username.
 async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Result<String> {
-    async fn lookup_zulip_id_from_zulip(
-        zulip: &ZulipClient,
-        gh_username: &str,
-    ) -> anyhow::Result<Option<u64>> {
-        let username_lowercase = gh_username.to_lowercase();
-        let users = zulip.get_zulip_users().await?;
-        Ok(users
-            .into_iter()
-            .find(|user| {
-                user.get_github_username().map(str::to_lowercase).as_deref()
-                    == Some(username_lowercase.as_str())
-            })
-            .map(|u| u.user_id))
-    }
-
-    async fn lookup_zulip_id_from_team(
-        ctx: &Context,
-        gh_username: &str,
-    ) -> anyhow::Result<Option<u64>> {
+    // We do not trust GitHub profile fields entered on Zulip, they can be modified arbitrarily
+    // We only trust the team database
+    let zulip_id = async move {
         let people = ctx.team.people().await?.people;
 
         // Lookup the person in the team DB
@@ -1514,22 +1514,17 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
         let Some(zulip_id) = ctx.team.github_to_zulip_id(person.github_id).await? else {
             return Ok(None);
         };
-        Ok(Some(zulip_id))
+        anyhow::Ok(Some(zulip_id))
     }
-
-    let zulip_id = match lookup_zulip_id_from_team(ctx, gh_username).await? {
-        Some(id) => id,
-        None => match lookup_zulip_id_from_zulip(&ctx.zulip, gh_username).await? {
-            Some(id) => id,
-            None => {
-                return Ok(format!(
-                    "No Zulip account found for GitHub username `{gh_username}`."
-                ));
-            }
-        },
+    .await?;
+    let Some(zulip_id) = zulip_id else {
+        return Ok(format!(
+            "No Zulip account found for GitHub username `{gh_username}`."
+        ));
     };
+
     Ok(format!(
-        "The GitHub user `{gh_username}` has the following Zulip account: {}",
+        "The GitHub user `{gh_username}` has Zulip account: {}",
         format_zulip_username(zulip_id, PingMode::Silent)
     ))
 }
