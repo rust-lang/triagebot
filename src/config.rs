@@ -88,6 +88,7 @@ define_config! {
     merge_conflicts: MergeConflictConfig,
     bot_pull_requests: BotPullRequests,
     rendered_link: RenderedLinkConfig,
+    large_pull_requests: LargePullRequests,
     #[serde(alias = "canonicalize-issue-links")]
     issue_links: IssueLinksConfig,
     behind_upstream: BehindUpstreamConfig,
@@ -649,6 +650,15 @@ pub(crate) struct BotPullRequests {}
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
+pub(crate) struct LargePullRequests {
+    #[serde(default)]
+    pub(crate) exclude_files: Vec<String>,
+    pub(crate) threshold: u64,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RenderedLinkConfig {
     /// List of paths to watch for modifications
     pub(crate) trigger_files: Vec<String>,
@@ -1115,6 +1125,7 @@ mod tests {
                     trigger_files: vec!["posts/".to_string()],
                     exclude_files: vec![],
                 }),
+                large_pull_requests: None,
                 issue_links: Some(IssueLinksConfig {
                     check_commits: IssueLinksCheckCommitsConfig::All,
                 }),
@@ -1217,6 +1228,7 @@ mod tests {
                 merge_conflicts: None,
                 bot_pull_requests: None,
                 rendered_link: None,
+                large_pull_requests: None,
                 issue_links: Some(IssueLinksConfig {
                     check_commits: IssueLinksCheckCommitsConfig::Off,
                 }),
