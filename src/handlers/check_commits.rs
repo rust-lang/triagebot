@@ -5,6 +5,7 @@ use anyhow::bail;
 use itertools::Itertools;
 
 use super::Context;
+use crate::handlers::large_pull_requests;
 use crate::interactions::ErrorComment;
 use crate::{
     config::Config,
@@ -150,6 +151,12 @@ pub(super) async fn handle(
     if let Some(config) = &config.skipped_workflow_runs {
         warnings.extend(skipped_workflow_runs::skipped_workflow_runs(
             config, &commits,
+        ));
+    }
+
+    if let Some(config) = &config.large_pull_requests {
+        warnings.extend(large_pull_requests::large_pull_requests(
+            compare, config
         ));
     }
 

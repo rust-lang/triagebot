@@ -153,20 +153,6 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         }
     };
 
-    let large_pr = async {
-        if let Some(large_pr_config) = config
-            .as_ref()
-            .ok()
-            .and_then(|c| c.large_pull_requests.as_ref())
-        {
-            large_pull_requests::handle(ctx, event, large_pr_config)
-                .await
-                .map_err(|e| HandlerError::Other(e.context("large_pull_requests handler failed")))
-        } else {
-            Ok(())
-        }
-    };
-
     let view_all_comments_link = async {
         if let Some(view_all_comments_config) = config
             .as_ref()
@@ -266,7 +252,6 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         rustc_commits,
         milestone_prs,
         rendered_link,
-        large_pr,
         view_all_comments,
         relnotes,
         bot_pull_requests,
@@ -282,7 +267,6 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         rustc_commits,
         milestone_prs,
         rendered_link,
-        large_pr,
         view_all_comments_link,
         relnotes,
         bot_pull_requests,
@@ -300,7 +284,6 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
         rustc_commits,
         milestone_prs,
         rendered_link,
-        large_pr,
         view_all_comments,
         relnotes,
         bot_pull_requests,
