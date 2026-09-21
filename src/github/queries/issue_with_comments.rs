@@ -13,7 +13,7 @@ pub struct GitHubIssueWithComments {
     #[serde(rename = "stateReason")]
     pub state_reason: Option<GitHubIssueStateReason>,
     pub url: String,
-    pub author: Option<GitHubSimplifiedAuthor>,
+    pub author: Option<GitHubSimplifiedUser>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "lastEditedAt")]
@@ -27,7 +27,7 @@ pub struct GitHubIssueWithComments {
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct GitHubSimplifiedAuthor {
+pub struct GitHubSimplifiedUser {
     pub login: String,
     pub url: String,
     #[serde(rename = "__typename")]
@@ -36,10 +36,10 @@ pub struct GitHubSimplifiedAuthor {
     pub avatar_url: String,
 }
 
-impl Default for GitHubSimplifiedAuthor {
+impl Default for GitHubSimplifiedUser {
     fn default() -> Self {
         // Default to the "Deleted user" (https://github.com/ghost)
-        GitHubSimplifiedAuthor {
+        GitHubSimplifiedUser {
             type_: "User".to_string(),
             login: "ghost".to_string(),
             url: "https://github.com/ghost".to_string(),
@@ -55,7 +55,7 @@ pub struct GitHubGraphQlComments {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubGraphQlComment {
-    pub author: Option<GitHubSimplifiedAuthor>,
+    pub author: Option<GitHubSimplifiedUser>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "lastEditedAt")]
@@ -84,6 +84,8 @@ pub struct GitHubGraphQlReviewThread {
     pub is_outdated: bool,
     #[serde(rename = "isResolved")]
     pub is_resolved: bool,
+    #[serde(rename = "resolvedBy")]
+    pub resolved_by: Option<GitHubSimplifiedUser>,
     pub path: String,
     #[serde(rename = "diffSide")]
     pub diff_side: GitHubDiffSide,
@@ -103,7 +105,7 @@ pub struct GitHubGraphQlReviewThreadComments {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubGraphQlReviewThreadComment {
-    pub author: Option<GitHubSimplifiedAuthor>,
+    pub author: Option<GitHubSimplifiedUser>,
     #[serde(rename = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[serde(rename = "lastEditedAt")]
@@ -131,7 +133,7 @@ pub struct GitHubGraphQlReviews {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct GitHubGraphQlReview {
-    pub author: Option<GitHubSimplifiedAuthor>,
+    pub author: Option<GitHubSimplifiedUser>,
     pub id: String,
     pub state: GitHubReviewState,
     #[serde(rename = "submittedAt")]
@@ -366,6 +368,12 @@ query ($owner: String!, $repo: String!, $issueNumber: Int!, $commentsCursor: Str
             isCollapsed
             isOutdated
             isResolved
+            resolvedBy {
+              url
+              login
+              avatarUrl
+              __typename
+            }
             path
             diffSide
             startDiffSide

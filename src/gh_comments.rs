@@ -20,7 +20,7 @@ use crate::{
     github::queries::issue_with_comments::{
         GitHubDiffSide, GitHubGraphQlComment, GitHubGraphQlReactionGroup, GitHubGraphQlReview,
         GitHubGraphQlReviewThread, GitHubGraphQlReviewThreadComment, GitHubIssueState,
-        GitHubIssueStateReason, GitHubIssueWithComments, GitHubReviewState, GitHubSimplifiedAuthor,
+        GitHubIssueStateReason, GitHubIssueWithComments, GitHubReviewState, GitHubSimplifiedUser,
     },
 };
 use crate::{
@@ -29,7 +29,7 @@ use crate::{
     utils::{immutable_headers, is_known_and_public_repo},
 };
 
-pub const STYLE_URL: &str = "/gh-comments/style@0.0.10.css";
+pub const STYLE_URL: &str = "/gh-comments/style@0.0.11.css";
 pub const MARKDOWN_URL: &str = "/gh-comments/github-markdown@20260616.css";
 pub const SELF_CONTAINED_URL: &str = "/gh-comments/self_contained@0.0.3.js";
 pub const RELATIVE_TIME_ELEMENT_URL: &str = "/gh-comments/relative-time-element@5.3.1.js";
@@ -50,8 +50,7 @@ impl cache::EstimatedSize for CachedComments {
     }
 }
 
-static GHOST_ACCOUNT: LazyLock<GitHubSimplifiedAuthor> =
-    LazyLock::new(GitHubSimplifiedAuthor::default);
+static GHOST_ACCOUNT: LazyLock<GitHubSimplifiedUser> = LazyLock::new(GitHubSimplifiedUser::default);
 
 pub async fn gh_comments(
     Path(ref key @ (ref owner, ref repo, issue_id)): Path<(String, String, u64)>,
@@ -447,6 +446,7 @@ pub async fn gh_comments(
                             review_thread.is_collapsed,
                             review_thread.is_resolved,
                             review_thread.is_outdated,
+                            &review_thread.resolved_by,
                             review_thread
                                 .comments
                                 .nodes
@@ -538,7 +538,7 @@ fn write_comment_as_html(
     buffer: &mut String,
     body_html: &str,
     comment_url: &str,
-    author: &GitHubSimplifiedAuthor,
+    author: &GitHubSimplifiedUser,
     created_at: &chrono::DateTime<Utc>,
     last_edited_at: &Option<chrono::DateTime<Utc>>,
     reaction_groups: &[GitHubGraphQlReactionGroup],
@@ -641,7 +641,7 @@ fn write_review_as_html(
     buffer: &mut String,
     body_html: &str,
     review_url: &str,
-    author: &GitHubSimplifiedAuthor,
+    author: &GitHubSimplifiedUser,
     state: GitHubReviewState,
     submitted_at: &chrono::DateTime<Utc>,
     last_edited_at: &Option<chrono::DateTime<Utc>>,
@@ -771,6 +771,7 @@ fn write_review_thread_as_html(
     is_collapsed: bool,
     is_resolved: bool,
     is_outdated: bool,
+    resolved_by: &Option<GitHubSimplifiedUser>,
     diff_hunk: &str,
     range: Option<DiffLineRange>,
     comments: &[GitHubGraphQlReviewThreadComment],
@@ -787,13 +788,18 @@ fn write_review_thread_as_html(
     } else {
         ""
     };
+    let resolved_indicator = if is_resolved {
+        r#"<span class="resolved-indicator"></span>"#
+    } else {
+        ""
+    };
 
     writeln!(
         buffer,
         r###"
       <details class="review-thread" data-expandable="{default_open}" {open}>
         <summary class="review-thread-header">
-            <span><span class="indicator"></span>{path_html}{status}</span><span class="fold-indicator"></span> 
+            <span><span class="indicator"></span>{path_html}{status}</span><span style="flex:1"></span><span class="fold-indicator"></span>{resolved_indicator} 
         </summary>
 
         <div class="review-thread-comments">
@@ -844,6 +850,15 @@ fn write_review_thread_as_html(
         )?;
         write_reaction_groups_as_html(buffer, reaction_groups)?;
         writeln!(buffer, "</div>")?;
+    }
+
+    if let Some(resolved_by) = resolved_by {
+        let login = &resolved_by.login;
+
+        writeln!(
+            buffer,
+            r#"<div class="review-thread-resolved"><b>{login}</b> marked this conversation as resolved.</div>"#,
+        )?;
     }
 
     writeln!(
