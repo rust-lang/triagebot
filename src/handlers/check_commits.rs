@@ -19,6 +19,7 @@ mod behind_upstream;
 mod branch_links;
 mod force_push_range_diff;
 mod issue_links;
+mod llm_assisted;
 mod modified_submodule;
 mod no_merges;
 mod non_default_branch;
@@ -151,6 +152,18 @@ pub(super) async fn handle(
         warnings.extend(skipped_workflow_runs::skipped_workflow_runs(
             config, &commits,
         ));
+    }
+
+    // Check if PR has LLM-assisted commits and emit a warning if so
+    if let Some(llm_assisted) = &config.llm_assisted
+        && let detected = llm_assisted::llm_trailers_in_commits(&commits)
+        && !detected.is_empty()
+    {
+        let explicit_llm_policy_url = llm_assisted.policy_url.as_deref();
+        if let Some(policy_url) = explicit_llm_policy_url {
+            warnings.push(llm_assisted::warning(policy_url, &detected));
+        }
+        labels.extend(llm_assisted.labels.iter().cloned());
     }
 
     // Check if this is a force-push with rebase and if it is emit comment
