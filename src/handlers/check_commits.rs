@@ -5,7 +5,6 @@ use anyhow::bail;
 use itertools::Itertools;
 
 use super::Context;
-use crate::handlers::large_pull_requests;
 use crate::interactions::ErrorComment;
 use crate::{
     config::Config,
@@ -20,6 +19,7 @@ mod behind_upstream;
 mod branch_links;
 mod force_push_range_diff;
 mod issue_links;
+mod large_pull_requests;
 mod modified_submodule;
 mod no_merges;
 mod non_default_branch;
@@ -156,7 +156,8 @@ pub(super) async fn handle(
 
     if let Some(config) = &config.large_pull_requests {
         warnings.extend(large_pull_requests::large_pull_requests(
-            compare, config
+            compare.files.as_slice(),
+            config,
         ));
     }
 

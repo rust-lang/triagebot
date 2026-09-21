@@ -23,7 +23,6 @@ pub mod docs_update;
 mod github_releases;
 pub mod goals;
 mod issue_links;
-mod large_pull_requests;
 mod lock;
 pub(crate) mod major_change;
 mod mentions;

@@ -651,6 +651,8 @@ pub(crate) struct BotPullRequests {}
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct LargePullRequests {
+    /// Path globs to exclude; useful for only focusing on logic code,
+    /// permitting as much testing as possible.
     #[serde(default)]
     pub(crate) exclude_files: Vec<String>,
     pub(crate) threshold: u64,
@@ -986,6 +988,10 @@ mod tests {
             [rendered-link]
             trigger-files = ["posts/"]
 
+            [large-pull-requests]
+            threshold = 250
+            exclude-files = ["tests/ui/*"]
+
             [behind-upstream]
             days-threshold = 14
             
@@ -1125,7 +1131,10 @@ mod tests {
                     trigger_files: vec!["posts/".to_string()],
                     exclude_files: vec![],
                 }),
-                large_pull_requests: None,
+                large_pull_requests: Some(LargePullRequests {
+                    exclude_files: vec!["tests/ui/*".into()],
+                    threshold: 250,
+                }),
                 issue_links: Some(IssueLinksConfig {
                     check_commits: IssueLinksCheckCommitsConfig::All,
                 }),
