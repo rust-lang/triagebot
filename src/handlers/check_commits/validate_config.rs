@@ -134,6 +134,12 @@ fn validate_parsed_config(config: &Config) -> Result<(), String> {
         }
     }
 
+    if let Some(large_pull_requests) = &config.large_pull_requests {
+        for pat in &large_pull_requests.exclude_files {
+            validate_pattern(pat, &format!("`large_pull_requests.exclude_files` item `{pat}`"))?;
+        }
+    }
+
     Ok(())
 }
 
