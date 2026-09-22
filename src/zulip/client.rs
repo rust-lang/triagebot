@@ -220,14 +220,7 @@ impl ZulipClient {
             send_notification_to_new_thread: bool,
         }
 
-        let mut topic = message_topic.replacen("", "✔ ", 1);
-        // Maximum 60, minus the elipsis
-        let mut chars = topic.char_indices().skip(60 - 1);
-        if let Some((len, _)) = chars.next()
-            && chars.next().is_some()
-        {
-            topic = format!("{}…", &topic[..len]);
-        }
+        let topic = format_resolved_topic(message_topic);
 
         let resp = self
             .make_request(Method::PATCH, &format!("messages/{message_id}"))
@@ -254,6 +247,22 @@ impl ZulipClient {
     }
 }
 
+fn format_resolved_topic(message_topic: &str) -> String {
+    // Ensure at most one "✔" at the beginning of the topic title
+    let mut topic = message_topic
+        .trim_start_matches("✔")
+        .trim()
+        .replacen("", "✔ ", 1);
+    // Maximum 60, minus the elipsis
+    let mut chars = topic.char_indices().skip(60 - 1);
+    if let Some((len, _)) = chars.next()
+        && chars.next().is_some()
+    {
+        topic = format!("{}…", &topic[..len]);
+    }
+    topic.to_string()
+}
+
 async fn deserialize_response<T>(response: Response) -> anyhow::Result<T>
 where
     T: DeserializeOwned,
@@ -270,5 +279,32 @@ where
     } else {
         let body = response.text().await.context("Zulip API request failed")?;
         Err(anyhow::anyhow!(body))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::zulip::client::format_resolved_topic;
+
+    #[test]
+    fn test_zulip_topic_resolved() {
+        assert_eq!(
+            "✔ Resolve this topic",
+            format_resolved_topic("Resolve this topic")
+        );
+        assert_eq!(
+            "✔ A very long text which is over sixty characters long - wh…",
+            format_resolved_topic(
+                "A very long text which is over sixty characters long - why do you ask? Ask Zulip, I reply!"
+            )
+        );
+        assert_eq!(
+            "✔ Topic resolved",
+            format_resolved_topic("✔ Topic resolved")
+        );
+        assert_eq!(
+            "✔ What happened!!!",
+            format_resolved_topic("✔✔✔✔✔ What happened!!!")
+        );
     }
 }
