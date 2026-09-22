@@ -88,6 +88,7 @@ define_config! {
     merge_conflicts: MergeConflictConfig,
     bot_pull_requests: BotPullRequests,
     rendered_link: RenderedLinkConfig,
+    large_pull_requests: LargePullRequests,
     #[serde(alias = "canonicalize-issue-links")]
     issue_links: IssueLinksConfig,
     behind_upstream: BehindUpstreamConfig,
@@ -649,6 +650,22 @@ pub(crate) struct BotPullRequests {}
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
+pub(crate) struct LargePullRequests {
+    /// Path globs to exclude; useful for only focusing on logic code,
+    /// permitting as much testing as possible.
+    #[serde(default)]
+    pub(crate) exclude_files: Vec<String>,
+
+    /// No action will be taken on PRs with these substrings in the title.
+    /// Useful for ignoring subtree syncs.
+    pub(crate) exclude_titles: Vec<String>,
+    /// The amount of lines (either additions or deletions) that a pull request has to contain to trigger a warning
+    pub(crate) threshold: u64,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RenderedLinkConfig {
     /// List of paths to watch for modifications
     pub(crate) trigger_files: Vec<String>,
@@ -976,6 +993,11 @@ mod tests {
             [rendered-link]
             trigger-files = ["posts/"]
 
+            [large-pull-requests]
+            threshold = 250
+            exclude-files = ["tests/ui/*"]
+            exclude-titles = ["subtree sync"]
+
             [behind-upstream]
             days-threshold = 14
             
@@ -1115,6 +1137,11 @@ mod tests {
                     trigger_files: vec!["posts/".to_string()],
                     exclude_files: vec![],
                 }),
+                large_pull_requests: Some(LargePullRequests {
+                    exclude_files: vec!["tests/ui/*".into()],
+                    exclude_titles: vec!["subtree sync".into()],
+                    threshold: 250,
+                }),
                 issue_links: Some(IssueLinksConfig {
                     check_commits: IssueLinksCheckCommitsConfig::All,
                 }),
@@ -1217,6 +1244,7 @@ mod tests {
                 merge_conflicts: None,
                 bot_pull_requests: None,
                 rendered_link: None,
+                large_pull_requests: None,
                 issue_links: Some(IssueLinksConfig {
                     check_commits: IssueLinksCheckCommitsConfig::Off,
                 }),

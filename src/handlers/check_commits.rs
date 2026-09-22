@@ -19,6 +19,7 @@ mod behind_upstream;
 mod branch_links;
 mod force_push_range_diff;
 mod issue_links;
+mod large_pull_requests;
 mod modified_submodule;
 mod no_merges;
 mod non_default_branch;
@@ -150,6 +151,14 @@ pub(super) async fn handle(
     if let Some(config) = &config.skipped_workflow_runs {
         warnings.extend(skipped_workflow_runs::skipped_workflow_runs(
             config, &commits,
+        ));
+    }
+
+    if let Some(config) = &config.large_pull_requests {
+        warnings.extend(large_pull_requests::large_pull_requests(
+            &event.issue.title,
+            compare.files.as_slice(),
+            config,
         ));
     }
 
