@@ -10,9 +10,15 @@ Big pull requests are reviewed much slower than small ones, consider splitting i
 }
 
 pub(super) fn large_pull_requests(
+    pr_title: &str,
     files: &[FileDiff],
     config: &LargePullRequests,
 ) -> Option<String> {
+    // Don't trigger if the PR has any of the excluded title segments.
+    if config.exclude_titles.iter().any(|s| pr_title.contains(s)) {
+        return None;
+    }
+
     let exclude_matcher = ModifiedPathMatcher::new(&config.exclude_files);
 
     let number_of_changed_lines: usize = files
@@ -54,10 +60,11 @@ fn enough_changed_files() {
 
     let no_excluded_threshold_100 = LargePullRequests {
         exclude_files: vec![],
+        exclude_titles: vec![],
         threshold: 100,
     };
 
-    assert!(large_pull_requests(&files, &no_excluded_threshold_100).is_some());
+    assert!(large_pull_requests("Title", &files, &no_excluded_threshold_100).is_some());
 
     let files: [FileDiff; 50] = std::array::from_fn(|_| FileDiff {
         filename: "file.txt".into(),
@@ -71,7 +78,7 @@ fn enough_changed_files() {
         .into(),
     });
 
-    assert!(large_pull_requests(&files, &no_excluded_threshold_100).is_none());
+    assert!(large_pull_requests("Title", &files, &no_excluded_threshold_100).is_none());
 
     let files: [FileDiff; 25] = std::array::from_fn(|_| FileDiff {
         filename: "file.txt".into(),
@@ -85,7 +92,7 @@ fn enough_changed_files() {
         .into(),
     });
 
-    assert!(large_pull_requests(&files, &no_excluded_threshold_100).is_some());
+    assert!(large_pull_requests("Title!", &files, &no_excluded_threshold_100).is_some());
 
     let files: [FileDiff; 300] = std::array::from_fn(|_| FileDiff {
         filename: "actually_ignored.jpeg".into(),
@@ -98,8 +105,9 @@ fn enough_changed_files() {
 
     let jpeg_excluded_threshold_100 = LargePullRequests {
         exclude_files: vec!["*.jpeg".into()],
+        exclude_titles: vec![],
         threshold: 100u64,
     };
 
-    assert!(large_pull_requests(&files, &jpeg_excluded_threshold_100).is_none());
+    assert!(large_pull_requests("Title", &files, &jpeg_excluded_threshold_100).is_none());
 }

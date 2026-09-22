@@ -655,6 +655,11 @@ pub(crate) struct LargePullRequests {
     /// permitting as much testing as possible.
     #[serde(default)]
     pub(crate) exclude_files: Vec<String>,
+
+    /// No action will be taken on PRs with these substrings in the title.
+    /// Useful for ignoring subtree syncs.
+    pub(crate) exclude_titles: Vec<String>,
+    /// The amount of lines (either additions or deletions) that a pull request has to contain to trigger a warning
     pub(crate) threshold: u64,
 }
 
@@ -991,6 +996,7 @@ mod tests {
             [large-pull-requests]
             threshold = 250
             exclude-files = ["tests/ui/*"]
+            exclude-titles = ["subtree sync"]
 
             [behind-upstream]
             days-threshold = 14
@@ -1133,6 +1139,7 @@ mod tests {
                 }),
                 large_pull_requests: Some(LargePullRequests {
                     exclude_files: vec!["tests/ui/*".into()],
+                    exclude_titles: vec!["subtree sync".into()],
                     threshold: 250,
                 }),
                 issue_links: Some(IssueLinksConfig {

@@ -156,6 +156,7 @@ pub(super) async fn handle(
 
     if let Some(config) = &config.large_pull_requests {
         warnings.extend(large_pull_requests::large_pull_requests(
+            &event.issue.title,
             compare.files.as_slice(),
             config,
         ));
