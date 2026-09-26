@@ -221,6 +221,11 @@ impl ZulipClient {
         }
 
         let topic = format_resolved_topic(message_topic);
+        // Zulip returns a BAD_REQUEST error if attempting to set the same title for a topic
+        // so return without nothing
+        if topic == message_topic {
+            return Ok(());
+        }
 
         let resp = self
             .make_request(Method::PATCH, &format!("messages/{message_id}"))
