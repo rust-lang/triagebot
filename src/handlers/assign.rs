@@ -1020,9 +1020,15 @@ pub(super) async fn handle_command(
         // When you send `r? ghost` in a PR comment, it should mean "unassign the current assignee".
         // Only allow this for the PR author (usually when they forget to do `r? ghost` in the PR
         // body), otherwise anyone could remove assignees from any PR.
-        if assignee == GHOST_ACCOUNT && issue.user.login == event.user().login {
-            issue.remove_assignees(&ctx.github, Selection::All).await?;
-            return Ok(());
+        if assignee == GHOST_ACCOUNT {
+            if issue.user.login == event.user().login {
+                issue.remove_assignees(&ctx.github, Selection::All).await?;
+                return Ok(());
+            } else {
+                return user_error!(
+                    "Only the PR author can use `r? ghost` to unassign the current reviewer."
+                );
+            }
         }
         let mut db_client = ctx.db.get().await;
         let repo_workqueue = get_repo_workqueue(ctx, &event.repo().full_name);
