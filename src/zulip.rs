@@ -71,6 +71,7 @@ pub struct Request {
     token: SecretString,
 }
 
+// Zulip webhook payload: https://rust-lang.zulipchat.com/api/outgoing-webhook-payload
 #[derive(Clone, Debug, serde::Deserialize)]
 struct Message {
     id: u64,
@@ -396,7 +397,7 @@ async fn handle_command<'a>(
                             }
                         }
                         Err(err) => {
-                            log::error!("Could not assign priority to #{}: {:?}", issue_num, err);
+                            log::error!("Could not assign priority to #{:?}: {:?}", issue_num, err);
                             ctx.zulip.add_reaction(message_data.id, "scream").await?;
                         }
                     };
@@ -445,7 +446,7 @@ async fn accept_decline_backport(
     let mut pr_num = pr_num;
     let mut channel = channel.clone();
 
-    // Parse the stream subjetc if the channel or the pr num are not provided
+    // Parse the stream subject if the channel or the pr num are not provided
     if pr_num.is_none() || channel.is_none() {
         let (maybe_pr_num, maybe_channel) = subject
             .rsplit_once(':')
@@ -559,9 +560,9 @@ async fn accept_decline_backport(
 async fn assign_issue_prio(
     ctx: &Context,
     message_data: &Message,
-    issue_num: PullRequestNumber,
+    issue_num: Option<PullRequestNumber>,
     prio: IssuePrio,
-) -> anyhow::Result<Option<String>> {
+) -> anyhow::Result<()> {
     let message = message_data.clone();
     let stream_id = message.stream_id.unwrap();
     let subject = message.subject.unwrap();
@@ -578,6 +579,24 @@ async fn assign_issue_prio(
         fork: false,
         parent: None,
     };
+
+    // Parse the Zulip topic subject if an issue num was not provided
+    // Hopefully it is something like "#123456 Some text" or "✔ #123456 Some text"
+    let mut issue_num: Option<u64> = issue_num;
+    if issue_num.is_none() {
+        let re_issue_num = regex::Regex::new(r"#[0-9]*").expect("Cannot build regex");
+        issue_num = Some(
+            re_issue_num
+                .find(&subject)
+                .expect("Cannot parse issue num")
+                .as_str()
+                .strip_prefix('#')
+                .expect("Cannot parse issue num")
+                .parse::<u64>()
+                .expect("Cannot parse issue num"),
+        );
+    }
+    let issue_num = issue_num.context("No issue number to apply to")?;
 
     // Ensure this is an issue and not a pull request
     let issue = repository
@@ -615,7 +634,7 @@ async fn assign_issue_prio(
 
     // if just removing priority, nothing else to do
     if prio == IssuePrio::None {
-        return Ok(None);
+        return Ok(());
     }
 
     // post a comment on GitHub
@@ -640,7 +659,7 @@ async fn assign_issue_prio(
         .await
         .context(format!("failed to add labels to issue #{}", issue_num))?;
 
-    Ok(None)
+    Ok(())
 }
 
 /// Unlock a specific issue in our managed repos.

@@ -173,11 +173,12 @@ pub enum StreamCommand {
     #[clap(subcommand)]
     Lookup(LookupCmd),
     /// Label assignment: add one of `P-{low,medium,high,critical}` and remove `I-prioritize`
+    #[clap(alias = "prio")]
     AssignPriority {
-        /// Issue target of the prioritization
-        issue_num: PullRequestNumber,
         /// Issue priority. Allowed: "low", "medium", "high", "critical", "none" (to just remove the prioritization)
         prio: IssuePrio,
+        /// Issue target of the prioritization
+        issue_num: Option<PullRequestNumber>,
     },
     /// Unlock a specific GitHub issue or pull-request.
     Unlock {
@@ -198,7 +199,7 @@ pub enum StreamCommand {
         /// Version of the crate to yank
         version: semver::Version,
     },
-    /// Unynk a specific crate version from crates.io.
+    /// Unyank a specific crate version from crates.io.
     /// Can only be performed by members of teams that own the crate.
     Unyank {
         /// Crate to unyank.
