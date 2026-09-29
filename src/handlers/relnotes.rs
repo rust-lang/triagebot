@@ -119,18 +119,22 @@ If this change is notable enough for inclusion in the blog post then this sectio
                     e.issue.repository(),
                     &title,
                     &body,
-                    ["relnotes", "relnotes-tracking-issue"]
-                        .into_iter()
-                        .chain(e.issue.labels.iter().map(|l| &*l.name).filter(|l| {
-                            l.starts_with("A-") // A-* (area)
+                    [
+                        "relnotes",
+                        "relnotes-tracking-issue",
+                        "relnotes-needs-review",
+                    ]
+                    .into_iter()
+                    .chain(e.issue.labels.iter().map(|l| &*l.name).filter(|l| {
+                        l.starts_with("A-") // A-* (area)
                             || l.starts_with("F-") // F-* (feature)
                             || l.starts_with("L-") // L-* (lint)
                             || l.starts_with("O-") // O-* (OS)
                             || l.starts_with("T-") // T-* (team)
                             || l.starts_with("WG-") // WG-* (working group)
-                        }))
-                        .map(ToOwned::to_owned)
-                        .collect::<Vec<_>>(),
+                    }))
+                    .map(ToOwned::to_owned)
+                    .collect::<Vec<_>>(),
                 )
                 .await?;
             if let Some(milestone) = &e.issue.milestone {
