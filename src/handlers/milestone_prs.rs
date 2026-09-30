@@ -63,7 +63,7 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     e.issue.set_milestone(&ctx.github, &version).await?;
 
     milestone_submodules(&ctx.github, e, &version).await?;
-    milestone_git_subtrees(&ctx.github, e, &version).await?;
+    milestone_josh_subtrees(&ctx.github, e, &version).await?;
 
     Ok(())
 }
@@ -197,7 +197,7 @@ async fn milestone_submodule(
     Ok(())
 }
 
-async fn milestone_git_subtrees(
+async fn milestone_josh_subtrees(
     gh: &GithubClient,
     event: &IssuesEvent,
     milestone_version: &str,
@@ -221,7 +221,7 @@ async fn milestone_git_subtrees(
             let mv = milestone_version.to_owned();
             let gh = gh.clone();
             tokio::task::spawn(async move {
-                if let Err(e) = milestone_git_subtree(&gh, repo, commits, mv).await {
+                if let Err(e) = milestone_josh_subtree(&gh, repo, subtree, commits, mv).await {
                     log::error!("failed to milestone {subtree}: {e:?}");
                 }
             });
@@ -231,10 +231,11 @@ async fn milestone_git_subtrees(
     Ok(())
 }
 
-/// Try to sync milestones from rust-lang/rust to one of it's git subtrees.
-async fn milestone_git_subtree(
+/// Try to sync milestones from rust-lang/rust to one of it's a JOSH subtrees
+async fn milestone_josh_subtree(
     gh: &GithubClient,
     repo_name: &str,
+    subtree_dir: &str,
     commits: Vec<crate::github::GithubCommit>,
     milestone_version: String,
 ) -> anyhow::Result<()> {
@@ -280,12 +281,13 @@ async fn milestone_git_subtree(
 
     let pr_numbers = merge_commits
         .filter_map(async |(pr_number, merge_commit)| {
-            // Check that the merge commit exists on the git subtree
-            subtree
-                .github_commit(&gh, &merge_commit.sha)
-                .await
-                .ok()
-                .map(|_| pr_number)
+            // Check that the commit only modifies files in the subtree directory
+            let commit = gh.rust_commit(&merge_commit.sha).await?;
+            let files = commit.files?;
+            files
+                .iter()
+                .all(|f| f.filename.starts_with(subtree_dir))
+                .then_some(pr_number)
         })
         .collect::<Vec<_>>()
         .await;
