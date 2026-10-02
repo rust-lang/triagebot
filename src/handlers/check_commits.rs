@@ -118,7 +118,11 @@ pub(super) async fn handle(
     }
 
     if let Some(issue_links) = &config.issue_links {
-        warnings.extend(issue_links::issue_links_in_commits(issue_links, &commits));
+        warnings.extend(issue_links::issue_links_in_commits(
+            issue_links,
+            &event.repository.full_name,
+            &commits,
+        ));
         warnings.extend(branch_links::branch_links_in_commits(ctx, issue_links, &commits).await);
     }
 
