@@ -13,6 +13,7 @@ static LINKED_RE: LazyLock<Regex> =
 
 pub(super) fn issue_links_in_commits(
     conf: &IssueLinksConfig,
+    repo: &str,
     commits: &[GithubCommit],
 ) -> Option<String> {
     let does_match = match conf.check_commits {
@@ -40,7 +41,7 @@ pub(super) fn issue_links_in_commits(
     ) {
         Some(format!(
             r"There are uncanonicalized issue links (such as `#123`) in the commit messages of the following commits.
-*Please add the organization and repository before the issue number (like so `rust-lang/rust#123`) to avoid issues with subtrees.*
+*Please add the organization and repository before the issue number (like so `{repo}#123`) to avoid issues with subtrees.*
 {issue_links_commits}",
         ))
     } else {
@@ -76,7 +77,10 @@ fn test_mentions_in_commits() {
         "This is simple without issue links!",
     )];
 
-    assert_eq!(issue_links_in_commits(&config, &commits), None);
+    assert_eq!(
+        issue_links_in_commits(&config, "rust-lang/rust", &commits),
+        None
+    );
 
     commits.push(dummy_commit_from_body(
         "86176475acda9c775f844f5ad2470f05aebd4249",
@@ -91,7 +95,10 @@ fn test_mentions_in_commits() {
         "Merge pull request #2236 from rust-lang/rustc-pull",
     ));
 
-    assert_eq!(issue_links_in_commits(&config, &commits), None);
+    assert_eq!(
+        issue_links_in_commits(&config, "rust-lang/rust", &commits),
+        None
+    );
 
     commits.push(dummy_commit_from_body(
         "d7daa17bc97df9377640b0d33cbd0bbeed703c3a",
@@ -99,7 +106,7 @@ fn test_mentions_in_commits() {
     ));
 
     assert_eq!(
-        issue_links_in_commits(&config, &commits),
+        issue_links_in_commits(&config, "rust-lang/rust", &commits),
         Some(
             r"There are issue links (such as `#123`) in the commit messages of the following commits.
 *Please move them to the PR description, to avoid spamming the issues with references to the commit, and so this bot can automatically canonicalize them to avoid issues with subtrees.*
@@ -113,6 +120,7 @@ fn test_mentions_in_commits() {
             &IssueLinksConfig {
                 check_commits: IssueLinksCheckCommitsConfig::Off,
             },
+            "rust-lang/rust",
             &commits
         ),
         None
@@ -124,7 +132,7 @@ fn test_mentions_in_commits() {
     ));
 
     assert_eq!(
-        issue_links_in_commits(&config, &commits),
+        issue_links_in_commits(&config, "rust-lang/rust", &commits),
         Some(
             r"There are issue links (such as `#123`) in the commit messages of the following commits.
 *Please move them to the PR description, to avoid spamming the issues with references to the commit, and so this bot can automatically canonicalize them to avoid issues with subtrees.*
@@ -148,14 +156,20 @@ fn uncanonicalized() {
         "This is simple without issue links!",
     )];
 
-    assert_eq!(issue_links_in_commits(&config, &commits), None);
+    assert_eq!(
+        issue_links_in_commits(&config, "rust-lang/rust", &commits),
+        None
+    );
 
     commits.push(dummy_commit_from_body(
         "86176475acda9c775f844f5ad2470f05aebd4249",
         "Test for canonicalized rust-lang/rust#123",
     ));
 
-    assert_eq!(issue_links_in_commits(&config, &commits), None);
+    assert_eq!(
+        issue_links_in_commits(&config, "rust-lang/rust", &commits),
+        None
+    );
 
     commits.push(dummy_commit_from_body(
         "fererfe5acda9c775f844f5ad2470f05aebd4249",
@@ -163,10 +177,10 @@ fn uncanonicalized() {
     ));
 
     assert_eq!(
-        issue_links_in_commits(&config, &commits),
+        issue_links_in_commits(&config, "rust-lang/rustfmt", &commits),
         Some(
             r"There are uncanonicalized issue links (such as `#123`) in the commit messages of the following commits.
-*Please add the organization and repository before the issue number (like so `rust-lang/rust#123`) to avoid issues with subtrees.*
+*Please add the organization and repository before the issue number (like so `rust-lang/rustfmt#123`) to avoid issues with subtrees.*
 - fererfe5acda9c775f844f5ad2470f05aebd4249
 ".to_string()
         )
