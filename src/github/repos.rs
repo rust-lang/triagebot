@@ -274,9 +274,10 @@ impl GithubClient {
         response.text().await.context("raw gist from url")
     }
 
+    /// Get an individual rust-lang/rust commit details (including modified files)
     pub async fn rust_commit(&self, sha: &str) -> Option<GithubCommit> {
         let req = self.get(&format!(
-            "{}/repos/rust-lang/rust/commits/{sha}",
+            "{}/repos/rust-lang/rust/commits/{sha}?per_page=1000",
             self.api_url
         ));
         match self.json(req).await {
@@ -1090,6 +1091,9 @@ pub struct GithubCommit {
     pub commit: GithubCommitCommitField,
     pub parents: Vec<Parent>,
     pub html_url: String,
+    // only populated when fetching individual commits, not ranges
+    #[serde(default)]
+    pub files: Option<Vec<GithubCommitFile>>,
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
@@ -1097,6 +1101,12 @@ pub struct GithubCommitCommitField {
     pub author: GitUser,
     pub message: String,
     pub tree: GitCommitTree,
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct GithubCommitFile {
+    pub sha: String,
+    pub filename: String,
 }
 
 #[derive(Debug, serde::Deserialize)]

@@ -357,6 +357,7 @@ fn dummy_commit_from_body(sha: &str, body: &str) -> GithubCommit {
             },
         },
         parents: vec![],
+        files: None,
         html_url: "".to_owned(),
     }
 }
