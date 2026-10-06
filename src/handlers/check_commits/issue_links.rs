@@ -8,8 +8,10 @@ use crate::{
     handlers::check_commits::MERGE_IGNORE_LIST,
 };
 
-static LINKED_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\B(?P<org>[a-zA-Z-_]+/[a-zA-Z-_]+)?(#[0-9]+)\b").unwrap());
+static LINKED_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?:^|\W)#[0-9]+\b|(?:^|[^\w/.#-])(?P<org>[a-zA-Z-_]+/[a-zA-Z-_]+)#[0-9]+\b")
+        .unwrap()
+});
 
 pub(super) fn issue_links_in_commits(
     conf: &IssueLinksConfig,
@@ -185,4 +187,42 @@ fn uncanonicalized() {
 ".to_string()
         )
     );
+}
+
+#[test]
+fn edge_cases() {
+    use super::dummy_commit_from_body;
+
+    let config = IssueLinksConfig {
+        check_commits: IssueLinksCheckCommitsConfig::All,
+    };
+
+    for should_not_match in [
+        "See https://example.com/docs/en/changelog#2-1-277.",
+        "See https://example.com/doc#2-1-277.",
+    ] {
+        let commits = vec![dummy_commit_from_body(
+            "d1992a392617dfb10518c3e56446b6c9efae38b0",
+            should_not_match,
+        )];
+
+        assert!(
+            issue_links_in_commits(&config, "rust-lang/rust", &commits).is_none(),
+            "{} is failing to not match",
+            should_not_match
+        );
+    }
+
+    for should_match in ["-#1-", "##1-", ".#1."] {
+        let commits = vec![dummy_commit_from_body(
+            "d1992a392617dfb10518c3e56446b6c9efae38b0",
+            should_match,
+        )];
+
+        assert!(
+            issue_links_in_commits(&config, "rust-lang/rust", &commits).is_some(),
+            "{} is failing to match",
+            should_match
+        );
+    }
 }
