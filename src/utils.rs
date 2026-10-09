@@ -7,6 +7,7 @@ use hyper::{
     HeaderMap,
     header::{CACHE_CONTROL, CONTENT_TYPE},
 };
+use pulldown_cmark_escape::FmtWriter;
 use std::{borrow::Cow, path::Path};
 
 /// Pluralize (add an 's' sufix) to `text` based on `count`.
@@ -81,6 +82,22 @@ pub(crate) fn immutable_headers(content_type: &'static str) -> HeaderMap {
     headers.insert(CONTENT_TYPE, HeaderValue::from_static(content_type));
 
     headers
+}
+
+pub(crate) struct EscapeHref<'a>(pub &'a str);
+
+impl<'a> std::fmt::Display for EscapeHref<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        pulldown_cmark_escape::escape_href(FmtWriter(f), self.0)
+    }
+}
+
+pub(crate) struct EscapeHtmlBodyText<'a>(pub &'a str);
+
+impl<'a> std::fmt::Display for EscapeHtmlBodyText<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        pulldown_cmark_escape::escape_html_body_text(FmtWriter(f), self.0)
+    }
 }
 
 #[derive(Debug)]

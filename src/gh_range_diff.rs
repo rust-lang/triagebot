@@ -21,7 +21,7 @@ use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::github::{FileDiff, GithubCommit, GithubCompare};
-use crate::utils::is_known_and_public_repo;
+use crate::utils::{EscapeHref, EscapeHtmlBodyText, is_known_and_public_repo};
 use crate::{errors::AppError, github, handlers::Context};
 
 mod bidi_unicode;
@@ -43,14 +43,6 @@ pub async fn gh_range_diff(
             format!("`{basehead}` is not in the form `base..head`"),
         ));
     };
-
-    if !looks_like_a_git_sha(oldhead) || !looks_like_a_git_sha(newhead) {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            HeaderMap::new(),
-            format!("`{oldhead}` and `{newhead}` must be valid git SHAs"),
-        ));
-    }
 
     if !is_known_and_public_repo(&ctx, &owner, &repo).await? {
         return Ok((
@@ -144,7 +136,7 @@ pub async fn gh_ranges_diff(
     Path((owner, repo, oldbasehead, newbasehead)): Path<(String, String, String, String)>,
     State(ctx): State<Arc<Context>>,
 ) -> axum::response::Result<impl IntoResponse, AppError> {
-    let Some((oldbase, oldhead)) = oldbasehead.split_once("..") else {
+    let Some((oldbaseref, oldheadref)) = oldbasehead.split_once("..") else {
         return Ok((
             StatusCode::BAD_REQUEST,
             HeaderMap::new(),
@@ -152,25 +144,13 @@ pub async fn gh_ranges_diff(
         ));
     };
 
-    let Some((newbase, newhead)) = newbasehead.split_once("..") else {
+    let Some((newbaseref, newheadref)) = newbasehead.split_once("..") else {
         return Ok((
             StatusCode::BAD_REQUEST,
             HeaderMap::new(),
             format!("`{newbasehead}` is not in the form `base..head`"),
         ));
     };
-
-    if !looks_like_a_git_sha(oldbase)
-        || !looks_like_a_git_sha(oldhead)
-        || !looks_like_a_git_sha(newbase)
-        || !looks_like_a_git_sha(newhead)
-    {
-        return Ok((
-            StatusCode::BAD_REQUEST,
-            HeaderMap::new(),
-            format!("`{oldbase}`, `{oldhead}`, `{newbase}` and `{newhead}` must be valid git SHAs"),
-        ));
-    }
 
     if !is_known_and_public_repo(&ctx, &owner, &repo).await? {
         return Ok((
@@ -188,20 +168,20 @@ pub async fn gh_ranges_diff(
     // Get the comparison between the oldbase..oldhead
     let old = async {
         ctx.github
-            .compare(&issue_repo, oldbase, oldhead)
+            .compare(&issue_repo, oldbaseref, oldheadref)
             .await
             .with_context(|| {
-                format!("failed to retrive the comparison between {oldbase} and {oldhead}")
+                format!("failed to retrive the comparison between {oldbaseref} and {oldheadref}")
             })
     };
 
     // Get the comparison between the newbase..newhead
     let new = async {
         ctx.github
-            .compare(&issue_repo, newbase, newhead)
+            .compare(&issue_repo, newbaseref, newheadref)
             .await
             .with_context(|| {
-                format!("failed to retrive the comparison between {newbase} and {newhead}")
+                format!("failed to retrive the comparison between {newbaseref} and {newheadref}")
             })
     };
 
@@ -210,15 +190,15 @@ pub async fn gh_ranges_diff(
 
     process_old_new(
         (&owner, &repo),
-        (oldbase, oldhead, old),
-        (newbase, newhead, new),
+        (oldbaseref, oldheadref, old),
+        (newbaseref, newheadref, new),
     )
 }
 
 fn process_old_new(
     (owner, repo): (&str, &str),
-    (oldbase, oldhead, mut old): (&str, &str, GithubCompare),
-    (newbase, newhead, mut new): (&str, &str, GithubCompare),
+    (oldbaseref, oldheadref, mut old): (&str, &str, GithubCompare),
+    (newbaseref, newheadref, mut new): (&str, &str, GithubCompare),
 ) -> axum::response::Result<(StatusCode, HeaderMap, String), AppError> {
     // Configure unified diff
     let config = CustomUnifiedDiffConfig { context_len: 3 };
@@ -232,8 +212,8 @@ fn process_old_new(
     // Create the HTML buffer with a very rough approximation for the capacity
     let mut html: String = String::with_capacity(800 + old.files.len() * 100);
 
-    let a_compare_before = a_github_compare("compare-before", owner, repo, oldbase, oldhead);
-    let a_compare_after = a_github_compare("compare-after", owner, repo, newbase, newhead);
+    let a_compare_before = a_github_compare("compare-before", owner, repo, oldbaseref, oldheadref);
+    let a_compare_after = a_github_compare("compare-after", owner, repo, newbaseref, newheadref);
 
     // Write HTML header, style, ...
     writeln!(
@@ -244,7 +224,7 @@ fn process_old_new(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" sizes="32x32" type="image/png" href="https://rust-lang.org/static/images/favicon-32x32.png">
-    <title>range-diff of {oldbase}..{oldhead} {newbase}..{newhead}</title>
+    <title>range-diff of {oldbaseref_}..{oldheadref_} {newbaseref_}..{newheadref_}</title>
     <style>
     body {{
       font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
@@ -390,7 +370,11 @@ fn process_old_new(
 <span>Legend: {REMOVED_BLOCK_SIGN}&nbsp;Removed from previous diff | {ADDED_BLOCK_SIGN}&nbsp;Added in new diff</span>
 <div class="spacer"></div>
 <h3>Changes</h3>
-"#
+"#,
+        oldbaseref_ = EscapeHtmlBodyText(oldbaseref),
+        oldheadref_ = EscapeHtmlBodyText(oldheadref),
+        newbaseref_ = EscapeHtmlBodyText(newbaseref),
+        newheadref_ = EscapeHtmlBodyText(newheadref),
     )?;
 
     let mut diff_displayed = 0;
@@ -439,27 +423,15 @@ fn process_old_new(
                 after: &input.after,
             };
 
-            let before_href = {
-                let mut buffer = String::new();
-                pulldown_cmark_escape::escape_href(
-                    &mut buffer,
-                    &format!("https://github.com/{owner}/{repo}/blob/{oldhead}/{filename}"),
-                )?;
-                buffer
-            };
-            let after_href = {
-                let mut buffer = String::new();
-                pulldown_cmark_escape::escape_href(
-                    &mut buffer,
-                    &format!("https://github.com/{owner}/{repo}/blob/{newhead}/{filename}"),
-                )?;
-                buffer
-            };
-            let escaped_filename = {
-                let mut buffer = String::new();
-                pulldown_cmark_escape::escape_html_body_text(&mut buffer, filename)?;
-                buffer
-            };
+            let before_href = format!(
+                "https://github.com/{owner}/{repo}/blob/{ref_}/{filename}",
+                ref_ = EscapeHref(oldheadref)
+            );
+            let after_href = format!(
+                "https://github.com/{owner}/{repo}/blob/{ref_}/{filename}",
+                ref_ = EscapeHref(newheadref)
+            );
+            let escaped_filename = EscapeHtmlBodyText(filename);
 
             write!(
                 html,
@@ -627,10 +599,9 @@ fn process_old_new(
         } else {
             writeln!(
                 html,
-                r#"<details><summary><span>{commit_number}: {old_sha} -- {new_sha} {first_line_message}</span></summary><pre style="margin-left: 4ch">"#
+                r#"<details><summary><span>{commit_number}: {old_sha} -- {new_sha} {first_line_message}</span></summary><pre style="margin-left: 4ch">{new_content}</pre></details>"#,
+                new_content = EscapeHtmlBodyText(&new_content)
             )?;
-            pulldown_cmark_escape::escape_html_body_text(&mut html, &new_content)?;
-            writeln!(html, r#"</pre></details>"#)?;
         }
     }
 
@@ -1018,10 +989,24 @@ fn contains_diff_marker(input: &InternedInput<&str>, mut hunk: Hunk) -> bool {
 
 // Function to create an <a> link to a GitHub compare
 fn a_github_compare(class: &str, owner: &str, repo: &str, base: &str, head: &str) -> String {
+    fn looks_like_a_git_sha(sha: &str) -> bool {
+        sha.chars().all(|c| c.is_ascii_hexdigit()) && sha.len() >= 6
+    }
+
     format!(
-        r#"<a href="https://github.com/{owner}/{repo}/compare/{base}...{head}" class="compare {class}">{base_6}..{head_6}</a>"#,
-        base_6 = &base[..base.len().min(7)],
-        head_6 = &head[..head.len().min(7)]
+        r#"<a href="https://github.com/{owner}/{repo}/compare/{base_href}...{head_href}" class="compare {class}">{base_6}..{head_6}</a>"#,
+        base_href = EscapeHref(base),
+        head_href = EscapeHref(head),
+        base_6 = EscapeHtmlBodyText(if looks_like_a_git_sha(base) {
+            &base[..base.len().min(7)]
+        } else {
+            &base
+        }),
+        head_6 = EscapeHtmlBodyText(if looks_like_a_git_sha(head) {
+            &head[..head.len().min(7)]
+        } else {
+            &head
+        }),
     )
 }
 
@@ -1031,8 +1016,4 @@ fn a_github_commit(class: &str, owner: &str, repo: &str, sha: &str) -> String {
         r#"<a href="https://github.com/{owner}/{repo}/commit/{sha}" class="{class}">{sha_6}</a>"#,
         sha_6 = &sha[..sha.len().min(7)],
     )
-}
-
-fn looks_like_a_git_sha(sha: &str) -> bool {
-    sha.chars().all(|c| c.is_ascii_hexdigit()) && sha.len() >= 6
 }
