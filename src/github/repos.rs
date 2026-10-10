@@ -10,6 +10,7 @@ use itertools::Itertools;
 use octocrab::models::Author;
 use reqwest::StatusCode;
 use tracing as log;
+use url::Url;
 
 // User
 
@@ -201,8 +202,13 @@ impl GithubClient {
         before: &str,
         after: &str,
     ) -> anyhow::Result<GithubCompare> {
-        let url = format!("{}/compare/{before}...{after}", repo.url(self));
-        self.json(self.get(&url))
+        let mut url = Url::parse(&format!("{}/compare", repo.url(self)))
+            .context("failed to create the compare base url")?;
+        {
+            let mut segments = url.path_segments_mut().unwrap();
+            segments.push(&format!("{before}...{after}"));
+        }
+        self.json(self.get(url))
             .await
             .context("failed to retrive the compare")
     }
