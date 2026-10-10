@@ -19,6 +19,7 @@ use hyper::{
 use pulldown_cmark_escape::FmtWriter;
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
+use url::Url;
 
 use crate::github::{FileDiff, GithubCommit, GithubCompare};
 use crate::utils::{EscapeHref, EscapeHtmlBodyText, is_known_and_public_repo};
@@ -423,14 +424,26 @@ fn process_old_new(
                 after: &input.after,
             };
 
-            let before_href = format!(
-                "https://github.com/{owner}/{repo}/blob/{ref_}/{filename}",
-                ref_ = EscapeHref(oldheadref)
-            );
-            let after_href = format!(
-                "https://github.com/{owner}/{repo}/blob/{ref_}/{filename}",
-                ref_ = EscapeHref(newheadref)
-            );
+            let before_href = {
+                let mut url = Url::parse(&format!("https://github.com/{owner}/{repo}/blob"))
+                    .expect("valid blob url");
+                {
+                    let mut segments = url.path_segments_mut().unwrap();
+                    segments.push(oldheadref);
+                    segments.push(filename);
+                }
+                EscapeHref(&url.to_string())
+            };
+            let after_href = {
+                let mut url = Url::parse(&format!("https://github.com/{owner}/{repo}/blob"))
+                    .expect("valid blob url");
+                {
+                    let mut segments = url.path_segments_mut().unwrap();
+                    segments.push(newheadref);
+                    segments.push(filename);
+                }
+                EscapeHref(&url.to_string())
+            };
             let escaped_filename = EscapeHtmlBodyText(filename);
 
             write!(
@@ -993,10 +1006,16 @@ fn a_github_compare(class: &str, owner: &str, repo: &str, base: &str, head: &str
         sha.chars().all(|c| c.is_ascii_hexdigit()) && sha.len() >= 6
     }
 
+    let mut url = Url::parse(&format!("https://github.com/{owner}/{repo}/compare"))
+        .expect("valid compare url");
+    {
+        let mut segments = url.path_segments_mut().unwrap();
+        segments.push(&format!("{base}...{head}"));
+    }
+
     format!(
-        r#"<a href="https://github.com/{owner}/{repo}/compare/{base_href}...{head_href}" class="compare {class}">{base_6}..{head_6}</a>"#,
-        base_href = EscapeHref(base),
-        head_href = EscapeHref(head),
+        r#"<a href="{href}" class="compare {class}">{base_6}..{head_6}</a>"#,
+        href = EscapeHref(&url.to_string()),
         base_6 = EscapeHtmlBodyText(if looks_like_a_git_sha(base) {
             &base[..base.len().min(7)]
         } else {
