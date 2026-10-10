@@ -1019,7 +1019,7 @@ fn contains_diff_marker(input: &InternedInput<&str>, mut hunk: Hunk) -> bool {
 // Function to create an <a> link to a GitHub compare
 fn a_github_compare(class: &str, owner: &str, repo: &str, base: &str, head: &str) -> String {
     format!(
-        r#"<a href="https://github.com/{owner}/{repo}/compare/{base}..{head}" class="compare {class}">{base_6}..{head_6}</a>"#,
+        r#"<a href="https://github.com/{owner}/{repo}/compare/{base}...{head}" class="compare {class}">{base_6}..{head_6}</a>"#,
         base_6 = &base[..base.len().min(7)],
         head_6 = &head[..head.len().min(7)]
     )
