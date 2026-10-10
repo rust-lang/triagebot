@@ -4,9 +4,11 @@ use futures::{FutureExt, future::BoxFuture};
 use http_body_util::BodyExt;
 use http_body_util::Limited;
 use reqwest::Body;
+use reqwest::IntoUrl;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
 use secrecy::{ExposeSecret, SecretString};
+use std::fmt::Debug;
 use std::time::{Duration, SystemTime};
 use tracing as log;
 
@@ -285,7 +287,7 @@ impl GithubClient {
         Ok(serde_json::from_slice(&body)?)
     }
 
-    pub fn get(&self, url: &str) -> RequestBuilder {
+    pub fn get<U: IntoUrl + Debug>(&self, url: U) -> RequestBuilder {
         log::trace!("get {:?}", url);
         self.client.get(url).configure(self)
     }
