@@ -1,3 +1,4 @@
+pub(crate) mod assigned_events;
 pub(crate) mod issue_with_comments;
 pub(crate) mod least_recently_reviewed;
 pub(crate) mod open_goal_issues;

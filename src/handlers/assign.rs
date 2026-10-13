@@ -57,6 +57,7 @@ mod messages;
 mod tests {
     mod tests_candidates;
     mod tests_from_diff;
+    mod tests_stale_assignment;
 }
 
 // Special account that we use to prevent assignment.
@@ -64,6 +65,10 @@ const GHOST_ACCOUNT: &str = "ghost";
 
 /// Key for the state in the database
 const PREVIOUS_REVIEWERS_KEY: &str = "previous-reviewers";
+
+/// How old an existing assignment must be for `@rustbot claim` by someone else
+/// to trigger a warning.
+const STALE_ASSIGNMENT_DAYS: i64 = 60;
 
 /// State stored in the database
 #[derive(Debug, Clone, PartialEq, Default, serde::Deserialize, serde::Serialize)]
@@ -76,6 +81,48 @@ struct Reviewers {
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 struct AssignData {
     user: Option<String>,
+}
+
+/// Returns the login of the user GitHub shows as the issue's assignee, unless that is the bot.
+///
+/// When the bot holds the assignment (because the real claimer couldn't be assigned by
+/// GitHub), the bot's assignment events can't tell us when that claim was made: assigning
+/// the bot again when it already holds the issue doesn't create a new event. So we don't
+/// try to warn in that case.
+fn assigned_user<'a>(bot: &str, assignees: &'a [GitHubUser]) -> Option<&'a str> {
+    let assignee = assignees.first()?;
+    (!assignee.login.eq_ignore_ascii_case(bot)).then_some(assignee.login.as_str())
+}
+
+/// Whether an assignment of the given age is old enough to warn about.
+fn is_stale(age: chrono::Duration) -> bool {
+    age >= chrono::Duration::days(STALE_ASSIGNMENT_DAYS)
+}
+
+/// Returns the age of `assigned_login`'s assignment if it is old enough to warn about.
+///
+/// Best effort: a failed lookup just means no warning.
+async fn stale_assignment_age(
+    ctx: &Context,
+    issue: &Issue,
+    assigned_login: &str,
+) -> Option<chrono::Duration> {
+    let assigned_at = match ctx
+        .github
+        .last_assigned_at(issue.repository(), issue.number, assigned_login)
+        .await
+    {
+        Ok(assigned_at) => assigned_at?,
+        Err(err) => {
+            log::warn!(
+                "failed to look up assignment age for {}: {err:?}",
+                issue.global_id()
+            );
+            return None;
+        }
+    };
+    let age = chrono::Utc::now() - assigned_at;
+    is_stale(age).then_some(age)
 }
 
 /// Returns the workqueue for the given repository, or an empty default workqueue
@@ -1064,6 +1111,7 @@ pub(super) async fn handle_command(
             EditIssueBody::load(&mut client, issue, "ASSIGN").await?;
         let d = e.data_mut();
 
+        let is_claim = matches!(cmd, AssignCommand::Claim);
         let to_assign = match cmd {
             AssignCommand::Claim => event.user().login.clone(),
             AssignCommand::AssignUser { username } => {
@@ -1103,6 +1151,22 @@ pub(super) async fn handle_command(
             );
             return Ok(());
         }
+
+        // `@rustbot claim` can replace another user's assignment. Warn the previous
+        // assignee if their assignment is old.
+        let stale = if is_claim {
+            match assigned_user(&ctx.username, &issue.assignees) {
+                Some(previous) if !previous.eq_ignore_ascii_case(&to_assign) => {
+                    stale_assignment_age(ctx, issue, previous)
+                        .await
+                        .map(|age| (previous.to_string(), age.num_days()))
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+
         *d = AssignData {
             user: Some(to_assign.clone()),
         };
@@ -1110,8 +1174,7 @@ pub(super) async fn handle_command(
         match issue.set_assignee(&ctx.github, &to_assign).await {
             Ok(()) => {
                 e.apply(&ctx.github, String::new()).await?;
-                return Ok(());
-            } // we are done
+            }
             Err(AssignmentError::InvalidAssignee) => {
                 issue.set_assignee(&ctx.github, &ctx.username).await?;
                 let cmt_body = format!(
@@ -1121,6 +1184,16 @@ pub(super) async fn handle_command(
                 e.apply(&ctx.github, cmt_body).await?;
             }
             Err(e) => return Err(e.into()),
+        }
+
+        if let Some((previous, days)) = stale {
+            let warning = format!(
+                "@{previous}, this issue was assigned to you {days} days ago and has now been \
+                 claimed by @{to_assign}. If you are still working on it, please say so here."
+            );
+            if let Err(err) = issue.post_comment(&ctx.github, &warning).await {
+                log::warn!("failed to post stale assignment warning: {err}");
+            }
         }
     }
 
