@@ -188,7 +188,7 @@ fn replacement<'source, 'mention>(
     source: &'source str,
     label: Option<&str>,
     captures: &Captures<'source>,
-    repo: &'source str,
+    source_repo: &'source str,
     resolve_mention: &mut impl FnMut(&str) -> Option<&'mention str>,
 ) -> Option<(Range<usize>, Replacement<'source, 'mention>)> {
     let url = if label.is_some() {
@@ -233,8 +233,8 @@ fn replacement<'source, 'mention>(
                 Some(IssueReference {
                     owner: "rust-lang",
                     // The source contained `#<number>`, but the repo cannot be determined
-                    // from the source alone, so use the provided `repo`.
-                    repo,
+                    // from the source alone, so use the provided `source_repo`.
+                    repo: source_repo,
                     number: &local.as_str()[1..],
                 }),
             )
@@ -342,15 +342,15 @@ struct Link<'markdown> {
 ///
 /// Returns the transformed string, or the borrowed original if nothing was replaced.
 ///
-/// `repo` is used to resolve links of the form `#<number>` (see examples),
+/// `source_repo` is used to resolve links of the form `#<number>` (see examples),
 /// and it must be a `rust-lang` repository (e.g., `goals`) where the `markdown` came from.
 ///
 /// # Examples
 ///
 /// + `rust-lang/rust#123` and URLs => `#123`
-/// + `rust-lang/<repo>#123` and URLs => `<repo>#123`
-/// + `#123` => `#123` in `rust-lang/rust`, or `<repo>#123` in `rust-lang/<repo>`
-/// + `<owner>/<repo>#123` and URLs => `<owner>/<repo>#123`
+/// + `rust-lang/<source_repo>#123` and URLs => `<source_repo>#123`
+/// + `#123` => `#123` in `rust-lang/rust`, or `<source_repo>#123` in `rust-lang/<source_repo>`
+/// + `<owner>/<source_repo>#123` and URLs => `<owner>/<source_repo>#123`
 /// + bare URLs to comments => `[<issue shorthand> (comment)](<url>)`
 /// + Markdown links with non-shorthand labels and reference-style links are unchanged
 /// + trailing `/files` and `/changes` in PR URLs are removed
@@ -361,7 +361,7 @@ struct Link<'markdown> {
 /// - `@rust-lang/team` => `resolve_mention(rust-lang/team)` (same as above)
 pub fn zulipify_github_links_and_mentions<'markdown, 'repo, 'mention>(
     markdown: &'markdown str,
-    repo: &'repo str,
+    source_repo: &'repo str,
     mut resolve_mention: impl FnMut(&str) -> Option<&'mention str>,
 ) -> Cow<'markdown, str> {
     const OPTIONS: Options = Options::empty()
@@ -451,7 +451,7 @@ pub fn zulipify_github_links_and_mentions<'markdown, 'repo, 'mention>(
                 &source,
                 label.as_deref(),
                 &captures,
-                repo,
+                source_repo,
                 &mut resolve_mention,
             ) else {
                 continue;
