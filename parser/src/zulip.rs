@@ -208,11 +208,6 @@ fn replacement<'source, 'mention>(
             return None;
         }
 
-        // Skip /files and /changes for non-PRs.
-        if captures.name("subpage").is_some() && !captures["kind"].eq_ignore_ascii_case("pull") {
-            return None;
-        }
-
         (
             url,
             IssueReference {
@@ -731,12 +726,6 @@ mod tests {
             "https://github.com/rust-lang/team/pull/2651/changes#r3740816350",
             "team#2651",
         );
-    }
-
-    #[test]
-    fn unsupported_pr_subpage_urls_are_unchanged() {
-        assert_unchanged("https://github.com/rust-lang/rust/issues/58/changes");
-        assert_unchanged("https://github.com/rust-lang/rust/pull/59/files#diff-123");
     }
 
     #[test]
