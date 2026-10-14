@@ -111,7 +111,9 @@ fn label_matches_shorthand(label: &str, issue: &IssueReference<'_>) -> bool {
             label_owner.eq_ignore_ascii_case(issue.owner)
                 && label_repo.eq_ignore_ascii_case(issue.repo)
         }
-        None => prefix.eq_ignore_ascii_case(issue.repo),
+        None => {
+            issue.owner.eq_ignore_ascii_case("rust-lang") && prefix.eq_ignore_ascii_case(issue.repo)
+        }
     }
 }
 
