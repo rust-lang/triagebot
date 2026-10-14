@@ -98,12 +98,7 @@ struct IssueReference<'source> {
 }
 
 /// Checks whether a label is a recognized shorthand for the given issue.
-fn label_matches_shorthand(
-    label: &str,
-    issue: &IssueReference<'_>,
-    is_rustlang: bool,
-    is_llvm: bool,
-) -> bool {
+fn label_matches_shorthand(label: &str, issue: &IssueReference<'_>) -> bool {
     let Some((prefix, label_number)) = label.rsplit_once('#') else {
         return false;
     };
@@ -116,8 +111,7 @@ fn label_matches_shorthand(
             label_owner.eq_ignore_ascii_case(issue.owner)
                 && label_repo.eq_ignore_ascii_case(issue.repo)
         }
-        None if is_rustlang => prefix.eq_ignore_ascii_case(issue.repo),
-        None => is_llvm && prefix.eq_ignore_ascii_case("llvm"),
+        None => prefix.eq_ignore_ascii_case(issue.repo),
     }
 }
 
@@ -144,17 +138,15 @@ fn issue_shorthand<'source>(
     is_comment: bool,
 ) -> Option<IssueShorthand<'source>> {
     let is_rustlang = issue.owner.eq_ignore_ascii_case("rust-lang");
-    let is_llvm =
-        issue.owner.eq_ignore_ascii_case("llvm") && issue.repo.eq_ignore_ascii_case("llvm-project");
 
-    if !is_rustlang && !is_llvm && !is_url {
+    if !is_rustlang && !is_url {
         return None;
     }
 
     if let Some(label) = label
         && let label = label.trim()
         && !label.eq_ignore_ascii_case(source)
-        && (is_comment || !label_matches_shorthand(label, &issue, is_rustlang, is_llvm))
+        && (is_comment || !label_matches_shorthand(label, &issue))
     {
         return None;
     }
@@ -169,11 +161,6 @@ fn issue_shorthand<'source>(
                 repo: issue.repo,
                 number: issue.number,
             }
-        }
-    } else if is_llvm {
-        IssueShorthand::Rustlang {
-            repo: "llvm",
-            number: issue.number,
         }
     } else {
         IssueShorthand::Global {
@@ -359,7 +346,6 @@ struct Link<'markdown> {
 ///
 /// + `rust-lang/rust#123` and URLs => `#123`
 /// + `rust-lang/<repo>#123` and URLs => `<repo>#123`
-/// + `llvm/llvm-project#123` and URLs => `llvm#123`
 /// + `#123` => `#123` in `rust-lang/rust`, or `<repo>#123` in `rust-lang/<repo>`
 /// + `<owner>/<repo>#123` and URLs => `<owner>/<repo>#123`
 /// + bare URLs to comments => `[<issue shorthand> (comment)](<url>)`
@@ -632,7 +618,6 @@ mod tests {
     fn global_references_use_zulip_shorthands() {
         assert_normalizes("rust-lang/rust#34", "#34");
         assert_normalizes("rust-lang/cargo#35", "cargo#35");
-        assert_normalizes("llvm/llvm-project#36", "llvm#36");
     }
 
     #[test]
@@ -680,14 +665,6 @@ mod tests {
         assert_normalizes(
             "[RUST#12](https://github.com/Rust-Lang/RuSt/issues/12)",
             "#12",
-        );
-        assert_normalizes(
-            "[LLVM#12](https://github.com/LLVM/LLVM-Project/issues/12)",
-            "llvm#12",
-        );
-        assert_normalizes(
-            "[llvm/llvm-project#12](https://github.com/LLVM/LLVM-Project/issues/12)",
-            "llvm#12",
         );
         assert_normalizes(
             "[#12](https://github.com/BevyEngine/BeVy/issues/12)",
