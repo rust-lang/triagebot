@@ -344,9 +344,12 @@ fn check_payload_signed(signature: &str, payload: &[u8]) -> Result<(), SignedPay
     // a comma-separated list of them.
     let gh_webhook_secrets =
         std::env::var("GITHUB_WEBHOOK_SECRET").expect("Missing GITHUB_WEBHOOK_SECRET");
+    assert!(!gh_webhook_secrets.trim().is_empty());
 
     for secret in gh_webhook_secrets.split(',') {
-        let mut mac = Hmac::<Sha256>::new_from_slice(secret.trim().as_bytes()).unwrap();
+        let secret = secret.trim();
+        assert!(!secret.is_empty());
+        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
 
         mac.update(payload);
         if mac.verify_slice(&signature).is_ok() {
