@@ -91,6 +91,7 @@ static ZULIPIFIABLE_RE: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
+/// A complete reference to a GitHub issue/PR.
 struct IssueReference<'source> {
     owner: &'source str,
     repo: &'source str,
@@ -117,15 +118,17 @@ fn label_matches_shorthand(label: &str, issue: &IssueReference<'_>) -> bool {
     }
 }
 
+/// An issue/PR shorthand recognized by Zulip.
 enum IssueShorthand<'source> {
-    Rust {
-        number: &'source str,
-    },
+    /// `#<number>` is a `rust-lang/rust` issue/PR.
+    Rust { number: &'source str },
+    /// `<repo>#<number>` is a `rust-lang/<repo>` issue/PR.
     Rustlang {
         repo: &'source str,
         number: &'source str,
     },
-    Global {
+    /// `<owner>/<repo>#<number>` is any other issue/PR.
+    Other {
         owner: &'source str,
         repo: &'source str,
         number: &'source str,
@@ -165,7 +168,7 @@ fn issue_shorthand<'source>(
             }
         }
     } else {
-        IssueShorthand::Global {
+        IssueShorthand::Other {
             owner: issue.owner,
             repo: issue.repo,
             number: issue.number,
@@ -234,6 +237,8 @@ fn replacement<'source, 'mention>(
                 local,
                 Some(IssueReference {
                     owner: "rust-lang",
+                    // The source contained `#<number>`, but the repo cannot be determined
+                    // from the source alone, so use the provided `repo`.
                     repo,
                     number: &local.as_str()[1..],
                 }),
@@ -294,7 +299,7 @@ fn append_replacement(output: &mut String, replacement: Replacement<'_, '_>) {
                     output.push_str(repo);
                     number
                 }
-                IssueShorthand::Global {
+                IssueShorthand::Other {
                     owner,
                     repo,
                     number,
@@ -342,7 +347,8 @@ struct Link<'markdown> {
 ///
 /// Returns the transformed string, or the borrowed original if nothing was replaced.
 ///
-/// `repo` must be a `rust-lang` repository (e.g., `goals`).
+/// `repo` is used to resolve links of the form `#<number>` (see examples),
+/// and it must be a `rust-lang` repository (e.g., `goals`) where the `markdown` came from.
 ///
 /// # Examples
 ///
