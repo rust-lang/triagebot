@@ -6,7 +6,10 @@ use crate::{
     handlers::Context,
     jobs::Job,
     team_data::TeamClient,
-    zulip::{MessageApiRequest, api::Recipient, client::ZulipClient},
+    zulip::{
+        Mention, MessageApiRequest, PingMode, api::Recipient, client::ZulipClient,
+        format_zulip_mention,
+    },
 };
 use async_trait::async_trait;
 use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc, Weekday};
@@ -58,11 +61,14 @@ struct ZulipId(u64);
 
 impl ZulipId {
     fn mention(self, muted: bool) -> String {
-        if muted {
-            format!("@_**|{}**", self.0)
-        } else {
-            format!("@**|{}**", self.0)
-        }
+        format_zulip_mention(
+            Mention::User(self.0),
+            if muted {
+                PingMode::Silent
+            } else {
+                PingMode::Ping
+            },
+        )
     }
 }
 
@@ -1098,7 +1104,7 @@ async fn zulipify_links_and_mentions<'comment>(
 
         let zulip_mention = if let Some((org, github_team)) = github_mention.split_once('/') {
             match team.get_zulip_group_by_github_name(org, github_team).await {
-                Ok(Some(group)) => format!("@*{group}*"),
+                Ok(Some(group)) => format_zulip_mention(Mention::Group(&group), PingMode::Silent),
                 Ok(None) => continue,
                 Err(error) => {
                     log::warn!("failed to resolve Zulip group for @{github_mention}: {error}");
@@ -1108,7 +1114,9 @@ async fn zulipify_links_and_mentions<'comment>(
         } else {
             match team.get_gh_id_from_username(github_mention).await {
                 Ok(Some(github_id)) => match team.github_to_zulip_id(github_id).await {
-                    Ok(Some(zulip_id)) => ZulipId(zulip_id).mention(true),
+                    Ok(Some(zulip_id)) => {
+                        format_zulip_mention(Mention::User(zulip_id), PingMode::Silent)
+                    }
                     Ok(None) => continue,
                     Err(error) => {
                         log::warn!("failed to resolve Zulip user for @{github_mention}: {error}");
