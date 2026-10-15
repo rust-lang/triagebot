@@ -1947,7 +1947,7 @@ fn truncate_and_normalize(text: &str, max_len: usize) -> String {
     if normalized.len() <= max_len {
         normalized
     } else {
-        let truncated: String = normalized.chars().take(max_len - 3).collect();
-        format!("{truncated}...")
+        let truncated: String = normalized.chars().take(max_len - 1).collect();
+        format!("{truncated}…")
     }
 }
