@@ -17,7 +17,7 @@ const ISSUE_URL_PAT: &str = r"
     (?P<subpage>/(?:files|changes))?
     /?
     (?:
-        \#(?P<comment>issuecomment-[0-9]+|discussion_r[0-9]+|r[0-9]+)
+        \#(?P<comment>issuecomment-[0-9]+|pullrequestreview-[0-9]+|discussion_r[0-9]+|r[0-9]+)
     )?
 ";
 
@@ -25,6 +25,8 @@ const ISSUE_URL_PAT: &str = r"
 /// - https://github.com/rust-lang/rust/issues/12345
 /// - https://github.com/rust-lang/rust/issues/12345#issuecomment-12
 /// - https://github.com/rust-lang/rust/pull/12345#discussion_r123
+/// - https://github.com/rust-lang/rust/pull/12345#pullrequestreview-123
+/// - https://github.com/rust-lang/rust/pull/12345/files#r123
 /// - https://github.com/rust-lang/rust/pull/12345/changes#r123
 static ISSUE_URL_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(&format!(r"(?ix)^(?:{ISSUE_URL_PAT})$")).unwrap());
@@ -342,18 +344,22 @@ struct Link<'markdown> {
 ///
 /// Returns the transformed string, or the borrowed original if nothing was replaced.
 ///
-/// `source_repo` is used to resolve links of the form `#<number>` (see examples),
+/// `source_repo` is used to resolve references of the form `#<number>` (see examples),
 /// and it must be a `rust-lang` repository (e.g., `goals`) where the `markdown` came from.
 ///
 /// # Examples
 ///
-/// + `rust-lang/rust#123` and URLs => `#123`
-/// + `rust-lang/<source_repo>#123` and URLs => `<source_repo>#123`
-/// + `#123` => `#123` in `rust-lang/rust`, or `<source_repo>#123` in `rust-lang/<source_repo>`
-/// + `<owner>/<source_repo>#123` and URLs => `<owner>/<source_repo>#123`
-/// + bare URLs to comments => `[<issue shorthand> (comment)](<url>)`
-/// + Markdown links with non-shorthand labels and reference-style links are unchanged
-/// + trailing `/files` and `/changes` in PR URLs are removed
+/// + `#123` in `rust-lang/rust` => `#123`
+/// + `#123` in `rust-lang/<source_repo>` => `<source_repo>#123`
+/// + `rust-lang/rust#123` => `#123`
+/// + `rust-lang/<repo>#123` => `<repo>#123`
+/// + `<owner>/<repo>#123` => `<owner>/<repo>#123`
+/// + `https://github.com/rust-lang/rust/{issues,pull}/123` => `#123` (trailing `/files` or `/changes` are allowed)
+/// + `https://github.com/rust-lang/<repo>/{issues,pull}/123` => `<repo>#123`
+/// + `https://github.com/<owner>/<repo>/{issues,pull}/123` => `<owner>/<repo>#123`
+/// + issue or PR comment URL => `[<issue shorthand> (comment)](<url>)`
+/// + links with non-shorthand labels => unchanged
+/// + reference-style links => unchanged
 ///
 /// # Mentions
 ///
@@ -684,9 +690,6 @@ mod tests {
         assert_unchanged("[#12][pr]\n\n[pr]: https://github.com/rust-lang/rust/issues/12");
         assert_unchanged("[#12][]\n\n[#12]: https://github.com/rust-lang/rust/issues/12");
         assert_unchanged("[#12]\n\n[#12]: https://github.com/rust-lang/rust/issues/12");
-
-        let url = "https://github.com/rust-lang/rust/pull/12#discussion_r2";
-        assert_unchanged(&format!("[{url}][pr]\n\n[pr]: {url}"));
         assert_unchanged_with(
             "[@alice #12][pr]\n\n[pr]: https://github.com/rust-lang/rust/issues/12",
             |_| panic!("mentions inside reference-style links are not resolved"),
@@ -703,14 +706,9 @@ mod tests {
             "https://github.com/rust-lang/rust/pull/56#discussion_r2",
             "#56",
         );
-    }
-
-    #[test]
-    fn comment_links_with_url_labels_become_labeled_links() {
-        let url = "https://github.com/rust-lang/rust/pull/56#discussion_r2";
-        assert_normalizes(
-            &format!("[{url}]({url})"),
-            &format!("[#56 (comment)]({url})"),
+        assert_normalizes_comment(
+            "https://github.com/rust-lang/rust/pull/56#pullrequestreview-1",
+            "#56",
         );
     }
 
