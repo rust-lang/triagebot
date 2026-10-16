@@ -5,7 +5,7 @@
 #  Build image  #
 #################
 
-FROM rust:1.93 AS base
+FROM rust:1.95 AS base
 
 RUN cargo install --locked cargo-chef
 

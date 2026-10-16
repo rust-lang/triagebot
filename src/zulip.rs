@@ -1480,19 +1480,19 @@ async fn lookup_github_username(ctx: &Context, zulip_username: &str) -> anyhow::
         // and instead take the team database as the ground truth.
         let zulip_id = matched_user.user_id;
         let Some(gh_id) = ctx.team.zulip_to_github_id(zulip_id).await? else {
-            user_results.push(format!("{} was not found in team Zulip mapping. Maybe they do not have zulip-id configured in team.", format_zulip_username(matched_user.user_id, PingMode::Silent)));
+            user_results.push(format!("{} was not found in team Zulip mapping. Maybe they do not have zulip-id configured in team.", format_zulip_mention(Mention::User(matched_user.user_id), PingMode::Silent)));
             continue;
         };
         let Some(github_username) = ctx.team.username_from_gh_id(gh_id).await? else {
             user_results.push(format!(
                 "{} was not found in the team database.",
-                format_zulip_username(matched_user.user_id, PingMode::Silent)
+                format_zulip_mention(Mention::User(matched_user.user_id), PingMode::Silent)
             ));
             continue;
         };
         user_results.push(format!(
             "{}'s GitHub profile is [{github_username}](https://github.com/{github_username}).",
-            format_zulip_username(matched_user.user_id, PingMode::Silent)
+            format_zulip_mention(Mention::User(matched_user.user_id), PingMode::Silent)
         ));
     }
 
@@ -1546,7 +1546,7 @@ async fn lookup_zulip_username(ctx: &Context, gh_username: &str) -> anyhow::Resu
 
     Ok(format!(
         "The GitHub user `{gh_username}` has Zulip account: {}",
-        format_zulip_username(zulip_id, PingMode::Silent)
+        format_zulip_mention(Mention::User(zulip_id), PingMode::Silent)
     ))
 }
 
@@ -1578,7 +1578,7 @@ async fn yank_crate_cmd(
 
     Ok(Some(format!(
         "Crate `{krate}@{version}` was successfully yanked by {}",
-        format_zulip_username(message_data.sender_id, PingMode::Silent)
+        format_zulip_mention(Mention::User(message_data.sender_id), PingMode::Silent)
     )))
 }
 
@@ -1610,7 +1610,7 @@ async fn unyank_crate_cmd(
 
     Ok(Some(format!(
         "Crate `{krate}@{version}` was successfully unyanked by {}",
-        format_zulip_username(message_data.sender_id, PingMode::Silent)
+        format_zulip_mention(Mention::User(message_data.sender_id), PingMode::Silent)
     )))
 }
 
@@ -1914,6 +1914,14 @@ pub fn format_user_pr(pr: &UserPullRequest) -> String {
     )
 }
 
+/// Mention of a user or a group.
+pub enum Mention<'a> {
+    /// User id.
+    User(u64),
+    /// Group name.
+    Group(&'a str),
+}
+
 /// Ping mode for @<user> mentions on Zulip.
 pub enum PingMode {
     /// Do not ping the person
@@ -1922,16 +1930,19 @@ pub enum PingMode {
     Ping,
 }
 
-pub fn format_zulip_username(zulip_id: u64, ping_mode: PingMode) -> String {
+pub fn format_zulip_mention(mention: Mention<'_>, ping: PingMode) -> String {
     // Rendering the username directly was running into some encoding issues, so we use
     // the special `|<user-id>` syntax instead.
     // @**|<zulip-id>** is Zulip syntax that will render as the username (and a link) of the user
     // with the given Zulip ID.
-    let prefix = match ping_mode {
+    let ping = match ping {
         PingMode::Silent => "_",
         PingMode::Ping => "",
     };
-    format!("@{prefix}**|{zulip_id}**")
+    match mention {
+        Mention::User(id) => format!("@{ping}**|{id}**"),
+        Mention::Group(name) => format!("@{ping}*|{name}*"),
+    }
 }
 
 fn format_date(date: Option<DateTime<Utc>>) -> String {
