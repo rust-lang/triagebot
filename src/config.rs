@@ -493,6 +493,12 @@ pub(crate) struct NotifyZulipLabelConfig {
     )]
     pub(crate) messages_on_close: Vec<String>,
     #[serde(
+        rename = "message_on_close_success",
+        default,
+        deserialize_with = "string_or_seq"
+    )]
+    pub(crate) messages_on_close_success: Vec<String>,
+    #[serde(
         rename = "message_on_reopen",
         default,
         deserialize_with = "string_or_seq"
@@ -1765,6 +1771,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
                 messages_on_add: vec![],
                 messages_on_remove: vec![],
                 messages_on_close: vec![],
+                messages_on_close_success: vec![],
                 messages_on_reopen: vec![],
                 required_labels: vec![]
             }
@@ -1784,6 +1791,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
             ]
             message_on_remove = "on remove"
             message_on_close = "on close"
+            message_on_close_success = "on close success"
             message_on_reopen = "on reopen"
             required_labels = ["required-label"]
         "#;
@@ -1800,6 +1808,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
                 messages_on_add: vec!["message one".to_string(), "message two".to_string()],
                 messages_on_remove: vec!["on remove".to_string()],
                 messages_on_close: vec!["on close".to_string()],
+                messages_on_close_success: vec!["on close success".to_string()],
                 messages_on_reopen: vec!["on reopen".to_string()],
                 required_labels: vec!["required-label".to_string()]
             }

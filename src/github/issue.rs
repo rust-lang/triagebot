@@ -1,5 +1,6 @@
 use anyhow::Context;
 use chrono::Utc;
+use octocrab::models::issues::IssueStateReason;
 use octocrab::models::pulls::MergeableState;
 use reqwest::StatusCode;
 use std::fmt;
@@ -85,6 +86,9 @@ pub struct Issue {
     pub head: Option<CommitBase>,
     /// Whether it is open or closed.
     pub state: IssueState,
+    /// Reason for why the issue/PR was closed.
+    #[serde(default)]
+    pub state_reason: Option<IssueStateReason>,
     pub milestone: Option<Milestone>,
     /// Whether a PR has merge conflicts.
     pub mergeable: Option<bool>,

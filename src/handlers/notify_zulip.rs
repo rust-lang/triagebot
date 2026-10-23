@@ -12,6 +12,7 @@ use crate::{
     handlers::Context,
 };
 use futures::future::join_all;
+use octocrab::models::issues::IssueStateReason;
 use tracing as log;
 
 pub(super) struct NotifyZulipInput {
@@ -29,8 +30,40 @@ pub(super) struct NotifyZulipInput {
 pub(super) enum NotificationType {
     Labeled,
     Unlabeled,
-    Closed,
+    Closed(CloseKind),
     Reopened,
+}
+
+/// A successful close is a merged pull request or an issue closed as completed.
+/// Issues and pull requests otherwise share [`CloseKind::Other`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CloseKind {
+    Success,
+    Other,
+}
+
+fn close_kind(issue: &Issue) -> CloseKind {
+    let success = if issue.is_pr() {
+        issue.merged_at.is_some()
+    } else {
+        matches!(issue.state_reason, Some(IssueStateReason::Completed))
+    };
+    if success {
+        CloseKind::Success
+    } else {
+        CloseKind::Other
+    }
+}
+
+/// `message_on_close_success` is used for a successful close when it is set.
+/// Every other close, and a successful close with no success message, uses
+/// `message_on_close`.
+fn close_messages(config: &NotifyZulipLabelConfig, kind: CloseKind) -> &[String] {
+    if kind == CloseKind::Success && !config.messages_on_close_success.is_empty() {
+        &config.messages_on_close_success
+    } else {
+        &config.messages_on_close
+    }
 }
 
 pub(super) async fn parse_input(
@@ -109,6 +142,7 @@ fn parse_close_reopen_input(
     event: &IssuesEvent,
     global_config: &NotifyZulipConfig,
 ) -> Vec<NotifyZulipInput> {
+    let close_kind = close_kind(&event.issue);
     event
         .issue
         .labels
@@ -126,7 +160,9 @@ fn parse_close_reopen_input(
             for (name, label_config) in &config.subtables {
                 if has_all_required_labels(&event.issue, label_config) {
                     match event.action {
-                        IssuesAction::Closed if !label_config.messages_on_close.is_empty() => {
+                        IssuesAction::Closed
+                            if !close_messages(label_config, close_kind).is_empty() =>
+                        {
                             include_config_names.push(name.to_string());
                         }
                         IssuesAction::Reopened if !label_config.messages_on_reopen.is_empty() => {
@@ -144,7 +180,7 @@ fn parse_close_reopen_input(
 
             match event.action {
                 IssuesAction::Closed => Some(NotifyZulipInput {
-                    notification_type: NotificationType::Closed,
+                    notification_type: NotificationType::Closed(close_kind),
                     label,
                     include_config_names,
                 }),
@@ -208,14 +244,14 @@ pub(super) async fn handle_input(
             let msgs = match input.notification_type {
                 NotificationType::Labeled => &config.messages_on_add,
                 NotificationType::Unlabeled => &config.messages_on_remove,
-                NotificationType::Closed => &config.messages_on_close,
+                NotificationType::Closed(close_kind) => close_messages(config, close_kind),
                 NotificationType::Reopened => &config.messages_on_reopen,
             };
 
             let github_comment = match input.notification_type {
                 NotificationType::Labeled => &config.github_comment,
                 NotificationType::Unlabeled
-                | NotificationType::Closed
+                | NotificationType::Closed(_)
                 | NotificationType::Reopened => &None,
             };
 
@@ -311,6 +347,124 @@ fn replace_team_to_be_nominated(labels: &[Label], msg: String) -> String {
     } else {
         msg
     }
+}
+
+#[test]
+fn close_messages_uses_success_when_set() {
+    use crate::config::NotifyZulipLabelConfig;
+
+    let mut config = NotifyZulipLabelConfig {
+        zulip_stream: 0,
+        topic: "".to_string(),
+        github_comment: None,
+        messages_on_add: vec![],
+        messages_on_remove: vec![],
+        messages_on_close: vec!["generic".to_string()],
+        messages_on_close_success: vec!["success".to_string()],
+        messages_on_reopen: vec![],
+        required_labels: vec![],
+    };
+
+    assert_eq!(
+        close_messages(&config, CloseKind::Success),
+        ["success".to_string()]
+    );
+    assert_eq!(
+        close_messages(&config, CloseKind::Other),
+        ["generic".to_string()]
+    );
+
+    // With no success message, a successful close uses the generic list too.
+    config.messages_on_close_success = vec![];
+    assert_eq!(
+        close_messages(&config, CloseKind::Success),
+        ["generic".to_string()]
+    );
+
+    // With only a success message, other closes produce no message.
+    config.messages_on_close = vec![];
+    config.messages_on_close_success = vec!["success".to_string()];
+    assert_eq!(
+        close_messages(&config, CloseKind::Success),
+        ["success".to_string()]
+    );
+    assert!(close_messages(&config, CloseKind::Other).is_empty());
+}
+
+#[test]
+fn close_only_success_skips_other_closes() {
+    use crate::config::Config;
+    use crate::github::{Issue, IssueState};
+    use crate::tests::github;
+    use chrono::Utc;
+
+    let config = toml::from_str::<Config>(
+        r#"
+        [notify-zulip."I-high"]
+        zulip_stream = 0
+        topic = "topic"
+        message_on_close_success = "done"
+        "#,
+    )
+    .unwrap()
+    .notify_zulip
+    .unwrap();
+
+    let event = |issue: Issue| IssuesEvent {
+        action: IssuesAction::Closed,
+        issue,
+        changes: None,
+        before: None,
+        after: None,
+        repository: Default::default(),
+        sender: github::default_test_user(),
+    };
+    let notifies = |issue: Issue| !parse_close_reopen_input(&event(issue), &config).is_empty();
+
+    let mut completed = github::issue()
+        .state(IssueState::Closed)
+        .labels(vec!["I-high"])
+        .call();
+    completed.state_reason = Some(IssueStateReason::Completed);
+    let mut not_planned = github::issue()
+        .state(IssueState::Closed)
+        .labels(vec!["I-high"])
+        .call();
+    not_planned.state_reason = Some(IssueStateReason::NotPlanned);
+    let mut merged = github::issue()
+        .state(IssueState::Closed)
+        .pr(true)
+        .labels(vec!["I-high"])
+        .call();
+    merged.merged_at = Some(Utc::now());
+    let unmerged = github::issue()
+        .state(IssueState::Closed)
+        .pr(true)
+        .labels(vec!["I-high"])
+        .call();
+
+    assert!(notifies(completed));
+    assert!(!notifies(not_planned));
+    assert!(notifies(merged));
+    assert!(!notifies(unmerged));
+}
+
+#[test]
+fn close_kind_is_success_or_other() {
+    use crate::tests::github::issue;
+    use chrono::Utc;
+
+    let mut pr = issue().pr(true).call();
+    assert_eq!(close_kind(&pr), CloseKind::Other);
+    pr.merged_at = Some(Utc::now());
+    assert_eq!(close_kind(&pr), CloseKind::Success);
+
+    let mut i = issue().pr(false).call();
+    assert_eq!(close_kind(&i), CloseKind::Other); // no reason sent
+    i.state_reason = Some(IssueStateReason::Completed);
+    assert_eq!(close_kind(&i), CloseKind::Success);
+    i.state_reason = Some(IssueStateReason::NotPlanned);
+    assert_eq!(close_kind(&i), CloseKind::Other);
 }
 
 #[test]
