@@ -72,6 +72,7 @@ pub fn issue(
         base: None,
         head: None,
         state,
+        state_reason: None,
         milestone: None,
         mergeable: None,
         mergeable_state: None,

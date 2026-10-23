@@ -445,6 +445,7 @@ r#":warning: **Warning** :warning:
                     repo: None,
                 }),
                 state: crate::github::IssueState::Open,
+                state_reason: None,
                 milestone: None,
                 mergeable: None,
                 mergeable_state: None,
