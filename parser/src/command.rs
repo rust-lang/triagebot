@@ -408,6 +408,137 @@ fn lock() {
     );
 }
 
+#[cfg(test)]
+mod polite {
+    use super::*;
+
+    #[test]
+    fn lock() {
+        let input = "@please lock please";
+        let mut input = Input::new(input, vec!["please"]);
+        assert_eq!(
+            input.next(),
+            Some(Command::Lock(Ok(lock::LockCommand::Lock)))
+        );
+    }
+
+    #[test]
+    fn unlock() {
+        let input = "@please unlock. please";
+        let mut input = Input::new(input, vec!["please"]);
+        assert_eq!(
+            input.next(),
+            Some(Command::Lock(Ok(lock::LockCommand::Unlock)))
+        );
+    }
+
+    #[test]
+    // CAUTION:Make sure to include the "please" in concerns
+    fn concern() {
+        let input = "@bot concern this is my concern please";
+        let mut input = Input::new(input, vec!["bot"]);
+        assert_eq!(
+            input.next(),
+            Some(Command::Concern(Ok(concern::ConcernCommand::Concern {
+                title: "this is my concern please".to_string()
+            })))
+        );
+    }
+
+    #[test]
+    // CAUTION:Make sure to include the "please" in concerns
+    fn concern_resolve() {
+        let input = "@bot concern resolve this is my concern please";
+        let mut input = Input::new(input, vec!["bot"]);
+        assert_eq!(
+            input.next(),
+            Some(Command::Concern(Ok(concern::ConcernCommand::Resolve {
+                title: "this is my concern please".to_string()
+            })))
+        );
+    }
+
+    #[test]
+    // CAUTION:Make sure to include the "please" in concerns
+    fn resolve() {
+        let input = "@bot resolve this is my concern please";
+        let mut input = Input::new(input, vec!["bot"]);
+        assert_eq!(
+            input.next(),
+            Some(Command::Concern(Ok(concern::ConcernCommand::Resolve {
+                title: "this is my concern please".to_string()
+            })))
+        );
+    }
+
+    #[test]
+    fn merge() {
+        let input = "@please merge please";
+        let mut input = Input::new(input, vec!["please"]);
+        assert_eq!(
+            input.next(),
+            Some(Command::Merge(Ok(merge::MergeCommand::Merge)))
+        );
+    }
+
+    #[test]
+    fn delegate() {
+        let input = "@bot delegate=ghost please";
+        let mut input = Input::new(input, vec!["bot"]);
+        assert_eq!(
+            input.next(),
+            Some(Command::Merge(Ok(merge::MergeCommand::Delegate {
+                login: "ghost".to_string()
+            })))
+        );
+    }
+
+    #[test]
+    fn delegate_author() {
+        let input = "@bot delegate+ please";
+        let mut input = Input::new(input, vec!["bot"]);
+        assert_eq!(
+            input.next(),
+            Some(Command::Merge(Ok(merge::MergeCommand::DelegateToAuthor)))
+        );
+    }
+
+    #[test]
+    fn delegate_author_2() {
+        let input = "@bot delegate please";
+        let mut input = Input::new(input, vec!["bot"]);
+        assert_eq!(
+            input.next(),
+            Some(Command::Merge(Ok(merge::MergeCommand::DelegateToAuthor)))
+        );
+    }
+
+    #[test]
+    // A bit weird but OK
+    fn delegate_empty() {
+        let input = "@bot delegate= please";
+        let mut input = Input::new(input, vec!["bot"]);
+        assert_eq!(
+            input.next(),
+            Some(Command::Merge(Ok(merge::MergeCommand::Delegate {
+                login: "".to_string()
+            })))
+        );
+    }
+
+    #[test]
+    fn delegate_with_at() {
+        let input = "@bot delegate=@ghost please";
+        let mut input = Input::new(input, vec!["bot"]);
+        assert_eq!(
+            input.next(),
+            Some(Command::Merge(Ok(merge::MergeCommand::Delegate {
+                login: "@ghost".to_string()
+            })))
+        );
+    }
+}
+
 #[test]
 fn unlock() {
     let input = "@bot unlock";

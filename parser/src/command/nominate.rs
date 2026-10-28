@@ -66,7 +66,7 @@ impl NominateCommand {
         } else {
             return Err(toks.error(ParseError::NoTeam));
         };
-        if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
+        if let Some(Token::Dot | Token::EndOfLine | Token::Word("please")) = toks.peek_token()? {
             toks.next_token()?;
             *input = toks;
             Ok(Some(NominateCommand { team, style }))
@@ -127,5 +127,16 @@ fn test_4() {
             .unwrap()
             .downcast_ref(),
         Some(&ParseError::NoTeam),
+    );
+}
+
+#[test]
+fn polite() {
+    assert_eq!(
+        parse("nominate lang please"),
+        Ok(Some(NominateCommand {
+            team: "lang".into(),
+            style: Style::Decision,
+        }))
     );
 }

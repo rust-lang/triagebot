@@ -44,7 +44,9 @@ impl PingCommand {
             } else {
                 return Err(toks.error(ParseError::NoTeam));
             };
-            if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
+            if let Some(Token::Dot | Token::EndOfLine | Token::Word("please")) =
+                toks.peek_token()?
+            {
                 toks.next_token()?;
                 *input = toks;
                 Ok(Some(PingCommand { team }))
@@ -92,5 +94,15 @@ fn test_3() {
     assert_eq!(
         parse("ping").unwrap_err().source().unwrap().downcast_ref(),
         Some(&ParseError::NoTeam),
+    );
+}
+
+#[test]
+fn polite_ping() {
+    assert_eq!(
+        parse("ping clippy please."),
+        Ok(Some(PingCommand {
+            team: "clippy".into()
+        }))
     );
 }
