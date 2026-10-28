@@ -1,5 +1,5 @@
 use super::issue_query::Query;
-use super::{GithubClient, GithubCompare, Issue, IssueRepository, PullRequestDetails};
+use super::{FileDiff, GithubClient, GithubCompare, Issue, IssueRepository, PullRequestDetails};
 
 use super::UserId;
 
@@ -13,6 +13,8 @@ use octocrab::models::Author;
 use reqwest::{Body, Response, StatusCode};
 use tracing as log;
 use url::Url;
+
+mod diff_files;
 
 // User
 
@@ -210,9 +212,79 @@ impl GithubClient {
             let mut segments = url.path_segments_mut().unwrap();
             segments.push(&format!("{before}...{after}"));
         }
-        self.json(self.get(url))
+        {
+            let mut queries = url.query_pairs_mut();
+            queries.append_pair("per_page", "1000");
+        }
+
+        let compare: GithubCompare<FileDiff<Option<String>>> = self
+            .json(self.get(url))
             .await
-            .context("failed to retrive the compare")
+            .context("failed to retrive the compare")?;
+
+        // If we are missing any files patch, let's do another request to GitHub compare
+        // endpoint, but this time we ask for the `diff --git` file.
+        //
+        // From our observations the diff file appears no have no limits.
+        //
+        // If the number of files is exactly at 300, the maximum that GitHub returns
+        // via the API, let's also request the diff file, otherwise we might be missing some files.
+        //
+        // Note that we unfortunatly can't only use the diff as it's missing a few fields that the
+        // JSON endpoint gives us, like the commits and merge base commit.
+        //
+        // cf. https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#compare-two-commits
+        let files: Vec<FileDiff> =
+            if compare.files.iter().any(|f| f.patch.is_none()) || compare.files.len() == 300 {
+                let mut url = Url::parse(&format!("{}/compare", repo.url(self)))
+                    .context("failed to create the compare base url")?;
+                {
+                    let mut segments = url.path_segments_mut().unwrap();
+                    segments.push(&format!("{before}...{after}"));
+                }
+
+                let req = self
+                    .get(url)
+                    .header("Accept", "application/vnd.github.diff");
+                let (body, _req_dbg) = self
+                    .send_req_with_limit(req, 16 * 1024 * 1024)
+                    .await
+                    .context("failed to get .diff")?;
+
+                let diff = String::from_utf8_lossy(&body).to_string();
+
+                diff_files::parse_git_diff(&diff).collect()
+            } else {
+                compare
+                    .files
+                    .into_iter()
+                    .map(
+                        |FileDiff {
+                             filename,
+                             previous_filename,
+                             patch,
+                         }| FileDiff {
+                            filename,
+                            previous_filename,
+                            patch: patch.unwrap_or_default(),
+                        },
+                    )
+                    .collect()
+            };
+
+        let GithubCompare {
+            base_commit,
+            merge_base_commit,
+            files: _,
+            commits,
+        } = compare;
+
+        Ok(GithubCompare {
+            base_commit,
+            merge_base_commit,
+            files,
+            commits,
+        })
     }
 
     pub async fn issue(&self, repo: &IssueRepository, issue_num: u64) -> anyhow::Result<Issue> {

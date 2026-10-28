@@ -146,7 +146,7 @@ impl PullRequestDetails {
 
 /// The return from GitHub compare API
 #[derive(Debug, serde::Deserialize)]
-pub struct GithubCompare {
+pub struct GithubCompare<D = FileDiff> {
     /// The base commit of the PR
     pub base_commit: GithubCommit,
     /// The merge base commit
@@ -154,14 +154,14 @@ pub struct GithubCompare {
     /// See <https://git-scm.com/docs/git-merge-base> for more details
     pub merge_base_commit: GithubCommit,
     /// List of file differences
-    pub files: Vec<FileDiff>,
+    pub files: Vec<D>,
     /// List of commits
     pub commits: Vec<GithubCommit>,
 }
 
 /// Representation of a diff to a single file.
 #[derive(Debug, serde::Deserialize)]
-pub struct FileDiff {
+pub struct FileDiff<P = String> {
     /// The fullname path of the file.
     pub filename: String,
     /// The previous fullname path of the file.
@@ -172,7 +172,7 @@ pub struct FileDiff {
     /// Can be empty when there isn't any changes to the content of the file
     /// (like when a file is renamed without it's content being modified).
     #[serde(default)]
-    pub patch: String,
+    pub patch: P,
 }
 
 impl Issue {
