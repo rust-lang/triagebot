@@ -3,7 +3,7 @@ use crate::errors::AppError;
 use crate::github::{self, WorkflowRunJob};
 use crate::handlers::Context;
 use crate::interactions::REPORT_TO;
-use crate::utils::{immutable_headers, is_known_and_public_repo};
+use crate::utils::{EscapeHtmlBodyText, immutable_headers, is_known_and_public_repo};
 use anyhow::Context as _;
 use axum::extract::{Path, State};
 use axum::http::HeaderValue;
@@ -132,10 +132,9 @@ pub async fn gha_logs(
                 .await
                 .with_context(|| format!("unable to get the raw logs for log {log_id}"))?;
 
-            let json_logs =
-                serde_json::to_string(&*logs).context("unable to JSON-ify the raw logs")?;
+            let escaped_logs = EscapeHtmlBodyText(&logs).to_string();
 
-            anyhow::Result::<_>::Ok(json_logs)
+            anyhow::Result::<_>::Ok(escaped_logs)
         };
 
         let (job_and_tree_roots, logs) = futures::join!(job_and_tree_roots, logs);
@@ -273,7 +272,7 @@ tr.selected {{
         
         try {{
 
-        const logs = {logs};
+        const logs = document.getElementById("raw-logs").content.textContent;
         const tree_roots = {tree_roots};
         const owner = "{owner}";
         const repo = "{repo}";
@@ -288,6 +287,7 @@ tr.selected {{
     </script>
 </head>
 <body>
+<template id="raw-logs">{logs}</template>
 <table>
     <tbody id="logs">
     </tbody>
