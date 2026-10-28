@@ -1,0 +1,16 @@
+Triagebot is awaiting triage.
+
+View all comments for a pull request or issue at:
+https://triagebot.infra.rust-lang.org/gh-comments/{OWNER}/{REPO}/{ISSUE_OR_PR_NUMBER}
+
+View a commit series at:
+https://triagebot.infra.rust-lang.org/gh-range-diff/{OWNER}/{REPO}/{BASE}..{HEAD}
+
+View a range diff across an updated commit series at:
+https://triagebot.infra.rust-lang.org/gh-range-diff/{OWNER}/{REPO}/{OLD_BASE}..{OLD_HEAD}/{NEW_BASE}..{NEW_HEAD}
+
+View enhanced plaintext CI logs for a job at:
+https://triagebot.infra.rust-lang.org/gha-logs/{OWNER}/{REPO}/{JOB_ID}
+
+View pull request triage at:
+https://triagebot.infra.rust-lang.org/triage/{OWNER}/{REPO}
