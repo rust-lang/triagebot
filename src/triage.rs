@@ -1,7 +1,7 @@
-use crate::handlers::Context;
+use crate::{handlers::Context, utils::is_known_and_public_repo};
 use axum::{
     extract::{Path, State},
-    response::{Html, IntoResponse},
+    response::{Html, IntoResponse, Response},
 };
 use chrono::{Duration, Utc};
 use hyper::StatusCode;
@@ -20,7 +20,18 @@ pub async fn index() -> Html<&'static str> {
 pub async fn pulls(
     Path((owner, repo)): Path<(String, String)>,
     State(ctx): State<Arc<Context>>,
-) -> impl IntoResponse {
+) -> Response {
+    if !is_known_and_public_repo(&ctx, &owner, &repo)
+        .await
+        .unwrap_or(false)
+    {
+        return (
+            StatusCode::UNAUTHORIZED,
+            format!("Repository `{owner}/{repo}` is not part of the Rust Project team repos"),
+        )
+            .into_response();
+    }
+
     let octocrab = &ctx.octocrab;
     let res = octocrab
         .pulls(&owner, &repo)
@@ -30,12 +41,15 @@ pub async fn pulls(
         .per_page(100)
         .send()
         .await;
+
     let Ok(mut page) = res else {
         return (
             StatusCode::NOT_FOUND,
-            Html("The repository is not found.".to_string()),
-        );
+            "The repository is not found.".to_string(),
+        )
+            .into_response();
     };
+
     let mut base_pulls = page.take_items();
     let mut next_page = page.next;
     while let Some(mut page) = octocrab
@@ -105,7 +119,7 @@ pub async fn pulls(
     let tera = tera::Tera::new("templates/triage/**/*").unwrap();
     let body = tera.render("pulls.html", &context).unwrap();
 
-    (StatusCode::OK, Html(body))
+    (StatusCode::OK, Html(body)).into_response()
 }
 
 #[derive(Serialize)]
