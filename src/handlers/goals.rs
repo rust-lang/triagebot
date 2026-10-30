@@ -17,7 +17,7 @@ use itertools::Itertools;
 use std::{borrow::Cow, collections::BTreeMap};
 use tracing as log;
 
-const GOALS_REPO: &str = "rust-lang/goals";
+const GOALS_REPO: &str = "goals";
 const GOALS_TEAM: &str = "goals";
 
 /// Give new goals a grace period before reminders begin.
@@ -1186,7 +1186,7 @@ async fn echo_comment_to_zulip(
 }
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
-    if event.repo().full_name != GOALS_REPO {
+    if event.repo().name() != GOALS_REPO {
         return Ok(());
     }
 
