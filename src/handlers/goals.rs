@@ -17,6 +17,7 @@ use itertools::Itertools;
 use std::{borrow::Cow, collections::BTreeMap};
 use tracing as log;
 
+const GOALS_REPO_FULL: &str = "rust-lang/goals";
 const GOALS_REPO: &str = "goals";
 const GOALS_TEAM: &str = "goals";
 
@@ -1186,7 +1187,7 @@ async fn echo_comment_to_zulip(
 }
 
 pub async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
-    if event.repo().name() != GOALS_REPO {
+    if event.repo().full_name != GOALS_REPO_FULL {
         return Ok(());
     }
 
