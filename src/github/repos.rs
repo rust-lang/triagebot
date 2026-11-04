@@ -1,3 +1,5 @@
+use crate::num;
+
 use super::issue_query::Query;
 use super::{FileDiff, GithubClient, GithubCompare, Issue, IssueRepository, PullRequestDetails};
 
@@ -78,8 +80,8 @@ impl GithubClient {
             body: &'a str,
             labels: Vec<String>,
         }
-        let url = format!("{}/issues", repo.url(self));
-        self.json(self.post(&url).json(&NewIssue {
+        let url = repo.url(self, ["issues"]);
+        self.json(self.post(url).json(&NewIssue {
             title,
             body,
             labels,
@@ -110,8 +112,8 @@ impl GithubClient {
         struct Update {
             state: PrState,
         }
-        let url = format!("{}/pulls/{number}", repo.url(self));
-        self.send_req(self.patch(&url).json(&Update { state }))
+        let url = repo.url(self, ["pulls", num!(number)]);
+        self.send_req(self.patch(url).json(&Update { state }))
             .await
             .context("failed to update pr state")?;
         Ok(())
@@ -145,8 +147,8 @@ impl GithubClient {
         repo: &IssueRepository,
         job_id: u128,
     ) -> anyhow::Result<WorkflowRunJob> {
-        let url = format!("{}/actions/jobs/{job_id}", repo.url(self));
-        self.json(self.get(&url))
+        let url = repo.url(self, ["actions", "jobs", num!(job_id)]);
+        self.json(self.get(url))
             .await
             .context("failed to retrive workflow job run details")
     }
@@ -175,8 +177,8 @@ impl GithubClient {
         repo: &IssueRepository,
         sha: &str,
     ) -> anyhow::Result<GitTrees> {
-        let url = format!("{}/git/trees/{sha}", repo.url(self));
-        self.json(self.get(&url))
+        let url = repo.url(self, ["git", "trees", sha]);
+        self.json(self.get(url))
             .await
             .context("failed to retrive git trees")
     }
@@ -192,9 +194,9 @@ impl GithubClient {
     ) -> anyhow::Result<String> {
         const MAX_LOG_SIZE_IN_MB: usize = 50 * 1024 * 1024; // 50 Mib
 
-        let url = format!("{}/actions/jobs/{job_id}/logs", repo.url(self));
+        let url = repo.url(self, ["actions", "jobs", num!(job_id), "logs"]);
         let (body, _req_dbg) = self
-            .send_req_with_limit(self.get(&url), MAX_LOG_SIZE_IN_MB)
+            .send_req_with_limit(self.get(url), MAX_LOG_SIZE_IN_MB)
             .await
             .context("failed to retrieve job logs")?;
         Ok(String::from_utf8_lossy(&body).to_string())
@@ -206,12 +208,7 @@ impl GithubClient {
         before: &str,
         after: &str,
     ) -> anyhow::Result<GithubCompare> {
-        let mut url = Url::parse(&format!("{}/compare", repo.url(self)))
-            .context("failed to create the compare base url")?;
-        {
-            let mut segments = url.path_segments_mut().unwrap();
-            segments.push(&format!("{before}...{after}"));
-        }
+        let mut url = repo.url(self, ["compare", &format!("{before}...{after}")]);
         {
             let mut queries = url.query_pairs_mut();
             queries.append_pair("per_page", "1000");
@@ -236,12 +233,7 @@ impl GithubClient {
         // cf. https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#compare-two-commits
         let files: Vec<FileDiff> =
             if compare.files.iter().any(|f| f.patch.is_none()) || compare.files.len() == 300 {
-                let mut url = Url::parse(&format!("{}/compare", repo.url(self)))
-                    .context("failed to create the compare base url")?;
-                {
-                    let mut segments = url.path_segments_mut().unwrap();
-                    segments.push(&format!("{before}...{after}"));
-                }
+                let url = repo.url(self, ["compare", &format!("{before}...{after}")]);
 
                 let req = self
                     .get(url)
@@ -288,16 +280,16 @@ impl GithubClient {
     }
 
     pub async fn issue(&self, repo: &IssueRepository, issue_num: u64) -> anyhow::Result<Issue> {
-        let url = format!("{}/issues/{issue_num}", repo.url(self));
-        self.json(self.get(&url))
+        let url = repo.url(self, ["issues", num!(issue_num)]);
+        self.json(self.get(url))
             .await
             .with_context(|| format!("{repo} failed to get issue {issue_num}"))
     }
 
     pub async fn pull_request(&self, repo: &IssueRepository, pr_num: u64) -> anyhow::Result<Issue> {
-        let url = format!("{}/pulls/{pr_num}", repo.url(self));
+        let url = repo.url(self, ["pulls", num!(pr_num)]);
         let mut pr: Issue = self
-            .json(self.get(&url))
+            .json(self.get(url))
             .await
             .with_context(|| format!("{repo} failed to get pr {pr_num}"))?;
         pr.pull_request = Some(PullRequestDetails::new());
@@ -309,19 +301,22 @@ impl GithubClient {
         repo: &IssueRepository,
         path: String,
     ) -> anyhow::Result<Vec<RepoContent>> {
-        let content_url = format!("{}/contents/{}", repo.url(self), path);
-        let contents = self.json(self.get(&content_url)).await?;
+        let content_url = repo.url(self, ["contents", &path]);
+        let contents = self.json(self.get(content_url)).await?;
         Ok(contents)
     }
 
     pub async fn raw_file(
         &self,
-        repo: &str,
+        repo_full_name: &str,
         branch: &str,
         path: &str,
     ) -> anyhow::Result<Option<Bytes>> {
-        let url = format!("{}/{repo}/{branch}/{path}", self.raw_url);
-        let req = self.get(&url);
+        let (org, repo) = repo_full_name
+            .split_once('/')
+            .context("invalid full repo name in raw_file")?;
+        let url = self.raw_url_with_segments([org, repo, branch, path]);
+        let req = self.get(url.clone());
         let req_dbg = format!("{req:?}");
         let req = req
             .build()
@@ -359,10 +354,8 @@ impl GithubClient {
 
     /// Get an individual rust-lang/rust commit details (including modified files)
     pub async fn rust_commit(&self, sha: &str) -> Option<GithubCommit> {
-        let req = self.get(&format!(
-            "{}/repos/rust-lang/rust/commits/{sha}?per_page=1000",
-            self.api_url
-        ));
+        let url = self.api_url_with_segments(["repos", "rust-lang", "rust", "commits", sha]);
+        let req = self.get(url).query(&[("per_page", "1000")]);
         match self.json(req).await {
             Ok(r) => Some(r),
             Err(e) => {
@@ -374,10 +367,8 @@ impl GithubClient {
 
     /// This does not retrieve all of them, only the last several.
     pub async fn bors_commits(&self) -> Vec<GithubCommit> {
-        let req = self.get(&format!(
-            "{}/repos/rust-lang/rust/commits?author=bors",
-            self.api_url
-        ));
+        let url = self.api_url_with_segments(["repos", "rust-lang", "rust", "commits"]);
+        let req = self.get(url).query(&[("author", "bors")]);
         match self.json(req).await {
             Ok(r) => r,
             Err(e) => {
@@ -493,11 +484,14 @@ impl GithubClient {
     /// Returns information about a repository.
     ///
     /// The `full_name` should be something like `rust-lang/rust`.
-    pub async fn repository(&self, full_name: &str) -> anyhow::Result<Repository> {
-        let req = self.get(&format!("{}/repos/{full_name}", self.api_url));
-        self.json(req)
+    pub async fn repository(&self, full_repo_name: &str) -> anyhow::Result<Repository> {
+        let (org, repo) = full_repo_name
+            .split_once("/")
+            .context("invalid full repo name")?;
+        let url = self.api_url_with_segments(["repos", org, repo]);
+        self.json(self.get(url))
             .await
-            .with_context(|| format!("{full_name} failed to get repo"))
+            .with_context(|| format!("{full_repo_name} failed to get repo"))
     }
 
     /// Returns the GraphQL ID of the given repository.
@@ -567,9 +561,12 @@ impl GithubClient {
         title: &str,
         state: &str,
     ) -> anyhow::Result<Milestone> {
-        let url = format!("{}/repos/{full_repo_name}/milestones", self.api_url);
+        let (org, repo) = full_repo_name
+            .split_once("/")
+            .context("invalid full repo name")?;
+        let url = self.api_url_with_segments(["repos", org, repo, "milestones"]);
         let resp = self
-            .send_req(self.post(&url).json(&serde_json::json!({
+            .send_req(self.post(url.clone()).json(&serde_json::json!({
                 "title": title,
                 "state": state,
             })))
@@ -593,14 +590,14 @@ impl GithubClient {
             }
         }
         // In the case where it already exists, we need to search for its number.
-        let mut page = 1;
+        let mut page: u32 = 1;
         loop {
-            let url = format!(
-                "{}/repos/{full_repo_name}/milestones?page={page}&state=all",
-                self.api_url
-            );
+            let mut url = self.api_url_with_segments(["repos", org, repo, "milestones"]);
+            url.query_pairs_mut()
+                .append_pair("page", num!(page))
+                .append_pair("state", "all");
             let milestones: Vec<Milestone> = self
-                .json(self.get(&url))
+                .json(self.get(url.clone()))
                 .await
                 .with_context(|| format!("failed to get milestones {url} searching for {title}"))?;
             if milestones.is_empty() {
@@ -620,8 +617,11 @@ impl GithubClient {
         milestone: &Milestone,
         issue_num: u64,
     ) -> anyhow::Result<()> {
-        let url = format!("{}/repos/{full_repo_name}/issues/{issue_num}", self.api_url);
-        self.send_req(self.patch(&url).json(&serde_json::json!({
+        let (org, repo) = full_repo_name
+            .split_once("/")
+            .context("invalid full repo name")?;
+        let url = self.api_url_with_segments(["repos", org, repo, "issues", num!(issue_num)]);
+        self.send_req(self.patch(url.clone()).json(&serde_json::json!({
             "milestone": milestone.number
         })))
         .await
@@ -641,8 +641,15 @@ pub struct Repository {
 }
 
 impl Repository {
-    fn url(&self, client: &GithubClient) -> String {
-        format!("{}/repos/{}", client.api_url, self.full_name)
+    pub(crate) fn url<'a, I>(&'a self, client: &GithubClient, segments: I) -> Url
+    where
+        I: IntoIterator<Item = &'a str>,
+    {
+        client.api_url_with_segments(
+            ["repos", self.owner(), self.name()]
+                .into_iter()
+                .chain(segments),
+        )
     }
 
     pub fn owner(&self) -> &str {
@@ -721,7 +728,8 @@ impl Repository {
                 self.build_issues_url(client, &filters, include_labels, ordering)
             };
 
-            let result = client.get(&url);
+            // FIXME: make the above functions return an url
+            let result = client.get(Url::parse(&url).expect("unexpected invalid get_issues Url"));
             if use_search_api {
                 let result = client
                     .json::<IssueSearchResult>(result)
@@ -783,8 +791,11 @@ impl Repository {
             .chain([format!("per_page={}", ordering.per_page)])
             .format("&");
         format!(
-            "{}/repos/{}/{}?{}",
-            client.api_url, self.full_name, endpoint, filters
+            "{}repos/{}/{}?{}",
+            client.api_url_with_segments([] as [&str; 0]),
+            self.full_name,
+            endpoint,
+            filters
         )
     }
 
@@ -806,7 +817,7 @@ impl Repository {
             .format("+");
         format!(
             "{}/search/issues?q={}&sort={}&order={}&per_page={}&page={}",
-            client.api_url,
+            client.api_url_with_segments([] as [&str; 0]),
             filters,
             ordering.sort,
             ordering.direction,
@@ -822,9 +833,9 @@ impl Repository {
         base_tree: &str,
         tree: &[GitTreeEntry],
     ) -> anyhow::Result<GitTreeObject> {
-        let url = format!("{}/git/trees", self.url(client));
+        let url = self.url(client, ["git", "trees"]);
         client
-            .json(client.post(&url).json(&serde_json::json!({
+            .json(client.post(url).json(&serde_json::json!({
                 "base_tree": base_tree,
                 "tree": tree,
             })))
@@ -846,9 +857,9 @@ impl Repository {
         base: &str,
         body: &str,
     ) -> anyhow::Result<Issue> {
-        let url = format!("{}/pulls", self.url(client));
+        let url = self.url(client, ["pulls"]);
         let mut issue: Issue = client
-            .json(client.post(&url).json(&serde_json::json!({
+            .json(client.post(url).json(&serde_json::json!({
                 "title": title,
                 "head": head,
                 "base": base,
@@ -869,9 +880,9 @@ impl Repository {
     ///
     /// **Warning**: This will to a force update if there are conflicts.
     pub async fn merge_upstream(&self, client: &GithubClient, branch: &str) -> anyhow::Result<()> {
-        let url = format!("{}/merge-upstream", self.url(client));
+        let url = self.url(client, ["merge-upstream"]);
         let merge_error = match client
-            .send_req(client.post(&url).json(&serde_json::json!({
+            .send_req(client.post(url).json(&serde_json::json!({
                 "branch": branch,
             })))
             .await
@@ -988,9 +999,9 @@ impl Repository {
         client: &GithubClient,
         sha: &str,
     ) -> anyhow::Result<Vec<Issue>> {
-        let url = format!("{}/commits/{sha}/pulls", self.url(client));
+        let url = self.url(client, ["commits", sha, "pulls"]);
         client
-            .json(client.get(&url))
+            .json(client.get(url))
             .await
             .with_context(|| format!("{} failed to get pulls for commit {sha}", self.full_name))
     }
@@ -1021,8 +1032,8 @@ impl GithubClient {
         repo: &str,
         refname: &str,
     ) -> anyhow::Result<GitReference> {
-        let url = format!("{}/repos/{org}/{repo}/git/ref/{refname}", self.api_url);
-        self.json(self.get(&url))
+        let url = self.api_url_with_segments(["repos", org, repo, "git", "ref", refname]);
+        self.json(self.get(url))
             .await
             .with_context(|| format!("{org}/{repo} failed to get git reference {refname}"))
     }
@@ -1047,9 +1058,9 @@ impl Repository {
         refname: &str,
         sha: &str,
     ) -> anyhow::Result<GitReference> {
-        let url = format!("{}/git/refs/{refname}", self.url(client));
+        let url = self.url(client, ["git", "refs", refname]);
         client
-            .json(client.patch(&url).json(&serde_json::json!({
+            .json(client.patch(url).json(&serde_json::json!({
                 "sha": sha,
                 "force": true,
             })))
@@ -1234,12 +1245,13 @@ impl Repository {
         let mut commits = Vec::new();
         let mut page = 1;
         loop {
-            let url = format!(
-                "{}/commits?sha={end}&per_page=100&page={page}",
-                self.url(client)
-            );
+            let mut url = self.url(client, ["commits"]);
+            url.query_pairs_mut()
+                .append_pair("sha", end)
+                .append_pair("per_page", "100")
+                .append_pair("page", &page.to_string());
             let mut this_page: Vec<GithubCommit> = client
-                .json(client.get(&url))
+                .json(client.get(url.clone()))
                 .await
                 .with_context(|| format!("failed to fetch commits for {url}"))?;
             // This is a temporary debugging measure to investigate why the
@@ -1271,18 +1283,18 @@ impl Repository {
         client: &GithubClient,
         sha: &str,
     ) -> anyhow::Result<GithubCommit> {
-        let url = format!("{}/commits/{}", self.url(client), sha);
+        let url = self.url(client, ["commits", sha]);
         client
-            .json(client.get(&url))
+            .json(client.get(url))
             .await
             .with_context(|| format!("{} failed to get github commit {sha}", self.full_name))
     }
 
     /// Retrieves a git commit for the given SHA.
     pub async fn git_commit(&self, client: &GithubClient, sha: &str) -> anyhow::Result<GitCommit> {
-        let url = format!("{}/git/commits/{sha}", self.url(client));
+        let url = self.url(client, ["git", "commits", sha]);
         client
-            .json(client.get(&url))
+            .json(client.get(url))
             .await
             .with_context(|| format!("{} failed to get git commit {sha}", self.full_name))
     }
@@ -1295,9 +1307,9 @@ impl Repository {
         parents: &[&str],
         tree: &str,
     ) -> anyhow::Result<GitCommit> {
-        let url = format!("{}/git/commits", self.url(client));
+        let url = self.url(client, ["git", "commits"]);
         client
-            .json(client.post(&url).json(&serde_json::json!({
+            .json(client.post(url).json(&serde_json::json!({
                 "message": message,
                 "parents": parents,
                 "tree": tree,
@@ -1350,12 +1362,11 @@ impl Repository {
         path: &str,
         refname: Option<&str>,
     ) -> anyhow::Result<Submodule> {
-        let mut url = format!("{}/contents/{}", self.url(client), path);
+        let mut url = self.url(client, ["contents", path]);
         if let Some(refname) = refname {
-            url.push_str("?ref=");
-            url.push_str(refname);
+            url.query_pairs_mut().append_pair("ref", refname);
         }
-        client.json(client.get(&url)).await.with_context(|| {
+        client.json(client.get(url)).await.with_context(|| {
             format!(
                 "{} failed to get submodule path={path} refname={refname:?}",
                 self.full_name

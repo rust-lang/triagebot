@@ -44,9 +44,9 @@ impl GithubClient {
             let per_page = limit.saturating_sub(repos.len()).min(MAX_PAGE_SIZE);
             let per_page_str = per_page.to_string();
             let page_str = page.to_string();
-            let url = format!("{}/users/{username}/repos", self.api_url);
+            let url = self.api_url_with_segments(["users", username, "repos"]);
             let page_repos: Vec<RepoResponse> = self
-                .json(self.get(&url).query(&[
+                .json(self.get(url).query(&[
                     ("sort", "created"),
                     ("direction", "desc"),
                     ("per_page", per_page_str.as_str()),

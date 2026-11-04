@@ -10,6 +10,14 @@ use hyper::{
 use pulldown_cmark_escape::FmtWriter;
 use std::{borrow::Cow, path::Path};
 
+/// Format a number in a temporary buffer
+#[macro_export]
+macro_rules! num {
+    ($n:expr) => {
+        $n.format_into(&mut ::core::fmt::NumBuffer::new())
+    };
+}
+
 /// Pluralize (add an 's' sufix) to `text` based on `count`.
 pub fn pluralize(text: &str, count: usize) -> Cow<'_, str> {
     if count == 1 {

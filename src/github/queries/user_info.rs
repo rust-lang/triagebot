@@ -15,9 +15,9 @@ pub struct UserInfo {
 impl GithubClient {
     /// Fetches basic public information about a GitHub user.
     pub async fn user_info(&self, username: &str) -> anyhow::Result<UserInfo> {
-        let url = format!("{}/users/{username}", self.api_url);
+        let url = self.api_url_with_segments(["users", username]);
         let info: UserInfo = self
-            .json(self.get(&url))
+            .json(self.get(url))
             .await
             .with_context(|| format!("failed to fetch user info for {username}"))?;
 

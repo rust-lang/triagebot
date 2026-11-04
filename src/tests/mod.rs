@@ -14,6 +14,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_postgres::Config;
 use tokio_postgres::config::Host;
+use url::Url;
 
 pub(crate) mod github;
 
@@ -68,9 +69,9 @@ impl TestContext {
         let octocrab = Octocrab::builder().build().unwrap();
         let github = GithubClient::new(
             "gh-test-fake-token".into(),
-            "https://api.github.com".to_string(),
-            "https://api.github.com/graphql".to_string(),
-            "https://raw.githubusercontent.com".to_string(),
+            Url::parse("https://api.github.com").unwrap(),
+            Url::parse("https://api.github.com/graphql").unwrap(),
+            Url::parse("https://raw.githubusercontent.com").unwrap(),
         );
         let zulip = ZulipClient::new(
             "https://rust-fake.zulipchat.com".to_string(),

@@ -4,13 +4,13 @@ use futures::{FutureExt, future::BoxFuture};
 use http_body_util::BodyExt;
 use http_body_util::Limited;
 use reqwest::Body;
-use reqwest::IntoUrl;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
 use secrecy::{ExposeSecret, SecretString};
 use std::fmt::Debug;
 use std::time::{Duration, SystemTime};
 use tracing as log;
+use url::Url;
 
 use bytes::Bytes;
 
@@ -50,9 +50,9 @@ fn get_token_from_git_config() -> anyhow::Result<String> {
 pub struct GithubClient {
     token: SecretString,
     client: Client,
-    pub(in crate::github) api_url: String,
-    pub(in crate::github) graphql_url: String,
-    pub(in crate::github) raw_url: String,
+    api_url: Url,
+    graphql_url: Url,
+    raw_url: Url,
     /// If `true`, requests will sleep if it hits GitHub's rate limit.
     retry_rate_limit: bool,
 }
@@ -72,7 +72,7 @@ pub struct RateLimit {
 }
 
 impl GithubClient {
-    pub fn new(token: SecretString, api_url: String, graphql_url: String, raw_url: String) -> Self {
+    pub fn new(token: SecretString, api_url: Url, graphql_url: Url, raw_url: Url) -> Self {
         GithubClient {
             client: Client::new(),
             token,
@@ -86,13 +86,48 @@ impl GithubClient {
     pub fn new_from_env() -> Self {
         Self::new(
             default_token_from_env(),
-            std::env::var("GITHUB_API_URL")
-                .unwrap_or_else(|_| "https://api.github.com".to_string()),
-            std::env::var("GITHUB_GRAPHQL_API_URL")
-                .unwrap_or_else(|_| "https://api.github.com/graphql".to_string()),
-            std::env::var("GITHUB_RAW_URL")
-                .unwrap_or_else(|_| "https://raw.githubusercontent.com".to_string()),
+            Url::parse(
+                &std::env::var("GITHUB_API_URL")
+                    .unwrap_or_else(|_| "https://api.github.com".to_string()),
+            )
+            .expect("couldn't parse GITHUB_API_URL"),
+            Url::parse(
+                &std::env::var("GITHUB_GRAPHQL_API_URL")
+                    .unwrap_or_else(|_| "https://api.github.com/graphql".to_string()),
+            )
+            .expect("couldn't parse GITHUB_GRAPHQL_API_URL"),
+            Url::parse(
+                &std::env::var("GITHUB_RAW_URL")
+                    .unwrap_or_else(|_| "https://raw.githubusercontent.com".to_string()),
+            )
+            .expect("couldn't parse GITHUB_RAW_URL"),
         )
+    }
+
+    pub(crate) fn api_url_with_segments<I>(&self, segments: I) -> Url
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        let mut url = self.api_url.clone();
+        url.path_segments_mut()
+            .expect("api_url should have a base")
+            .pop_if_empty()
+            .extend(segments);
+        url
+    }
+
+    pub(crate) fn raw_url_with_segments<I>(&self, segments: I) -> Url
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        let mut url = self.raw_url.clone();
+        url.path_segments_mut()
+            .expect("raw_url should have a base")
+            .pop_if_empty()
+            .extend(segments);
+        url
     }
 
     /// Sets whether or not this client will retry when it hits GitHub's rate limit.
@@ -287,27 +322,27 @@ impl GithubClient {
         Ok(serde_json::from_slice(&body)?)
     }
 
-    pub fn get<U: IntoUrl + Debug>(&self, url: U) -> RequestBuilder {
+    pub fn get(&self, url: Url) -> RequestBuilder {
         log::trace!("get {:?}", url);
         self.client.get(url).configure(self)
     }
 
-    pub fn patch(&self, url: &str) -> RequestBuilder {
+    pub fn patch(&self, url: Url) -> RequestBuilder {
         log::trace!("patch {:?}", url);
         self.client.patch(url).configure(self)
     }
 
-    pub fn delete(&self, url: &str) -> RequestBuilder {
+    pub fn delete(&self, url: Url) -> RequestBuilder {
         log::trace!("delete {:?}", url);
         self.client.delete(url).configure(self)
     }
 
-    pub fn post(&self, url: &str) -> RequestBuilder {
+    pub fn post(&self, url: Url) -> RequestBuilder {
         log::trace!("post {:?}", url);
         self.client.post(url).configure(self)
     }
 
-    pub fn put(&self, url: &str) -> RequestBuilder {
+    pub fn put(&self, url: Url) -> RequestBuilder {
         log::trace!("put {:?}", url);
         self.client.put(url).configure(self)
     }
@@ -319,9 +354,9 @@ impl GithubClient {
             resources: RateLimitResources,
         }
 
-        let url = format!("{}/rate_limit", self.api_url);
+        let url = self.api_url_with_segments(["rate_limit"]);
         let response = self
-            .json::<RateLimitResponse>(self.get(&url))
+            .json::<RateLimitResponse>(self.get(url))
             .await
             .context("failed to fetch GitHub /rate_limit endpoint")?;
 
@@ -346,10 +381,11 @@ impl GithubClient {
 
         let (body, _dbg) = self
             .send_req_with_limit(
-                self.post(&self.graphql_url).json(&serde_json::json!({
-                    "query": query,
-                    "variables": vars,
-                })),
+                self.post(self.graphql_url.clone())
+                    .json(&serde_json::json!({
+                        "query": query,
+                        "variables": vars,
+                    })),
                 MAX_DEFAULT_GRAPH_QL_RESPONSE_SIZE,
             )
             .await?;
@@ -466,14 +502,14 @@ fn gh_api_version() {
     let c = GithubClient {
         client: Client::new(),
         token: String::new().into(),
-        api_url: String::new(),
-        graphql_url: "".to_string(),
-        raw_url: "".to_string(),
+        api_url: Url::parse("https://api.github.com").unwrap(),
+        graphql_url: Url::parse("https://api.github.com/graphql").unwrap(),
+        raw_url: Url::parse("https://raw.githubusercontent.com").unwrap(),
         retry_rate_limit: false,
     };
 
     let headers = c
-        .get("http://www.example.com")
+        .get(Url::parse("http://www.example.com").unwrap())
         .configure(&c)
         .build()
         .unwrap();
