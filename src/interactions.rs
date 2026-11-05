@@ -8,7 +8,7 @@ use crate::{
 };
 use std::fmt::Write;
 
-pub const REPORT_TO: &str = "Please file an issue on GitHub at [triagebot](https://github.com/rust-lang/triagebot) if there's \
+pub const REPORT_TO: &str = "Please file an issue on GitHub at [triagebot](https://github.com/rust-lang/triagebot/issues) if there's \
             a problem with this bot, or reach out on [#triagebot](https://rust-lang.zulipchat.com/#narrow/channel/224082-triagebot) on Zulip.";
 
 pub struct ErrorComment<'a> {
