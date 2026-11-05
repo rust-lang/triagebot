@@ -6,12 +6,14 @@ use reqwest::StatusCode;
 use std::fmt;
 use std::sync::OnceLock;
 use tracing as log;
+use url::Url;
 
 use super::client::GithubClient;
 use super::repos::{GitHubUser, Milestone, Repository};
 use super::utils::{Selection, opt_string};
 use crate::errors::{AssignmentError, UserError};
 use crate::github::GithubCommit;
+use crate::num;
 
 /// An issue or pull request.
 ///
@@ -207,13 +209,13 @@ impl Issue {
     }
 
     pub async fn edit_body(&self, client: &GithubClient, body: &str) -> anyhow::Result<()> {
-        let edit_url = format!("{}/issues/{}", self.repository().url(client), self.number);
+        let edit_url = self.repository().url(client, ["issues", num!(self.number)]);
         #[derive(serde::Serialize)]
         struct ChangedIssue<'a> {
             body: &'a str,
         }
         client
-            .send_req(client.patch(&edit_url).json(&ChangedIssue { body }))
+            .send_req(client.patch(edit_url).json(&ChangedIssue { body }))
             .await
             .context("failed to edit issue body")?;
         Ok(())
@@ -225,22 +227,15 @@ impl Issue {
         id: u64,
         new_body: &str,
     ) -> anyhow::Result<()> {
-        let comment_url = format!(
-            "{}/pulls/{}/reviews/{}",
-            self.repository().url(client),
-            self.number,
-            id
-        );
+        let comment_url = self
+            .repository()
+            .url(client, ["pulls", num!(self.number), "reviews", num!(id)]);
         #[derive(serde::Serialize)]
         struct NewComment<'a> {
             body: &'a str,
         }
         client
-            .send_req(
-                client
-                    .put(&comment_url)
-                    .json(&NewComment { body: new_body }),
-            )
+            .send_req(client.put(comment_url).json(&NewComment { body: new_body }))
             .await
             .context("failed to edit review comment")?;
         Ok(())
@@ -252,7 +247,9 @@ impl Issue {
         id: u64,
         new_body: &str,
     ) -> anyhow::Result<Comment> {
-        let comment_url = format!("{}/pulls/comments/{}", self.repository().url(client), id);
+        let comment_url = self
+            .repository()
+            .url(client, ["pulls", "comments", num!(id)]);
         #[derive(serde::Serialize)]
         struct EditComment<'a> {
             body: &'a str,
@@ -260,7 +257,7 @@ impl Issue {
         let comment = client
             .json(
                 client
-                    .patch(&comment_url)
+                    .patch(comment_url)
                     .json(&EditComment { body: new_body }),
             )
             .await
@@ -295,15 +292,12 @@ impl Issue {
         // API requests are required in parallel.
         let requests = labels.into_iter().map(|label| async move {
             // DELETE /repos/:owner/:repo/issues/:number/labels/{name}
-            let url = format!(
-                "{repo_url}/issues/{number}/labels/{name}",
-                repo_url = self.repository().url(client),
-                number = self.number,
-                name = label.name,
-            );
+            let url = self
+                .repository()
+                .url(client, ["issues", num!(self.number), "labels", &label.name]);
 
             client
-                .send_req(client.delete(&url))
+                .send_req(client.delete(url))
                 .await
                 .with_context(|| format!("failed to remove {label:?}"))
         });
@@ -321,11 +315,9 @@ impl Issue {
         log::info!("add_labels: {} +{:?}", self.global_id(), labels);
         // POST /repos/:owner/:repo/issues/:number/labels
         // repo_url = https://api.github.com/repos/Codertocat/Hello-World
-        let url = format!(
-            "{repo_url}/issues/{number}/labels",
-            repo_url = self.repository().url(client),
-            number = self.number
-        );
+        let url = self
+            .repository()
+            .url(client, ["issues", num!(self.number), "labels"]);
 
         // Don't try to add labels already present on this issue.
         let labels = labels
@@ -363,7 +355,7 @@ impl Issue {
         }
 
         client
-            .send_req(client.post(&url).json(&LabelsReq {
+            .send_req(client.post(url).json(&LabelsReq {
                 labels: known_labels,
             }))
             .await
@@ -394,11 +386,9 @@ impl Issue {
         selection: Selection<'_, str>,
     ) -> Result<(), AssignmentError> {
         log::info!("remove {:?} assignees for {}", selection, self.global_id());
-        let url = format!(
-            "{repo_url}/issues/{number}/assignees",
-            repo_url = self.repository().url(client),
-            number = self.number
-        );
+        let url = self
+            .repository()
+            .url(client, ["issues", num!(self.number), "assignees"]);
 
         let assignees = match selection {
             Selection::All => self
@@ -421,7 +411,7 @@ impl Issue {
         }
 
         client
-            .send_req(client.delete(&url).json(&AssigneeReq {
+            .send_req(client.delete(url).json(&AssigneeReq {
                 assignees: &assignees[..],
             }))
             .await
@@ -436,11 +426,9 @@ impl Issue {
         user: &str,
     ) -> Result<(), AssignmentError> {
         log::info!("add_assignee {} for {}", user, self.global_id());
-        let url = format!(
-            "{repo_url}/issues/{number}/assignees",
-            repo_url = self.repository().url(client),
-            number = self.number
-        );
+        let url = self
+            .repository()
+            .url(client, ["issues", num!(self.number), "assignees"]);
 
         #[derive(serde::Serialize)]
         struct AssigneeReq<'a> {
@@ -448,7 +436,7 @@ impl Issue {
         }
 
         let result: Issue = client
-            .json(client.post(&url).json(&AssigneeReq { assignees: &[user] }))
+            .json(client.post(url).json(&AssigneeReq { assignees: &[user] }))
             .await
             .map_err(AssignmentError::Other)?;
 
@@ -501,17 +489,13 @@ impl Issue {
     }
 
     pub async fn close(&self, client: &GithubClient) -> anyhow::Result<()> {
-        let edit_url = format!("{}/issues/{}", self.repository().url(client), self.number);
+        let edit_url = self.repository().url(client, ["issues", num!(self.number)]);
         #[derive(serde::Serialize)]
         struct CloseIssue<'a> {
             state: &'a str,
         }
         client
-            .send_req(
-                client
-                    .patch(&edit_url)
-                    .json(&CloseIssue { state: "closed" }),
-            )
+            .send_req(client.patch(edit_url).json(&CloseIssue { state: "closed" }))
             .await
             .context("failed to close issue")?;
         Ok(())
@@ -542,11 +526,12 @@ impl Issue {
             .get_or_try_init::<anyhow::Error, _, _>(|| async move {
                 // Note: the `per_page` here only applies to commits, not the
                 // files, which is hard capted (by GitHub) at 300 total.
-                let req = client.get(&format!(
-                    "{}/compare/{before}...{after}?per_page=1000",
-                    self.repository().url(client)
-                ));
-                client.json(req).await
+                let url = self
+                    .repository()
+                    .url(client, ["compare", &format!("{before}...{after}")]);
+                client
+                    .json(client.get(url).query(&[("per_page", "1000")]))
+                    .await
             })
             .await?;
         Ok(Some(compare))
@@ -560,13 +545,14 @@ impl Issue {
         }
 
         let mut commits = Vec::new();
-        let mut page = 1;
+        let mut page: u32 = 1;
         loop {
-            let req = client.get(&format!(
-                "{}/pulls/{}/commits?page={page}&per_page=100",
-                self.repository().url(client),
-                self.number
-            ));
+            let url = self
+                .repository()
+                .url(client, ["pulls", num!(self.number), "commits"]);
+            let req = client
+                .get(url)
+                .query(&[("page", num!(page)), ("per_page", "100")]);
 
             let new: Vec<_> = client.json(req).await?;
             if new.is_empty() {
@@ -690,13 +676,12 @@ impl Issue {
         client: &GithubClient,
         review_id: u64,
     ) -> anyhow::Result<Comment> {
-        let review_url = format!(
-            "{}/pulls/{}/reviews/{review_id}",
-            self.repository().url(client),
-            self.number,
+        let review_url = self.repository().url(
+            client,
+            ["pulls", num!(self.number), "reviews", num!(review_id)],
         );
         let review = client
-            .json(client.get(&review_url))
+            .json(client.get(review_url))
             .await
             .with_context(|| format!("unable to fetch review ({review_id})"))?;
         Ok(review)
@@ -707,12 +692,11 @@ impl Issue {
         client: &GithubClient,
         review_comment_id: u64,
     ) -> anyhow::Result<Comment> {
-        let review_comment_url = format!(
-            "{}/pulls/comments/{review_comment_id}",
-            self.repository().url(client),
-        );
+        let review_comment_url = self
+            .repository()
+            .url(client, ["pulls", "comments", num!(review_comment_id)]);
         let review = client
-            .json(client.get(&review_comment_url))
+            .json(client.get(review_comment_url))
             .await
             .with_context(|| format!("unable to fetch review comment ({review_comment_id})"))?;
         Ok(review)
@@ -723,13 +707,14 @@ impl Issue {
         client: &GithubClient,
         page: u32,
     ) -> anyhow::Result<Vec<Comment>> {
-        let review_url = format!(
-            "{}/pulls/{}/reviews?per_page={REVIEWS_PAGE_SIZE}&page={page}",
-            self.repository().url(client),
-            self.number,
-        );
+        let review_url = self
+            .repository()
+            .url(client, ["pulls", num!(self.number), "reviews"]);
+        let req = client
+            .get(review_url)
+            .query(&[("per_page", num!(REVIEWS_PAGE_SIZE)), ("page", num!(page))]);
         let reviews: Vec<Comment> = client
-            .json(client.get(&review_url))
+            .json(req)
             .await
             .with_context(|| format!("unable to fetch reviews for {}", self.number))?;
         Ok(reviews)
@@ -798,8 +783,10 @@ pub enum PullRequestReviewState {
 
 impl Issue {
     pub async fn get_comment(&self, client: &GithubClient, id: u64) -> anyhow::Result<Comment> {
-        let comment_url = format!("{}/issues/comments/{}", self.repository().url(client), id);
-        let comment = client.json(client.get(&comment_url)).await?;
+        let comment_url = self
+            .repository()
+            .url(client, ["issues", "comments", num!(id)]);
+        let comment = client.json(client.get(comment_url)).await?;
         Ok(comment)
     }
 
@@ -807,12 +794,14 @@ impl Issue {
         &self,
         client: &GithubClient,
     ) -> anyhow::Result<Vec<Comment>> {
-        let comment_url = format!(
-            "{}/issues/{}/comments?page=1&per_page=100",
-            self.repository().url(client),
-            self.number,
-        );
-        client.json::<Vec<Comment>>(client.get(&comment_url)).await
+        let mut comments_url = self
+            .repository()
+            .url(client, ["issues", num!(self.number), "comments"]);
+        comments_url
+            .query_pairs_mut()
+            .append_pair("page", "1")
+            .append_pair("per_page", "100");
+        client.json::<Vec<Comment>>(client.get(comments_url)).await
     }
 
     pub async fn edit_comment(
@@ -821,7 +810,9 @@ impl Issue {
         id: u64,
         new_body: &str,
     ) -> anyhow::Result<Comment> {
-        let comment_url = format!("{}/issues/comments/{}", self.repository().url(client), id);
+        let comment_url = self
+            .repository()
+            .url(client, ["issues", "comments", num!(id)]);
         #[derive(serde::Serialize)]
         struct NewComment<'a> {
             body: &'a str,
@@ -829,7 +820,7 @@ impl Issue {
         let comment = client
             .json(
                 client
-                    .patch(&comment_url)
+                    .patch(comment_url)
                     .json(&NewComment { body: new_body }),
             )
             .await
@@ -842,13 +833,11 @@ impl Issue {
         struct PostComment<'a> {
             body: &'a str,
         }
-        let comments_path = self
-            .comments_url
-            .strip_prefix("https://api.github.com")
-            .expect("expected api host");
-        let comments_url = format!("{}{comments_path}", client.api_url);
+        let comments_url = self
+            .repository()
+            .url(client, ["issues", num!(self.number), "comments"]);
         let comment = client
-            .json(client.post(&comments_url).json(&PostComment { body }))
+            .json(client.post(comments_url).json(&PostComment { body }))
             .await
             .context("failed to post comment")?;
         Ok(comment)
@@ -945,18 +934,16 @@ impl Issue {
         client: &GithubClient,
         reason: Option<LockReason>,
     ) -> anyhow::Result<()> {
-        let lock_url = format!(
-            "{}/issues/{}/lock",
-            self.repository().url(client),
-            self.number
-        );
+        let lock_url = self
+            .repository()
+            .url(client, ["issues", num!(self.number), "lock"]);
         #[derive(serde::Serialize)]
         struct LockReasonIssue {
             lock_reason: LockReason,
         }
         client
             .send_req({
-                let req = client.put(&lock_url);
+                let req = client.put(lock_url);
 
                 if let Some(lock_reason) = reason {
                     req.json(&LockReasonIssue { lock_reason })
@@ -971,13 +958,11 @@ impl Issue {
 
     /// Unlock an issue.
     pub async fn unlock(&self, client: &GithubClient) -> anyhow::Result<()> {
-        let lock_url = format!(
-            "{}/issues/{}/lock",
-            self.repository().url(client),
-            self.number
-        );
+        let lock_url = self
+            .repository()
+            .url(client, ["issues", num!(self.number), "lock"]);
         client
-            .send_req(client.delete(&lock_url))
+            .send_req(client.delete(lock_url))
             .await
             .context("failed to unlock issue")?;
         Ok(())
@@ -1015,11 +1000,10 @@ impl Issue {
             return Ok(vec![]);
         }
 
-        let req = client.get(&format!(
-            "{}/pulls/{}/files",
-            self.repository().url(client),
-            self.number
-        ));
+        let url = self
+            .repository()
+            .url(client, ["pulls", num!(self.number), "files"]);
+        let req = client.get(url);
         client.json(req).await
     }
 }
@@ -1075,10 +1059,14 @@ impl fmt::Display for IssueRepository {
 }
 
 impl IssueRepository {
-    pub(crate) fn url(&self, client: &GithubClient) -> String {
-        format!(
-            "{}/repos/{}/{}",
-            client.api_url, self.organization, self.repository
+    pub(crate) fn url<'a, I>(&'a self, client: &GithubClient, segments: I) -> Url
+    where
+        I: IntoIterator<Item = &'a str>,
+    {
+        client.api_url_with_segments(
+            ["repos", &self.organization, &self.repository]
+                .into_iter()
+                .chain(segments),
         )
     }
 
@@ -1091,9 +1079,8 @@ impl IssueRepository {
         client: &GithubClient,
         label: &str,
     ) -> anyhow::Result<bool> {
-        #[allow(clippy::redundant_pattern_matching)]
-        let url = format!("{}/labels/{}", self.url(client), label);
-        match client.send_req(client.get(&url)).await {
+        let url = self.url(client, ["labels", label]);
+        match client.send_req(client.get(url)).await {
             Ok(_) => Ok(true),
             Err(e) => {
                 if e.downcast_ref::<reqwest::Error>()
@@ -1131,8 +1118,8 @@ impl IssueRepository {
         client: &GithubClient,
         username: &str,
     ) -> anyhow::Result<CollaboratorPermission> {
-        let url = format!("{}/collaborators/{username}/permission", self.url(client));
-        let permission = client.json(client.get(&url)).await?;
+        let url = self.url(client, ["collaborators", username, "permission"]);
+        let permission = client.json(client.get(url)).await?;
         Ok(permission)
     }
 }

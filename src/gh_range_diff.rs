@@ -425,20 +425,24 @@ fn process_old_new(
             };
 
             let before_href = {
-                let mut url = Url::parse(&format!("https://github.com/{owner}/{repo}/blob"))
-                    .expect("valid blob url");
+                let mut url = Url::parse("https://github.com").expect("valid base github.com url");
                 {
                     let mut segments = url.path_segments_mut().unwrap();
+                    segments.push(owner);
+                    segments.push(repo);
+                    segments.push("blob");
                     segments.push(oldheadref);
                     segments.push(filename);
                 }
                 EscapeHref(&url.to_string())
             };
             let after_href = {
-                let mut url = Url::parse(&format!("https://github.com/{owner}/{repo}/blob"))
-                    .expect("valid blob url");
+                let mut url = Url::parse("https://github.com").expect("valid base github.com url");
                 {
                     let mut segments = url.path_segments_mut().unwrap();
+                    segments.push(owner);
+                    segments.push(repo);
+                    segments.push("blob");
                     segments.push(newheadref);
                     segments.push(filename);
                 }
