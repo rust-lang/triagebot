@@ -310,7 +310,7 @@ async fn block_user_agents(req: Request<axum::body::Body>, next: Next) -> Respon
     {
         if BANNED_USER_AGENTS.iter().any(|banned| ua.contains(banned)) {
             // Reject immediately with a 403 Forbidden status
-            return (StatusCode::FORBIDDEN, "Access Denied: Banned User-Agent. If you think this a mistake, please open an issue at https://github.com/rust-lang/triagebot.").into_response();
+            return (StatusCode::FORBIDDEN, "Access Denied: Banned User-Agent. If you think this a mistake, please open an issue at https://github.com/rust-lang/triagebot/issues").into_response();
         }
     }
 
