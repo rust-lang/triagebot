@@ -75,6 +75,11 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
     }
     let mut errors = Vec::new();
 
+    // Ignore comments made by triagebot itself
+    if event.comment_body().is_some() && event.user().login == ctx.username {
+        return errors;
+    }
+
     if let (Ok(config), Event::Issue(event)) = (config.as_ref(), event) {
         handle_issue(ctx, event, config, &mut errors).await;
     }
