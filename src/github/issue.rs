@@ -524,14 +524,10 @@ impl Issue {
         let compare = pr
             .compare
             .get_or_try_init::<anyhow::Error, _, _>(|| async move {
-                // Note: the `per_page` here only applies to commits, not the
-                // files, which is hard capted (by GitHub) at 300 total.
-                let url = self
-                    .repository()
-                    .url(client, ["compare", &format!("{before}...{after}")]);
-                client
-                    .json(client.get(url).query(&[("per_page", "1000")]))
-                    .await
+                // Go through `GithubClient::compare` so that we also get the files that
+                // GitHub's JSON API doesn't return (it caps at 300 files and omits the
+                // `patch` of large files).
+                client.compare(self.repository(), before, after).await
             })
             .await?;
         Ok(Some(compare))
