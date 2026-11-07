@@ -129,7 +129,9 @@ impl RelabelCommand {
             toks.eat_token(Token::Comma)?;
             toks.eat_token(Token::Word("and"))?;
 
-            if let Some(Token::Semi | Token::Dot | Token::EndOfLine) = toks.peek_token()? {
+            if let Some(Token::Semi | Token::Dot | Token::EndOfLine | Token::Word("please")) =
+                toks.peek_token()?
+            {
                 toks.next_token()?;
                 *input = toks;
                 return Ok(Some(RelabelCommand(deltas)));
@@ -192,6 +194,18 @@ fn parse_no_dot() {
 fn parse_to_colon() {
     assert_eq!(
         parse("modify labels to: +T-compiler -T-lang bug"),
+        Ok(Some(vec![
+            LabelDelta::Add(Label("T-compiler".into())),
+            LabelDelta::Remove(Label("T-lang".into())),
+            LabelDelta::Add(Label("bug".into())),
+        ]))
+    );
+}
+
+#[test]
+fn parse_politeness() {
+    assert_eq!(
+        parse("modify labels to +T-compiler -T-lang bug please."),
         Ok(Some(vec![
             LabelDelta::Add(Label("T-compiler".into())),
             LabelDelta::Remove(Label("T-lang".into())),
