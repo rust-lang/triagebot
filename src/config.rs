@@ -147,12 +147,26 @@ pub(crate) struct AssignReviewPrefsConfig {}
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AssignCustomMessages {
-    /// Message with reviewer automaticaly chosen (`{assignee}`)
-    #[serde(alias = "welcome-message")]
+    /// Message with reviewer automatically chosen (placeholder `{assignee}`).
+    ///
+    /// If the PR author is first time contributor [`auto_assign_someone_welcome`] is prefered (if set).
+    #[serde(default)]
     pub(crate) auto_assign_someone: Option<String>,
-    /// Message without a reviewer automaticaly chosen
-    #[serde(alias = "welcome-message-no-reviewer")]
-    pub(crate) auto_assign_no_one: String,
+    /// Message without a reviewer automatically chosen
+    ///
+    /// If the PR author is first time contributor [`auto_assign_no_one_welcome`] is prefered (if set).
+    #[serde(default)]
+    pub(crate) auto_assign_no_one: Option<String>,
+    /// Welcome message with reviewer chosen (`{assignee}`), only used for first timer.
+    ///
+    /// If unset, fallback to [`auto_assign_someone`].
+    #[serde(default)]
+    pub(crate) auto_assign_someone_welcome: Option<String>,
+    /// Welcome message without a reviewer chosen, only used for first timer.
+    ///
+    /// If unset, fallback to [`auto_assign_no_one`].
+    #[serde(default)]
+    pub(crate) auto_assign_no_one_welcome: Option<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
@@ -184,7 +198,6 @@ pub(crate) struct AssignConfig {
     pub(crate) review_prefs: Option<AssignReviewPrefsConfig>,
     /// Custom welcome messages
     #[serde(default)]
-    #[serde(alias = "custom_welcome_messages")]
     pub(crate) custom_messages: Option<AssignCustomMessages>,
 }
 
@@ -1180,6 +1193,7 @@ mod tests {
             [assign.custom_messages]
             auto-assign-someone = "Welcome message, assigning {assignee}!"
             auto-assign-no-one = "Welcome message for when no reviewer could be found!"
+            auto-assign-no-one-welcome = "test"
 
             [[assign.warn_non_default_branch.exceptions]]
             title = "[beta"
@@ -1218,8 +1232,11 @@ mod tests {
                         auto_assign_someone: Some(
                             "Welcome message, assigning {assignee}!".to_string()
                         ),
-                        auto_assign_no_one: "Welcome message for when no reviewer could be found!"
-                            .to_string()
+                        auto_assign_no_one: Some(
+                            "Welcome message for when no reviewer could be found!".to_string()
+                        ),
+                        auto_assign_someone_welcome: None,
+                        auto_assign_no_one_welcome: Some("test".to_string()),
                     }),
                     contributing_url: None,
                     llm_policy_url: None,
@@ -1292,22 +1309,6 @@ mod tests {
             Some(AssignCommunityReviewsConfig {
                 minimum_approvals: NonZeroU8::new(2).unwrap(),
                 label: "S-waiting-on-community-reviews".to_string(),
-            })
-        );
-    }
-
-    #[test]
-    fn assign_custom_welcome_message_old() {
-        let config = r#"
-            [assign.custom_welcome_messages]
-            welcome-message-no-reviewer = "welcome message!"
-        "#;
-        let config = toml::from_str::<Config>(&config).unwrap();
-        assert_eq!(
-            config.assign.and_then(|c| c.custom_messages),
-            Some(AssignCustomMessages {
-                auto_assign_someone: None,
-                auto_assign_no_one: "welcome message!".to_string(),
             })
         );
     }

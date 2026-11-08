@@ -333,21 +333,21 @@ pub(super) async fn handle_input(
             return Ok(());
         }
         let welcome = if let Some(custom_messages) = &config.custom_messages {
-            if from_comment {
-                // No welcome is posted if they used `r?` in the opening body.
-                None
-            } else {
+            if event.issue.author_association.is_probably_first_timer() {
                 let mut welcome = match &assignee {
                     Some(assignee) => custom_messages
-                        .auto_assign_someone
+                        .auto_assign_someone_welcome
                         .as_ref()
+                        .or(custom_messages.auto_assign_someone.as_ref())
                         .map(|wm| wm.trim().replace("{assignee}", &assignee.name)),
-                    None => Some(custom_messages.auto_assign_no_one.trim().to_string()),
+                    None => custom_messages
+                        .auto_assign_no_one_welcome
+                        .as_ref()
+                        .or(custom_messages.auto_assign_no_one.as_ref())
+                        .map(|wm| wm.trim().to_string()),
                 };
 
-                if let Some(ref mut welcome) = welcome
-                    && event.issue.author_association.is_probably_first_timer()
-                {
+                if let Some(ref mut welcome) = welcome {
                     add_contribution_urls(
                         welcome,
                         config.contributing_url.as_deref(),
@@ -355,6 +355,21 @@ pub(super) async fn handle_input(
                     );
                 }
                 welcome
+            } else if !from_comment {
+                match &assignee {
+                    Some(assignee) => custom_messages
+                        .auto_assign_someone
+                        .as_ref()
+                        .map(|m| m.trim().replace("{assignee}", &assignee.name)),
+                    None => custom_messages
+                        .auto_assign_no_one
+                        .as_ref()
+                        .map(|m| m.trim().to_string()),
+                }
+            } else {
+                // No welcome or recurring message is posted if the author is not new
+                // and they used `r?` in the opening body.
+                None
             }
         } else if event.issue.author_association.is_probably_first_timer()
             && config.community_reviews.is_none()
@@ -364,6 +379,8 @@ pub(super) async fn handle_input(
                 None => {
                     // If the assign fallback group is empty, then we don't expect any automatic
                     // assignment, and this message would just be spam.
+                    //
+                    // To be kept in sync with the validate_config handler.
                     if config.fallback_review_group().is_some() {
                         Some(messages::WELCOME_WITHOUT_REVIEWER.to_string())
                     } else {
