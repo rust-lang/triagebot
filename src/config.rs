@@ -148,10 +148,8 @@ pub(crate) struct AssignReviewPrefsConfig {}
 #[serde(deny_unknown_fields)]
 pub(crate) struct AssignCustomMessages {
     /// Message with reviewer automaticaly chosen (`{assignee}`)
-    #[serde(alias = "welcome-message")]
     pub(crate) auto_assign_someone: Option<String>,
     /// Message without a reviewer automaticaly chosen
-    #[serde(alias = "welcome-message-no-reviewer")]
     pub(crate) auto_assign_no_one: String,
 }
 
@@ -184,7 +182,6 @@ pub(crate) struct AssignConfig {
     pub(crate) review_prefs: Option<AssignReviewPrefsConfig>,
     /// Custom welcome messages
     #[serde(default)]
-    #[serde(alias = "custom_welcome_messages")]
     pub(crate) custom_messages: Option<AssignCustomMessages>,
 }
 
@@ -1292,22 +1289,6 @@ mod tests {
             Some(AssignCommunityReviewsConfig {
                 minimum_approvals: NonZeroU8::new(2).unwrap(),
                 label: "S-waiting-on-community-reviews".to_string(),
-            })
-        );
-    }
-
-    #[test]
-    fn assign_custom_welcome_message_old() {
-        let config = r#"
-            [assign.custom_welcome_messages]
-            welcome-message-no-reviewer = "welcome message!"
-        "#;
-        let config = toml::from_str::<Config>(&config).unwrap();
-        assert_eq!(
-            config.assign.and_then(|c| c.custom_messages),
-            Some(AssignCustomMessages {
-                auto_assign_someone: None,
-                auto_assign_no_one: "welcome message!".to_string(),
             })
         );
     }
