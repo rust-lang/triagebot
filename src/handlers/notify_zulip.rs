@@ -201,7 +201,7 @@ fn has_all_required_labels(issue: &Issue, config: &NotifyZulipLabelConfig) -> bo
             return false;
         }
     }
-    for req_not_label in &config.absent_labels {
+    for req_not_label in &config.excluded_labels {
         if pattern_matches_labels(issue, req_not_label) {
             return false;
         }
@@ -371,7 +371,7 @@ fn close_messages_uses_success_when_set() {
         messages_on_close_success: vec!["success".to_string()],
         messages_on_reopen: vec![],
         required_labels: vec![],
-        absent_labels: vec![],
+        excluded_labels: vec![],
     };
 
     assert_eq!(

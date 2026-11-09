@@ -508,7 +508,7 @@ pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) required_labels: Vec<String>,
     /// Labels which the issue should *NOT* have for this config to match
     #[serde(default)]
-    pub(crate) absent_labels: Vec<String>,
+    pub(crate) excluded_labels: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
@@ -1777,7 +1777,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
                 messages_on_close_success: vec![],
                 messages_on_reopen: vec![],
                 required_labels: vec![],
-                absent_labels: vec![],
+                excluded_labels: vec![],
             }
         );
     }
@@ -1798,7 +1798,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
             message_on_close_success = "on close success"
             message_on_reopen = "on reopen"
             required_labels = ["required-label"]
-            absent_labels = ["absent-label"]
+            excluded_labels = ["excluded-label"]
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let notify_zulip = config.notify_zulip.unwrap();
@@ -1816,7 +1816,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
                 messages_on_close_success: vec!["on close success".to_string()],
                 messages_on_reopen: vec!["on reopen".to_string()],
                 required_labels: vec!["required-label".to_string()],
-                absent_labels: vec!["absent-label".to_string()],
+                excluded_labels: vec!["excluded-label".to_string()],
             }
         );
     }
