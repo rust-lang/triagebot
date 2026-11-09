@@ -506,6 +506,9 @@ pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) messages_on_reopen: Vec<String>,
     #[serde(default)]
     pub(crate) required_labels: Vec<String>,
+    /// Will resolve the given zulip thread when the label is removed
+    #[serde(default)]
+    pub(crate) resolve_on_remove: bool,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
@@ -1773,7 +1776,8 @@ Multi text body with ${mcp_issue} and ${mcp_title}
                 messages_on_close: vec![],
                 messages_on_close_success: vec![],
                 messages_on_reopen: vec![],
-                required_labels: vec![]
+                required_labels: vec![],
+                resolve_on_remove: false,
             }
         );
     }
@@ -1794,6 +1798,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
             message_on_close_success = "on close success"
             message_on_reopen = "on reopen"
             required_labels = ["required-label"]
+            resolve_on_remove = true
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let notify_zulip = config.notify_zulip.unwrap();
@@ -1810,7 +1815,8 @@ Multi text body with ${mcp_issue} and ${mcp_title}
                 messages_on_close: vec!["on close".to_string()],
                 messages_on_close_success: vec!["on close success".to_string()],
                 messages_on_reopen: vec!["on reopen".to_string()],
-                required_labels: vec!["required-label".to_string()]
+                required_labels: vec!["required-label".to_string()],
+                resolve_on_remove: true,
             }
         );
     }
