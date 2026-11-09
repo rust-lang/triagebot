@@ -64,16 +64,25 @@ pub(super) async fn validate_config(
 }
 
 fn validate_parsed_config(config: &Config) -> Result<(), String> {
-    // Error if `[assign.owners]` is not empty (ie auto-assign) and the custom welcome message for assignee isn't set.
-    if let Some(assign) = &config.assign
-        && !assign.owners.is_empty()
-        && let Some(custom_messages) = &assign.custom_messages
-        && custom_messages.auto_assign_someone.is_none()
-    {
-        return Err("Invalid `triagebot.toml`:\n\
-            `[assign.owners]` is populated but `[assign.custom_messages.auto-assign-someone]` \
-            is not set!"
-            .to_string());
+    if let Some(assign) = &config.assign {
+        // Error if `[assign.owners]` is not empty (ie auto-assign) and the custom welcome message for assignee isn't set.
+        if !assign.owners.is_empty()
+            && let Some(custom_messages) = &assign.custom_messages
+            && custom_messages.auto_assign_someone.is_none()
+        {
+            return Err("Invalid `triagebot.toml`:\n\
+            `[assign.owners]` is populated but `[assign.custom_messages.auto-assign-someone]` is not set!"
+                .to_string());
+        }
+
+        // Error if the LLM policy or contributing URLs are set but neither auto-assign or custom messages are set
+        if assign.llm_policy_url.is_some() || assign.contributing_url.is_some() {
+            if assign.owners.is_empty() && assign.custom_messages.is_none() {
+                return Err("Invalid `triagebot.toml`:\n\
+                    `[assign.llm_policy_url]` and/or `[assign.contributing_url]` are populated but neither `[assign.owners]` nor `[assign.custom_messages]` are populated."
+                    .to_string());
+            }
+        }
     }
 
     // Validate patterns everywhere we allow glob matching
