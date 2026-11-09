@@ -197,20 +197,28 @@ fn parse_close_reopen_input(
 
 fn has_all_required_labels(issue: &Issue, config: &NotifyZulipLabelConfig) -> bool {
     for req_label in &config.required_labels {
-        let pattern = match globset::Glob::new(req_label) {
-            Ok(pattern) => pattern,
-            Err(err) => {
-                log::error!("Invalid glob pattern: {err}");
-                continue;
-            }
-        };
-        let matcher = pattern.compile_matcher();
-        if !issue.labels().iter().any(|l| matcher.is_match(&l.name)) {
+        if !pattern_matches_labels(issue, req_label) {
             return false;
         }
     }
-
+    for req_not_label in &config.absent_labels {
+        if pattern_matches_labels(issue, req_not_label) {
+            return false;
+        }
+    }
     true
+}
+
+fn pattern_matches_labels(issue: &Issue, pattern: &str) -> bool {
+    let pattern = match globset::Glob::new(pattern) {
+        Ok(pattern) => pattern,
+        Err(err) => {
+            log::error!("Invalid glob pattern: {err}");
+            return false;
+        }
+    };
+    let matcher = pattern.compile_matcher();
+    issue.labels().iter().any(|l| matcher.is_match(&l.name))
 }
 
 pub(super) async fn handle_input(
@@ -363,6 +371,7 @@ fn close_messages_uses_success_when_set() {
         messages_on_close_success: vec!["success".to_string()],
         messages_on_reopen: vec![],
         required_labels: vec![],
+        absent_labels: vec![],
     };
 
     assert_eq!(
