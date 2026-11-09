@@ -48,6 +48,7 @@ pub mod rustc_commits;
 mod shortcut;
 mod transfer;
 pub mod types_planning_updates;
+mod undraft_comment;
 mod view_all_comments_link;
 
 pub struct Context {
@@ -373,6 +374,7 @@ issue_handlers! {
     mentions,
     notify_zulip,
     review_requested,
+    undraft_comment,
     pr_tracking,
 }
 

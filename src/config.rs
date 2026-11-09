@@ -77,6 +77,7 @@ define_config! {
     github_releases: GitHubReleasesConfig,
     review_submitted: ReviewSubmittedConfig,
     review_requested: ReviewRequestedConfig,
+    undraft_comment: UndraftCommentConfig,
     shortcut: ShortcutConfig,
     note: NoteConfig,
     concern: ConcernConfig,
@@ -611,6 +612,10 @@ pub(crate) struct ReviewRequestedConfig {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UndraftCommentConfig {}
+
+#[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GitHubReleasesConfig {
@@ -1033,6 +1038,8 @@ mod tests {
 
             [merge]
             type = "merge-queue"
+
+            [undraft-comment]
         "##;
         let config = toml::from_str::<Config>(&config).unwrap();
         let mut ping_teams = HashMap::new();
@@ -1180,6 +1187,7 @@ mod tests {
                 merge: Some(MergeConfig {
                     type_: MergeType::MergeQueue
                 }),
+                undraft_comment: Some(UndraftCommentConfig {}),
             }
         );
     }
@@ -1280,6 +1288,7 @@ mod tests {
                 review_changes_since: None,
                 view_all_comments_link: None,
                 merge: None,
+                undraft_comment: None,
             }
         );
     }
