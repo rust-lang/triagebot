@@ -31,7 +31,7 @@ pub(super) async fn behind_upstream(
         Some(format!(
             r"This PR is based on an [upstream commit]({upstream_commit_url}) that is older than {age_threshold} days.
 
-*It's recommended to update your branch according to the [rustc-dev-guide](https://rustc-dev-guide.rust-lang.org/contributing.html#keeping-your-branch-up-to-date).*",
+*It's recommended to update your branch according to the [rustc-dev-guide](https://rustc-dev-guide.rust-lang.org/git.html#keeping-things-up-to-date).*",
         ))
     } else {
         // Parent commit is not too old, log and do nothing
