@@ -1,8 +1,8 @@
 use crate::{
-    github::{Event, GithubClient, IssuesAction, IssuesEvent},
+    github::{Event, GithubClient, GithubCommit, IssuesAction, IssuesEvent},
     handlers::Context,
 };
-use anyhow::Context as _;
+use anyhow::{Context as _, bail};
 use futures::stream::{self, StreamExt};
 use regex::Regex;
 use reqwest::StatusCode;
@@ -43,8 +43,30 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
         return Ok(());
     };
 
+    let Some(commit) = ctx.github.rust_commit(merge_sha).await else {
+        log::error!(
+            "rust-lang/rust#{}: merge commit {merge_sha} doesn't exist",
+            e.issue.number
+        );
+        return Ok(());
+    };
+
+    // Make sure we are getting the version from the actual auto merge,
+    // and not from the rollup merge (where the version might be outdated).
+    let commit = match get_auto_merge_for(&ctx.github, commit).await {
+        Ok(v) => v,
+        Err(err) => {
+            log::error!(
+                "rust-lang/rust#{}: couldn't find auto merge for {merge_sha}: {err}",
+                e.issue.number
+            );
+
+            return Ok(());
+        }
+    };
+
     // Fetch the version from the upstream repository.
-    let Some(version) = get_version_standalone(&ctx.github, merge_sha).await? else {
+    let Some(version) = get_version_standalone(&ctx.github, &commit.sha).await? else {
         log::error!("could not find the version of {merge_sha:?}");
         return Ok(());
     };
@@ -68,10 +90,80 @@ pub(super) async fn handle(ctx: &Context, event: &Event) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Given a commit, finds a an auto merge commit that merged said commit into rust-lang/rust's main.
+///
+/// Note:
+/// - `commit` must be a merge commit (i.e. either an auto merge itself, or a rollup merge).
+/// - this function is quite slow / wasteful, especially if `commit` is old. (this is fine for our
+///   usecase since we call this rarely and only on newly created commits)
+async fn get_auto_merge_for(
+    github: &GithubClient,
+    commit: GithubCommit,
+) -> anyhow::Result<GithubCommit> {
+    let is_bors = |c: &GithubCommit| c.commit.author.name.as_deref() == Some("bors");
+    let is_auto = |c: &GithubCommit| is_bors(c) && c.commit.message.starts_with("Auto merge of");
+    let is_rollup = |c: &GithubCommit| c.commit.message.starts_with("Rollup merge of");
+
+    if is_auto(&commit) {
+        Ok(commit)
+    } else if is_rollup(&commit) {
+        let rlr = github.repository("rust-lang/rust").await?;
+
+        // Gets all commits from the original `commit` (exclusive) till main (inclusive)
+        //
+        // This gets us way too many commits, but I don't see any better way to do this:
+        // - Filtering by author=bors on GH API side doesn't work because `commit` isn't authored by
+        //   bors and `github_commits_in_range` requires start to be in the filters.
+        // - Getting the children is not an operation accessible in the API.
+        // - We don't know where the auto merge is, other than it's between `commit` and `main`,
+        //   and that it's a descendant of `commit`...
+        let commits = rlr
+            .github_commits_in_range(github, &commit.sha, "main")
+            .await?;
+
+        // Filter to auto merges and reverse (the last auto merge is the oldest one and therefore
+        // is the one that should contain the rollup)
+        for auto_merge in commits.into_iter().filter(is_auto).rev() {
+            let mut current = auto_merge.clone();
+
+            // For auto-merges the second parent is the rollup merge,
+            // but for rollup merges the first parent is the previous rollup merge...
+            //
+            // So just try both and check whichever is a rollup.
+            while let [a, b] = &current.parents[..]
+                && let Some(a) = github.rust_commit(&a.sha).await
+                && let Some(b) = github.rust_commit(&b.sha).await
+                && let a_is_rollup = is_rollup(&a)
+                && (a_is_rollup || is_rollup(&b))
+            {
+                current = if a_is_rollup { a } else { b };
+
+                // If one of `auto_merge`'s direct (rollup merge) ancestors is the commit we
+                // started with, the auto merge is the correct merge, return it.
+                if current.sha == commit.sha {
+                    return Ok(auto_merge);
+                }
+            }
+        }
+
+        bail!(
+            "couldn't find an auto merge containing rollup merge {}",
+            commit.sha
+        )
+    } else {
+        bail!(
+            "{} is neither an auot merge not a rollup merge",
+            commit.commit.tree.sha
+        )
+    }
+}
+
 async fn get_version_standalone(
     gh: &GithubClient,
     merge_sha: &str,
 ) -> anyhow::Result<Option<String>> {
+    // Get the literal contents of the `src/version` file in rust-lang/rust
+    // at the `merge_sha` commit.
     let resp = gh
         .raw()
         .get(format!(
