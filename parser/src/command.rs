@@ -84,88 +84,93 @@ impl<'a> Input<'a> {
         let tok = Tokenizer::new(&self.all[self.parsed..]);
         log::info!("identified potential command");
 
-        let mut success = vec![];
+        let mut parse_results = vec![];
 
         let original_tokenizer = tok.clone();
 
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             relabel::RelabelCommand::parse,
             Command::Relabel,
             &original_tokenizer,
         ));
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             assign::AssignCommand::parse,
             Command::Assign,
             &original_tokenizer,
         ));
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             note::NoteCommand::parse,
             Command::Note,
             &original_tokenizer,
         ));
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             concern::ConcernCommand::parse,
             Command::Concern,
             &original_tokenizer,
         ));
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             ping::PingCommand::parse,
             Command::Ping,
             &original_tokenizer,
         ));
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             nominate::NominateCommand::parse,
             Command::Nominate,
             &original_tokenizer,
         ));
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             prioritize::PrioritizeCommand::parse,
             Command::Prioritize,
             &original_tokenizer,
         ));
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             second::SecondCommand::parse,
             Command::Second,
             &original_tokenizer,
         ));
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             shortcut::ShortcutCommand::parse,
             Command::Shortcut,
             &original_tokenizer,
         ));
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             lock::LockCommand::parse,
             Command::Lock,
             &original_tokenizer,
         ));
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             close::CloseCommand::parse,
             Command::Close,
             &original_tokenizer,
         ));
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             transfer::TransferCommand::parse,
             Command::Transfer,
             &original_tokenizer,
         ));
-        success.extend(parse_single_command(
+        parse_results.extend(parse_single_command(
             merge::MergeCommand::parse,
             Command::Merge,
             &original_tokenizer,
         ));
 
+        let (mut successes, mut failures): (Vec<_>, Vec<_>) =
+            parse_results.into_iter().partition(|(_, cmd)| cmd.is_ok());
+
         assert!(
-            success.len() <= 1,
+            successes.len() <= 1,
             "succeeded parsing {:?} to multiple commands: {:?}",
             &self.all[self.parsed..],
-            success
+            successes
         );
 
-        let (mut tok, c) = success.pop()?;
-        // if we errored out while parsing the command do not move the input forwards
-        if c.is_ok() {
-            self.parsed += tok.position();
+        // If we errored out while parsing any command, do not move the input forwards
+        if let Some((_, cmd)) = failures.pop() {
+            return Some(cmd);
         }
+
+        let (mut tok, c) = successes.pop()?;
+        self.parsed += tok.position();
         Some(c)
     }
 
@@ -537,4 +542,18 @@ fn test_follow_commands() {
         ]))))
     );
     assert_eq!(input.next(), None);
+}
+
+// Invalid input that fails to be parsed by multiple command parsers.
+// In this case, we should not panic.
+// Reported in https://github.com/rust-lang/triagebot/issues/2563
+#[test]
+fn test_parse_multiple_invalid_commands() {
+    let input = vec![
+        0x75, 0x73, 0x7a, 0x40, 0x72, 0x75, 0xc5, 0xbf, 0x74, 0x62, 0x6f, 0x74, 0x00, 0x30, 0x00,
+        0x7f, 0x00, 0x22, 0x00, 0x62, 0x6f, 0x23, 0x74, 0x74, 0x20, 0x2b,
+    ];
+    let input = str::from_utf8(&input).unwrap();
+    let mut input = Input::new(input, vec!["rustbot"]);
+    while let Some(_) = input.next() {}
 }
