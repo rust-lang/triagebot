@@ -77,7 +77,9 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
     let mut errors = Vec::new();
 
     // Ignore comments made by triagebot itself
-    if event.comment_body().is_some() && event.user().login == ctx.username {
+    // We allow handling issue bodies, because sometimes triagebot opens PRs and we want to react to
+    // them.
+    if matches!(event, Event::IssueComment(_)) && event.user().login == ctx.username {
         return errors;
     }
 
