@@ -6,7 +6,10 @@ use crate::{
     config::MergeConfig,
     db::issue_data::IssueData,
     errors::user_error,
-    github::{Event, IssueCommentEvent, UserId as GitHubUserId, client::GraphQlErrors},
+    github::{
+        Event, IssueCommentEvent, UserId as GitHubUserId, client::GraphQlErrors,
+        queries::dismiss_reviews::GitHubOpinionatedReviewState,
+    },
     handlers::Context,
 };
 
@@ -113,6 +116,39 @@ async fn merge_pr_with_merge_queue(
     ctx: &Context,
     issue_comment: &IssueCommentEvent,
 ) -> anyhow::Result<()> {
+    // Let's fetch the opinionated reviews of the PR (aka the last review of each users
+    // with write permissions)
+    let mut opinionated_reviews = ctx
+        .github
+        .opinionated_reviews(
+            &issue_comment.issue.repository().organization,
+            &issue_comment.issue.repository().repository,
+            issue_comment.issue.number,
+        )
+        .await
+        .context("failed to fetch the opinionated reviews")?;
+
+    tracing::info!("pr opinionated reviews: {:?}", &opinionated_reviews);
+
+    // Only keep the requested changes reviews, only those one are blocking
+    opinionated_reviews.retain(|r| r.state == GitHubOpinionatedReviewState::ChangesRequested);
+
+    // Dimiss the blocking reviews (otherwise the PR will never be merged without manual actions
+    // on the blocking reviews).
+    if !opinionated_reviews.is_empty() {
+        let msg = format!("Approved by {}", &issue_comment.comment.user.login);
+
+        futures::future::try_join_all(
+            opinionated_reviews
+                .iter()
+                .map(|r| ctx.github.dismiss_review(&r.id, &msg)),
+        )
+        .await
+        .context("failed to dismiss the outstanding reviews")?;
+    }
+
+    // Fetch the PR details, in particular the mergeable status (which could have been
+    // modified by the dismiss of the outstanding reviews above).
     let pr = ctx
         .github
         .pull_request(issue_comment.issue.repository(), issue_comment.issue.number)
