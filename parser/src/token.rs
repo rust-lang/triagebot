@@ -43,6 +43,15 @@ pub struct Tokenizer<'a> {
     end_of_input_emitted: bool,
 }
 
+#[macro_export]
+macro_rules! skippable_tokens {
+    ($tokenizer:expr => $pat:pat) => {
+        if let Some($pat | Token::Word("please")) = $tokenizer.peek_token()? {
+            $tokenizer.next_token()?;
+        }
+    };
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ErrorKind {
     UnterminatedString,

@@ -10,6 +10,7 @@
 //! ```
 
 use crate::error::Error;
+use crate::skippable_tokens;
 use crate::token::{Token, Tokenizer};
 use std::fmt;
 
@@ -64,9 +65,8 @@ impl AssignCommand {
                     username: user[1..].to_owned(),
                 }));
             }
-            if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
-                toks.next_token()?;
-            }
+
+            skippable_tokens!(toks => Token::Dot | Token::EndOfLine);
             *input = toks;
             Ok(Some(AssignCommand::Claim))
         } else if let Some(Token::Word("assign")) = toks.peek_token()? {
@@ -84,16 +84,14 @@ impl AssignCommand {
             }
         } else if let Some(Token::Word("release-assignment" | "unclaim")) = toks.peek_token()? {
             toks.next_token()?;
-            if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
-                toks.next_token()?;
-            }
+
+            skippable_tokens!(toks => Token::Dot | Token::EndOfLine);
             *input = toks;
             Ok(Some(AssignCommand::ReleaseAssignment))
         } else if let Some(Token::Word("reroll")) = toks.peek_token()? {
             toks.next_token()?;
-            if let Some(Token::Dot | Token::EndOfLine) = toks.peek_token()? {
-                toks.next_token()?;
-            }
+
+            skippable_tokens!(toks => Token::Dot | Token::EndOfLine);
             *input = toks;
             Ok(Some(AssignCommand::Reroll))
         } else {
@@ -239,5 +237,10 @@ mod tests {
     #[test]
     fn unclaim() {
         assert_eq!(parse("unclaim"), Ok(Some(AssignCommand::ReleaseAssignment)));
+    }
+
+    #[test]
+    fn polite() {
+        assert_eq!(parse("claim please"), Ok(Some(AssignCommand::Claim)),);
     }
 }
