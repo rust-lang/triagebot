@@ -211,6 +211,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
                 .layer(RateLimitLayer::new(2, Duration::from_secs(60))),
         );
 
+    // When adding routes, consider mentioning them in `templates/index.txt` as well.
     let protected = Router::new()
         .route(
             "/gha-logs/{owner}/{repo}/{log-id}",
@@ -247,7 +248,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         ));
 
     let app = Router::new()
-        .route("/", get(|| async { "Triagebot is awaiting triage." }))
+        .route("/", get(include_str!("../templates/index.txt")))
         .route(
             "/robots.txt",
             get(|| async { "User-Agent: *\nDisallow: /\n" }),
