@@ -286,6 +286,12 @@ pub(super) async fn handle_input(
                 }
             }
 
+            if label_config.resolve_on_remove
+                && matches!(input.notification_type, NotificationType::Unlabeled)
+            {
+                ctx.zulip.resolve_topic(config.zulip_stream, &topic).await?;
+            }
+
             if msgs_send > 0
                 && let Some(github_comment) = &github_comment
             {
@@ -363,6 +369,7 @@ fn close_messages_uses_success_when_set() {
         messages_on_close_success: vec!["success".to_string()],
         messages_on_reopen: vec![],
         required_labels: vec![],
+        resolve_on_remove: false,
     };
 
     assert_eq!(
