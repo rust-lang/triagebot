@@ -800,30 +800,6 @@ impl Issue {
         client.json::<Vec<Comment>>(client.get(comments_url)).await
     }
 
-    pub async fn edit_comment(
-        &self,
-        client: &GithubClient,
-        id: u64,
-        new_body: &str,
-    ) -> anyhow::Result<Comment> {
-        let comment_url = self
-            .repository()
-            .url(client, ["issues", "comments", num!(id)]);
-        #[derive(serde::Serialize)]
-        struct NewComment<'a> {
-            body: &'a str,
-        }
-        let comment = client
-            .json(
-                client
-                    .patch(comment_url)
-                    .json(&NewComment { body: new_body }),
-            )
-            .await
-            .context("failed to edit comment")?;
-        Ok(comment)
-    }
-
     pub async fn post_comment(&self, client: &GithubClient, body: &str) -> anyhow::Result<Comment> {
         #[derive(serde::Serialize)]
         struct PostComment<'a> {
