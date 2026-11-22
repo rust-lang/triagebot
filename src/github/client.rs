@@ -8,14 +8,18 @@ use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use reqwest::{Client, Request, RequestBuilder, Response, StatusCode};
 use secrecy::{ExposeSecret, SecretString};
 use std::fmt::Debug;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tracing as log;
 use url::Url;
 
-use bytes::Bytes;
-
 use crate::jobs::Job;
 use crate::utils::UrlExt;
+use bytes::Bytes;
+use chrono::{DateTime, Utc};
+use http::HeaderValue;
+use octocrab::Octocrab;
+use octocrab::models::InstallationId;
 
 // TODO: Update to "2026-03-10" and see what breaks
 // current version 2022-11-28 (supported until March 2028)
@@ -23,15 +27,47 @@ use crate::utils::UrlExt;
 // see: https://docs.github.com/rest/about-the-rest-api/api-versions?apiVersion=2026-03-10
 const GITHUB_API_VERSION: &str = "2022-11-28";
 
+const TRIAGEBOT_USER_AGENT: &str = "rust-lang-triagebot";
+
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
-pub fn default_token_from_env() -> SecretString {
-    std::env::var("GITHUB_TOKEN")
-        // kept for retrocompatibility but usage is discouraged and will be deprecated
-        .or_else(|_| std::env::var("GITHUB_API_TOKEN"))
-        .or_else(|_| get_token_from_git_config())
-        .expect("could not find token in GITHUB_TOKEN, GITHUB_API_TOKEN or .gitconfig/github.oath-token")
-        .into()
+pub fn default_auth_from_env() -> GithubAuth {
+    match (
+        std::env::var("GITHUB_APP_ID"),
+        std::env::var("GITHUB_APP_PRIVATE_KEY"),
+        std::env::var("GITHUB_APP_INSTALLATION_ID"),
+    ) {
+        (Ok(app_id), Ok(private_key), Ok(installation_id)) => {
+            let app_id: u64 = app_id.parse().expect("GITHUB_APP_ID must be a number");
+            let installation_id: u64 = installation_id
+                .parse()
+                .expect("GITHUB_APP_INSTALLATION_ID must be a number");
+            let key = jsonwebtoken::EncodingKey::from_rsa_pem(private_key.as_bytes())
+                .expect("GITHUB_APP_PRIVATE_KEY must be a valid RSA PEM key");
+            tracing::info!(
+                "Using GitHub App (app={app_id}, installation={installation_id}) for GitHub authentication"
+            );
+
+            GithubAuth::App {
+                app_auth: octocrab::auth::AppAuth {
+                    app_id: octocrab::models::AppId(app_id),
+                    key,
+                },
+                installation_id: InstallationId::from(installation_id),
+                token_cache: Arc::new(std::sync::RwLock::new(None)),
+            }
+        }
+        _ => {
+            let pat_token = std::env::var("GITHUB_TOKEN")
+                // kept for retrocompatibility but usage is discouraged and will be deprecated
+                .or_else(|_| std::env::var("GITHUB_API_TOKEN"))
+                .or_else(|_| get_token_from_git_config())
+                .expect("could not find token in GITHUB_TOKEN, GITHUB_API_TOKEN or .gitconfig/github.oath-token")
+                .into();
+            tracing::info!("Using PAT token for GitHub authentication");
+            GithubAuth::Pat { token: pat_token }
+        }
+    }
 }
 
 fn get_token_from_git_config() -> anyhow::Result<String> {
@@ -47,9 +83,42 @@ fn get_token_from_git_config() -> anyhow::Result<String> {
     Ok(git_token)
 }
 
+/// Cached GitHub App installation access token with its expiry time.
+pub struct CachedInstallationToken {
+    token: SecretString,
+    expires_at: DateTime<Utc>,
+}
+
+/// Authentication mechanism for the GitHub API.
+#[derive(Clone)]
+pub enum GithubAuth {
+    /// Classic Personal Access Token (PAT) authentication.
+    /// Useful for local testing.
+    Pat { token: SecretString },
+    /// GitHub App authentication using app ID and private key.
+    /// Generates JWTs to obtain short-lived installation access tokens.
+    App {
+        app_auth: octocrab::auth::AppAuth,
+        installation_id: InstallationId,
+        token_cache: Arc<std::sync::RwLock<Option<CachedInstallationToken>>>,
+    },
+}
+
+pub(crate) struct RequestToken(SecretString);
+
+impl RequestToken {
+    fn auth_header(&self) -> reqwest::header::HeaderValue {
+        let mut header =
+            reqwest::header::HeaderValue::from_str(&format!("token {}", self.0.expose_secret()))
+                .unwrap();
+        header.set_sensitive(true);
+        header
+    }
+}
+
 #[derive(Clone)]
 pub struct GithubClient {
-    token: SecretString,
+    auth: GithubAuth,
     client: Client,
     api_url: Url,
     graphql_url: Url,
@@ -73,10 +142,10 @@ pub struct RateLimit {
 }
 
 impl GithubClient {
-    pub fn new(token: SecretString, api_url: Url, graphql_url: Url, raw_url: Url) -> Self {
+    pub fn new(auth: GithubAuth, api_url: Url, graphql_url: Url, raw_url: Url) -> Self {
         GithubClient {
             client: Client::new(),
-            token,
+            auth,
             api_url,
             graphql_url,
             raw_url,
@@ -86,7 +155,7 @@ impl GithubClient {
 
     pub fn new_from_env() -> Self {
         Self::new(
-            default_token_from_env(),
+            default_auth_from_env(),
             Url::parse(
                 &std::env::var("GITHUB_API_URL")
                     .unwrap_or_else(|_| "https://api.github.com".to_string()),
@@ -103,6 +172,101 @@ impl GithubClient {
             )
             .expect("couldn't parse GITHUB_RAW_URL"),
         )
+    }
+
+    /// Ensures that a valid installation token is present for App auth.
+    /// No-op for PAT auth.
+    ///
+    /// Fetches a new installation token if the cache is empty or the token
+    /// is about to expire (within 5 minutes).
+    pub(crate) async fn ensure_app_token(&self) -> anyhow::Result<RequestToken> {
+        match &self.auth {
+            GithubAuth::Pat { token } => Ok(RequestToken(token.clone())),
+            GithubAuth::App {
+                app_auth,
+                installation_id,
+                token_cache,
+            } => {
+                // Cached token is still valid at least for 5+ minutes
+                if let Some(existing_token) = token_cache
+                    .read()
+                    .expect("token cache lock poisoned")
+                    .as_ref()
+                    .filter(|cached| cached.expires_at - Utc::now() >= chrono::Duration::minutes(5))
+                {
+                    return Ok(RequestToken(existing_token.token.clone()));
+                }
+
+                // Cached token is not valid, we need to get a new one
+                let url = self.api_url_with_segments(&[
+                    "app",
+                    "installations",
+                    &installation_id.to_string(),
+                    "access_tokens",
+                ]);
+                let jwt = app_auth
+                    .generate_bearer_token()
+                    .context("failed to generate GitHub App JWT")?;
+                let mut auth_header = HeaderValue::from_str(&format!("Bearer {jwt}"))?;
+                auth_header.set_sensitive(true);
+                let resp = self
+                    .client
+                    .post(url)
+                    .header(USER_AGENT, TRIAGEBOT_USER_AGENT)
+                    .header(AUTHORIZATION, auth_header)
+                    .header("Accept", "application/vnd.github+json")
+                    .send()
+                    .await
+                    .context("failed to request installation token")?
+                    .error_for_status()
+                    .context("GitHub rejected installation token request")?;
+
+                #[derive(serde::Deserialize)]
+                struct InstallationTokenResponse {
+                    token: String,
+                    expires_at: DateTime<Utc>,
+                }
+                let body: InstallationTokenResponse = resp
+                    .json()
+                    .await
+                    .context("failed to parse installation token response")?;
+
+                let token = SecretString::from(body.token.clone());
+                {
+                    let mut cache = token_cache.write().expect("token cache lock poisoned");
+                    *cache = Some(CachedInstallationToken {
+                        token,
+                        expires_at: body.expires_at,
+                    });
+                }
+                log::info!(
+                    "Refreshed GitHub App installation token, expires at {}",
+                    body.expires_at
+                );
+                Ok(RequestToken(SecretString::from(body.token)))
+            }
+        }
+    }
+
+    /// Create an Octocrab client with the current GitHub authentication.
+    pub fn create_octocrab_client(&self) -> anyhow::Result<Octocrab> {
+        let client = match &self.auth {
+            GithubAuth::Pat { token } => octocrab::OctocrabBuilder::new()
+                .personal_token(token.clone())
+                .build()?,
+            GithubAuth::App {
+                app_auth,
+                installation_id,
+                ..
+            } => {
+                // We want a client scoped to a specific app installation
+                octocrab::OctocrabBuilder::new()
+                    .app(app_auth.app_id, app_auth.key.clone())
+                    .build()?
+                    .installation(*installation_id)?
+            }
+        };
+        Ok(client)
     }
 
     pub(crate) fn api_url_with_segments<I>(&self, segments: I) -> Url
@@ -151,7 +315,10 @@ impl GithubClient {
 
         let req_dbg = format!("{req:?}");
 
+        let token = self.ensure_app_token().await?;
+
         let req = req
+            .configure(token)
             .build()
             .with_context(|| format!("building reqwest {req_dbg}"))?;
 
@@ -244,7 +411,7 @@ impl GithubClient {
         req: Request,
         sleep: Duration,
         remaining_attempts: u32,
-    ) -> BoxFuture<'_, Result<Response, reqwest::Error>> {
+    ) -> BoxFuture<'_, Result<Response, anyhow::Error>> {
         #[derive(Debug, serde::Deserialize)]
         struct RateLimitResponse {
             resources: RateLimitResources,
@@ -259,13 +426,15 @@ impl GithubClient {
         async move {
             tokio::time::sleep(sleep).await;
 
+            let token = self.ensure_app_token().await?;
+
             // check rate limit
             let rate_resp = self
                 .client
                 .execute(
                     self.client
                         .get(format!("{}/rate_limit", self.api_url))
-                        .configure(self)
+                        .configure(token)
                         .build()
                         .unwrap(),
                 )
@@ -315,27 +484,27 @@ impl GithubClient {
 
     pub fn get(&self, url: Url) -> RequestBuilder {
         log::trace!("get {:?}", url);
-        self.client.get(url).configure(self)
+        self.client.get(url)
     }
 
     pub fn patch(&self, url: Url) -> RequestBuilder {
         log::trace!("patch {:?}", url);
-        self.client.patch(url).configure(self)
+        self.client.patch(url)
     }
 
     pub fn delete(&self, url: Url) -> RequestBuilder {
         log::trace!("delete {:?}", url);
-        self.client.delete(url).configure(self)
+        self.client.delete(url)
     }
 
     pub fn post(&self, url: Url) -> RequestBuilder {
         log::trace!("post {:?}", url);
-        self.client.post(url).configure(self)
+        self.client.post(url)
     }
 
     pub fn put(&self, url: Url) -> RequestBuilder {
         log::trace!("put {:?}", url);
-        self.client.put(url).configure(self)
+        self.client.put(url)
     }
 
     /// Fetch current rate limit, remaining and used
@@ -433,20 +602,14 @@ impl std::fmt::Display for GraphQlErrors {
     }
 }
 
-trait RequestSend: Sized {
-    fn configure(self, g: &GithubClient) -> Self;
+pub(crate) trait RequestSend: Sized {
+    fn configure(self, token: RequestToken) -> Self;
 }
 
 impl RequestSend for RequestBuilder {
-    fn configure(self, g: &GithubClient) -> RequestBuilder {
-        let mut auth = reqwest::header::HeaderValue::from_maybe_shared(format!(
-            "token {}",
-            g.token.expose_secret()
-        ))
-        .unwrap();
-        auth.set_sensitive(true);
-        self.header(USER_AGENT, "rust-lang-triagebot")
-            .header(AUTHORIZATION, &auth)
+    fn configure(self, token: RequestToken) -> RequestBuilder {
+        self.header(USER_AGENT, TRIAGEBOT_USER_AGENT)
+            .header(AUTHORIZATION, token.auth_header())
             .header("X-GitHub-Api-Version", GITHUB_API_VERSION)
     }
 }
@@ -491,8 +654,10 @@ impl Job for GithubRateLimitLoggingJob {
 #[test]
 fn gh_api_version() {
     let c = GithubClient {
+        auth: GithubAuth::Pat {
+            token: Default::default(),
+        },
         client: Client::new(),
-        token: String::new().into(),
         api_url: Url::parse("https://api.github.com").unwrap(),
         graphql_url: Url::parse("https://api.github.com/graphql").unwrap(),
         raw_url: Url::parse("https://raw.githubusercontent.com").unwrap(),
@@ -501,7 +666,7 @@ fn gh_api_version() {
 
     let headers = c
         .get(Url::parse("http://www.example.com").unwrap())
-        .configure(&c)
+        .configure(RequestToken(SecretString::default()))
         .build()
         .unwrap();
     let headers = headers

@@ -44,10 +44,8 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
     let gh = github::GithubClient::new_from_env();
     let zulip = ZulipClient::new_from_env();
     let team_api = TeamClient::new_from_env();
-    let oc = octocrab::OctocrabBuilder::new()
-        .personal_token(github::default_token_from_env())
-        .build()
-        .expect("Failed to build octocrab.");
+
+    let oc = gh.create_octocrab_client()?;
 
     check_ongoing_service_maintenance();
 
