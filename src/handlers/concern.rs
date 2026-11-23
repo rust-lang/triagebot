@@ -95,15 +95,19 @@ pub(super) async fn handle_command(
                 });
             }
         }
-        ConcernCommand::Resolve { title } => concern_data
-            .concerns
-            .iter_mut()
-            .filter(|c| c.title == title)
-            .for_each(|c| {
+        ConcernCommand::Resolve { title } => {
+            let mut matches = concern_data
+                .concerns
+                .iter_mut()
+                .filter(|c| c.title.starts_with(&title));
+
+            // Only resolve a concern if there is no ambiguity
+            if let (Some(c), None) = (matches.next(), matches.next()) {
                 c.status = ConcernStatus::Resolved {
                     comment_url: comment_url.to_string(),
-                }
-            }),
+                };
+            }
+        }
     }
 
     // Create the new markdown content listing all the concerns
