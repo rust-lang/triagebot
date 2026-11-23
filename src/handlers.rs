@@ -47,7 +47,6 @@ mod review_submitted;
 pub mod rustc_commits;
 mod shortcut;
 mod transfer;
-pub mod types_planning_updates;
 mod undraft_comment;
 mod view_all_comments_link;
 
