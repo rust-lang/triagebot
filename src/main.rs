@@ -323,12 +323,16 @@ async fn block_if_github_ratelimit_too_low(
     req: Request<axum::body::Body>,
     next: Next,
 ) -> Response {
-    let Ok(rl) = ctx.github.rate_limit().await else {
-        return (
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Could not read GitHub rate limit",
-        )
-            .into_response();
+    let rl = match ctx.github.rate_limit().await {
+        Ok(rl) => rl,
+        Err(err) => {
+            tracing::error!("couldn't read GitHub rate limit: {err:?}");
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Could not read GitHub rate limit",
+            )
+                .into_response();
+        }
     };
 
     if rl.graphql.remaining < 750 || rl.core.remaining < 750 {

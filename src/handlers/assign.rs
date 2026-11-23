@@ -1420,7 +1420,7 @@ async fn find_reviewer_from_names(
         // Select a random reviewer from the filtered list
         let candidate = candidates
             .into_iter()
-            .choose(&mut rand::thread_rng())
+            .choose(&mut rand::rng())
             .expect("candidate_reviewers_from_names should return at least one entry");
         Ok(candidate.add_selection_step(SelectionStep::RandomlySelectedFrom(possible_candidates)))
     }

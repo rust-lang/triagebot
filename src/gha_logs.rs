@@ -179,7 +179,7 @@ pub async fn gha_logs(
         )
     };
 
-    let nonce = Uuid::new_v4().to_hyphenated().to_string();
+    let nonce = Uuid::new_v4().hyphenated().to_string();
     let sha = &*job.head_sha;
     let short_sha = &job.head_sha[..7];
 

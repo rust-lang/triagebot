@@ -2,7 +2,7 @@
 
 use crate::db::review_prefs::RotationMode;
 use crate::github::PullRequestNumber;
-use clap::{ColorChoice, Parser};
+use clap::Parser;
 use std::str::FromStr;
 
 /// Command sent in a DM with triagebot on Zulip.
@@ -308,7 +308,6 @@ pub fn parse_cli<'a, T: Parser, I: Iterator<Item = &'a str>>(input: I) -> anyhow
     let input = std::iter::once("triagebot").chain(input);
 
     let matches = T::command()
-        .color(ColorChoice::Never)
         // Allow title-case subcommands
         .mut_subcommands(allow_title_case)
         .try_get_matches_from(input)?;

@@ -2,9 +2,8 @@ use std::{fmt, sync::Arc};
 
 use anyhow::Context;
 use axum::{extract::State, response::IntoResponse};
-use axum_extra::extract::Host;
 use bytes::Bytes;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use hyper::HeaderMap;
 use hyper::StatusCode;
 use sha2::Sha256;
@@ -16,6 +15,7 @@ pub(crate) mod event;
 use crate::github::PullRequestDetails;
 use crate::handlers::HandlerError;
 use crate::interactions::ErrorComment;
+use crate::utils::Host;
 use event::*;
 
 /// The name of a webhook event.
@@ -173,7 +173,7 @@ pub async fn webhook(
         return (StatusCode::BAD_REQUEST, "Payload must be UTF-8").into_response();
     };
 
-    match process_payload(event, payload, &ctx, &host).await {
+    match process_payload(event, payload, &ctx, host.as_str()).await {
         Ok(true) => ("processed request",).into_response(),
         Ok(false) => ("ignored request",).into_response(),
         Err(err) => {
