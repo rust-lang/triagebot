@@ -1,19 +1,19 @@
 use super::Changelog;
 use anyhow::Context as _;
 use comrak::{
-    Arena, ComrakOptions,
+    Arena, Options,
     nodes::{AstNode, NodeHeading, NodeValue},
 };
 use std::collections::HashMap;
 
 pub(super) struct RustcFormat<'a> {
-    arena: &'a Arena<AstNode<'a>>,
+    arena: &'a Arena<'a>,
     current_h1: Option<String>,
     result: Changelog,
 }
 
 impl<'a> RustcFormat<'a> {
-    pub(super) fn new(arena: &'a Arena<AstNode<'a>>) -> Self {
+    pub(super) fn new(arena: &'a Arena<'a>) -> Self {
         RustcFormat {
             arena,
             current_h1: None,
@@ -24,7 +24,7 @@ impl<'a> RustcFormat<'a> {
     }
 
     pub(super) fn parse(mut self, content: &str) -> anyhow::Result<Changelog> {
-        let ast = comrak::parse_document(self.arena, content, &ComrakOptions::default());
+        let ast = comrak::parse_document(self.arena, content, &Options::default());
 
         let mut section_ast = Vec::new();
         for child in ast.children() {

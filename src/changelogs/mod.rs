@@ -1,6 +1,6 @@
 mod rustc;
 
-use comrak::{Arena, ComrakOptions, ComrakRenderOptions, nodes::AstNode};
+use comrak::{Arena, Options, nodes::AstNode, options::Render as RenderOptions};
 use std::collections::HashMap;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, serde::Deserialize)]
@@ -26,21 +26,21 @@ impl Changelog {
 }
 
 fn render_for_github_releases<'a>(document: &'a AstNode<'a>) -> anyhow::Result<String> {
-    let mut content = Vec::new();
+    let mut content = String::new();
     comrak::format_commonmark(
         document,
-        &ComrakOptions {
-            render: ComrakRenderOptions {
+        &Options {
+            render: RenderOptions {
                 // Prevent column width line breaks from appearing in the generated release
                 // notes. GitHub Releases insert <br>s for every line break in the markdown,
                 // mangling the output.
                 width: usize::MAX,
 
-                ..ComrakRenderOptions::default()
+                ..RenderOptions::default()
             },
-            ..ComrakOptions::default()
+            ..Options::default()
         },
         &mut content,
     )?;
-    Ok(String::from_utf8(content)?)
+    Ok(content)
 }

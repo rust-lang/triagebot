@@ -3,8 +3,8 @@ use anyhow::Context as _;
 use chrono::Utc;
 use native_tls::{Certificate, TlsConnector};
 use postgres_native_tls::MakeTlsConnector;
-use std::sync::{Arc, LazyLock, Mutex};
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use std::sync::{Arc, Mutex};
+use tokio::sync::{OnceCell, OwnedSemaphorePermit, Semaphore};
 use tokio_postgres::Client as DbClient;
 
 pub mod issue_data;
@@ -15,11 +15,7 @@ pub mod users;
 
 const CERT_URL: &str = "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem";
 
-static CERTIFICATE_PEMS: LazyLock<Vec<u8>> = LazyLock::new(|| {
-    let client = reqwest::blocking::Client::new();
-    let resp = client.get(CERT_URL).send().expect("failed to get RDS cert");
-    resp.bytes().expect("failed to get RDS cert body").to_vec()
-});
+static CERTIFICATE_PEMS: OnceCell<Vec<u8>> = OnceCell::const_new();
 
 pub struct ClientPool {
     connections: Arc<Mutex<Vec<tokio_postgres::Client>>>,
@@ -92,7 +88,8 @@ impl ClientPool {
 pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client> {
     if db_url.contains("rds.amazonaws.com") {
         let mut builder = TlsConnector::builder();
-        for cert in make_certificates() {
+        let certificates = make_certificates().await;
+        for cert in certificates {
             builder.add_root_certificate(cert);
         }
         let connector = builder.build().context("built TlsConnector")?;
@@ -130,11 +127,23 @@ pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client>
     }
 }
 
-fn make_certificates() -> Vec<Certificate> {
+async fn make_certificates() -> Vec<Certificate> {
     use x509_cert::der::EncodePem;
     use x509_cert::der::pem::LineEnding;
 
-    let certs = x509_cert::Certificate::load_pem_chain(&CERTIFICATE_PEMS[..]).unwrap();
+    let certificate_pems = CERTIFICATE_PEMS
+        .get_or_init(|| async {
+            reqwest::get(CERT_URL)
+                .await
+                .expect("failed to get RDS cert")
+                .bytes()
+                .await
+                .expect("failed to get RDS cert body")
+                .to_vec()
+        })
+        .await;
+
+    let certs = x509_cert::Certificate::load_pem_chain(&certificate_pems[..]).unwrap();
     certs
         .into_iter()
         .map(|cert| Certificate::from_pem(cert.to_pem(LineEnding::LF).unwrap().as_bytes()).unwrap())
@@ -143,9 +152,9 @@ fn make_certificates() -> Vec<Certificate> {
 
 // Makes sure we successfully parse the RDS certificates and load them into native-tls compatible
 // format.
-#[test]
-fn cert() {
-    make_certificates();
+#[tokio::test]
+async fn cert() {
+    make_certificates().await;
 }
 
 pub async fn run_migrations(client: &mut DbClient) -> anyhow::Result<()> {
