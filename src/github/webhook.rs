@@ -15,7 +15,6 @@ pub(crate) mod event;
 use crate::github::PullRequestDetails;
 use crate::handlers::HandlerError;
 use crate::interactions::ErrorComment;
-use crate::utils::Host;
 use event::*;
 
 /// The name of a webhook event.
@@ -122,7 +121,6 @@ fn deserialize_payload<T: serde::de::DeserializeOwned>(v: &str) -> anyhow::Resul
 pub async fn webhook(
     headers: HeaderMap,
     State(ctx): State<Arc<crate::handlers::Context>>,
-    Host(host): Host,
     body: Bytes,
 ) -> axum::response::Response {
     // Extract X-GitHub-Event header
@@ -173,7 +171,7 @@ pub async fn webhook(
         return (StatusCode::BAD_REQUEST, "Payload must be UTF-8").into_response();
     };
 
-    match process_payload(event, payload, &ctx, host.as_str()).await {
+    match process_payload(event, payload, &ctx).await {
         Ok(true) => ("processed request",).into_response(),
         Ok(false) => ("ignored request",).into_response(),
         Err(err) => {
@@ -188,7 +186,6 @@ async fn process_payload(
     event: EventName,
     payload: &str,
     ctx: &crate::handlers::Context,
-    host: &str,
 ) -> anyhow::Result<bool> {
     let event = match event {
         EventName::PullRequestReview => {
@@ -285,7 +282,7 @@ async fn process_payload(
             return Ok(false);
         }
     };
-    let errors = crate::handlers::handle(ctx, host, &event).await;
+    let errors = crate::handlers::handle(ctx, &event).await;
     let mut other_error = false;
     let mut message = String::new();
     for err in errors {

@@ -110,11 +110,16 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             .context("database migrations")?;
     }
 
+    let host_url = std::env::var("TRIAGEBOT_URL")
+        .unwrap_or_else(|_| "https://triage.rust-lang.org".to_string());
+    let host_url = host_url.trim_suffix("/").to_string();
+
     let ctx = Arc::new(Context {
         username: std::env::var("TRIAGEBOT_USERNAME").or_else(|err| match err {
             std::env::VarError::NotPresent => Ok("rustbot".to_owned()),
             err => Err(err),
         })?,
+        host_url,
         db: pool,
         github: gh,
         team: team_api,

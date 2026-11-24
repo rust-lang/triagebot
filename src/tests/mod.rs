@@ -82,6 +82,7 @@ impl TestContext {
             github,
             zulip,
             team: team_api,
+            host_url: "https://triagebot.com".to_string(),
             crates_io: CratesIoApi::new(),
             db: pool,
             username: "triagebot-test".to_string(),

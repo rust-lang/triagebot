@@ -54,6 +54,9 @@ pub struct Context {
     pub github: GithubClient,
     pub zulip: ZulipClient,
     pub team: TeamClient,
+    /// URL under which triagebot is accessible.
+    /// Does not contain / at its end.
+    pub host_url: String,
     pub crates_io: CratesIoApi,
     pub db: crate::db::ClientPool,
     pub username: String,
@@ -68,7 +71,7 @@ pub struct Context {
     clippy::collapsible_if,
     reason = "we check the preconditions in the outer if, and handle errors inside"
 )]
-pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerError> {
+pub async fn handle(ctx: &Context, event: &Event) -> Vec<HandlerError> {
     let config = config::get(&ctx.github, event.repo()).await;
     if let Err(e) = &config {
         log::warn!("configuration error {}: {e}", event.repo().full_name);
@@ -121,7 +124,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
 
     let check_commits = async {
         if let Ok(check_commits_config) = &config {
-            check_commits::handle(ctx, host, event, check_commits_config)
+            check_commits::handle(ctx, event, check_commits_config)
                 .await
                 .map_err(|e| HandlerError::Other(e.context("check_commits handler failed")))
         } else {
@@ -165,7 +168,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
             .ok()
             .and_then(|c| c.view_all_comments_link.as_ref())
         {
-            view_all_comments_link::handle(ctx, event, host, view_all_comments_config)
+            view_all_comments_link::handle(ctx, event, view_all_comments_config)
                 .await
                 .map_err(|e| HandlerError::Other(e.context("view_all_comments handler failed")))
         } else {
@@ -214,7 +217,7 @@ pub async fn handle(ctx: &Context, host: &str, event: &Event) -> Vec<HandlerErro
             .ok()
             .and_then(|c| c.review_changes_since.as_ref())
         {
-            review_changes_since::handle(ctx, host, event, review_changes_since_config)
+            review_changes_since::handle(ctx, event, review_changes_since_config)
                 .await
                 .map_err(|e| HandlerError::Other(e.context("review_changes_since handler failed")))
         } else {

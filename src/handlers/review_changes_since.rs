@@ -31,7 +31,6 @@ impl cache::EstimatedSize for ReviewBodyState {
 /// a link our `gh-changes-since` endpoint to view changes since this review.
 pub(crate) async fn handle(
     ctx: &Context,
-    host: &str,
     event: &Event,
     _config: &ReviewChangesSinceConfig,
 ) -> anyhow::Result<()> {
@@ -66,7 +65,10 @@ pub(crate) async fn handle(
         let base = &event.issue.base.as_ref().context("no base")?.sha;
         let head = &event.issue.head.as_ref().context("no head")?.sha;
 
-        let link = format!("https://{host}/gh-changes-since/{issue_repo}/{pr_num}/{base}..{head}");
+        let link = format!(
+            "{}/gh-changes-since/{issue_repo}/{pr_num}/{base}..{head}",
+            ctx.host_url
+        );
 
         if event.comment.pr_review_state.is_some() {
             // this is a review (not a review comment)

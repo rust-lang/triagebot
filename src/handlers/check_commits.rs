@@ -76,12 +76,7 @@ fn should_handle_event(event: &IssuesEvent) -> bool {
     false
 }
 
-pub(super) async fn handle(
-    ctx: &Context,
-    host: &str,
-    event: &Event,
-    config: &Config,
-) -> anyhow::Result<()> {
+pub(super) async fn handle(ctx: &Context, event: &Event, config: &Config) -> anyhow::Result<()> {
     let Event::Issue(event) = event else {
         return Ok(());
     };
@@ -169,7 +164,7 @@ pub(super) async fn handle(
     // Check if this is a force-push with rebase and if it is emit comment
     // with link to our range-diff viewer.
     if let Some(range_diff) = &config.range_diff {
-        force_push_range_diff::handle_event(ctx, host, range_diff, event, compare).await?;
+        force_push_range_diff::handle_event(ctx, range_diff, event, compare).await?;
     }
 
     // Check if the `triagebot.toml` config is valid

@@ -22,7 +22,6 @@ struct RangeDiffLinkState {
 
 pub(super) async fn handle_event(
     ctx: &Context,
-    host: &str,
     config: &RangeDiffConfig,
     event: &IssuesEvent,
     compare_after: &GithubCompare,
@@ -53,7 +52,7 @@ pub(super) async fn handle_event(
         .context("failed to get the before compare")?;
 
     if let Some(message) = changed_base_commit(
-        host,
+        &ctx.host_url,
         &issue_repo,
         base,
         &compare_before,
@@ -69,7 +68,7 @@ pub(super) async fn handle_event(
 }
 
 fn changed_base_commit(
-    host: &str,
+    host_url: &str,
     issue_repo: &IssueRepository,
     base: &CommitBase,
     compare_before: &GithubCompare,
@@ -82,18 +81,12 @@ fn changed_base_commit(
         return None;
     }
 
-    let protocol = if host.starts_with("localhost:") {
-        "http"
-    } else {
-        "https"
-    };
-
     let branch = &base.git_ref;
     let oldbase = &compare_before.merge_base_commit.sha;
     let newbase = &compare_after.merge_base_commit.sha;
 
     let message = format!(
-        r"This PR was rebased onto a different {branch} commit. Here's a [range-diff]({protocol}://{host}/gh-range-diff/{issue_repo}/{oldbase}..{oldhead}/{newbase}..{newhead}) highlighting what actually changed.
+        r"This PR was rebased onto a different {branch} commit. Here's a [range-diff]({host_url}/gh-range-diff/{issue_repo}/{oldbase}..{oldhead}/{newbase}..{newhead}) highlighting what actually changed.
 
 *Rebasing is a normal part of keeping PRs up to date, so no action is needed—this note is just to help reviewers.*"
     );
@@ -148,7 +141,7 @@ mod tests {
     fn unchanged_base_commit() {
         assert_eq!(
             changed_base_commit(
-                "mytriagebot.com",
+                "https://mytriagebot.com",
                 &crate::github::IssueRepository {
                     organization: "rust-lang".to_string(),
                     repository: "rust".to_string()
@@ -187,7 +180,7 @@ mod tests {
     fn changed_base_commit_() {
         assert_eq!(
             changed_base_commit(
-                "mytriagebot.com",
+                "https://mytriagebot.com",
                 &crate::github::IssueRepository {
                     organization: "rust-lang".to_string(),
                     repository: "rust".to_string()

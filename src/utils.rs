@@ -1,10 +1,7 @@
 use crate::handlers::Context;
 
 use anyhow::Context as _;
-use axum::{
-    extract::FromRequestParts,
-    http::{HeaderValue, StatusCode, header::HOST, request::Parts, uri::Authority},
-};
+use axum::http::HeaderValue;
 use globset::GlobSet;
 use hyper::{
     HeaderMap,
@@ -93,31 +90,6 @@ pub(crate) fn immutable_headers(content_type: &'static str) -> HeaderMap {
     headers.insert(CONTENT_TYPE, HeaderValue::from_static(content_type));
 
     headers
-}
-
-/// Small `Host` header extractor
-// Avoid pulling 5+ dependencies
-pub struct Host(pub Authority);
-
-impl<S: Send + Sync> FromRequestParts<S> for Host {
-    type Rejection = (StatusCode, &'static str);
-
-    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Self::Rejection> {
-        // HTTP/2 sends `:authority`, which hyper puts in the URI.
-        if let Some(authority) = parts.uri.authority() {
-            Ok(Host(authority.clone()))
-        }
-        // HTTP/1.1 sends `Host`
-        else if let Some(raw) = parts.headers.get(HOST)
-            && let Ok(s) = raw.to_str()
-        {
-            s.parse::<Authority>()
-                .map(Host)
-                .map_err(|_| (StatusCode::BAD_REQUEST, "invalid Host header"))
-        } else {
-            Err((StatusCode::BAD_REQUEST, "missing Host header"))
-        }
-    }
 }
 
 pub(crate) struct EscapeHref<'a>(pub &'a str);
