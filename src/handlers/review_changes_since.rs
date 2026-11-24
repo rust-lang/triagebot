@@ -66,7 +66,7 @@ pub(crate) async fn handle(
         let head = &event.issue.head.as_ref().context("no head")?.sha;
 
         let link = format!(
-            "{}/gh-changes-since/{issue_repo}/{pr_num}/{base}..{head}",
+            "{}gh-changes-since/{issue_repo}/{pr_num}/{base}..{head}",
             ctx.host_url
         );
 

@@ -38,6 +38,7 @@ use triagebot::jobs::{
 use triagebot::team_data::TeamClient;
 use triagebot::zulip::client::ZulipClient;
 use triagebot::{db, github};
+use url::Url;
 
 const BANNED_USER_AGENTS: &[&str] = &["meta-webindexer/1.1", "Nexus 5 Build/MRA58N"];
 
@@ -112,7 +113,7 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
 
     let host_url = std::env::var("TRIAGEBOT_URL")
         .unwrap_or_else(|_| "https://triage.rust-lang.org".to_string());
-    let host_url = host_url.trim_suffix("/").to_string();
+    let host_url = Url::parse(&host_url).expect("URL passed in TRIAGEBOT_URL is invalid");
 
     let ctx = Arc::new(Context {
         username: std::env::var("TRIAGEBOT_USERNAME").or_else(|err| match err {

@@ -1,5 +1,3 @@
-use anyhow::Context as _;
-
 use crate::config::RangeDiffConfig;
 use crate::db::issue_data::IssueData;
 use crate::github::CommitBase;
@@ -9,6 +7,8 @@ use crate::github::IssueRepository;
 use crate::github::IssuesEvent;
 use crate::github::ReportedContentClassifiers;
 use crate::handlers::Context;
+use anyhow::Context as _;
+use url::Url;
 
 /// Key for the state in the database
 const RANGE_DIFF_LINK_KEY: &str = "range-diff-link";
@@ -68,7 +68,7 @@ pub(super) async fn handle_event(
 }
 
 fn changed_base_commit(
-    host_url: &str,
+    host_url: &Url,
     issue_repo: &IssueRepository,
     base: &CommitBase,
     compare_before: &GithubCompare,
@@ -86,7 +86,7 @@ fn changed_base_commit(
     let newbase = &compare_after.merge_base_commit.sha;
 
     let message = format!(
-        r"This PR was rebased onto a different {branch} commit. Here's a [range-diff]({host_url}/gh-range-diff/{issue_repo}/{oldbase}..{oldhead}/{newbase}..{newhead}) highlighting what actually changed.
+        r"This PR was rebased onto a different {branch} commit. Here's a [range-diff]({host_url}gh-range-diff/{issue_repo}/{oldbase}..{oldhead}/{newbase}..{newhead}) highlighting what actually changed.
 
 *Rebasing is a normal part of keeping PRs up to date, so no action is needed—this note is just to help reviewers.*"
     );
@@ -141,7 +141,7 @@ mod tests {
     fn unchanged_base_commit() {
         assert_eq!(
             changed_base_commit(
-                "https://mytriagebot.com",
+                &"https://mytriagebot.com".parse().unwrap(),
                 &crate::github::IssueRepository {
                     organization: "rust-lang".to_string(),
                     repository: "rust".to_string()
@@ -180,7 +180,7 @@ mod tests {
     fn changed_base_commit_() {
         assert_eq!(
             changed_base_commit(
-                "https://mytriagebot.com",
+                &"https://mytriagebot.com".parse().unwrap(),
                 &crate::github::IssueRepository {
                     organization: "rust-lang".to_string(),
                     repository: "rust".to_string()

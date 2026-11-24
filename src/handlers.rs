@@ -11,6 +11,7 @@ use parser::command::{Command, Input, assign::AssignCommand};
 use std::fmt;
 use std::sync::Arc;
 use tracing as log;
+use url::Url;
 
 mod assign;
 mod autolabel;
@@ -55,8 +56,7 @@ pub struct Context {
     pub zulip: ZulipClient,
     pub team: TeamClient,
     /// URL under which triagebot is accessible.
-    /// Does not contain / at its end.
-    pub host_url: String,
+    pub host_url: Url,
     pub crates_io: CratesIoApi,
     pub db: crate::db::ClientPool,
     pub username: String,

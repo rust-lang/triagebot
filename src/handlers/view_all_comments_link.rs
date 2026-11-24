@@ -55,7 +55,7 @@ async fn add_comments_link(ctx: &Context, issue: &Issue) -> anyhow::Result<()> {
     let issue_number = issue.number;
 
     let mut comments_link = format!(
-        "*[View all comments]({}/gh-comments/{repo_name}/{type_}/{issue_number})*",
+        "*[View all comments]({}gh-comments/{repo_name}/{type_}/{issue_number})*",
         ctx.host_url
     );
 
