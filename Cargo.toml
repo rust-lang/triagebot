@@ -9,7 +9,7 @@ edition = "2024"
 [dependencies]
 serde_json = "1"
 dotenvy = "0.15"
-reqwest = { version = "0.13", default-features = false, features = ["native-tls", "json", "stream", "query", "form"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "stream", "query", "form"] }
 regex = "1"
 anyhow = "1"
 hex = "0.4"
@@ -27,11 +27,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5.8"
 chrono = { version = "0.4.38", features = ["serde"] }
 tokio-postgres = { version = "0.7.2", features = ["with-chrono-0_4", "with-serde_json-1", "with-uuid-1"] }
-postgres-native-tls = "0.5.0"
-native-tls = "0.2"
-x509-cert = { version = "0.3.0", features = ["pem"] }
+tokio-postgres-rustls = "0.13"
+rustls = { version = "0.23", default-features = false, features = ["std", "aws-lc-rs", "tls12"] }
+rustls-pki-types = "1.16"
 serde_path_to_error = "0.1.2"
-octocrab = { version = "0.54", default-features = false, features = ["opentls", "default-client", "follow-redirect", "retry", "timeout", "tracing", "stream"] }
+octocrab = { version = "0.54", default-features = false, features = ["rustls", "rustls-aws-lc-rs", "default-client", "follow-redirect", "retry", "timeout", "tracing", "stream"] }
 comrak = { version = "0.55", default-features = false }
 itertools = "0.15.0"
 tower = { version = "0.5", features = ["util", "limit", "buffer", "load-shed"] }

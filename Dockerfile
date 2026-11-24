@@ -16,7 +16,6 @@ RUN apt-get update -y && \
       ca-certificates \
       libc6-dev \
       make \
-      libssl-dev \
       pkg-config \
       git \
       cmake \
