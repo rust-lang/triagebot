@@ -1,11 +1,12 @@
 use crate::{db::jobs::*, handlers::Context, jobs::jobs};
 use anyhow::Context as _;
 use chrono::Utc;
-use native_tls::{Certificate, TlsConnector};
-use postgres_native_tls::MakeTlsConnector;
+use rustls::pki_types::{CertificateDer, pem::PemObject};
+use rustls::{ClientConfig, RootCertStore};
 use std::sync::{Arc, Mutex};
 use tokio::sync::{OnceCell, OwnedSemaphorePermit, Semaphore};
 use tokio_postgres::Client as DbClient;
+use tokio_postgres_rustls::MakeRustlsConnect;
 
 pub mod issue_data;
 pub mod jobs;
@@ -87,13 +88,16 @@ impl ClientPool {
 
 pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client> {
     if db_url.contains("rds.amazonaws.com") {
-        let mut builder = TlsConnector::builder();
-        let certificates = make_certificates().await;
-        for cert in certificates {
-            builder.add_root_certificate(cert);
-        }
-        let connector = builder.build().context("built TlsConnector")?;
-        let connector = MakeTlsConnector::new(connector);
+        let certs = make_certificates().await;
+
+        let mut roots = RootCertStore::empty();
+        roots.add_parsable_certificates(certs);
+
+        let connector = MakeRustlsConnect::new(
+            ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth(),
+        );
 
         let (db_client, connection) = match tokio_postgres::connect(db_url, connector).await {
             Ok(v) => v,
@@ -127,10 +131,7 @@ pub async fn make_client(db_url: &str) -> anyhow::Result<tokio_postgres::Client>
     }
 }
 
-async fn make_certificates() -> Vec<Certificate> {
-    use x509_cert::der::EncodePem;
-    use x509_cert::der::pem::LineEnding;
-
+async fn make_certificates() -> Vec<CertificateDer<'static>> {
     let certificate_pems = CERTIFICATE_PEMS
         .get_or_init(|| async {
             reqwest::get(CERT_URL)
@@ -143,11 +144,9 @@ async fn make_certificates() -> Vec<Certificate> {
         })
         .await;
 
-    let certs = x509_cert::Certificate::load_pem_chain(&certificate_pems[..]).unwrap();
-    certs
-        .into_iter()
-        .map(|cert| Certificate::from_pem(cert.to_pem(LineEnding::LF).unwrap().as_bytes()).unwrap())
-        .collect()
+    CertificateDer::pem_slice_iter(&certificate_pems[..])
+        .collect::<Result<Vec<_>, _>>()
+        .expect("failed to parse RDS certs")
 }
 
 // Makes sure we successfully parse the RDS certificates and load them into native-tls compatible
