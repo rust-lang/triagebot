@@ -12,14 +12,12 @@ use axum::{BoxError, Router};
 use hyper::{Request, StatusCode};
 use std::time::Duration;
 use std::{env, net::SocketAddr, sync::Arc};
+use throttle_kit::{ClientIpConfig, InMemoryBackend, IpNet, Quota};
 use tokio::sync::RwLock;
 use tokio::{task, time};
 use tower::ServiceBuilder;
 use tower::buffer::BufferLayer;
 use tower::limit::RateLimitLayer;
-use tower_governor::GovernorLayer;
-use tower_governor::governor::GovernorConfigBuilder;
-use tower_governor::key_extractor::SmartIpKeyExtractor;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::compression::CompressionLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
@@ -136,25 +134,25 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
         spawn_job_runner(ctx.clone());
     }
 
-    let ratelimit_config = if !std::env::var("DISABLE_RATE_LIMIT").is_ok_and(|value| value == "1") {
+    let quota_config = if !std::env::var("DISABLE_RATE_LIMIT").is_ok_and(|value| value == "1") {
         // Allow bursts with up to 3 requests per IP address
         // and replenishes one element every 15 seconds
-        GovernorConfigBuilder::default()
-            .per_second(15)
-            .burst_size(3)
-            .key_extractor(SmartIpKeyExtractor)
-            .use_headers()
-            .finish()
-            .context("fail to create the governor configuration")?
+        Quota::from_parts(Duration::from_secs(15), 3)
     } else {
         tracing::warn!("Endpoints ratelimits are disabled");
-        GovernorConfigBuilder::default()
-            .per_second(1)
-            .burst_size(300)
-            .key_extractor(SmartIpKeyExtractor)
-            .use_headers()
-            .finish()
-            .context("fail to create the governor configuration")?
+        // Effectively unlimited: one token per millisecond, burst of 10k.
+        Quota::from_parts(Duration::from_millis(1), 10_000)
+    };
+    let clientip_config = ClientIpConfig {
+        // The trusted proxy IPs from which the requests are coming from.
+        //
+        // In our case we use AWS load balancer/proxy.
+        // cf. https://github.com/rust-lang/triagebot/pull/2576#discussion_r4704697073
+        trusted_proxies: vec![IpNet::parse("10.0.0.0/16")?],
+        // We only have one proxy, so no need to hop.
+        num_trusted_hops: 0,
+        // AWS load balencer uses `X-Forwarded-For`.
+        trusted_header: Some(HeaderName::from_static("x-forwarded-for")),
     };
 
     const REQUEST_ID_HEADER: &str = "x-request-id";
@@ -240,7 +238,10 @@ async fn run_server(addr: SocketAddr) -> anyhow::Result<()> {
             "/gh-comments/{owner}/{repo}/pull/{pr}",
             get(triagebot::gh_comments::gh_comments),
         )
-        .layer(GovernorLayer::new(ratelimit_config))
+        .layer(
+            throttle_kit::RateLimitLayer::new(quota_config, InMemoryBackend::new())
+                .with_client_ip(clientip_config),
+        )
         .layer(middleware::from_fn_with_state(
             ctx.clone(),
             block_if_github_ratelimit_too_low,
