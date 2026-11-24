@@ -252,6 +252,7 @@ pub enum IssuesAction {
     Dequeued,
     Typed,
     Untyped,
+    StatusChanged,
 }
 
 #[derive(Debug, serde::Deserialize)]
