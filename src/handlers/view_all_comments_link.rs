@@ -77,19 +77,28 @@ async fn add_comments_link(ctx: &Context, issue: &Issue) -> anyhow::Result<()> {
             format!("<!-- homu-ignore:start -->\n{comments_link}\n<!-- homu-ignore:end -->");
     }
 
-    if !issue.body.contains("[View all comments](") {
+    pin_to_body(ctx, issue, comments_link).await?;
+
+    Ok(())
+}
+
+pub async fn pin_to_body(
+    ctx: &Context,
+    issue: &Issue,
+    message_to_pin: String,
+) -> anyhow::Result<()> {
+    Ok(if !issue.body.contains(&message_to_pin) {
         // add comments link to the start of the body
-        let new_body = format!("{comments_link}\n\n{}", issue.body);
+        let new_body = format!("{message_to_pin}\n\n{}", issue.body);
 
         tracing::info!(
-            r#"adding "View all comments" link to {repo_name}#{}"#,
+            r#"Pinning message "{message_to_pin}" to {}#{}"#,
+            issue.repository().full_repo_name(),
             issue.number
         );
         issue
             .edit_body(&ctx.github, &new_body)
             .await
             .context("failed to edit the body")?;
-    }
-
-    Ok(())
+    })
 }

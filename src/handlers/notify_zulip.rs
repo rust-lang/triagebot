@@ -4,6 +4,7 @@
 //!
 
 use crate::github::GitHubUser;
+use crate::handlers::view_all_comments_link::pin_to_body;
 use crate::zulip::api::Recipient;
 use crate::zulip::{Mention, PingMode, format_zulip_mention};
 use crate::{
@@ -303,6 +304,13 @@ pub(super) async fn handle_input(
                 if let Err(err) = event.issue.post_comment(&ctx.github, &github_comment).await {
                     log::error!("failed to post github notification comment {err}");
                 }
+
+                if config.pin_to_issue {
+                    let message = format!("[See Zulip thread]({})", recipient.url(&ctx.zulip));
+                    if let Err(err) = pin_to_body(ctx, &event.issue, message).await {
+                        log::error!("failed to edit PR description: {err}");
+                    }
+                }
             }
         }
     }
@@ -372,6 +380,7 @@ fn close_messages_uses_success_when_set() {
         messages_on_reopen: vec![],
         required_labels: vec![],
         excluded_labels: vec![],
+        pin_to_issue: false,
     };
 
     assert_eq!(
