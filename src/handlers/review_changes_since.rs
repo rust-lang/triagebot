@@ -1,15 +1,16 @@
 use std::sync::{Arc, LazyLock};
 
-use anyhow::Context as _;
-use async_trait::async_trait;
-use chrono::{Duration, Utc};
-
+use crate::utils::UrlExt;
 use crate::{
     cache,
     config::ReviewChangesSinceConfig,
     github::{Comment, Event, Issue, IssueCommentAction, IssueCommentEvent, IssueRepository},
     handlers::Context,
 };
+use anyhow::Context as _;
+use async_trait::async_trait;
+use chrono::{Duration, Utc};
+use url::Url;
 
 static REVIEW_BODY_CACHE: LazyLock<
     tokio::sync::Mutex<cache::LeastRecentlyUsedCache<String, ReviewBodyState>>,
@@ -31,7 +32,6 @@ impl cache::EstimatedSize for ReviewBodyState {
 /// a link our `gh-changes-since` endpoint to view changes since this review.
 pub(crate) async fn handle(
     ctx: &Context,
-    host: &str,
     event: &Event,
     _config: &ReviewChangesSinceConfig,
 ) -> anyhow::Result<()> {
@@ -66,7 +66,13 @@ pub(crate) async fn handle(
         let base = &event.issue.base.as_ref().context("no base")?.sha;
         let head = &event.issue.head.as_ref().context("no head")?.sha;
 
-        let link = format!("https://{host}/gh-changes-since/{issue_repo}/{pr_num}/{base}..{head}");
+        let link = ctx.host_url.with_segments(&[
+            "gh-changes-since",
+            &issue_repo.organization,
+            &issue_repo.repository,
+            &pr_num.to_string(),
+            &format!("{base}..{head}"),
+        ]);
 
         if event.comment.pr_review_state.is_some() {
             // this is a review (not a review comment)
@@ -173,7 +179,7 @@ struct AddReviewChangesSinceLinkJobArgs {
     repo: String,
     pr_id: u64,
     review_comment_id: u64,
-    link: String,
+    link: Url,
 }
 
 pub(crate) struct AddReviewChangesSinceLinkJob;

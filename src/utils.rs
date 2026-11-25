@@ -1,10 +1,7 @@
 use crate::handlers::Context;
 
 use anyhow::Context as _;
-use axum::{
-    extract::FromRequestParts,
-    http::{HeaderValue, StatusCode, header::HOST, request::Parts, uri::Authority},
-};
+use axum::http::HeaderValue;
 use globset::GlobSet;
 use hyper::{
     HeaderMap,
@@ -12,6 +9,7 @@ use hyper::{
 };
 use pulldown_cmark_escape::FmtWriter;
 use std::{borrow::Cow, path::Path};
+use url::Url;
 
 /// Format a number in a temporary buffer
 #[macro_export]
@@ -93,31 +91,6 @@ pub(crate) fn immutable_headers(content_type: &'static str) -> HeaderMap {
     headers.insert(CONTENT_TYPE, HeaderValue::from_static(content_type));
 
     headers
-}
-
-/// Small `Host` header extractor
-// Avoid pulling 5+ dependencies
-pub struct Host(pub Authority);
-
-impl<S: Send + Sync> FromRequestParts<S> for Host {
-    type Rejection = (StatusCode, &'static str);
-
-    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Self::Rejection> {
-        // HTTP/2 sends `:authority`, which hyper puts in the URI.
-        if let Some(authority) = parts.uri.authority() {
-            Ok(Host(authority.clone()))
-        }
-        // HTTP/1.1 sends `Host`
-        else if let Some(raw) = parts.headers.get(HOST)
-            && let Ok(s) = raw.to_str()
-        {
-            s.parse::<Authority>()
-                .map(Host)
-                .map_err(|_| (StatusCode::BAD_REQUEST, "invalid Host header"))
-        } else {
-            Err((StatusCode::BAD_REQUEST, "missing Host header"))
-        }
-    }
 }
 
 pub(crate) struct EscapeHref<'a>(pub &'a str);
@@ -237,6 +210,35 @@ impl ModifiedPathMatcher {
 pub(crate) enum PathMatcherError {
     Glob(globset::Error),
     NonRelativePath,
+}
+
+pub(crate) trait UrlExt {
+    fn with_segments<I>(&self, segments: I) -> Url
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>;
+}
+
+impl UrlExt for Url {
+    /// Add the given segments to this URL.
+    ///
+    /// ```ignore
+    /// let url: url::Url = "https://foo.com/baz".parse().unwrap();
+    /// assert_eq!(url.with_segments(&["a", "b"]).as_str(), "https://foo.com/baz/a/b");
+    /// ```
+    fn with_segments<I>(&self, segments: I) -> Url
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        let mut url = self.clone();
+        {
+            let mut url_segments = url.path_segments_mut().expect("URL does not have a base");
+            // `pop_if_empty` removes trailing / if there is nothing after it
+            url_segments.pop_if_empty().extend(segments);
+        }
+        url
+    }
 }
 
 #[cfg(test)]

@@ -1,5 +1,6 @@
 use anyhow::Context as _;
 
+use crate::utils::UrlExt;
 use crate::{
     config::ViewAllCommentsLinkConfig,
     github::{Event, Issue},
@@ -18,7 +19,6 @@ const DEFAULT_THRESHOLD: u32 = 20;
 pub(super) async fn handle(
     ctx: &Context,
     event: &Event,
-    host: &str,
     config: &ViewAllCommentsLinkConfig,
 ) -> anyhow::Result<()> {
     let Some(issue) = event.issue() else {
@@ -47,16 +47,23 @@ pub(super) async fn handle(
         return Ok(());
     }
 
-    add_comments_link(ctx, issue, host).await
+    add_comments_link(ctx, issue).await
 }
 
-async fn add_comments_link(ctx: &Context, issue: &Issue, host: &str) -> anyhow::Result<()> {
+async fn add_comments_link(ctx: &Context, issue: &Issue) -> anyhow::Result<()> {
     let repo_name = issue.repository().full_repo_name();
     let type_ = if issue.is_pr() { "pull" } else { "issues" };
     let issue_number = issue.number;
 
     let mut comments_link = format!(
-        "*[View all comments](https://{host}/gh-comments/{repo_name}/{type_}/{issue_number})*"
+        "*[View all comments]({})*",
+        ctx.host_url.with_segments(&[
+            "gh-comments",
+            &issue.repository().organization,
+            &issue.repository().repository,
+            type_,
+            &issue_number.to_string()
+        ])
     );
 
     // This repository has bors which inlines the PR body by default into merge commits, and we
