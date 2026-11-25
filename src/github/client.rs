@@ -15,6 +15,7 @@ use url::Url;
 use bytes::Bytes;
 
 use crate::jobs::Job;
+use crate::utils::UrlExt;
 
 // TODO: Update to "2026-03-10" and see what breaks
 // current version 2022-11-28 (supported until March 2028)
@@ -109,12 +110,7 @@ impl GithubClient {
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
-        let mut url = self.api_url.clone();
-        url.path_segments_mut()
-            .expect("api_url should have a base")
-            .pop_if_empty()
-            .extend(segments);
-        url
+        self.api_url.with_segments(segments)
     }
 
     pub(crate) fn raw_url_with_segments<I>(&self, segments: I) -> Url
@@ -122,12 +118,7 @@ impl GithubClient {
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
-        let mut url = self.raw_url.clone();
-        url.path_segments_mut()
-            .expect("raw_url should have a base")
-            .pop_if_empty()
-            .extend(segments);
-        url
+        self.raw_url.with_segments(segments)
     }
 
     /// Sets whether or not this client will retry when it hits GitHub's rate limit.

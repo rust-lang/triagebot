@@ -1,3 +1,4 @@
+use crate::utils::UrlExt;
 use reqwest::Client;
 use reqwest::header;
 use reqwest::header::{HeaderMap, HeaderValue};
@@ -88,13 +89,8 @@ impl CratesIoApi {
     /// We construct the URL from individual segments, to avoid possible "URL injection" by using
     /// segments like "../<path>", which could overwrite other segments of the URL.
     fn url(&self, segments: &[&str]) -> Url {
-        let mut url = Url::parse(CRATES_IO_BASE_URL).unwrap();
-        {
-            let mut url_segments = url.path_segments_mut().unwrap();
-            for segment in segments {
-                url_segments.push(segment);
-            }
-        }
-        url
+        Url::parse(CRATES_IO_BASE_URL)
+            .unwrap()
+            .with_segments(segments)
     }
 }

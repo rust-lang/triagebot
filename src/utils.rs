@@ -9,6 +9,7 @@ use hyper::{
 };
 use pulldown_cmark_escape::FmtWriter;
 use std::{borrow::Cow, path::Path};
+use url::Url;
 
 /// Format a number in a temporary buffer
 #[macro_export]
@@ -209,6 +210,35 @@ impl ModifiedPathMatcher {
 pub(crate) enum PathMatcherError {
     Glob(globset::Error),
     NonRelativePath,
+}
+
+pub(crate) trait UrlExt {
+    fn with_segments<I>(&self, segments: I) -> Url
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>;
+}
+
+impl UrlExt for Url {
+    /// Add the given segments to this URL.
+    ///
+    /// ```ignore
+    /// let url: url::Url = "https://foo.com/baz".parse().unwrap();
+    /// assert_eq!(url.with_segments(&["a", "b"]).as_str(), "https://foo.com/baz/a/b");
+    /// ```
+    fn with_segments<I>(&self, segments: I) -> Url
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        let mut url = self.clone();
+        {
+            let mut url_segments = url.path_segments_mut().expect("URL does not have a base");
+            // `pop_if_empty` removes trailing / if there is nothing after it
+            url_segments.pop_if_empty().extend(segments);
+        }
+        url
+    }
 }
 
 #[cfg(test)]

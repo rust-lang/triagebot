@@ -22,7 +22,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use url::Url;
 
 use crate::github::{FileDiff, GithubCommit, GithubCompare};
-use crate::utils::{EscapeHref, EscapeHtmlBodyText, is_known_and_public_repo};
+use crate::utils::{EscapeHref, EscapeHtmlBodyText, UrlExt, is_known_and_public_repo};
 use crate::{errors::AppError, github, handlers::Context};
 
 mod bidi_unicode;
@@ -425,27 +425,15 @@ fn process_old_new(
             };
 
             let before_href = {
-                let mut url = Url::parse("https://github.com").expect("valid base github.com url");
-                {
-                    let mut segments = url.path_segments_mut().unwrap();
-                    segments.push(owner);
-                    segments.push(repo);
-                    segments.push("blob");
-                    segments.push(oldheadref);
-                    segments.push(filename);
-                }
+                let url = Url::parse("https://github.com")
+                    .expect("valid base github.com url")
+                    .with_segments(&[owner, repo, "blob", oldheadref, filename]);
                 EscapeHref(&url.to_string())
             };
             let after_href = {
-                let mut url = Url::parse("https://github.com").expect("valid base github.com url");
-                {
-                    let mut segments = url.path_segments_mut().unwrap();
-                    segments.push(owner);
-                    segments.push(repo);
-                    segments.push("blob");
-                    segments.push(newheadref);
-                    segments.push(filename);
-                }
+                let url = Url::parse("https://github.com")
+                    .expect("valid base github.com url")
+                    .with_segments(&[owner, repo, "blob", newheadref, filename]);
                 EscapeHref(&url.to_string())
             };
             let escaped_filename = EscapeHtmlBodyText(filename);
@@ -1010,12 +998,9 @@ fn a_github_compare(class: &str, owner: &str, repo: &str, base: &str, head: &str
         sha.chars().all(|c| c.is_ascii_hexdigit()) && sha.len() >= 6
     }
 
-    let mut url = Url::parse(&format!("https://github.com/{owner}/{repo}/compare"))
-        .expect("valid compare url");
-    {
-        let mut segments = url.path_segments_mut().unwrap();
-        segments.push(&format!("{base}...{head}"));
-    }
+    let url = Url::parse(&format!("https://github.com/{owner}/{repo}/compare"))
+        .expect("valid compare url")
+        .with_segments(&[&format!("{base}...{head}")]);
 
     format!(
         r#"<a href="{href}" class="compare {class}">{base_6}..{head_6}</a>"#,

@@ -7,6 +7,7 @@ use crate::github::IssueRepository;
 use crate::github::IssuesEvent;
 use crate::github::ReportedContentClassifiers;
 use crate::handlers::Context;
+use crate::utils::UrlExt;
 use anyhow::Context as _;
 use url::Url;
 
@@ -68,7 +69,7 @@ pub(super) async fn handle_event(
 }
 
 fn changed_base_commit(
-    host_url: &Url,
+    url: &Url,
     issue_repo: &IssueRepository,
     base: &CommitBase,
     compare_before: &GithubCompare,
@@ -85,8 +86,15 @@ fn changed_base_commit(
     let oldbase = &compare_before.merge_base_commit.sha;
     let newbase = &compare_after.merge_base_commit.sha;
 
+    let url = url.with_segments(&[
+        "gh-range-diff",
+        &issue_repo.organization,
+        &issue_repo.repository,
+        &format!("{oldbase}..{oldhead}"),
+        &format!("{newbase}..{newhead}"),
+    ]);
     let message = format!(
-        r"This PR was rebased onto a different {branch} commit. Here's a [range-diff]({host_url}gh-range-diff/{issue_repo}/{oldbase}..{oldhead}/{newbase}..{newhead}) highlighting what actually changed.
+        r"This PR was rebased onto a different {branch} commit. Here's a [range-diff]({url}) highlighting what actually changed.
 
 *Rebasing is a normal part of keeping PRs up to date, so no action is needed—this note is just to help reviewers.*"
     );
