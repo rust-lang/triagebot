@@ -6,7 +6,7 @@ pub(crate) mod repos;
 pub(crate) mod utils;
 mod webhook;
 
-pub use client::{GithubClient, default_auth_from_env};
+pub use client::GithubClient;
 pub use issue::*;
 pub use repos::*;
 pub use webhook::event::*;
