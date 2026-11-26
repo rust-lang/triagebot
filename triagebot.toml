@@ -7,6 +7,9 @@ allow-unauthenticated = ["bug", "invalid", "question", "enhancement"]
 
 [lock]
 
+[merge]
+type = "merge-queue"
+
 [concern]
 labels = ["has-concerns"]
 
