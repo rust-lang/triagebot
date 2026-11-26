@@ -196,7 +196,7 @@ impl GithubClient {
         const MAX_LOG_SIZE_IN_MB: usize = 50 * 1024 * 1024; // 50 Mib
 
         let url = repo.url(self, ["actions", "jobs", num!(job_id), "logs"]);
-        let (body, _req_dbg) = self
+        let body = self
             .send_req_with_limit(self.get(url), MAX_LOG_SIZE_IN_MB)
             .await
             .context("failed to retrieve job logs")?;
@@ -239,7 +239,7 @@ impl GithubClient {
                 let req = self
                     .get(url)
                     .header("Accept", "application/vnd.github.diff");
-                let (body, _req_dbg) = self
+                let body = self
                     .send_req_with_limit(req, 16 * 1024 * 1024)
                     .await
                     .context("failed to get .diff")?;
@@ -460,7 +460,7 @@ impl GithubClient {
             })))
             .await;
         match resp {
-            Ok((body, _dbg)) => {
+            Ok(body) => {
                 let milestone = serde_json::from_slice(&body)?;
                 log::trace!("Created milestone: {milestone:?}");
                 return Ok(milestone);

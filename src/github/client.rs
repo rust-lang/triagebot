@@ -297,7 +297,7 @@ impl GithubClient {
         &self.client
     }
 
-    pub async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<(Bytes, String)> {
+    pub async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<Bytes> {
         const MAX_DEFAULT_RESPONSE_SIZE: usize = 8 * 1024 * 1024; // 8 Mib
 
         self.send_req_with_limit(req, MAX_DEFAULT_RESPONSE_SIZE)
@@ -308,7 +308,7 @@ impl GithubClient {
         &self,
         req: RequestBuilder,
         max_response_size: usize,
-    ) -> anyhow::Result<(Bytes, String)> {
+    ) -> anyhow::Result<Bytes> {
         const MAX_ATTEMPTS: u32 = 2;
 
         log::debug!("send_req with {:?}", req);
@@ -378,7 +378,7 @@ impl GithubClient {
             });
         }
 
-        Ok((body, req_dbg))
+        Ok(body)
     }
 
     async fn needs_retry(resp: &Response) -> Option<Duration> {
@@ -478,7 +478,7 @@ impl GithubClient {
     where
         T: serde::de::DeserializeOwned,
     {
-        let (body, _req_dbg) = self.send_req(req).await?;
+        let body = self.send_req(req).await?;
         Ok(serde_json::from_slice(&body)?)
     }
 
@@ -539,7 +539,7 @@ impl GithubClient {
         // response size than for normal REST Api response.
         const MAX_DEFAULT_GRAPH_QL_RESPONSE_SIZE: usize = 10 * 1024 * 1024;
 
-        let (body, _dbg) = self
+        let body = self
             .send_req_with_limit(
                 self.post(self.graphql_url.clone())
                     .json(&serde_json::json!({
