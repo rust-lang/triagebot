@@ -5,6 +5,7 @@ use super::{FileDiff, GithubClient, GithubCompare, Issue, IssueRepository, PullR
 
 use super::UserId;
 
+use crate::github::client::RequestSend;
 use anyhow::Context;
 use bytes::Bytes;
 use chrono::{DateTime, FixedOffset};
@@ -318,9 +319,12 @@ impl GithubClient {
         let url = self.raw_url_with_segments([org, repo, branch, path]);
         let req = self.get(url.clone());
         let req_dbg = format!("{req:?}");
+        let token = self.ensure_app_token().await?;
         let req = req
+            .configure(token)
             .build()
             .with_context(|| format!("failed to build request {req_dbg:?}"))?;
+
         let resp: Response = self.raw().execute(req).await.context(req_dbg.clone())?;
         let status = resp.status();
 

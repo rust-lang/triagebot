@@ -31,9 +31,10 @@ tokio-postgres-rustls = "0.13"
 rustls = { version = "0.23", default-features = false, features = ["std", "aws-lc-rs", "tls12"] }
 rustls-pki-types = "1.16"
 serde_path_to_error = "0.1.2"
-octocrab = { version = "0.54", default-features = false, features = ["rustls", "rustls-aws-lc-rs", "default-client", "follow-redirect", "retry", "timeout", "tracing", "stream"] }
+octocrab = { version = "0.54", default-features = false, features = ["rustls", "rustls-aws-lc-rs", "default-client", "follow-redirect", "retry", "timeout", "tracing", "stream", "jwt", "jwt-aws-lc-rs"] }
 comrak = { version = "0.55", default-features = false }
 itertools = "0.15.0"
+jsonwebtoken = "10"
 tower = { version = "0.5", features = ["util", "limit", "buffer", "load-shed"] }
 tower-http = { version = "0.6.11", features = ["compression-br", "compression-gzip", "request-id", "catch-panic", "trace"] }
 rand = "0.10.3"
