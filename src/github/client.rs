@@ -13,6 +13,7 @@ use std::time::{Duration, SystemTime};
 use tracing as log;
 use url::Url;
 
+use crate::github::REPOS_WITH_GITHUB_APP_AUTH;
 use crate::jobs::Job;
 use crate::utils::UrlExt;
 use bytes::Bytes;
@@ -118,9 +119,6 @@ impl RequestToken {
     }
 }
 
-/// GitHub repositories that opt into using triagebot with GitHub App authentication.
-const REPOS_WITH_GITHUB_AUTH: &[&str] = &["rust-lang/triagebot", "rust-lang/bors-kindergarten"];
-
 #[derive(Clone)]
 pub struct GithubClient {
     auth: GithubAuth,
@@ -203,7 +201,7 @@ impl GithubClient {
             .map(|r| r.url().clone());
         let auth = match (url, &self.app_auth) {
             (Some(url), Some(auth)) => {
-                let repo = REPOS_WITH_GITHUB_AUTH
+                let repo = REPOS_WITH_GITHUB_APP_AUTH
                     .iter()
                     .find(|r| url.path().contains(*r));
                 if let Some(_repo) = repo {
@@ -694,6 +692,7 @@ fn gh_api_version() {
         auth: GithubAuth::Pat {
             token: Default::default(),
         },
+        app_auth: None,
         client: Client::new(),
         api_url: Url::parse("https://api.github.com").unwrap(),
         graphql_url: Url::parse("https://api.github.com/graphql").unwrap(),

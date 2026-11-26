@@ -14,3 +14,6 @@ pub use webhook::webhook;
 
 pub type UserId = u64;
 pub type PullRequestNumber = u64;
+
+/// GitHub repositories that opt into using triagebot with GitHub App authentication.
+const REPOS_WITH_GITHUB_APP_AUTH: &[&str] = &["rust-lang/triagebot", "rust-lang/bors-kindergarten"];
