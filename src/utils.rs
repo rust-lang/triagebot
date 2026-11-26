@@ -1,4 +1,4 @@
-use crate::handlers::Context;
+use crate::{github::Issue, handlers::Context};
 
 use anyhow::Context as _;
 use axum::http::HeaderValue;
@@ -79,6 +79,27 @@ pub(crate) async fn is_issue_under_rfcbot_fcp(
     }
 
     false
+}
+
+pub async fn pin_to_body(
+    ctx: &Context,
+    issue: &Issue,
+    message_to_pin: String,
+) -> anyhow::Result<()> {
+    Ok(if !issue.body.contains(&message_to_pin) {
+        // add comments link to the start of the body
+        let new_body = format!("{message_to_pin}\n\n{}", issue.body);
+
+        tracing::info!(
+            r#"Pinning message "{message_to_pin}" to {}#{}"#,
+            issue.repository().full_repo_name(),
+            issue.number
+        );
+        issue
+            .edit_body(&ctx.github, &new_body)
+            .await
+            .context("failed to edit the body")?;
+    })
 }
 
 pub(crate) fn immutable_headers(content_type: &'static str) -> HeaderMap {
