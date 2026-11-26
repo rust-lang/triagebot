@@ -179,7 +179,7 @@ impl GithubClient {
     ///
     /// Fetches a new installation token if the cache is empty or the token
     /// is about to expire (within 5 minutes).
-    pub(crate) async fn ensure_app_token(&self) -> anyhow::Result<RequestToken> {
+    async fn ensure_app_token(&self) -> anyhow::Result<RequestToken> {
         match &self.auth {
             GithubAuth::Pat { token } => Ok(RequestToken(token.clone())),
             GithubAuth::App {
@@ -293,10 +293,7 @@ impl GithubClient {
         self.retry_rate_limit = retry;
     }
 
-    pub fn raw(&self) -> &Client {
-        &self.client
-    }
-
+    /// Send a request with the default response size limit.
     pub async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<Bytes> {
         const MAX_DEFAULT_RESPONSE_SIZE: usize = 8 * 1024 * 1024; // 8 Mib
 
@@ -304,6 +301,15 @@ impl GithubClient {
             .await
     }
 
+    /// Send a request without checking response size, and return the raw response.
+    /// The caller is responsible for checking whether the response was successful or not.
+    pub async fn send_req_raw(&self, req: RequestBuilder) -> anyhow::Result<Response> {
+        let token = self.ensure_app_token().await?;
+        let req = req.configure(token).build()?;
+        Ok(self.client.execute(req).await?)
+    }
+
+    /// Send a request with a custom response size limit.
     pub async fn send_req_with_limit(
         &self,
         req: RequestBuilder,
@@ -602,7 +608,7 @@ impl std::fmt::Display for GraphQlErrors {
     }
 }
 
-pub(crate) trait RequestSend: Sized {
+trait RequestSend: Sized {
     fn configure(self, token: RequestToken) -> Self;
 }
 
