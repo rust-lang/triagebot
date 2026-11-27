@@ -525,7 +525,7 @@ pub(crate) struct NotifyZulipLabelConfig {
     pub(crate) excluded_labels: Vec<String>,
     /// Whether to edit the PR's body, linking to the Zulip stream. The link text itself is customizable.
     #[serde(default)]
-    pub(crate) body_link_text: Option<String>,
+    pub(crate) github_body_link_text: Option<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, serde::Deserialize)]
@@ -1791,7 +1791,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
                 messages_on_reopen: vec![],
                 required_labels: vec![],
                 excluded_labels: vec![],
-                body_link_text: None,
+                github_body_link_text: None,
             }
         );
     }
@@ -1813,7 +1813,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
             message_on_reopen = "on reopen"
             required_labels = ["required-label"]
             excluded_labels = ["excluded-label"]
-            body_link_text = "See the Zulip notification!"
+            github_body_link_text = "See the Zulip notification!"
         "#;
         let config = toml::from_str::<Config>(&config).unwrap();
         let notify_zulip = config.notify_zulip.unwrap();
@@ -1832,7 +1832,7 @@ Multi text body with ${mcp_issue} and ${mcp_title}
                 messages_on_reopen: vec!["on reopen".to_string()],
                 required_labels: vec!["required-label".to_string()],
                 excluded_labels: vec!["excluded-label".to_string()],
-                body_link_text: Some("See the Zulip notification!".to_string()),
+                github_body_link_text: Some("See the Zulip notification!".to_string()),
             }
         );
     }

@@ -305,7 +305,7 @@ pub(super) async fn handle_input(
                     log::error!("failed to post github notification comment {err}");
                 }
 
-                if let Some(ref pin_message) = config.body_link_text {
+                if let Some(ref pin_message) = config.github_body_link_text {
                     let message = format!("[{pin_message}]({})", recipient.url(&ctx.zulip));
                     if let Err(err) = pin_to_body(ctx, &event.issue, message).await {
                         log::error!("failed to edit PR description: {err}");
@@ -380,7 +380,7 @@ fn close_messages_uses_success_when_set() {
         messages_on_reopen: vec![],
         required_labels: vec![],
         excluded_labels: vec![],
-        body_link_text: None,
+        github_body_link_text: None,
     };
 
     assert_eq!(
