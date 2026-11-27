@@ -1,6 +1,4 @@
-use anyhow::Context as _;
-
-use crate::utils::UrlExt;
+use crate::utils::{UrlExt, pin_to_body};
 use crate::{
     config::ViewAllCommentsLinkConfig,
     github::{Event, Issue},
@@ -77,19 +75,7 @@ async fn add_comments_link(ctx: &Context, issue: &Issue) -> anyhow::Result<()> {
             format!("<!-- homu-ignore:start -->\n{comments_link}\n<!-- homu-ignore:end -->");
     }
 
-    if !issue.body.contains("[View all comments](") {
-        // add comments link to the start of the body
-        let new_body = format!("{comments_link}\n\n{}", issue.body);
-
-        tracing::info!(
-            r#"adding "View all comments" link to {repo_name}#{}"#,
-            issue.number
-        );
-        issue
-            .edit_body(&ctx.github, &new_body)
-            .await
-            .context("failed to edit the body")?;
-    }
+    pin_to_body(ctx, issue, comments_link).await?;
 
     Ok(())
 }
