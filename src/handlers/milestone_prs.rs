@@ -72,12 +72,9 @@ async fn get_version_standalone(
     gh: &GithubClient,
     merge_sha: &str,
 ) -> anyhow::Result<Option<String>> {
+    let url = gh.raw_url_with_segments(&["rust-lang", "rust", merge_sha, "src", "version"]);
     let resp = gh
-        .raw()
-        .get(format!(
-            "https://raw.githubusercontent.com/rust-lang/rust/{merge_sha}/src/version"
-        ))
-        .send()
+        .send_req_raw(gh.get(url))
         .await
         .with_context(|| format!("retrieving src/version for {merge_sha}"))?;
 

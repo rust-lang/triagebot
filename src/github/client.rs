@@ -179,7 +179,7 @@ impl GithubClient {
     ///
     /// Fetches a new installation token if the cache is empty or the token
     /// is about to expire (within 5 minutes).
-    pub(crate) async fn ensure_app_token(&self) -> anyhow::Result<RequestToken> {
+    async fn ensure_app_token(&self) -> anyhow::Result<RequestToken> {
         match &self.auth {
             GithubAuth::Pat { token } => Ok(RequestToken(token.clone())),
             GithubAuth::App {
@@ -293,22 +293,28 @@ impl GithubClient {
         self.retry_rate_limit = retry;
     }
 
-    pub fn raw(&self) -> &Client {
-        &self.client
-    }
-
-    pub async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<(Bytes, String)> {
+    /// Send a request with the default response size limit.
+    pub async fn send_req(&self, req: RequestBuilder) -> anyhow::Result<Bytes> {
         const MAX_DEFAULT_RESPONSE_SIZE: usize = 8 * 1024 * 1024; // 8 Mib
 
         self.send_req_with_limit(req, MAX_DEFAULT_RESPONSE_SIZE)
             .await
     }
 
+    /// Send a request without checking response size, and return the raw response.
+    /// The caller is responsible for checking whether the response was successful or not.
+    pub async fn send_req_raw(&self, req: RequestBuilder) -> anyhow::Result<Response> {
+        let token = self.ensure_app_token().await?;
+        let req = req.configure(token).build()?;
+        Ok(self.client.execute(req).await?)
+    }
+
+    /// Send a request with a custom response size limit.
     pub async fn send_req_with_limit(
         &self,
         req: RequestBuilder,
         max_response_size: usize,
-    ) -> anyhow::Result<(Bytes, String)> {
+    ) -> anyhow::Result<Bytes> {
         const MAX_ATTEMPTS: u32 = 2;
 
         log::debug!("send_req with {:?}", req);
@@ -378,7 +384,7 @@ impl GithubClient {
             });
         }
 
-        Ok((body, req_dbg))
+        Ok(body)
     }
 
     async fn needs_retry(resp: &Response) -> Option<Duration> {
@@ -478,7 +484,7 @@ impl GithubClient {
     where
         T: serde::de::DeserializeOwned,
     {
-        let (body, _req_dbg) = self.send_req(req).await?;
+        let body = self.send_req(req).await?;
         Ok(serde_json::from_slice(&body)?)
     }
 
@@ -539,7 +545,7 @@ impl GithubClient {
         // response size than for normal REST Api response.
         const MAX_DEFAULT_GRAPH_QL_RESPONSE_SIZE: usize = 10 * 1024 * 1024;
 
-        let (body, _dbg) = self
+        let body = self
             .send_req_with_limit(
                 self.post(self.graphql_url.clone())
                     .json(&serde_json::json!({
@@ -602,7 +608,7 @@ impl std::fmt::Display for GraphQlErrors {
     }
 }
 
-pub(crate) trait RequestSend: Sized {
+trait RequestSend: Sized {
     fn configure(self, token: RequestToken) -> Self;
 }
 

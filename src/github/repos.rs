@@ -5,7 +5,6 @@ use super::{FileDiff, GithubClient, GithubCompare, Issue, IssueRepository, PullR
 
 use super::UserId;
 
-use crate::github::client::RequestSend;
 use anyhow::Context;
 use bytes::Bytes;
 use chrono::{DateTime, FixedOffset};
@@ -196,7 +195,7 @@ impl GithubClient {
         const MAX_LOG_SIZE_IN_MB: usize = 50 * 1024 * 1024; // 50 Mib
 
         let url = repo.url(self, ["actions", "jobs", num!(job_id), "logs"]);
-        let (body, _req_dbg) = self
+        let body = self
             .send_req_with_limit(self.get(url), MAX_LOG_SIZE_IN_MB)
             .await
             .context("failed to retrieve job logs")?;
@@ -239,7 +238,7 @@ impl GithubClient {
                 let req = self
                     .get(url)
                     .header("Accept", "application/vnd.github.diff");
-                let (body, _req_dbg) = self
+                let body = self
                     .send_req_with_limit(req, 16 * 1024 * 1024)
                     .await
                     .context("failed to get .diff")?;
@@ -319,13 +318,8 @@ impl GithubClient {
         let url = self.raw_url_with_segments([org, repo, branch, path]);
         let req = self.get(url.clone());
         let req_dbg = format!("{req:?}");
-        let token = self.ensure_app_token().await?;
-        let req = req
-            .configure(token)
-            .build()
-            .with_context(|| format!("failed to build request {req_dbg:?}"))?;
 
-        let resp: Response = self.raw().execute(req).await.context(req_dbg.clone())?;
+        let resp: Response = self.send_req_raw(req).await.context(req_dbg.clone())?;
         let status = resp.status();
 
         // Avoid reading too much data
@@ -460,7 +454,7 @@ impl GithubClient {
             })))
             .await;
         match resp {
-            Ok((body, _dbg)) => {
+            Ok(body) => {
                 let milestone = serde_json::from_slice(&body)?;
                 log::trace!("Created milestone: {milestone:?}");
                 return Ok(milestone);
