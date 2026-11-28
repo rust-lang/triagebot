@@ -6,13 +6,14 @@ use bytes::Bytes;
 use hmac::{Hmac, KeyInit, Mac};
 use hyper::HeaderMap;
 use hyper::StatusCode;
+use octocrab::models::InstallationId;
 use sha2::Sha256;
 use tracing as log;
 use tracing::debug;
 
 pub(crate) mod event;
 
-use crate::github::PullRequestDetails;
+use crate::github::{PullRequestDetails, REPOS_WITH_GITHUB_APP_AUTH};
 use crate::handlers::HandlerError;
 use crate::interactions::ErrorComment;
 use event::*;
@@ -170,6 +171,46 @@ pub async fn webhook(
         tracing::error!("payload not utf-8");
         return (StatusCode::BAD_REQUEST, "Payload must be UTF-8").into_response();
     };
+
+    #[derive(serde::Deserialize)]
+    struct InstallationMeta {
+        // We just want to check that the attribute exists.
+        #[allow(unused)]
+        id: InstallationId,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct RepositoryMeta {
+        full_name: String,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct PayloadMeta {
+        #[serde(default)]
+        installation: Option<InstallationMeta>,
+        repository: RepositoryMeta,
+    }
+
+    // Try to parse information out of the webhook that would help us identify that it is a webhook
+    // coming from a repository that has opted into using Github App auth.
+    // For those repositories, we are receiving webhooks twice, once per the whole-org
+    // webhook setup, and also through the App installation.
+    // We want to ignore whole-org webhooks for those repositories, to avoid duplicated handling.
+    if let Ok(meta) = serde_json::from_str::<PayloadMeta>(&payload) {
+        // Has this repository opted into using Github app auth?
+        let is_opt_in = REPOS_WITH_GITHUB_APP_AUTH.contains(&meta.repository.full_name.as_str());
+        // Is this a webhook coming from a Github App?
+        let is_app_webhook = meta.installation.is_some();
+
+        // Skip handling the webhook if it doesn't match.
+        if (is_opt_in && !is_app_webhook) || (!is_opt_in && is_app_webhook) {
+            tracing::warn!(
+                "Skipping handling webhook for repo {}. Is App webhook: {is_app_webhook}",
+                meta.repository.full_name,
+            );
+            return StatusCode::OK.into_response();
+        }
+    }
 
     match process_payload(event, payload, &ctx).await {
         Ok(true) => ("processed request",).into_response(),

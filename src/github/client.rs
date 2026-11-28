@@ -13,6 +13,7 @@ use std::time::{Duration, SystemTime};
 use tracing as log;
 use url::Url;
 
+use crate::github::REPOS_WITH_GITHUB_APP_AUTH;
 use crate::jobs::Job;
 use crate::utils::UrlExt;
 use bytes::Bytes;
@@ -31,7 +32,7 @@ const TRIAGEBOT_USER_AGENT: &str = "rust-lang-triagebot";
 
 /// Finds the token in the user's environment, panicking if no suitable token
 /// can be found.
-pub fn default_auth_from_env() -> GithubAuth {
+fn default_app_auth_from_env() -> Option<GithubAuth> {
     match (
         std::env::var("GITHUB_APP_ID"),
         std::env::var("GITHUB_APP_PRIVATE_KEY"),
@@ -48,26 +49,28 @@ pub fn default_auth_from_env() -> GithubAuth {
                 "Using GitHub App (app={app_id}, installation={installation_id}) for GitHub authentication"
             );
 
-            GithubAuth::App {
+            Some(GithubAuth::App {
                 app_auth: octocrab::auth::AppAuth {
                     app_id: octocrab::models::AppId(app_id),
                     key,
                 },
                 installation_id: InstallationId::from(installation_id),
                 token_cache: Arc::new(std::sync::RwLock::new(None)),
-            }
+            })
         }
-        _ => {
-            let pat_token = std::env::var("GITHUB_TOKEN")
-                // kept for retrocompatibility but usage is discouraged and will be deprecated
-                .or_else(|_| std::env::var("GITHUB_API_TOKEN"))
-                .or_else(|_| get_token_from_git_config())
-                .expect("could not find token in GITHUB_TOKEN, GITHUB_API_TOKEN or .gitconfig/github.oath-token")
-                .into();
-            tracing::info!("Using PAT token for GitHub authentication");
-            GithubAuth::Pat { token: pat_token }
-        }
+        _ => None,
     }
+}
+
+fn default_token_auth_from_env() -> GithubAuth {
+    let pat_token = std::env::var("GITHUB_TOKEN")
+        // kept for retrocompatibility but usage is discouraged and will be deprecated
+        .or_else(|_| std::env::var("GITHUB_API_TOKEN"))
+        .or_else(|_| get_token_from_git_config())
+        .expect("could not find token in GITHUB_TOKEN, GITHUB_API_TOKEN or .gitconfig/github.oath-token")
+        .into();
+    tracing::info!("Using PAT token for GitHub authentication");
+    GithubAuth::Pat { token: pat_token }
 }
 
 fn get_token_from_git_config() -> anyhow::Result<String> {
@@ -119,6 +122,8 @@ impl RequestToken {
 #[derive(Clone)]
 pub struct GithubClient {
     auth: GithubAuth,
+    /// Optional Github App auth used for selected repositories (if present).
+    app_auth: Option<GithubAuth>,
     client: Client,
     api_url: Url,
     graphql_url: Url,
@@ -146,6 +151,7 @@ impl GithubClient {
         GithubClient {
             client: Client::new(),
             auth,
+            app_auth: default_app_auth_from_env(),
             api_url,
             graphql_url,
             raw_url,
@@ -155,7 +161,7 @@ impl GithubClient {
 
     pub fn new_from_env() -> Self {
         Self::new(
-            default_auth_from_env(),
+            default_token_auth_from_env(),
             Url::parse(
                 &std::env::var("GITHUB_API_URL")
                     .unwrap_or_else(|_| "https://api.github.com".to_string()),
@@ -179,8 +185,36 @@ impl GithubClient {
     ///
     /// Fetches a new installation token if the cache is empty or the token
     /// is about to expire (within 5 minutes).
-    async fn ensure_app_token(&self) -> anyhow::Result<RequestToken> {
-        match &self.auth {
+    async fn ensure_app_token(&self, request: &RequestBuilder) -> anyhow::Result<RequestToken> {
+        // Temporary combination of two auth mechanisms:
+        // If we figure out that we are working with a repo that opted into using Github App auth,
+        // and that auth is present, use Github App auth.
+        // Otherwise, use token auth.
+
+        // Because we don't know what repository we are dealing with here, we have to resort to a
+        // hack, and try to parse it from the URL.
+        // But getting the URL from a `RequestBuilder` also isn't trivial, we have to first
+        // build a cloned request out of it, and then get the URL.
+        let url = request
+            .try_clone()
+            .and_then(|r| r.build().ok())
+            .map(|r| r.url().clone());
+        let auth = match (url, &self.app_auth) {
+            (Some(url), Some(auth)) => {
+                let repo = REPOS_WITH_GITHUB_APP_AUTH
+                    .iter()
+                    .find(|r| url.path().contains(*r));
+                if let Some(_repo) = repo {
+                    // We found an opt-in repo, use Github App auth for it
+                    auth
+                } else {
+                    &self.auth
+                }
+            }
+            _ => &self.auth,
+        };
+
+        match &auth {
             GithubAuth::Pat { token } => Ok(RequestToken(token.clone())),
             GithubAuth::App {
                 app_auth,
@@ -304,7 +338,7 @@ impl GithubClient {
     /// Send a request without checking response size, and return the raw response.
     /// The caller is responsible for checking whether the response was successful or not.
     pub async fn send_req_raw(&self, req: RequestBuilder) -> anyhow::Result<Response> {
-        let token = self.ensure_app_token().await?;
+        let token = self.ensure_app_token(&req).await?;
         let req = req.configure(token).build()?;
         Ok(self.client.execute(req).await?)
     }
@@ -321,7 +355,7 @@ impl GithubClient {
 
         let req_dbg = format!("{req:?}");
 
-        let token = self.ensure_app_token().await?;
+        let token = self.ensure_app_token(&req).await?;
 
         let req = req
             .configure(token)
@@ -432,18 +466,13 @@ impl GithubClient {
         async move {
             tokio::time::sleep(sleep).await;
 
-            let token = self.ensure_app_token().await?;
+            let rate_limit_req = self.client.get(format!("{}/rate_limit", self.api_url));
+            let token = self.ensure_app_token(&rate_limit_req).await?;
 
             // check rate limit
             let rate_resp = self
                 .client
-                .execute(
-                    self.client
-                        .get(format!("{}/rate_limit", self.api_url))
-                        .configure(token)
-                        .build()
-                        .unwrap(),
-                )
+                .execute(rate_limit_req.configure(token).build().unwrap())
                 .await?;
             rate_resp.error_for_status_ref()?;
             let rate_limit_response = rate_resp.json::<RateLimitResponse>().await?;
@@ -663,6 +692,7 @@ fn gh_api_version() {
         auth: GithubAuth::Pat {
             token: Default::default(),
         },
+        app_auth: None,
         client: Client::new(),
         api_url: Url::parse("https://api.github.com").unwrap(),
         graphql_url: Url::parse("https://api.github.com/graphql").unwrap(),
